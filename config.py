@@ -27,7 +27,8 @@ _db_url = None
 _b64 = os.getenv('DATABASE_URL_B64')
 if _b64:
     import base64
-    _db_url = base64.b64decode(_b64).decode()
+    _b64_padded = _b64 + '=' * ((4 - len(_b64) % 4) % 4)
+    _db_url = base64.b64decode(_b64_padded).decode()
 
 if not _db_url:
     _db_url_file = os.getenv('DATABASE_URL_FILE')
