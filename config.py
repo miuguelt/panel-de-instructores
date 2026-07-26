@@ -21,15 +21,20 @@ if os.getenv('FLASK_ENV') == 'production' and _secret_key in _INSECURE_SECRETS:
     )
 
 
-_db_url = os.getenv('DATABASE_URL')
+# Priority: DATABASE_URL_B64 > DATABASE_URL_FILE > Docker secret > DATABASE_URL
+_db_url = None
 
-# Allow overriding via DATABASE_URL_FILE (Docker secret / Coolify file mount)
-_db_url_file = os.getenv('DATABASE_URL_FILE')
-if not _db_url and _db_url_file and os.path.isfile(_db_url_file):
-    with open(_db_url_file) as _f:
-        _db_url = _f.read().strip()
+_b64 = os.getenv('DATABASE_URL_B64')
+if _b64:
+    import base64
+    _db_url = base64.b64decode(_b64).decode()
 
-# Docker secret mount
+if not _db_url:
+    _db_url_file = os.getenv('DATABASE_URL_FILE')
+    if _db_url_file and os.path.isfile(_db_url_file):
+        with open(_db_url_file) as _f:
+            _db_url = _f.read().strip()
+
 if not _db_url:
     for _secret in ('/run/secrets/DATABASE_URL', '/run/secrets/db_url'):
         if os.path.isfile(_secret):
@@ -37,12 +42,8 @@ if not _db_url:
                 _db_url = _f.read().strip()
             break
 
-# Base64-encoded (bypasses Docker Compose $ expansion)
 if not _db_url:
-    _b64 = os.getenv('DATABASE_URL_B64')
-    if _b64:
-        import base64
-        _db_url = base64.b64decode(_b64).decode()
+    _db_url = os.getenv('DATABASE_URL')
 
 if not _db_url:
     _db_url = 'postgresql://adso:adso_pass@127.0.0.1:5434/adso_control'

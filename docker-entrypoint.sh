@@ -1,8 +1,12 @@
 #!/bin/bash
 set -e
 
-# --- Resolve DATABASE_URL from multiple sources (file, b64, or env) ---
-if [ -n "$DATABASE_URL_FILE" ] && [ -f "$DATABASE_URL_FILE" ]; then
+# --- Resolve DATABASE_URL (priority: B64 > FILE > secret > env > parts) ---
+# DATABASE_URL_B64 bypasses Docker Compose $ expansion entirely
+if [ -n "$DATABASE_URL_B64" ]; then
+  DATABASE_URL=$(echo "$DATABASE_URL_B64" | base64 -d 2>/dev/null || python3 -c "import sys,base64; print(base64.b64decode(sys.argv[1]).decode())" "$DATABASE_URL_B64")
+  export DATABASE_URL
+elif [ -n "$DATABASE_URL_FILE" ] && [ -f "$DATABASE_URL_FILE" ]; then
   DATABASE_URL=$(cat "$DATABASE_URL_FILE")
   export DATABASE_URL
 elif [ -f /run/secrets/DATABASE_URL ]; then
@@ -10,11 +14,6 @@ elif [ -f /run/secrets/DATABASE_URL ]; then
   export DATABASE_URL
 elif [ -f /run/secrets/db_url ]; then
   DATABASE_URL=$(cat /run/secrets/db_url)
-  export DATABASE_URL
-fi
-
-if [ -z "$DATABASE_URL" ] && [ -n "$DATABASE_URL_B64" ]; then
-  DATABASE_URL=$(echo "$DATABASE_URL_B64" | base64 -d 2>/dev/null || python3 -c "import sys,base64; print(base64.b64decode(sys.argv[1]).decode())" "$DATABASE_URL_B64")
   export DATABASE_URL
 fi
 
