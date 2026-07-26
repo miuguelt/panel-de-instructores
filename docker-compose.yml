@@ -19,9 +19,15 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
     volumes:
       - uploads:/app/uploads
-    ports:
-      - "${PORT:-8009}:8009"
+    expose:
+      - "8009"
+    networks:
+      - coolify
 
 volumes:
   uploads:
     name: adso_uploads
+
+networks:
+  coolify:
+    external: true
