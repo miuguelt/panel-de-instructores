@@ -64,7 +64,7 @@ echo "PostgreSQL listo."
 
 # --- Migraciones ---
 echo "Aplicando migraciones..."
-if ! flask db upgrade; then
+if ! python3 -m flask db upgrade; then
   echo "No se pudieron aplicar las migraciones. Abortando para proteger los datos." >&2
   exit 1
 fi
