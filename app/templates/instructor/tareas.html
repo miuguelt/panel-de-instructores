@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Tareas - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <h1>Tareas y Evidencias</h1>
+    <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+</div>
+
+<div class="card form-card">
+    <h2>Crear nueva tarea</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+                <label for="titulo">Título de la tarea</label>
+            <input type="text" id="titulo" name="titulo" placeholder="Ej: Diseño de base de datos" required>
+        </div>
+
+        <div class="form-group">
+            <label for="descripcion">Descripción</label>
+            <textarea id="descripcion" name="descripcion" rows="3" placeholder="Describe lo que deben hacer los aprendices..."></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group flex-grow">
+                <label for="enlace_externo">Enlace externo (opcional)</label>
+                <input type="url" id="enlace_externo" name="enlace_externo" placeholder="https://meet.google.com/...">
+            </div>
+            <div class="form-group">
+                <label for="fecha_limite">Fecha límite</label>
+                <input type="datetime-local" id="fecha_limite" name="fecha_limite">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="material_apoyo">Material de apoyo (PDF, DOC, etc.)</label>
+            <input type="file" id="material_apoyo" name="material_apoyo">
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="requiere_archivo" checked>
+                Los aprendices deben subir archivo como evidencia
+            </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Crear Tarea</button>
+    </form>
+</div>
+
+{% if tareas %}
+<div class="tasks-list">
+    {% for tarea in tareas %}
+    <div class="card task-card">
+        <div class="task-header">
+            <h3>{{ tarea.titulo }}</h3>
+            {% if tarea.fecha_limite %}
+            <span class="badge badge-{{ 'danger' if tarea.fecha_limite < now else 'info' }}">
+                Límite: {{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}
+            </span>
+            {% endif %}
+        </div>
+        {% if tarea.creador %}
+        <p class="text-muted">Instructor responsable: {{ tarea.creador.nombre }}</p>
+        {% endif %}
+        {% if tarea.descripcion %}
+        <p class="task-desc">{{ tarea.descripcion }}</p>
+        {% endif %}
+        {% if tarea.enlace_externo %}
+        <a href="{{ tarea.enlace_externo }}" target="_blank" class="link-external">Enlace externo &rarr;</a>
+        {% endif %}
+        <div class="task-actions">
+            <a href="{{ url_for('instructor.ver_entregas', tarea_id=tarea.id) }}" class="btn btn-sm btn-primary">Ver Entregas</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📝</div>
+    <h3>Todavía no hay tareas creadas</h3>
+    <p>Crea tu primera tarea para asignar actividades a los aprendices.</p>
+</div>
+{% endif %}
+{% endblock %}

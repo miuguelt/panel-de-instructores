@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+{% block title %}Ranking - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    /* ---- Page layout ---- */
+    .ranking-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        align-items: start;
+        margin-top: 1rem;
+    }
+    @media (min-width: 992px) {
+        .ranking-layout { grid-template-columns: 2fr 1fr; }
+    }
+    .ranking-main {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .ranking-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    /* ---- Ranking card container (periodo tabs + lista) ---- */
+    .ranking-card-container {
+        background: var(--bg-card);
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+    }
+    .ranking-card-container .period-tabs {
+        margin-bottom: 0;
+        border-bottom: 1px solid var(--border-divider);
+        border-radius: 0;
+        border-top-left-radius: var(--radius-lg);
+        border-top-right-radius: var(--radius-lg);
+        box-shadow: none;
+        padding: 10px 12px;
+        gap: 4px;
+    }
+    #ranking-lista {
+        padding: 16px;
+    }
+
+    /* ---- Participation note ---- */
+    .participation-note {
+        margin-bottom: 0;
+    }
+
+    /* ---- Chart card ---- */
+    .chart-card {
+        padding: 0;
+    }
+    .chart-card .section-header {
+        padding: 16px 20px 12px;
+        border-bottom: 1px solid var(--border-divider);
+    }
+    .chart-wrap {
+        padding: 16px;
+    }
+    .chart-selector {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    .chart-selector select {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-divider);
+        background: var(--input-bg);
+        color: var(--text-main);
+        max-width: 160px;
+    }
+
+    /* ---- Settings card ---- */
+    .settings-card {
+        padding: 0;
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    .settings-card summary {
+        padding: 14px 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        user-select: none;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--text-strong);
+        background: var(--bg-surface);
+        border-radius: var(--radius-lg);
+        transition: background 0.2s;
+    }
+    .settings-card[open] summary {
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        border-bottom: 1px solid var(--border-divider);
+    }
+    .settings-card summary:hover { background: var(--bg-glass-hover); }
+    .settings-card summary small {
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 11px;
+    }
+    .settings-form {
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .settings-form h3 {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin: 0 0 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border-divider);
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+    }
+    .form-group input[type="number"],
+    .form-group select {
+        width: 100%;
+        padding: 6px 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-subtle);
+        background: var(--input-bg);
+        color: var(--text-main);
+        font-size: 13px;
+        font-family: inherit;
+    }
+    .form-help {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin: -8px 0 0;
+        line-height: 1.4;
+    }
+    .privacy-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--text-main);
+        cursor: pointer;
+    }
+
+    /* ---- Reset card ---- */
+    .reset-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        border: 1px solid var(--danger);
+        border-radius: var(--radius-lg);
+        padding: 16px 18px;
+        background: var(--sena-red-light);
+    }
+    .reset-card h2 {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-strong);
+        margin: 0;
+    }
+    .reset-card .text-muted {
+        font-size: 12px;
+        margin: 0;
+    }
+    @media (min-width: 600px) {
+        .reset-card {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+    }
+    [data-theme="dark"] .reset-card,
+    [data-theme="ocean"] .reset-card {
+        border-color: var(--danger);
+        background: var(--sena-red-light);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header ranking-heading">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <div>
+        <span class="eyebrow">Participación y constancia</span>
+        <h1>Ranking de desempeño</h1>
+        <p class="text-muted">{{ ficha.codigo }} · {{ ficha.nombre_programa }}</p>
+    </div>
+    <div class="header-actions">
+        <a href="{{ url_for('ranking.insignias', ficha_id=ficha.id) }}" class="btn btn-secondary">🏅 Insignias</a>
+        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='excel') }}" class="btn btn-outline">↓ Excel</a>
+        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='pdf') }}" class="btn btn-outline">↓ PDF</a>
+    </div>
+</div>
+
+<div class="ranking-layout">
+    <div class="ranking-main">
+        <div class="participation-note">
+            <span aria-hidden="true" style="font-size: 1.1rem; flex-shrink: 0;">ℹ️</span>
+            <p><strong>Ranking de participación.</strong> Es una herramienta motivacional y no corresponde a una nota ni a una evaluación oficial del SENA.</p>
+        </div>
+
+        {% if filas %}
+        {% set promedio_puntaje = (filas | sum(attribute='puntaje_total')) / (filas | length) %}
+        <section class="ranking-overview" aria-label="Resumen del ranking">
+            <article class="ranking-overview-card ranking-overview-leader">
+                <span class="overview-icon" aria-hidden="true">🏆</span>
+                <div>
+                    <span class="overview-label">Líder actual</span>
+                    <strong>{{ filas[0].aprendiz.nombre_completo }}</strong>
+                    <small>{{ '%.1f'|format(filas[0].puntaje_total) }} puntos</small>
+                </div>
+            </article>
+            <article class="ranking-overview-card">
+                <span class="overview-icon" aria-hidden="true">👥</span>
+                <div>
+                    <span class="overview-label">Participantes</span>
+                    <strong>{{ filas|length }}</strong>
+                    <small>Aprendices en la lista</small>
+                </div>
+            </article>
+            <article class="ranking-overview-card">
+                <span class="overview-icon" aria-hidden="true">📊</span>
+                <div>
+                    <span class="overview-label">Promedio del grupo</span>
+                    <strong>{{ '%.1f'|format(promedio_puntaje) }}</strong>
+                    <small>Puntos de participación</small>
+                </div>
+            </article>
+            <article class="ranking-overview-card">
+                <span class="overview-icon" aria-hidden="true">🗓️</span>
+                <div>
+                    <span class="overview-label">Periodo visible</span>
+                    <strong>{% if periodo == 'semanal' %}Esta semana{% elif periodo == 'mensual' %}Este mes{% else %}General{% endif %}</strong>
+                    <small>Ordenado por puntaje</small>
+                </div>
+            </article>
+        </section>
+        {% endif %}
+
+        <div class="ranking-card-container">
+            <nav class="period-tabs" aria-label="Periodo del ranking">
+                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='general') }}"
+                   class="{% if periodo == 'general' %}active{% endif %}">General</a>
+                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='semanal') }}"
+                   class="{% if periodo == 'semanal' %}active{% endif %}">Esta semana</a>
+                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='mensual') }}"
+                   class="{% if periodo == 'mensual' %}active{% endif %}">Este mes</a>
+            </nav>
+
+            <div class="ranking-list-head">
+                <div>
+                    <span class="eyebrow">Clasificación</span>
+                    <h2>Participación del grupo</h2>
+                    <p>Los puestos combinan asistencia, evidencias y juicios aprobados.</p>
+                </div>
+                {% if filas %}<span class="ranking-total">{{ filas|length }} aprendices</span>{% endif %}
+            </div>
+
+            <section id="ranking-lista"
+                     hx-get="{{ url_for('ranking.ranking_lista', ficha_id=ficha.id, periodo=periodo) }}"
+                     hx-trigger="every 30s"
+                     hx-swap="innerHTML">
+                {% include "instructor/_ranking_lista.html" %}
+            </section>
+        </div>
+    </div>
+
+    <div class="ranking-sidebar">
+        {# ── Gráfico de evolución ── #}
+        <section class="card chart-card">
+            <div class="section-header compact">
+                <div>
+                    <span class="eyebrow">Histórico</span>
+                    <h2>Evolución del puntaje</h2>
+                </div>
+                {% if filas %}
+                <label class="chart-selector">
+                    <span>Aprendiz</span>
+                    <select id="aprendiz-chart">
+                        {% for fila in filas %}
+                        <option value="{{ fila.aprendiz.id }}">{{ fila.aprendiz.nombre_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                {% endif %}
+            </div>
+            {% if filas %}
+            <div class="chart-wrap">
+                <canvas id="ranking-chart" height="260" aria-label="Gráfico de evolución del puntaje"></canvas>
+            </div>
+            {% else %}
+            <div style="padding: 1.5rem 20px;">
+                <p class="text-muted" style="font-size: 13px;">Todavía no hay datos para mostrar una evolución.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        {# ── Configuración ── #}
+        <details class="settings-card">
+            <summary>
+                <span>⚙️ Configurar ranking</span>
+                <small>Pesos, bonificaciones y visibilidad</small>
+            </summary>
+            <form method="POST" action="{{ url_for('ranking.configurar_ranking', ficha_id=ficha.id) }}" class="settings-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div>
+                    <h3>Fórmula del puntaje</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="peso_asistencia">Asistencia (%)</label>
+                            <input type="number" id="peso_asistencia" name="peso_asistencia" min="0" max="100" step="0.1"
+                                   value="{{ config.peso_asistencia }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="peso_evidencias">Evidencias (%)</label>
+                            <input type="number" id="peso_evidencias" name="peso_evidencias" min="0" max="100" step="0.1"
+                                   value="{{ config.peso_evidencias }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="peso_juicios">Juicios aprobados (%)</label>
+                            <input type="number" id="peso_juicios" name="peso_juicios" min="0" max="100" step="0.1"
+                                   value="{{ config.peso_juicios }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="penalizacion_falla_injustificada">Penaliz. por falla</label>
+                            <input type="number" id="penalizacion_falla_injustificada" name="penalizacion_falla_injustificada"
+                                   min="0" step="0.1" value="{{ config.penalizacion_falla_injustificada }}">
+                        </div>
+                    </div>
+                    <p class="form-help">Las fallas justificadas se excluyen y no penalizan.</p>
+                </div>
+
+                <div>
+                    <h3>Bonificaciones opcionales</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="bonus_entrega_anticipada">Entrega anticipada (pts)</label>
+                            <input type="number" id="bonus_entrega_anticipada" name="bonus_entrega_anticipada"
+                                   min="0" step="0.1" value="{{ config.bonus_entrega_anticipada }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="horas_entrega_anticipada">Anticipación mínima (h)</label>
+                            <input type="number" id="horas_entrega_anticipada" name="horas_entrega_anticipada"
+                                   min="0" value="{{ config.horas_entrega_anticipada }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="bonus_racha_asistencia">Racha perfecta (pts)</label>
+                            <input type="number" id="bonus_racha_asistencia" name="bonus_racha_asistencia"
+                                   min="0" step="0.1" value="{{ config.bonus_racha_asistencia }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="semanas_racha">Semanas de racha</label>
+                            <input type="number" id="semanas_racha" name="semanas_racha"
+                                   min="1" value="{{ config.semanas_racha }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="bonus_calificacion_alta">Nota alta (pts)</label>
+                            <input type="number" id="bonus_calificacion_alta" name="bonus_calificacion_alta"
+                                   min="0" step="0.1" value="{{ config.bonus_calificacion_alta }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="umbral_calificacion_alta">Nota mínima para bonus</label>
+                            <input type="number" id="umbral_calificacion_alta" name="umbral_calificacion_alta"
+                                   min="0" step="0.1" value="{{ config.umbral_calificacion_alta }}">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3>Bienestar y visibilidad</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="modo_visibilidad">Aprendices ven</label>
+                            <select id="modo_visibilidad" name="modo_visibilidad">
+                                <option value="privado" {% if config.modo_visibilidad == 'privado' %}selected{% endif %}>
+                                    Privado: su puesto + top 5
+                                </option>
+                                <option value="publico" {% if config.modo_visibilidad == 'publico' %}selected{% endif %}>
+                                    Público: listado completo
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="periodo_corte">Frecuencia de corte</label>
+                            <select id="periodo_corte" name="periodo_corte">
+                                {% for valor, texto in [('mensual', 'Mensual'), ('trimestral', 'Trimestral'), ('semestral', 'Semestral')] %}
+                                <option value="{{ valor }}" {% if config.periodo_corte == valor %}selected{% endif %}>{{ texto }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <label class="privacy-checkbox">
+                        <input type="checkbox" name="modo_anonimo_parcial" {% if config.modo_anonimo_parcial %}checked{% endif %}>
+                        Usar alias en la lista que ven los aprendices
+                    </label>
+                </div>
+
+                <div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Guardar configuración</button>
+                </div>
+            </form>
+        </details>
+
+        {# ── Nuevo corte ── #}
+        <section class="reset-card">
+            <div>
+                <h2>Iniciar un nuevo corte</h2>
+                <p class="text-muted">Todos comienzan de nuevo sin borrar el histórico anterior.</p>
+            </div>
+            <form method="POST" action="{{ url_for('ranking.nuevo_corte', ficha_id=ficha.id) }}"
+                  onsubmit="return confirm('¿Iniciar un nuevo corte? El resultado actual se guardará en el histórico.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-warning">Iniciar nuevo corte</button>
+            </form>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('click', function(e) {
+    const clickable = e.target.closest('[data-url]');
+    if (clickable) {
+        window.location.href = clickable.getAttribute('data-url');
+    }
+});
+</script>
+{% if filas %}
+<script>
+(function () {
+    const series = {{ evolucion|tojson }};
+    const canvas = document.getElementById('ranking-chart');
+    const selector = document.getElementById('aprendiz-chart');
+    const ctx = canvas.getContext('2d');
+
+    function getThemeColors() {
+        const styles = getComputedStyle(document.documentElement);
+        const token = (name) => styles.getPropertyValue(name).trim();
+        return {
+            grid: token('--border-divider'),
+            text: token('--text-muted'),
+            line: token('--accent-primary'),
+            dot: token('--accent-hover'),
+            fill: token('--sena-green-light'),
+        };
+    }
+
+    function draw() {
+        const c = getThemeColors();
+        const item = series[selector.value];
+        const width = canvas.parentElement.clientWidth;
+        const height = 240;
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = width * ratio;
+        canvas.height = height * ratio;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        const pad = {left: 44, right: 16, top: 16, bottom: 38};
+        const graphW = width - pad.left - pad.right;
+        const graphH = height - pad.top - pad.bottom;
+
+        /* Grid lines */
+        ctx.font = '11px Outfit, Segoe UI, sans-serif';
+        ctx.lineWidth = 1;
+        [0, 25, 50, 75, 100].forEach(function (value) {
+            const y = pad.top + graphH - (Math.min(value, 100) / 100 * graphH);
+            ctx.strokeStyle = c.grid;
+            ctx.beginPath();
+            ctx.moveTo(pad.left, y);
+            ctx.lineTo(width - pad.right, y);
+            ctx.stroke();
+            ctx.fillStyle = c.text;
+            ctx.fillText(value, 6, y + 4);
+        });
+
+        if (!item || !item.valores.length) return;
+        const maxValue = Math.max(100, ...item.valores);
+        const pts = item.valores.map(function (v, i) {
+            return {
+                x: item.valores.length > 1 ? pad.left + (graphW / (item.valores.length - 1)) * i : pad.left + graphW / 2,
+                y: pad.top + graphH - (v / maxValue * graphH),
+                v: v,
+                l: item.labels[i],
+            };
+        });
+
+        /* Fill area */
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pad.top + graphH);
+        pts.forEach(function(p) { ctx.lineTo(p.x, p.y); });
+        ctx.lineTo(pts[pts.length-1].x, pad.top + graphH);
+        ctx.closePath();
+        ctx.fillStyle = c.fill;
+        ctx.fill();
+
+        /* Line */
+        ctx.strokeStyle = c.line;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        pts.forEach(function(p, i) { i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); });
+        ctx.stroke();
+
+        /* Dots + labels */
+        pts.forEach(function(p, i) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = c.dot;
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            if (pts.length <= 8 || i === 0 || i === pts.length - 1) {
+                ctx.fillStyle = c.text;
+                ctx.font = '10px Outfit, Segoe UI, sans-serif';
+                ctx.fillText(p.l, Math.max(2, p.x - 20), height - 10);
+            }
+        });
+    }
+
+    selector.addEventListener('change', draw);
+    window.addEventListener('resize', draw);
+    draw();
+})();
+</script>
+{% endif %}
+{% endblock %}

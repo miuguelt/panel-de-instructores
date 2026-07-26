@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Turnos de aseo - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header cleaning-page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <div>
+        <span class="eyebrow">Organización del ambiente</span>
+        <h1>🧹 Turnos de aseo</h1>
+        <p class="text-muted">{{ ficha.codigo }} · {{ ficha.nombre_programa }}</p>
+    </div>
+</div>
+
+<div class="cleaning-summary-grid">
+    <article class="cleaning-summary-card">
+        <span>Sesiones del mes</span>
+        <strong>{{ sesiones_mes|length }}</strong>
+    </article>
+    <article class="cleaning-summary-card">
+        <span>Programados</span>
+        <strong>{{ total_programados }}</strong>
+    </article>
+    <article class="cleaning-summary-card">
+        <span>Cumplidos</span>
+        <strong>{{ total_cumplidos }}</strong>
+    </article>
+</div>
+
+<div class="cleaning-controls">
+    <section class="card form-card">
+        <span class="eyebrow">Cola justa</span>
+        <h2>Generar turnos automáticamente</h2>
+        <p class="text-muted">Solo se asignan fechas con una sesión de clase registrada. Los turnos existentes no se sobrescriben.</p>
+        <form method="POST" action="{{ url_for('aseo.generar', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-row align-center">
+                <div class="form-group">
+                    <label for="fecha_inicio">Desde</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio_default.isoformat() }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="fecha_fin">Hasta</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin_default.isoformat() }}" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Generar turnos</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card form-card">
+        <span class="eyebrow">Reglas de asignación</span>
+        <h2>Configuración</h2>
+        <form method="POST" action="{{ url_for('aseo.configurar', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="checkbox-label cleaning-check">
+                <input type="checkbox" name="excluir_ausentes" {% if config.excluir_ausentes %}checked{% endif %}>
+                Saltar automáticamente a quienes no asistieron
+            </label>
+            <div class="form-group">
+                <label for="aviso_horas">Aviso anticipado (horas)</label>
+                <input type="number" id="aviso_horas" name="aviso_horas" min="0" max="720" value="{{ config.aviso_horas }}">
+            </div>
+            <button type="submit" class="btn btn-outline btn-sm">Guardar configuración</button>
+        </form>
+    </section>
+</div>
+
+{% if sesiones_mes|length == 0 and turnos_por_fecha|length == 0 %}
+<div class="alert alert-info" role="alert">
+    <strong>Todavía no hay sesiones de clase registradas en {{ nombre_mes }}.</strong><br>
+    Las sesiones se crean al tomar asistencia o al importar un reporte de juicios.
+    <span class="text-muted">Sin sesiones no se pueden generar turnos de aseo.</span>
+</div>
+{% endif %}
+
+<section class="card calendar-card">
+    <div class="calendar-toolbar">
+        <a class="calendar-arrow" href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes_anterior) }}" aria-label="Mes anterior">&larr;</a>
+        <div>
+            <span class="eyebrow">Calendario mensual</span>
+            <h2>{{ nombre_mes }}</h2>
+        </div>
+        <a class="calendar-arrow" href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes_siguiente) }}" aria-label="Mes siguiente">&rarr;</a>
+    </div>
+
+    <div class="cleaning-calendar-scroll">
+        <div class="cleaning-calendar">
+            {% for nombre in ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] %}
+            <div class="calendar-weekday">{{ nombre }}</div>
+            {% endfor %}
+            {% for semana in semanas %}
+                {% for dia in semana %}
+                {% set turno = turnos_por_fecha.get(dia) %}
+                <article class="calendar-day {% if dia.month != mes.month %}outside{% endif %} {% if dia == hoy %}today{% endif %} {% if dia in sesiones_mes %}has-session{% endif %}">
+                    <div class="calendar-day-number">
+                        <span>{{ dia.day }}</span>
+                        {% if dia in sesiones_mes %}<span class="session-dot" title="Día de clase"></span>{% endif %}
+                    </div>
+                    {% if turno %}
+                    <div class="calendar-assignment state-{{ turno.estado }}">
+                        <span class="badge badge-{{ 'success' if turno.estado == 'cumplido' else 'warning' }}">{{ turno.estado }}</span>
+                        <strong class="{% if turno.estado == 'cumplido' and turno.completado_1 == false %}attendance-absent{% endif %}"><a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=turno.aprendiz_1.id) }}" title="Ver historial y detalles" style="color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor;">{{ turno.aprendiz_1.nombre }} {{ turno.aprendiz_1.apellidos[:1] }}.</a></strong>
+                        <strong class="{% if turno.estado == 'cumplido' and turno.completado_2 == false %}attendance-absent{% endif %}"><a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=turno.aprendiz_2.id) }}" title="Ver historial y detalles" style="color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor;">{{ turno.aprendiz_2.nombre }} {{ turno.aprendiz_2.apellidos[:1] }}.</a></strong>
+                        {% if turno.estado == 'cumplido' %}
+                        <small>
+                            {% if turno.completado_1 and turno.completado_2 %}
+                            Ambos asistieron
+                            {% elif turno.completado_1 %}
+                            {{ turno.aprendiz_1.nombre }} asistió solo
+                            {% elif turno.completado_2 %}
+                            {{ turno.aprendiz_2.nombre }} asistió solo
+                            {% else %}
+                            Ninguno asistió
+                            {% endif %}
+                        </small>
+                        {% else %}
+                        <small>{{ 'Automático' if turno.generado_por == 'sistema' else 'Ajuste manual' }}</small>
+                        {% endif %}
+                    </div>
+                    <details class="calendar-actions">
+                        <summary>Gestionar</summary>
+                        <form method="POST" action="{{ url_for('aseo.editar', ficha_id=ficha.id, turno_id=turno.id) }}" class="calendar-edit-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="aprendiz_1_id" aria-label="Primer aprendiz">
+                                {% for aprendiz in aprendices %}
+                                <option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_1_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="aprendiz_2_id" aria-label="Segundo aprendiz">
+                                {% for aprendiz in aprendices %}
+                                <option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_2_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="observacion" placeholder="Motivo del cambio">
+                            <button class="btn btn-sm btn-outline" type="submit">Cambiar</button>
+                        </form>
+                        {% if turno.estado != 'cumplido' %}
+                        <form method="POST" action="{{ url_for('aseo.cumplir', ficha_id=ficha.id, turno_id=turno.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-primary btn-full" type="submit">✓ Marcar cumplido</button>
+                        </form>
+                        {% endif %}
+                        <details class="audit-details">
+                            <summary>¿Por qué los eligió?</summary>
+                            <p><strong>{{ turno.aprendiz_1.nombre }}:</strong> {{ turno.auditoria_1 }}</p>
+                            <p><strong>{{ turno.aprendiz_2.nombre }}:</strong> {{ turno.auditoria_2 }}</p>
+                        </details>
+                    </details>
+                    {% elif dia in sesiones_mes %}
+                    <span class="calendar-unassigned">Sin asignar</span>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+    <div class="calendar-legend">
+        <span><i class="session-dot"></i> Sesión registrada</span>
+        <span><i class="legend-block programmed"></i> Programado</span>
+        <span><i class="legend-block done"></i> Cumplido</span>
+        <span><i class="legend-absent"></i> Ausente (no suma al contador)</span>
+    </div>
+</section>
+
+<section class="card equity-card">
+    <div class="section-header compact">
+        <div>
+            <span class="eyebrow">Transparencia</span>
+            <h2>Tabla de equidad</h2>
+        </div>
+        <span class="badge badge-info">{{ equidad|length }} activos</span>
+    </div>
+    <p class="text-muted">Los contadores solo suben cuando el aprendiz está presente el día de su turno. Si falta, su puesto se conserva y el sistema lo prioriza la próxima vez. Una exclusión temporal conserva el lugar acumulado.</p>
+    <div class="table-container">
+    <div class="table-responsive">
+        <table class="table equity-table">
+            <caption class="sr-only">Tabla de equidad de turnos de aseo</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='nombre') }}">Aprendiz</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Veces</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='ultima') }}">Última vez</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='proxima') }}">Próxima estimada</a></th>
+                    <th scope="col">Disponibilidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in equidad %}
+                <tr data-estado="{{ fila.aprendiz.estado }}">
+                    <td data-label="Aprendiz"><strong><a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}">{{ fila.aprendiz.nombre_completo }}</a></strong></td>
+                    <td data-label="Veces"><span class="equity-count">{{ fila.contador.veces_aseo }}</span></td>
+                    <td data-label="Última vez">{{ fila.contador.ultima_vez_aseo.strftime('%d/%m/%Y') if fila.contador.ultima_vez_aseo else 'Nunca' }}</td>
+                    <td data-label="Próxima">{{ fila.proxima.strftime('%d/%m/%Y') if fila.proxima else 'Sin programar' }}</td>
+                    <td data-label="Disponibilidad">
+                        <details class="availability-details">
+                            <summary>
+                                {% if fila.contador.excluido_hasta and fila.contador.excluido_hasta >= hoy %}
+                                <span class="badge badge-warning">Excluido hasta {{ fila.contador.excluido_hasta.strftime('%d/%m') }}</span>
+                                {% else %}
+                                <span class="badge badge-success">Disponible</span>
+                                {% endif %}
+                            </summary>
+                            <form method="POST" action="{{ url_for('aseo.excluir', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}" class="availability-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="date" name="excluido_hasta" value="{{ fila.contador.excluido_hasta.isoformat() if fila.contador.excluido_hasta else '' }}">
+                                <input type="text" name="motivo" value="{{ fila.contador.motivo_exclusion or '' }}" placeholder="Motivo (opcional)">
+                                <button type="submit" class="btn btn-sm btn-outline">{% if fila.contador.excluido_hasta %}Actualizar / reactivar al borrar fecha{% else %}Excluir temporalmente{% endif %}</button>
+                            </form>
+                        </details>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    </div>
+</section>
+{% endblock %}

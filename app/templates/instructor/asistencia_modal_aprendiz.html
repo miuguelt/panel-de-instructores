@@ -1,0 +1,977 @@
+<div id="asistencia-modal" class="app-modal-overlay is-open" role="dialog" aria-modal="true" aria-labelledby="asistencia-modal-title" onclick="closeModal(event)">
+    <div class="app-modal-content app-modal-content--fullscreen premium-fullscreen-glass" onclick="event.stopPropagation()">
+        
+        <!-- Encabezado compacto: solo identidad, estado y cierre -->
+        <header class="app-modal-header modal-header-fullscreen">
+            <div class="header-main-info">
+                <div class="avatar-badge">
+                    {{ aprendiz.nombre[:1] }}{{ aprendiz.apellidos[:1] }}
+                </div>
+                <div class="header-identity">
+                    <div class="header-title-row">
+                        <h2 id="asistencia-modal-title" class="learner-name-title">{{ aprendiz.nombre }} {{ aprendiz.apellidos }}</h2>
+                        <span class="badge {{ 'badge-solid-success' if aprendiz.estado == 'EN_FORMACION' else 'badge-solid-warning' }}">
+                            {{ aprendiz.estado.replace('_', ' ') }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <button type="button" class="app-modal-close" onclick="document.getElementById('asistencia-modal').remove(); document.body.classList.remove('modal-open')" title="Cerrar modal (Esc)" aria-label="Cerrar modal">
+                    &times;
+                </button>
+            </div>
+        </header>
+        
+        <!-- Cuerpo Principal del Modal (Scrollable) -->
+        <div class="app-modal-body modal-body-fullscreen">
+
+            <!-- Información trasladada al cuerpo para evitar un encabezado alto -->
+            <section class="learner-context-card" aria-labelledby="learner-context-title">
+                <div class="learner-context-heading">
+                    <div>
+                        <span class="learner-context-eyebrow">Información del aprendiz</span>
+                        <h3 id="learner-context-title" class="learner-context-title">Datos de identificación</h3>
+                    </div>
+                </div>
+                <div class="learner-context-grid">
+                    <div class="learner-context-item">
+                        <span class="learner-context-label">Documento</span>
+                        <strong class="learner-context-value">{{ aprendiz.documento }}</strong>
+                    </div>
+                    <div class="learner-context-item">
+                        <span class="learner-context-label">Ficha de formación</span>
+                        <strong class="learner-context-value">{{ ficha.codigo }}</strong>
+                    </div>
+                    <div class="learner-context-item learner-context-item--program">
+                        <span class="learner-context-label">Programa</span>
+                        <strong class="learner-context-value">{{ ficha.nombre_programa }}</strong>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Top KPI Dashboard (5 Indicadores Clave) -->
+            <div class="kpis-fullscreen-grid">
+                <!-- Asistencia Global -->
+                <div class="kpi-glass-card">
+                    <div class="kpi-header-row">
+                        <span class="kpi-label-text">Asistencia Global</span>
+                        <div class="kpi-icon-box icon-emerald">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="kpi-value-row">
+                        <span class="kpi-big-value {{ 'text-emerald' if pct_asistencia >= 85 else ('text-amber' if pct_asistencia >= 70 else 'text-red') }}">
+                            {{ '%.1f'|format(pct_asistencia) }}%
+                        </span>
+                        <small class="kpi-subtext">{{ total_asistencias }}/{{ total_sesiones }} clases</small>
+                    </div>
+                    <div class="kpi-progress-track mt-2">
+                        <div class="kpi-progress-bar" style="width: {{ pct_asistencia }}%; background: {% if pct_asistencia >= 85 %}#059669{% elif pct_asistencia >= 70 %}#d97706{% else %}#dc2626{% endif %};"></div>
+                    </div>
+                </div>
+
+                <!-- Faltas Injustificadas -->
+                <div class="kpi-glass-card {{ 'card-alert-active' if total_faltas_nj > 0 }}">
+                    <div class="kpi-header-row">
+                        <span class="kpi-label-text">Faltas Injustificadas</span>
+                        <div class="kpi-icon-box icon-red">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="kpi-value-row">
+                        <span class="kpi-big-value text-red">{{ total_faltas_nj }}</span>
+                        {% if config_alertas %}
+                        <span class="badge {{ 'badge-solid-danger' if total_faltas_nj >= config_alertas.umbral_rojo else ('badge-solid-warning' if total_faltas_nj >= config_alertas.umbral_amarillo else 'badge-solid-secondary') }}">
+                            Límite: {{ config_alertas.umbral_rojo }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <small class="kpi-subtext">Inasistencias sin excusa</small>
+                </div>
+
+                <!-- Faltas Justificadas / Excusas -->
+                <div class="kpi-glass-card">
+                    <div class="kpi-header-row">
+                        <span class="kpi-label-text">Faltas Justificadas</span>
+                        <div class="kpi-icon-box icon-amber">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="kpi-value-row">
+                        <span class="kpi-big-value text-amber">{{ total_faltas_j }}</span>
+                        <small class="kpi-subtext">Cita médica / soporte</small>
+                    </div>
+                    <small class="kpi-subtext">Soportadas y aprobadas</small>
+                </div>
+
+                <!-- Tardanzas -->
+                <div class="kpi-glass-card">
+                    <div class="kpi-header-row">
+                        <span class="kpi-label-text">Tardanzas</span>
+                        <div class="kpi-icon-box icon-purple">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="kpi-value-row">
+                        <span class="kpi-big-value text-purple">{{ total_tardanzas }}</span>
+                        <small class="kpi-subtext">Llegadas con retardo</small>
+                    </div>
+                    <small class="kpi-subtext">Registradas en sesión</small>
+                </div>
+
+                <!-- Racha / Día Crítico -->
+                <div class="kpi-glass-card">
+                    <div class="kpi-header-row">
+                        <span class="kpi-label-text">Patrón de Asistencia</span>
+                        <div class="kpi-icon-box icon-blue">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                    </div>
+                    <div style="margin-top: 4px;">
+                        {% if racha_actual > 0 %}
+                        <div style="font-weight: 800; font-size: 1.1rem; color: var(--accent-primary);">🔥 {{ racha_actual }} días seguidos</div>
+                        <small class="kpi-subtext">Racha de asistencia continua</small>
+                        {% else %}
+                        <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-strong);">⚠️ Inasistencia reciente</div>
+                        <small class="kpi-subtext">Requiere seguimiento</small>
+                        {% endif %}
+
+                        {% if dia_mas_inasistencias %}
+                        <div style="font-size: 0.75rem; margin-top: 4px; color: var(--text-muted);">
+                            Día con más faltas: <strong style="color: var(--text-strong);">{{ dia_mas_inasistencias }}</strong> ({{ max_faltas_dia }})
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grilla Principal en 2 Columnas -->
+            <div class="modal-two-columns">
+                
+                <!-- Columna Izquierda: Calendario Interactivo -->
+                <div class="column-card glass-panel">
+                    <div class="column-card-header">
+                        <h4>📅 Calendario Mensual de Asistencia</h4>
+                        <span class="badge badge-solid-secondary">{{ total_sesiones }} Sesiones Registradas</span>
+                    </div>
+
+                    <div class="calendar-toolbar">
+                        <button type="button" class="btn-cal-nav" onclick="changeMonth(-1)" title="Mes anterior">
+                            &larr; Anterior
+                        </button>
+                        <h3 id="calendar-month-year" class="calendar-month-title">Cargando mes...</h3>
+                        <button type="button" class="btn-cal-nav" onclick="changeMonth(1)" title="Mes siguiente">
+                            Siguiente &rarr;
+                        </button>
+                    </div>
+
+                    <!-- Calendario Adaptativo -->
+                    <div class="calendar-large-grid" id="calendar-grid">
+                        <!-- Generado por JS -->
+                    </div>
+
+                    <!-- Leyenda del Calendario -->
+                    <div class="calendar-legend-bar">
+                        <div class="legend-item"><span class="legend-box box-asiste"></span> Asistió</div>
+                        <div class="legend-item"><span class="legend-box box-falta-nj"></span> Falta Injustificada</div>
+                        <div class="legend-item"><span class="legend-box box-falta-j"></span> Falta Justificada / Excusa</div>
+                        <div class="legend-item"><span class="legend-box box-tardanza"></span> Tardanza</div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Inasistencias Detalladas y Diagnóstico -->
+                <div class="column-card glass-panel">
+                    <div class="column-card-header">
+                        <h4>⚠️ Inasistencias Detalladas ({{ total_faltas }})</h4>
+                        {% if total_faltas_nj == 0 %}
+                        <span class="badge badge-solid-success">✓ Sin faltas injustificadas</span>
+                        {% else %}
+                        <span class="badge badge-solid-danger">{{ total_faltas_nj }} sin justificar</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Lista de Inasistencias con Formato Claro -->
+                    <div class="faltas-scroll-container">
+                        {% if faltas_detalladas %}
+                            <div class="faltas-list">
+                                {% for falta in faltas_detalladas %}
+                                <div class="falta-item-card {{ 'card-falta-nj' if falta.estado == 'FALTA' else 'card-falta-j' }}">
+                                    <div class="falta-item-header">
+                                        <div class="falta-date-group">
+                                            <span class="falta-date-icon">🗓️</span>
+                                            <span class="falta-date-text">{{ falta.fecha_fmt }}</span>
+                                        </div>
+                                        <span class="badge {{ 'badge-solid-danger' if falta.estado == 'FALTA' else 'badge-solid-warning' }}">
+                                            {% if falta.estado == 'FALTA' %}
+                                                🚨 FALTA INJUSTIFICADA
+                                            {% elif falta.estado == 'EXCUSA_MEDICA' %}
+                                                🏥 EXCUSA MÉDICA
+                                            {% else %}
+                                                📝 FALTA JUSTIFICADA
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    {% if falta.causal %}
+                                    <div class="falta-causal-box">
+                                        <strong>Razón / Justificación:</strong> {{ falta.causal }}
+                                    </div>
+                                    {% else %}
+                                    <div class="falta-causal-box text-red">
+                                        <em>Sin justificación ni excusa presentada en el sistema.</em>
+                                    </div>
+                                    {% endif %}
+                                    {% if falta.nota %}
+                                    <div class="falta-note-box">
+                                        <strong>Nota de instructor:</strong> {{ falta.nota }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-faltas-state">
+                                <div class="empty-state-icon">🎉</div>
+                                <h4>¡Asistencia Perfecta!</h4>
+                                <p>Este aprendiz no registra faltas injustificadas ni excusas en las sesiones de formación de la ficha.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Diagnóstico de Riesgo Institucional -->
+                    <div class="risk-diagnosis-card mt-3">
+                        <h5 class="risk-title">📊 Evaluación de Riesgo de Deserción / Comité</h5>
+                        {% if config_alertas %}
+                            {% set faltan_para_rojo = config_alertas.umbral_rojo - total_faltas_nj %}
+                            {% if total_faltas_nj >= config_alertas.umbral_rojo %}
+                                <div class="alert-box alert-danger">
+                                    🚨 <strong>¡ALERTA ROJA!</strong> Ha alcanzado {{ total_faltas_nj }} faltas injustificadas. Aplica citación a Comité de Evaluación y Seguimiento según Reglamento del Aprendiz SENA.
+                                </div>
+                            {% elif total_faltas_nj >= config_alertas.umbral_amarillo %}
+                                <div class="alert-box alert-warning">
+                                    ⚠️ <strong>ALERTA AMARILLA:</strong> Acumula {{ total_faltas_nj }} faltas injustificadas. Quedan {{ faltan_para_rojo }} falta(s) para alcanzar el umbral de citación a comité.
+                                </div>
+                            {% else %}
+                                <div class="alert-box alert-success">
+                                    ✅ <strong>ESTADO REGULAR:</strong> Sin riesgo inmediato por asistencia ({{ total_faltas_nj }}/{{ config_alertas.umbral_rojo }} faltas injustificadas permitidas antes de citación a comité).
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* CSS Reset y Estilos del Modal Fullscreen con Alto Contraste */
+
+/* Header de Alto Contraste */
+.modal-header-fullscreen {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.95rem 2rem;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-divider);
+}
+
+.header-main-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.header-identity {
+    min-width: 0;
+}
+
+.header-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.avatar-badge {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: var(--accent-primary, #059669);
+    color: #ffffff;
+    font-size: 1.4rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.learner-name-title {
+    margin: 0;
+    font-size: clamp(1.1rem, 2vw, 1.45rem);
+    font-weight: 800;
+    color: var(--text-strong) !important;
+    letter-spacing: -0.02em;
+}
+
+/* Cuerpo Scrollable */
+.modal-body-fullscreen {
+    padding: 1.5rem 2rem;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Identificación dentro del cuerpo: concentra la información extensa sin agrandar el encabezado. */
+.learner-context-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem 1.15rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: 16px;
+}
+
+.learner-context-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.learner-context-eyebrow {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: var(--accent-primary);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.learner-context-title {
+    margin: 0;
+    color: var(--text-strong);
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.learner-context-grid {
+    display: grid;
+    grid-template-columns: minmax(9rem, 0.75fr) minmax(9rem, 0.75fr) minmax(16rem, 2fr);
+    gap: 0.75rem;
+}
+
+.learner-context-item {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.7rem 0.85rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+}
+
+.learner-context-label {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.learner-context-value {
+    overflow-wrap: anywhere;
+    color: var(--text-strong);
+    font-size: 0.98rem;
+    line-height: 1.35;
+}
+
+.modal-body-fullscreen::-webkit-scrollbar {
+    width: 8px;
+}
+.modal-body-fullscreen::-webkit-scrollbar-thumb {
+    background: var(--border-divider, #475569);
+    border-radius: 4px;
+}
+
+/* Dashboard KPI Horizontal */
+.kpis-fullscreen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+}
+
+.kpi-glass-card {
+    background: var(--bg-surface, #1e293b);
+    border: 1px solid var(--border-subtle, #334155);
+    border-radius: 16px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.kpi-glass-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-primary, #059669);
+}
+
+.kpi-glass-card.card-alert-active {
+    border-color: rgba(220, 38, 38, 0.6);
+    background: linear-gradient(180deg, rgba(220, 38, 38, 0.08) 0%, var(--bg-surface, #1e293b) 100%);
+}
+
+.kpi-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-label-text {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #94a3b8);
+}
+
+.kpi-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-emerald { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.icon-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.icon-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.icon-purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+.icon-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+
+.kpi-value-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.kpi-big-value {
+    font-size: 2.1rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.text-emerald { color: #059669 !important; }
+.text-red { color: #dc2626 !important; }
+.text-amber { color: #d97706 !important; }
+.text-purple { color: #8b5cf6 !important; }
+
+.kpi-subtext {
+    font-size: 0.8rem;
+    color: var(--text-muted, #94a3b8);
+    font-weight: 600;
+}
+
+.kpi-progress-track {
+    height: 6px;
+    background: var(--border-divider, #334155);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.kpi-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+/* Grilla en 2 Columnas */
+.modal-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1100px) {
+    .modal-two-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.column-card {
+    background: var(--bg-surface, #1e293b);
+    border: 1px solid var(--border-subtle, #334155);
+    border-radius: 18px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.column-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-divider, #334155);
+}
+
+.column-card-header h4 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-strong);
+}
+
+/* Calendario Estilizado y Amplio */
+.calendar-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-card, #0f172a);
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle, #334155);
+}
+
+.calendar-month-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-strong);
+}
+
+.btn-cal-nav {
+    background: var(--bg-surface, #1e293b);
+    border: 1px solid var(--border-subtle, #475569);
+    color: var(--text-strong);
+    padding: 0.4rem 0.9rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-cal-nav:hover {
+    background: var(--accent-primary, #059669);
+    border-color: var(--accent-primary, #059669);
+}
+
+.calendar-large-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    text-align: center;
+}
+
+.cal-day-name {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--text-muted, #94a3b8);
+    padding: 0.4rem 0;
+    text-transform: uppercase;
+}
+
+.cal-day-cell {
+    aspect-ratio: 1.1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    background: var(--bg-card, #0f172a);
+    border: 1px solid var(--border-divider, #334155);
+    color: var(--text-strong);
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.cal-day-cell:not(.empty-cell):hover {
+    transform: scale(1.05);
+    z-index: 2;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.cal-day-cell.empty-cell {
+    background: transparent;
+    border: none;
+}
+
+/* Celda Falta Injustificada */
+.cal-day-cell.is-falta-nj {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.4);
+}
+
+/* Celda Falta Justificada */
+.cal-day-cell.is-falta-j {
+    background: #d97706 !important;
+    color: #ffffff !important;
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 12px rgba(217, 119, 6, 0.4);
+}
+
+/* Celda Tardanza */
+.cal-day-cell.is-tardanza {
+    background: #7c3aed !important;
+    color: #ffffff !important;
+    border-color: #8b5cf6 !important;
+}
+
+/* Celda Asistió */
+.cal-day-cell.is-asiste {
+    border-color: rgba(5, 150, 105, 0.5);
+}
+.cal-day-cell.is-asiste::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: #059669;
+    border-radius: 50%;
+    margin-top: 2px;
+}
+
+.calendar-legend-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    font-size: 0.82rem;
+    color: var(--text-main, #cbd5e1);
+    background: var(--bg-card, #0f172a);
+    padding: 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle, #334155);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+}
+
+.legend-box {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+}
+
+.box-asiste { background: #059669; }
+.box-falta-nj { background: #dc2626; }
+.box-falta-j { background: #d97706; }
+.box-tardanza { background: #7c3aed; }
+
+/* Lista de Inasistencias Detalladas */
+.faltas-scroll-container {
+    max-height: 380px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.faltas-scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+.faltas-scroll-container::-webkit-scrollbar-thumb {
+    background: var(--border-divider, #475569);
+    border-radius: 3px;
+}
+
+.faltas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.falta-item-card {
+    background: var(--bg-card, #0f172a);
+    border: 1px solid var(--border-divider, #334155);
+    border-left: 5px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.falta-item-card.card-falta-nj {
+    border-left-color: #dc2626;
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.08) 0%, var(--bg-card, #0f172a) 100%);
+}
+
+.falta-item-card.card-falta-j {
+    border-left-color: #d97706;
+    background: linear-gradient(90deg, rgba(217, 119, 6, 0.08) 0%, var(--bg-card, #0f172a) 100%);
+}
+
+.falta-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.falta-date-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 800;
+    color: var(--text-strong);
+    font-size: 0.95rem;
+}
+
+.falta-causal-box {
+    font-size: 0.88rem;
+    color: var(--text-main, #cbd5e1);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+}
+
+.falta-note-box {
+    font-size: 0.82rem;
+    color: var(--text-muted, #94a3b8);
+    font-style: italic;
+}
+
+.empty-faltas-state {
+    text-align: center;
+    padding: 2.5rem 1.5rem;
+    background: var(--bg-card, #0f172a);
+    border-radius: 16px;
+    border: 1px dashed var(--border-divider, #334155);
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.empty-faltas-state h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-strong);
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.empty-faltas-state p {
+    margin: 0;
+    color: var(--text-muted, #94a3b8);
+    font-size: 0.9rem;
+}
+
+/* Tarjeta de Diagnóstico de Riesgo */
+.risk-diagnosis-card {
+    background: var(--bg-card, #0f172a);
+    border: 1px solid var(--border-divider, #334155);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.risk-title {
+    margin: 0 0 0.6rem 0;
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: var(--text-strong);
+}
+
+.alert-box {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.alert-danger {
+    background: rgba(220, 38, 38, 0.12);
+    color: var(--text-strong);
+    border: 1px solid rgba(220, 38, 38, 0.35);
+}
+
+.alert-warning {
+    background: rgba(217, 119, 6, 0.12);
+    color: var(--text-strong);
+    border: 1px solid rgba(217, 119, 6, 0.35);
+}
+
+.alert-success {
+    background: rgba(5, 150, 105, 0.12);
+    color: var(--text-strong);
+    border: 1px solid rgba(5, 150, 105, 0.35);
+}
+
+/* Badges de Alto Contraste Sólidos */
+.badge-solid-success { background: var(--success) !important; color: var(--color-white) !important; font-weight: 700; }
+.badge-solid-warning { background: var(--color-sena-yellow) !important; color: var(--color-gray-900) !important; font-weight: 700; }
+.badge-solid-danger { background: var(--danger) !important; color: var(--color-white) !important; font-weight: 700; }
+.badge-solid-secondary { background: var(--color-gray-600) !important; color: var(--color-white) !important; font-weight: 700; }
+
+@media (max-width: 760px) {
+    .app-modal-overlay {
+        padding: 0.75rem;
+    }
+
+    .premium-fullscreen-glass {
+        width: 100%;
+        height: 96vh;
+        border-radius: 18px;
+    }
+
+    .modal-header-fullscreen,
+    .modal-body-fullscreen {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .modal-header-fullscreen {
+        padding-top: 0.8rem;
+        padding-bottom: 0.8rem;
+    }
+
+    .avatar-badge {
+        width: 46px;
+        height: 46px;
+        font-size: 1.2rem;
+    }
+
+    .header-main-info {
+        gap: 0.75rem;
+    }
+
+    .header-title-row {
+        gap: 0.4rem;
+    }
+
+    .learner-context-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalScaleUp { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+</style>
+
+<script>
+// Soporte para cerrar con la tecla ESC
+document.addEventListener('keydown', function handleEscKey(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('asistencia-modal');
+        if (modal) modal.remove();
+        document.body.classList.remove('modal-open');
+        document.removeEventListener('keydown', handleEscKey);
+    }
+});
+
+function closeModal(e) {
+    if (e.target.id === 'asistencia-modal') {
+        const modal = document.getElementById('asistencia-modal');
+        if (modal) modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+}
+
+// Datos de asistencia completos e inasistencias pasados desde Jinja
+const asistenciaMapData = {{ asistencia_map | tojson | safe }};
+let currentDate = new Date();
+currentDate.setHours(12,0,0,0);
+
+function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    let startDayIndex = firstDay.getDay() || 7; 
+    startDayIndex -= 1; // 0 for Mon, 6 for Sun
+    
+    const numDays = lastDay.getDate();
+    const grid = document.getElementById('calendar-grid');
+    
+    grid.style.opacity = '0';
+    setTimeout(() => {
+        grid.innerHTML = '';
+        
+        const dayNames = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+        dayNames.forEach(d => {
+            const div = document.createElement('div');
+            div.className = 'cal-day-name';
+            div.textContent = d;
+            grid.appendChild(div);
+        });
+        
+        for (let i = 0; i < startDayIndex; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'cal-day-cell empty-cell';
+            grid.appendChild(empty);
+        }
+        
+        const today = new Date();
+        const isCurrentMonth = (today.getMonth() === month && today.getFullYear() === year);
+        const currentDay = today.getDate();
+
+        for (let i = 1; i <= numDays; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'cal-day-cell';
+            dayDiv.textContent = i;
+            
+            if (isCurrentMonth && i === currentDay) {
+                dayDiv.style.boxShadow = '0 0 0 2px #059669';
+            }
+
+            const dStr = `${year}-${String(month+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+            const record = asistenciaMapData[dStr];
+            
+            if (record) {
+                if (record.estado === 'FALTA') {
+                    dayDiv.classList.add('is-falta-nj');
+                    dayDiv.title = `🚨 FALTA INJUSTIFICADA (${record.fecha_fmt})`;
+                } else if (record.estado === 'FALTA_JUSTIFICADA' || record.estado === 'EXCUSA_MEDICA') {
+                    dayDiv.classList.add('is-falta-j');
+                    dayDiv.title = `📝 FALTA JUSTIFICADA: ${record.causal || 'Excusa'} (${record.fecha_fmt})`;
+                } else if (record.estado === 'TARDANZA') {
+                    dayDiv.classList.add('is-tardanza');
+                    dayDiv.title = `⏰ TARDANZA (${record.fecha_fmt})`;
+                } else if (record.estado === 'ASISTE') {
+                    dayDiv.classList.add('is-asiste');
+                    dayDiv.title = `✓ Asistió (${record.fecha_fmt})`;
+                }
+            }
+            
+            grid.appendChild(dayDiv);
+        }
+        grid.style.opacity = '1';
+    }, 100);
+    grid.style.transition = 'opacity 0.15s ease';
+}
+
+function changeMonth(delta) {
+    currentDate.setMonth(currentDate.getMonth() + delta);
+    renderCalendar();
+}
+
+// Render inicial
+renderCalendar();
+</script>

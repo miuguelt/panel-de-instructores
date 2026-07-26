@@ -1,0 +1,1107 @@
+{% extends "base.html" %}
+{% block title %}Mi Panel - {{ aprendiz.nombre }} - SENA Control{% endblock %}
+
+{# REGLA: No mostrar números de documento/cédula en esta vista #}
+{% block content %}
+<div class="panel-aprendiz">
+    <!-- Header del panel -->
+    <div class="card panel-header-card">
+        <div class="panel-header-main">
+            <div>
+                <span class="eyebrow">Panel del Aprendiz</span>
+                <h1 class="panel-title">Hola, {{ aprendiz.nombre }}</h1>
+                <p class="text-muted panel-subtitle">{{ ficha.codigo }} — {{ ficha.nombre_programa }}</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('aprendiz.descargar_reporte', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">
+                    📄 Reporte PDF
+                </a>
+                <a href="{{ url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">
+                    🔔 Notificaciones{% if notificaciones_aprendiz %} ({{ notificaciones_aprendiz|length }}){% endif %}
+                </a>
+                <a href="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">
+                    Cambiar usuario
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% include '_cronograma.html' %}
+
+    {# Compute evidence progress for unified section #}
+    {% if tareas_estado %}
+    {% set total_tareas = tareas_estado|length %}
+    {% set _entregadas = [] %}
+    {% for item in tareas_estado %}
+        {% if item.estado in ['entregada', 'retraso'] %}
+            {% set _ = _entregadas.append(item) %}
+        {% endif %}
+    {% endfor %}
+    {% set pct_evidencias = (_entregadas|length / total_tareas * 100)|round|int if total_tareas > 0 else 0 %}
+    {% endif %}
+
+    {# ── Consolidated Progress Dashboard ── #}
+    <section class="section-container">
+        <div class="section-title-row">
+            <h2 class="section-title">Mi Progreso</h2>
+            <span class="badge badge-secondary">Panorama general</span>
+        </div>
+
+        <div class="progress-dashboard">
+            {# ── Asistencia ── #}
+            <div class="progress-card">
+                {% set c_asist = 'var(--success)' if pct_asistencia >= 80 else ('var(--warning)' if pct_asistencia >= 50 else 'var(--danger)') %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">📅 Asistencia</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_asist }};">{{ '%.0f'|format(pct_asistencia) }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if pct_asistencia > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_asistencia }}%; --metric-color: {{ c_asist }};"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    <span>{{ total_sesiones - total_faltas }} de {{ total_sesiones }} sesiones</span>
+                    <span>{{ faltas_no_justificadas }} sin justificar</span>
+                </div>
+            </div>
+
+            {# ── Juicios Global ── #}
+            <div class="progress-card">
+                {% set c_jui = 'var(--success)' if stats_juicios.pct_total >= 80 else ('var(--warning)' if stats_juicios.pct_total >= 50 else 'var(--danger)') %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">🎓 Juicios Evaluativos</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_jui }};">{{ stats_juicios.pct_total }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if stats_juicios.pct_total > 0 %}<div class="progress-card-fill" style="--progress-value: {{ stats_juicios.pct_total }}%; --metric-color: var(--accent-primary);"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    <span>{{ stats_juicios.aprobados }} de {{ stats_juicios.total }} aprobados</span>
+                    <span>{{ stats_juicios.total - stats_juicios.aprobados }} pendientes</span>
+                </div>
+                {% if stats_juicios.total > 0 %}
+                <div class="progress-detail">
+                    <div class="progress-detail-row">
+                        <span class="progress-detail-label">Técnicas</span>
+                        <div class="progress-detail-bar">{% if stats_juicios.pct_tecnica > 0 %}<span style="--progress-value: {{ stats_juicios.pct_tecnica }}%; --metric-color: var(--accent-primary);"></span>{% endif %}</div>
+                        <span class="progress-detail-value">{{ stats_juicios.pct_tecnica }}%</span>
+                    </div>
+                    <div class="progress-detail-row">
+                        <span class="progress-detail-label">Transversales</span>
+                        <div class="progress-detail-bar">{% if stats_juicios.pct_transversal > 0 %}<span style="--progress-value: {{ stats_juicios.pct_transversal }}%; --metric-color: var(--success);"></span>{% endif %}</div>
+                        <span class="progress-detail-value">{{ stats_juicios.pct_transversal }}%</span>
+                    </div>
+                    <div class="progress-detail-row">
+                        <span class="progress-detail-label">Inglés</span>
+                        <div class="progress-detail-bar">{% if stats_juicios.pct_ingles > 0 %}<span style="--progress-value: {{ stats_juicios.pct_ingles }}%; --metric-color: var(--info);"></span>{% endif %}</div>
+                        <span class="progress-detail-value">{{ stats_juicios.pct_ingles }}%</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            {# ── Evidencias ── #}
+            <div class="progress-card">
+                {% set pct_ev = pct_evidencias if tareas_estado else 0 %}
+                {% set c_ev = 'var(--success)' if pct_ev >= 80 else ('var(--warning)' if pct_ev >= 50 else 'var(--danger)') %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">📋 Evidencias</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_ev }};">{{ pct_ev }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if pct_ev > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_ev }}%; --metric-color: {{ c_ev }};"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    {% if tareas_estado %}
+                    <span>{{ _entregadas|length }} de {{ total_tareas }} entregadas</span>
+                    <span>{{ total_tareas - _entregadas|length }} pendientes</span>
+                    {% else %}
+                    <span>Sin tareas asignadas</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# ── Ranking ── #}
+            <div class="progress-card">
+                {% set pct_rank = fila_propia.barra_puntaje if fila_propia else 0 %}
+                {% set c_rank = 'var(--success)' if pct_rank >= 80 else ('var(--warning)' if pct_rank >= 50 else 'var(--danger)') %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">🏆 Ranking</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_rank }};">{{ '%.1f'|format(pct_rank) }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if pct_rank > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_rank }}%; --metric-color: {{ c_rank }};"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    {% if fila_propia %}
+                    <span>Puesto #{{ fila_propia.posicion }} de {{ total_ranking }}</span>
+                    <span>{{ '%.1f'|format(fila_propia.puntaje_total) }} pts</span>
+                    {% else %}
+                    <span>Participación</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# ── Cronograma ── #}
+            <div class="progress-card">
+                {% set pct_cro = cronograma.porcentaje if cronograma.configurado else 0 %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">📅 Avance de la ficha</span>
+                    <span class="progress-card-value" style="--metric-color: var(--accent-hover);">{{ '%.0f'|format(pct_cro) }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if pct_cro > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_cro }}%; --metric-color: var(--accent-primary);"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    {% if cronograma.configurado %}
+                    <span>{{ cronograma.fase_label }}</span>
+                    <span>{{ cronograma.dias_restantes }} días restantes</span>
+                    {% else %}
+                    <span>Cronograma no configurado</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# ── Faltas ── #}
+            {% set pct_faltas = (faltas_no_justificadas / total_sesiones * 100)|round|int if total_sesiones > 0 else 0 %}
+            {% set c_faltas = 'var(--success)' if pct_faltas <= 5 else ('var(--warning)' if pct_faltas <= 15 else 'var(--danger)') %}
+            <div class="progress-card">
+                <div class="progress-card-header">
+                    <span class="progress-card-label">🚫 Inasistencias</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_faltas }};">{{ pct_faltas }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if pct_faltas > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_faltas }}%; --metric-color: {{ c_faltas }};"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    <span>{{ faltas_no_justificadas }} sin justificar</span>
+                    <span>{{ faltas_justificadas }} justificadas</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-card-header">
+                <div>
+                    <h2 class="metric-card-title">Juicios de Evaluación Oficiales</h2>
+                    <p class="metric-card-subtitle">Progreso académico certificado</p>
+                </div>
+                <span class="badge badge-success metric-card-score">{{ stats_juicios.pct_total }}% Global</span>
+            </div>
+            
+            <div class="juicio-tabs" role="tablist" aria-label="Vistas de juicios">
+                <button onclick="openJuicioTab('competencias')" id="btn-tab-competencias" class="juicio-tab-active">Por Competencia ({{ competencias_aprendiz|length }})</button>
+                <button onclick="openJuicioTab('resumen')" id="btn-tab-resumen" class="juicio-tab-inactive">Resumen</button>
+                <button onclick="openJuicioTab('pendientes')" id="btn-tab-pendientes" class="juicio-tab-inactive">Por Aprobar ({{ juicios_pendientes|length }})</button>
+                <button onclick="openJuicioTab('aprobados')" id="btn-tab-aprobados" class="juicio-tab-inactive">Aprobados ({{ juicios_aprobados|length }})</button>
+            </div>
+            
+            <!-- Tab Desplegable por Competencia (Acordeones 1-Clic) -->
+            <div id="tab-competencias" class="juicio-tab-content">
+                <div class="juicio-competencias-list">
+                    {% if competencias_aprendiz %}
+                        {% for comp in competencias_aprendiz %}
+                        {% set tipo_label = 'Inglés' if comp.tipo == 'ingles' else ('Transversal' if comp.tipo == 'transversal' else 'Técnica') %}
+                        {% set badge_cls = 'badge-solid-ingles' if comp.tipo == 'ingles' else ('badge-solid-transversal' if comp.tipo == 'transversal' else 'badge-solid-tech') %}
+                        <details class="competencia-accordion">
+                            <summary class="competencia-summary">
+                                <div class="competencia-summary-main">
+                                    <div class="competencia-name">{{ comp.nombre }}</div>
+                                    <div class="competencia-meta">
+                                        <span class="badge {{ badge_cls }}">{{ tipo_label }}</span>
+                                        <span>📊 {{ comp.aprobados }}/{{ comp.total }} RAPs aprobados</span>
+                                    </div>
+                                </div>
+                                <div class="competencia-summary-stats">
+                                    <div class="competencia-progress">
+                                        <div class="competencia-progress-fill {% if comp.pct == 100 %}is-complete{% elif comp.pct > 0 %}is-partial{% else %}is-empty{% endif %}" style="--progress-value: {{ comp.pct }}%;"></div>
+                                    </div>
+                                    <span class="badge {% if comp.pct == 100 %}badge-solid-success{% elif comp.pct > 0 %}badge-solid-warning{% else %}badge-solid-secondary{% endif %}">
+                                        {{ comp.pct }}%
+                                    </span>
+                                    <span class="competencia-chevron" aria-hidden="true">▼</span>
+                                </div>
+                            </summary>
+                            <div class="competencia-rap-list">
+                                {% for r in comp.raps %}
+                                <div class="rap-item">
+                                    <div class="rap-item-content">
+                                        <p class="rap-item-title">{{ r.rap }}</p>
+                                        <div class="rap-item-meta">
+                                            👨‍🏫 <strong>Instructor:</strong> {{ r.evaluador|strip_document_id }} {% if r.fecha != 'Pendiente' %}• 📅 {{ r.fecha }}{% endif %}
+                                        </div>
+                                    </div>
+                                    {% if r.es_aprobado %}
+                                        <span class="badge badge-solid-success">APROBADO</span>
+                                    {% else %}
+                                        <span class="badge badge-solid-warning">POR EVALUAR</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% endfor %}
+                    {% else %}
+                        <div class="panel-empty-message">No hay competencias registradas para esta ficha.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div id="tab-resumen" class="juicio-tab-content" hidden>
+                <div class="juicio-summary-grid">
+                    <div class="juicio-donut-wrap">
+                        <div class="juicio-donut" style="--summary-value: {{ stats_juicios.pct_total }}%;">
+                            <div class="juicio-donut-hole">
+                                <span>{{ stats_juicios.pct_total }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="juicio-summary-bars">
+                        <div class="juicio-summary-bar">
+                            <div class="juicio-summary-bar-label"><span>Técnicas</span><strong>{{ stats_juicios.tecnica_aprobada }}/{{ stats_juicios.tecnica }}</strong></div>
+                            <progress value="{{ stats_juicios.pct_tecnica }}" max="100" class="progress-tech"></progress>
+                        </div>
+                        <div class="juicio-summary-bar">
+                            <div class="juicio-summary-bar-label"><span>Transversales</span><strong>{{ stats_juicios.transversal_aprobada }}/{{ stats_juicios.transversal }}</strong></div>
+                            <progress value="{{ stats_juicios.pct_transversal }}" max="100" class="progress-transversal"></progress>
+                        </div>
+                        <div class="juicio-summary-bar">
+                            <div class="juicio-summary-bar-label"><span>Inglés</span><strong>{{ stats_juicios.ingles_aprobada }}/{{ stats_juicios.ingles }}</strong></div>
+                            <progress value="{{ stats_juicios.pct_ingles }}" max="100" class="progress-ingles"></progress>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-pendientes" class="juicio-tab-content" hidden>
+                <div class="juicio-status-list">
+                    {% if juicios_pendientes %}
+                        {% for j in juicios_pendientes %}
+                        <div class="juicio-status-item is-pending">
+                            <p class="juicio-status-title">{{ j.resultado_aprendizaje }}</p>
+                            <div class="juicio-status-meta">
+                                <div class="juicio-status-row">
+                                    <span>{{ j.competencia[:40] }}...</span>
+                                    <span class="juicio-status-value">{{ j.juicio or 'Por Evaluar' }}</span>
+                                </div>
+                                {% if j.funcionario_registro %}
+                                <div class="juicio-status-detail">
+                                    <span>👨‍🏫 {{ j.funcionario_registro|strip_document_id }}</span>
+                                    {% if j.fecha_juicio %}<span>📅 {{ j.fecha_juicio.strftime('%d/%m/%Y') }}</span>{% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="panel-empty-message is-success">
+                            ¡Felicidades! Tienes todos tus resultados de aprendizaje aprobados.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div id="tab-aprobados" class="juicio-tab-content" hidden>
+                <div class="juicio-status-list">
+                    {% if juicios_aprobados %}
+                        {% for j in juicios_aprobados %}
+                        <div class="juicio-status-item is-approved">
+                            <p class="juicio-status-title">{{ j.resultado_aprendizaje }}</p>
+                            <div class="juicio-status-meta">
+                                <div class="juicio-status-row">
+                                    <span>{{ j.competencia[:40] }}...</span>
+                                    <span class="juicio-status-value">{{ j.juicio or 'Aprobado' }}</span>
+                                </div>
+                                {% if j.funcionario_registro %}
+                                <div class="juicio-status-detail">
+                                    <span>👨‍🏫 {{ j.funcionario_registro|strip_document_id }}</span>
+                                    {% if j.fecha_juicio %}<span>📅 {{ j.fecha_juicio.strftime('%d/%m/%Y') }}</span>{% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="panel-empty-message is-warning">
+                            Aún no tienes resultados aprobados registrados en el sistema.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <script>
+                function openJuicioTab(tabName) {
+                    document.querySelectorAll('.juicio-tab-content').forEach(el => el.hidden = true);
+                    document.getElementById('tab-' + tabName).hidden = false;
+                    
+                    document.querySelectorAll('[id^="btn-tab-"]').forEach(btn => {
+                        btn.className = 'juicio-tab-inactive';
+                    });
+                    
+                    const activeBtn = document.getElementById('btn-tab-' + tabName);
+                    activeBtn.className = 'juicio-tab-active';
+                }
+            </script>
+        </div>
+
+        {% if evaluadores %}
+        <div class="evaluators-block">
+            <p class="evaluators-title">
+                <span>👨‍🏫</span> Instructores que te han evaluado ({{ evaluadores|length }})
+            </p>
+            <div class="evaluators-list">
+                {% for eval in evaluadores %}
+                <span class="evaluator-chip">
+                    {{ eval|strip_document_id }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="learner-cleaning-card {% if aseo.aviso_visible %}is-upcoming{% endif %}">
+        <div class="learner-cleaning-heading">
+            <div>
+                <span class="eyebrow">Responsabilidad compartida</span>
+                <h2>Turno de aseo</h2>
+            </div>
+            <span class="cleaning-balance-pill">{{ aseo.contador.veces_aseo }} cumplido{{ '' if aseo.contador.veces_aseo == 1 else 's' }}</span>
+        </div>
+        <p class="text-muted cleaning-card-link">
+            <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver calendario completo y tabla de equidad</a>
+        </p>
+
+        {% if aseo.turno_propio and aseo.aviso_visible %}
+        <div class="own-cleaning-alert">
+            <span>Tu próximo turno</span>
+            <strong>{% if aseo.turno_propio.fecha == aseo.hoy %}¡Te toca hoy!{% else %}¡Te toca el {{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}!{% endif %}</strong>
+            <p>Con {{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</p>
+        </div>
+        {% endif %}
+
+        <div class="cleaning-card-block">
+            <h3>Hoy / próximo turno</h3>
+            {% if aseo.siguientes %}
+            {% set proximo = aseo.siguientes[0] %}
+            <div class="next-cleaning-feature">
+                <time datetime="{{ proximo.fecha.isoformat() }}">{{ proximo.fecha.strftime('%d/%m') }}</time>
+                <div>
+                    <strong>{{ proximo.aprendiz_1.nombre_completo }}</strong>
+                    <span>y {{ proximo.aprendiz_2.nombre_completo }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted">Aún no hay turnos próximos programados.</p>
+            {% endif %}
+        </div>
+
+        <div class="cleaning-card-block">
+            <h3>Últimos en hacerlo</h3>
+            {% if aseo.ultimos %}
+            <div class="cleaning-timeline">
+                {% for turno in aseo.ultimos|reverse %}
+                <div class="cleaning-timeline-item">
+                    <span class="timeline-check">✓</span>
+                    <strong>{{ turno.aprendiz_1.nombre }} + {{ turno.aprendiz_2.nombre }}</strong>
+                    <small>{{ turno.fecha.strftime('%d/%m') }}</small>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted">El grupo todavía no ha marcado turnos cumplidos.</p>
+            {% endif %}
+        </div>
+
+        <div class="cleaning-card-block">
+            <h3>Siguientes en la fila</h3>
+            <div class="upcoming-cleaning-list">
+                {% for turno in aseo.siguientes %}
+                <div class="upcoming-cleaning-row {% if turno.incluye(aprendiz.id) %}is-me{% endif %}">
+                    <time>{{ turno.fecha.strftime('%d/%m') }}</time>
+                    <span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span>
+                    {% if turno.incluye(aprendiz.id) %}<strong>Tú</strong>{% endif %}
+                </div>
+                {% else %}
+                <p class="text-muted">Sin fechas próximas.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="cleaning-balance">
+            <strong>Has hecho aseo {{ aseo.contador.veces_aseo }} veces</strong>
+            <span>El promedio del grupo es {{ '%.1f'|format(aseo.promedio) }}.</span>
+        </div>
+
+        {% if aseo.turno_propio %}
+        <details class="learner-audit">
+            <summary>¿Por qué me eligió el sistema?</summary>
+            <p>{{ aseo.auditoria or 'Este turno fue ajustado manualmente o mediante un intercambio confirmado.' }}</p>
+        </details>
+        {% if aseo.candidatos_intercambio %}
+        <details class="learner-swap">
+            <summary>Proponer un intercambio</summary>
+            <form method="POST" action="{{ url_for('aseo_aprendiz.proponer_intercambio', ficha_id=ficha.id, turno_id=aseo.turno_propio.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label for="aprendiz_recibe_id">¿Con quién quieres cambiar?</label>
+                <select id="aprendiz_recibe_id" name="aprendiz_recibe_id" required>
+                    <option value="">Selecciona un aprendiz</option>
+                    {% for candidato in aseo.candidatos_intercambio %}
+                    <option value="{{ candidato.id }}">{{ candidato.nombre_completo }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline">Enviar solicitud</button>
+            </form>
+            <small>El cambio solo se aplica cuando la otra persona lo confirma.</small>
+        </details>
+        {% endif %}
+        {% endif %}
+
+        {% for intercambio in aseo.intercambios_entrantes %}
+        <div class="swap-request">
+            <p><strong>{{ intercambio.aprendiz_solicita.nombre_completo }}</strong> te propone cambiar su turno del {{ intercambio.turno.fecha.strftime('%d/%m/%Y') }}.</p>
+            <div class="swap-actions">
+                <form method="POST" action="{{ url_for('aseo_aprendiz.responder_intercambio', ficha_id=ficha.id, intercambio_id=intercambio.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="accion" value="aceptar">
+                    <button class="btn btn-sm btn-primary" type="submit">Aceptar</button>
+                </form>
+                <form method="POST" action="{{ url_for('aseo_aprendiz.responder_intercambio', ficha_id=ficha.id, intercambio_id=intercambio.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="accion" value="rechazar">
+                    <button class="btn btn-sm btn-outline" type="submit">Rechazar</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+
+    {% if nuevas_insignias %}
+    <div class="unlock-banner" role="status">
+        <span class="unlock-icon">{{ nuevas_insignias[0].insignia.icono }}</span>
+        <div>
+            <strong>¡Nueva insignia desbloqueada: {{ nuevas_insignias[0].insignia.nombre }}!</strong>
+            <p>{{ nuevas_insignias[0].insignia.descripcion }}</p>
+            {% if nuevas_insignias|length > 1 %}
+            <small>Además desbloqueaste {{ nuevas_insignias|length - 1 }} reconocimiento(s) más.</small>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if alertas_activas %}
+    <div class="active-alerts-label">
+        <span class="badge badge-solid-danger">{{ alertas_activas|length }} alerta{% if alertas_activas|length != 1 %}s{% endif %} activa{% if alertas_activas|length != 1 %}s{% endif %}</span>
+    </div>
+    {% for alerta in alertas_activas %}
+    <div class="alert alert-{% if alerta.nivel == 'roja' %}error{% else %}warning{% endif %}">
+        <strong>{{ alerta.titulo }}</strong>
+        <p class="alert-message">{{ alerta.mensaje }}</p>
+        <small class="alert-note">Este aviso es informativo; conversa con tu instructor para revisar tu situación.</small>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if inasistencias_pendientes %}
+    <section class="card support-card">
+        <h2>Presentar soporte de una inasistencia</h2>
+        <p class="text-muted">Adjunta tu soporte o deja una nota para que el instructor pueda revisar el contexto.</p>
+        {% for registro in inasistencias_pendientes[:3] %}
+        <form method="POST" action="{{ url_for('aprendiz.adjuntar_soporte_inasistencia', ficha_id=ficha.id, registro_id=registro.id) }}" enctype="multipart/form-data" class="support-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <strong>Sesión del {{ registro.sesion.fecha.strftime('%d/%m/%Y') }}</strong>
+            {% if registro.soporte_url %}<a href="{{ url_for('aprendiz.descargar_soporte', registro_id=registro.id) }}" class="link-download">Ver soporte enviado</a>{% endif %}
+            <input type="file" name="soporte" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" aria-label="Soporte de inasistencia">
+            <textarea name="nota" rows="2" placeholder="Nota para tu instructor (opcional)">{{ registro.nota or '' }}</textarea>
+            <button type="submit" class="btn btn-sm btn-primary">Enviar para revisión</button>
+        </form>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if nivel_alerta == 'rojo' %}
+    <div class="alert alert-error">
+        <strong class="alert-lead">🚨 Estás en zona de alerta.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Habla con tu instructor para definir tu situación.
+    </div>
+    {% elif nivel_alerta == 'amarillo' %}
+    <div class="alert alert-warning">
+        <strong class="alert-lead">⚠️ Estás en riesgo.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Cuida tu asistencia para no afectar tu proceso.
+    </div>
+    {% else %}
+    <div class="alert alert-success">
+        <strong class="alert-lead">🌟 ¡Excelente desempeño!</strong> Tu asistencia es constante y estás al día. ¡Sigue así!
+    </div>
+    {% endif %}
+
+    {% if juicios and resumen_aprendiz %}
+    <section class="card juicio-detail-card">
+        <div class="juicio-detail-header">
+            <div>
+                <span class="eyebrow">Detalle de Evaluación</span>
+                <h2 class="juicio-detail-title">{{ resumen_aprendiz.total_competencias }} competencias · {{ stats_juicios.total }} juicios</h2>
+            </div>
+            <div class="juicio-detail-badges">
+                <span class="badge badge-secondary">{{ resumen_aprendiz.total_instructores }} instructores</span>
+                {% if resumen_aprendiz is defined and resumen_aprendiz and resumen_aprendiz.primera_evaluacion and resumen_aprendiz.ultima_evaluacion %}
+                <span class="badge badge-secondary">
+                    {{ resumen_aprendiz.primera_evaluacion.strftime('%d/%m/%Y') }} → {{ resumen_aprendiz.ultima_evaluacion.strftime('%d/%m/%Y') }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Competencias detalladas -->
+        {% if competencias_aprendiz %}
+        <h3 class="juicio-sub-title">Estado por Competencia</h3>
+        <div class="table-container">
+            <div class="table-responsive" tabindex="0" aria-label="Estado por competencia">
+                <table class="table table-sena">
+                    <thead>
+                        <tr>
+                            <th scope="col">Competencia</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Progreso</th>
+                            <th scope="col" class="text-center">Aprobados</th>
+                            <th scope="col" class="text-center">Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for comp in competencias_aprendiz %}
+                        {% set tipo_label = 'Inglés' if comp.tipo == 'ingles' else ('Transversal' if comp.tipo == 'transversal' else 'Técnica') %}
+                        <tr class="{% if comp.pct == 100 %}row-success{% elif comp.pct > 0 %}row-warning{% endif %}">
+                            <td data-label="Competencia"><strong>{{ comp.nombre }}</strong></td>
+                            <td data-label="Tipo">
+                                <span class="badge badge-solid-secondary">{{ tipo_label }}</span>
+                            </td>
+                            <td data-label="Progreso">
+                                <div class="table-progress">
+                                    <div class="table-progress-track">
+                                        <div class="table-progress-fill {% if comp.pct == 100 %}is-complete{% elif comp.pct > 0 %}is-partial{% else %}is-empty{% endif %}" style="--progress-value: {{ comp.pct }}%;"></div>
+                                    </div>
+                                    <span class="badge {% if comp.pct == 100 %}badge-solid-success{% elif comp.pct > 0 %}badge-solid-warning{% else %}badge-solid-secondary{% endif %}">{{ comp.pct }}%</span>
+                                </div>
+                            </td>
+                            <td data-label="Aprobados" class="text-center">{{ comp.aprobados }}/{{ comp.total }}</td>
+                            <td data-label="Detalle" class="text-center">
+                                <button type="button" class="competencia-detail-button" data-competencia-source="competencia-detail-source-{{ loop.index }}" aria-haspopup="dialog">
+                                    Ver detalle
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Timeline del aprendiz -->
+        {% if timeline_aprendiz %}
+        <h3 class="juicio-sub-title">Línea de tiempo</h3>
+        <div class="timeline-grid">
+            {% set max_tl = timeline_aprendiz|map(attribute='1.total')|max %}
+            {% for mes, data in timeline_aprendiz %}
+            <div class="timeline-row">
+                <span class="timeline-label">{{ mes }}</span>
+                <div class="timeline-bars">
+                    {% if data.aprobados > 0 %}
+                    <div class="timeline-bar-approved" style="--progress-value: {{ (data.aprobados / data.total * 100)|round|int }}%;"></div>
+                    {% endif %}
+                    {% if data.total - data.aprobados > 0 %}
+                    <div class="timeline-bar-pending" style="--progress-value: {{ ((data.total - data.aprobados) / data.total * 100)|round|int }}%;"></div>
+                    {% endif %}
+                </div>
+                <div class="timeline-count">{{ data.total }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="timeline-legend">
+            <span><span class="legend-dot legend-approved"></span> Aprobados</span>
+            <span><span class="legend-dot legend-pending"></span> Pendientes</span>
+        </div>
+        {% endif %}
+
+        <!-- Instructores que evaluaron a este aprendiz -->
+        {% if instructores_aprendiz %}
+        <h3 class="juicio-sub-title instructor-distribution-title">Distribución por Instructor</h3>
+        <div class="table-container">
+            <div class="table-responsive" tabindex="0" aria-label="Distribución por instructor">
+                <table class="table table-sena">
+                    <thead>
+                        <tr>
+                            <th scope="col">Instructor</th>
+                            <th scope="col" class="text-center">Aprobados</th>
+                            <th scope="col" class="text-center">Pendientes</th>
+                            <th scope="col" class="text-center">Efectividad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for func, stats in instructores_aprendiz.items() %}
+                        <tr class="{% if stats.pct >= 80 %}row-success{% elif stats.pct >= 50 %}row-warning{% endif %}">
+                            <td data-label="Instructor"><strong>{{ func|strip_document_id }}</strong></td>
+                            <td data-label="Aprobados" class="text-center cell-success">{{ stats.aprobados }}</td>
+                            <td data-label="Pendientes" class="text-center cell-danger">{{ stats.pendientes }}</td>
+                            <td data-label="Efectividad" class="text-center">
+                                <span class="badge {% if stats.pct >= 80 %}badge-solid-success{% elif stats.pct >= 50 %}badge-solid-warning{% else %}badge-solid-danger{% endif %}">{{ stats.pct }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if competencias_aprendiz %}
+    <dialog id="competencia-detail-modal" class="app-modal-overlay" aria-modal="true" aria-labelledby="competencia-modal-title">
+        <div class="competencia-modal-shell app-modal-content app-modal-content--wide">
+            <header class="competencia-modal-header app-modal-header">
+                <div>
+                    <span class="eyebrow">Detalle para el aprendiz</span>
+                    <h2 id="competencia-modal-title">Detalle de la competencia</h2>
+                </div>
+                <button type="button" class="competencia-modal-close app-modal-close" data-close-competencia-modal aria-label="Cerrar detalle">&times;</button>
+            </header>
+            <div id="competencia-modal-body" class="competencia-modal-body app-modal-body"></div>
+            <footer class="competencia-modal-footer app-modal-footer">
+                <form method="dialog">
+                    <button type="submit" class="btn btn-primary">Cerrar</button>
+                </form>
+            </footer>
+        </div>
+    </dialog>
+
+    {% for comp in competencias_aprendiz %}
+    {% set tipo_label = 'Inglés' if comp.tipo == 'ingles' else ('Transversal' if comp.tipo == 'transversal' else 'Técnica') %}
+    <div id="competencia-detail-source-{{ loop.index }}" class="competencia-detail-source" hidden>
+        <div class="competencia-modal-overview">
+            <div class="competencia-modal-stat">
+                <span>Tipo de competencia</span>
+                <strong>{{ tipo_label }}</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Progreso</span>
+                <strong>{{ comp.pct }}%</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Resultados aprobados</span>
+                <strong>{{ comp.aprobados }} de {{ comp.total }}</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Resultados pendientes</span>
+                <strong>{{ comp.pendientes }}</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Última evaluación</span>
+                <strong>{{ comp.fecha_ultima.strftime('%d/%m/%Y') if comp.fecha_ultima else 'Sin evaluar' }}</strong>
+            </div>
+        </div>
+
+        <section class="competencia-modal-section">
+            <div class="competencia-modal-section-heading">
+                <h3>Resultados de aprendizaje</h3>
+                <span class="badge {% if comp.pct == 100 %}badge-solid-success{% elif comp.pct > 0 %}badge-solid-warning{% else %}badge-solid-secondary{% endif %}">
+                    {% if comp.pct == 100 %}Competencia completada{% elif comp.pct > 0 %}En progreso{% else %}Pendiente{% endif %}
+                </span>
+            </div>
+            <div class="competencia-modal-rap-list">
+                {% for r in comp.raps %}
+                <article class="competencia-modal-rap {% if r.es_aprobado %}is-approved{% else %}is-pending{% endif %}">
+                    <div class="competencia-modal-rap-main">
+                        <h4>{{ r.rap }}</h4>
+                        <p>
+                            {% if r.es_aprobado %}Aprobado{% else %}Pendiente de evaluación{% endif %}
+                            {% if r.evaluador %} · Instructor: {{ r.evaluador|strip_document_id }}{% endif %}
+                            {% if r.fecha and r.fecha != 'Pendiente' %} · Fecha: {{ r.fecha }}{% endif %}
+                        </p>
+                        <p class="competencia-modal-rap-judgement"><strong>Juicio registrado:</strong> {{ r.juicio }}</p>
+                    </div>
+                    <span class="badge {% if r.es_aprobado %}badge-solid-success{% else %}badge-solid-warning{% endif %}">
+                        {% if r.es_aprobado %}APROBADO{% else %}POR EVALUAR{% endif %}
+                    </span>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+    {% endfor %}
+
+    <script>
+        (function () {
+            const modal = document.getElementById('competencia-detail-modal');
+            const modalBody = document.getElementById('competencia-modal-body');
+            const modalTitle = document.getElementById('competencia-modal-title');
+            if (!modal || !modalBody || !modalTitle) return;
+
+            const closeModal = () => {
+                if (typeof modal.close === 'function' && modal.open) modal.close();
+                else modal.removeAttribute('open');
+                document.body.classList.remove('modal-open');
+            };
+
+            document.querySelectorAll('[data-competencia-source]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const source = document.getElementById(button.dataset.competenciaSource);
+                    if (!source) return;
+                    const row = button.closest('tr');
+                    const competenceName = row?.querySelector('[data-label="Competencia"]')?.innerText?.trim();
+                    modalTitle.textContent = competenceName || 'Detalle de la competencia';
+                    modalBody.replaceChildren(...Array.from(source.children).map((child) => child.cloneNode(true)));
+                    if (typeof modal.showModal === 'function') modal.showModal();
+                    else modal.setAttribute('open', '');
+                    document.body.classList.add('modal-open');
+                });
+            });
+
+            document.querySelectorAll('[data-close-competencia-modal]').forEach((button) => {
+                button.addEventListener('click', closeModal);
+            });
+
+            modal.addEventListener('close', () => document.body.classList.remove('modal-open'));
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeModal();
+            });
+        })();
+    </script>
+    {% endif %}
+
+    {% if ranking %}
+    <section class="card my-ranking-card">
+        <div class="my-ranking-top">
+            <div>
+                <span class="eyebrow">Mi participación</span>
+                <h2>Vas en el puesto {{ ranking.posicion }} de {{ total_ranking }}</h2>
+            </div>
+            <span class="my-position">{{ ranking.medalla or ('#' ~ ranking.posicion) }}</span>
+        </div>
+        <div class="score-row">
+            <span>Puntaje Total</span>
+            <strong>{{ '%.1f'|format(ranking.puntaje_total) }}</strong>
+        </div>
+        <div class="progress-track progress-large ranking-progress" role="progressbar"
+             aria-valuenow="{{ ranking.barra_puntaje }}" aria-valuemin="0" aria-valuemax="100">
+            {% if ranking.barra_puntaje > 0 %}<span style="--progress-value: {{ ranking.barra_puntaje }}%;"></span>{% endif %}
+        </div>
+        <div class="score-sources">
+            <span class="badge badge-secondary">📅 Asistencia <strong>{{ '%.1f'|format(ranking.porcentaje_asistencia) }}%</strong></span>
+            <span class="badge badge-secondary">🗂️ Evidencias <strong>{{ '%.1f'|format(ranking.porcentaje_evidencias) }}%</strong></span>
+            <span class="badge badge-secondary trend trend-{{ ranking.tendencia }}">{{ ranking.tendencia_icono }} {{ ranking.tendencia|capitalize }}</span>
+        </div>
+        {% if punto_siguiente %}
+        <p class="next-position">
+            ⚡ Te faltan <strong>{{ '%.1f'|format(punto_siguiente) }}</strong> puntos para alcanzar el puesto {{ ranking.posicion - 1 }}.
+        </p>
+        {% endif %}
+        <p class="motivational-message">"{{ mensaje_ranking }}"</p>
+        <p class="ranking-disclaimer">Este es un indicador de participación; no es una nota oficial.</p>
+    </section>
+
+    <section class="card learner-leaderboard">
+        <div class="section-header compact">
+            <div>
+                <span class="eyebrow">Para inspirarte</span>
+                <h2>{% if config_ranking.modo_visibilidad == 'publico' %}Ranking de la ficha{% else %}Top 5 y tu posición{% endif %}</h2>
+            </div>
+            {% if config_ranking.modo_anonimo_parcial %}
+            <span class="badge badge-info">Alias activados</span>
+            {% endif %}
+        </div>
+        <div class="learner-ranking-list">
+            {% for fila in ranking_visible %}
+            <div class="learner-ranking-row {% if fila.aprendiz.id == aprendiz.id %}is-me{% endif %}">
+                <span class="learner-position">{{ fila.medalla or fila.posicion }}</span>
+                <div class="learner-rank-info">
+                    <strong>
+                        {% if fila.aprendiz.id == aprendiz.id %}
+                        Tú · {{ aprendiz.nombre }}
+                        {% else %}
+                        {{ fila.alias }}
+                        {% endif %}
+                    </strong>
+                    <div class="progress-track">{% if fila.barra_puntaje > 0 %}<span style="--progress-value: {{ fila.barra_puntaje }}%;"></span>{% endif %}</div>
+                </div>
+                <strong>{{ '%.1f'|format(fila.puntaje_total) }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="achievements-section">
+        <div class="section-header">
+            <div>
+                <span class="eyebrow">Reconocimiento de participación</span>
+                <h2>Mis logros</h2>
+            </div>
+            <span class="badge badge-success">{{ otorgamientos|length }} obtenida(s)</span>
+        </div>
+        <div class="achievement-grid">
+            {% for insignia in catalogo_insignias %}
+            {% set obtenida = insignia.id in ids_insignias_obtenidas %}
+            <article class="achievement-card {% if not obtenida %}locked{% endif %}">
+                <span class="achievement-icon">{{ insignia.icono }}</span>
+                <h3>{{ insignia.nombre }}</h3>
+                <p>{{ insignia.descripcion }}</p>
+                <span class="achievement-status">{{ 'Obtenida' if obtenida else 'Por desbloquear' }}</span>
+            </article>
+            {% endfor %}
+        </div>
+        <p class="ranking-disclaimer">Estos reconocimientos son motivacionales y no hacen parte de tu evaluación oficial.</p>
+    </section>
+
+    <div class="tasks-section-header">
+        <div>
+            <span class="eyebrow">Espacio de Evidencias</span>
+            <h2 class="tasks-section-title">Mis Tareas Programadas</h2>
+        </div>
+        
+        {% if tareas_estado %}
+        {% set total_tareas = tareas_estado|length %}
+        {% set entregadas = [] %}
+        {% set pendientes = [] %}
+        {% for item in tareas_estado %}
+            {% if item.estado in ['entregada', 'retraso'] %}
+                {% set _ = entregadas.append(item) %}
+            {% else %}
+                {% set _ = pendientes.append(item) %}
+            {% endif %}
+        {% endfor %}
+        {% set pct = (entregadas|length / total_tareas * 100)|round|int if total_tareas > 0 else 0 %}
+        
+        <div class="evidence-progress-mini">
+            <div class="evidence-progress-row">
+                <span>Progreso de Evidencias</span>
+                <span class="evidence-progress-value">{{ pct }}%</span>
+            </div>
+            <div class="progress-card-track">
+                {% if pct > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct }}%; --metric-color: var(--success);"></div>{% endif %}
+            </div>
+            <small class="text-muted evidence-progress-caption">{{ entregadas|length }} de {{ total_tareas }} entregadas</small>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if tareas_estado %}
+    <!-- TAREAS PENDIENTES (VISIBLES) -->
+    {% if pendientes %}
+    <h3 class="tasks-pending-title">
+        ⚠️ Por Entregar ({{ pendientes|length }})
+    </h3>
+    <div class="tasks-list-aprendiz">
+        {% for item in pendientes %}
+        <div class="task-item task-{{ item.estado }}">
+            <div class="task-item-header">
+                <div class="task-info">
+                    <h3 class="task-title">{{ item.tarea.titulo }}</h3>
+                    {% if item.tarea.fecha_limite %}
+                    <p class="task-deadline">🕒 Límite: {{ item.tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
+                </div>
+                <div class="task-status">
+                    {% if item.estado == 'pendiente' %}
+                    <span class="badge badge-warning">Pendiente</span>
+                    {% elif item.estado == 'vencida' %}
+                    <span class="badge badge-secondary">Vencida</span>
+                    {% elif item.estado == 'correccion' %}
+                    <span class="badge badge-warning">Requiere corrección</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if item.tarea.descripcion %}
+            <p class="task-desc">{{ item.tarea.descripcion }}</p>
+            {% endif %}
+
+            {% if item.entrega and item.entrega.calificada %}
+            <div class="task-feedback">
+                <strong>Nota: {{ item.entrega.calificacion }}</strong>
+                {% if item.entrega.feedback %}
+                <p>{{ item.entrega.feedback }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="task-actions task-evidence-actions">
+                {% if item.tarea.enlace_externo %}
+                <a href="{{ item.tarea.enlace_externo }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🔗 Enlace externo</a>
+                {% endif %}
+                {% if item.tarea.material_apoyo_url %}
+                <a href="{{ url_for('aprendiz.descargar_archivo', filename=item.tarea.material_apoyo_url, ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">⬇️ Material de apoyo</a>
+                {% endif %}
+                {% if item.entrega and item.entrega.archivo_url %}
+                <a href="{{ url_for('aprendiz.descargar_evidencia', entrega_id=item.entrega.id) }}" class="btn btn-outline btn-sm download-evidence-link">📄 Descargar mi evidencia</a>
+                {% endif %}
+                {% if item.entrega and item.entrega.enlace_repositorio %}
+                <a href="{{ item.entrega.enlace_repositorio }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🌐 Abrir enlace entregado</a>
+                {% endif %}
+            </div>
+
+            <details class="entrega-form">
+                <summary class="entrega-summary">
+                    {% if item.entrega %}
+                        ✏️ Editar evidencia entregada
+                    {% elif item.estado == 'correccion' %}
+                        📝 Corregir y reenviar evidencia
+                    {% else %}
+                        📤 Subir evidencia de la tarea
+                    {% endif %}
+                </summary>
+                <form method="POST" action="{{ url_for('aprendiz.subir_evidencia', ficha_id=ficha.id, tarea_id=item.tarea.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    {% if item.tarea.requiere_archivo %}
+                    <div class="form-group">
+                        <label for="evidencia-{{ item.tarea.id }}">
+                            Archivo de evidencia {% if item.entrega and item.entrega.archivo_url %}(opcional para reemplazar archivo existente){% else %}(obligatorio){% endif %}
+                        </label>
+                        <input type="file" id="evidencia-{{ item.tarea.id }}" name="archivo_evidencia"
+                               accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                        {% if item.entrega and item.entrega.archivo_url %}
+                        <small class="uploaded-note">Tiene un archivo subido previamente.</small>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="form-group">
+                        <label for="evidencia-{{ item.tarea.id }}">Archivo de evidencia (opcional)</label>
+                        <input type="file" id="evidencia-{{ item.tarea.id }}" name="archivo_evidencia"
+                               accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" class="form-file-input">
+                    </div>
+                    {% endif %}
+
+                    <div class="form-group">
+                        <label for="repositorio-{{ item.tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
+                        <input type="url" id="repositorio-{{ item.tarea.id }}" name="enlace_repositorio"
+                               value="{{ item.entrega.enlace_repositorio or '' if item.entrega else '' }}"
+                               placeholder="https://github.com/..." class="form-control">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary full-width">
+                        {% if item.entrega %}Guardar cambios en evidencia{% else %}Enviar evidencia{% endif %}
+                    </button>
+                </form>
+            </details>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- TAREAS ENTREGADAS (COLAPSADAS) -->
+    {% if entregadas %}
+    <details class="entregadas-details">
+        <summary class="entregadas-summary">
+            ✅ Evidencias Entregadas ({{ entregadas|length }})
+            <span class="badge badge-success details-badge">Ver detalle</span>
+        </summary>
+        
+        <div class="tasks-list-aprendiz tasks-inner">
+            {% for item in entregadas %}
+            <div class="task-item task-{{ item.estado }}">
+                <div class="task-item-header">
+                    <div class="task-info">
+                        <h3 class="task-title">{{ item.tarea.titulo }}</h3>
+                        {% if item.tarea.fecha_limite %}
+                        <p class="task-deadline">🕒 Límite: {{ item.tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="task-status">
+                        {% if item.estado == 'entregada' %}
+                        <span class="badge badge-success">Entregada</span>
+                        {% elif item.estado == 'retraso' %}
+                        <span class="badge badge-danger">Entregada con retraso</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if item.tarea.descripcion %}
+                <p class="task-desc">{{ item.tarea.descripcion }}</p>
+                {% endif %}
+
+                {% if item.entrega and item.entrega.calificada %}
+                <div class="task-feedback task-feedback-success">
+                    <strong>Nota: {{ item.entrega.calificacion }}</strong>
+                    {% if item.entrega.feedback %}
+                    <p>{{ item.entrega.feedback }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="task-actions task-evidence-actions">
+                    {% if item.tarea.enlace_externo %}
+                    <a href="{{ item.tarea.enlace_externo }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🔗 Enlace tarea</a>
+                    {% endif %}
+                    {% if item.tarea.material_apoyo_url %}
+                    <a href="{{ url_for('aprendiz.descargar_archivo', filename=item.tarea.material_apoyo_url, ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">⬇️ Material de apoyo</a>
+                    {% endif %}
+                    {% if item.entrega and item.entrega.archivo_url %}
+                    <a href="{{ url_for('aprendiz.descargar_evidencia', entrega_id=item.entrega.id) }}" class="btn btn-outline btn-sm download-evidence-link">📄 Descargar mi evidencia</a>
+                    {% endif %}
+                    {% if item.entrega and item.entrega.enlace_repositorio %}
+                    <a href="{{ item.entrega.enlace_repositorio }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🌐 Abrir enlace entregado</a>
+                    {% endif %}
+                </div>
+
+                <details class="entrega-form">
+                    <summary class="entrega-summary">
+                        ✏️ Editar evidencia entregada
+                    </summary>
+                    <form method="POST" action="{{ url_for('aprendiz.subir_evidencia', ficha_id=ficha.id, tarea_id=item.tarea.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        {% if item.tarea.requiere_archivo %}
+                        <div class="form-group">
+                            <label for="evidencia-entregada-{{ item.tarea.id }}">
+                                Archivo de evidencia {% if item.entrega and item.entrega.archivo_url %}(opcional para reemplazar archivo existente){% else %}(obligatorio){% endif %}
+                            </label>
+                            <input type="file" id="evidencia-entregada-{{ item.tarea.id }}" name="archivo_evidencia"
+                                   accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                            {% if item.entrega and item.entrega.archivo_url %}
+                            <small class="uploaded-note">Tiene un archivo subido previamente.</small>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="form-group">
+                            <label for="evidencia-entregada-{{ item.tarea.id }}">Archivo de evidencia (opcional)</label>
+                            <input type="file" id="evidencia-entregada-{{ item.tarea.id }}" name="archivo_evidencia"
+                                   accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" class="form-file-input">
+                        </div>
+                        {% endif %}
+
+                        <div class="form-group">
+                            <label for="repositorio-entregada-{{ item.tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
+                            <input type="url" id="repositorio-entregada-{{ item.tarea.id }}" name="enlace_repositorio"
+                                   value="{{ item.entrega.enlace_repositorio or '' if item.entrega else '' }}"
+                                   placeholder="https://github.com/..." class="form-control">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary full-width">Guardar cambios en evidencia</button>
+                    </form>
+                </details>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+
+    {% if not pendientes and not entregadas %}
+    <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h3>Todavía no hay tareas asignadas</h3>
+        <p>Tu instructor aún no ha creado tareas para esta ficha.</p>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h3>Todavía no hay tareas asignadas</h3>
+        <p>Tu instructor aún no ha creado tareas para esta ficha.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- openJuicioTab defined in the metrics-grid inline script above -->
+{% endblock %}

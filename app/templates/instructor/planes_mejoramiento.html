@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Planes de mejoramiento - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver a casos</a>
+    <h1>Planes de mejoramiento</h1>
+    <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+</div>
+
+<div class="participation-note">
+    <span aria-hidden="true">📋</span>
+    <p><strong>Plan de mejoramiento — Art. 28 Res. 009 de 2024.</strong> El plan de mejoramiento es un acuerdo entre el instructor y el aprendiz para superar las dificultades académicas antes de llegar a comité.</p>
+</div>
+
+<details class="card form-card" {% if request.args.get('aprendiz_id') %}open{% endif %}>
+    <summary><span>+ Crear nuevo plan de mejoramiento</span></summary>
+    <form method="POST" action="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label for="aprendiz_id">Aprendiz</label>
+            <select id="aprendiz_id" name="aprendiz_id" required>
+                <option value="">Seleccionar aprendiz...</option>
+                {% for ap in aprendices %}
+                <option value="{{ ap.id }}" {% if request.args.get('aprendiz_id')|int == ap.id %}selected{% endif %}>{{ ap.nombre_completo }} ({{ ap.documento }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="alerta_id">Asociar a alerta (opcional)</label>
+            <select id="alerta_id" name="alerta_id">
+                <option value="">Sin alerta específica...</option>
+                {% for caso in casos_activos %}
+                {% if caso is mapping %}
+                    {% set caso_aprendiz = caso.aprendiz %}
+                    {% set caso_alertas = caso.alertas %}
+                {% else %}
+                    {% set caso_aprendiz = caso[0].aprendiz if caso else none %}
+                    {% set caso_alertas = caso %}
+                {% endif %}
+                {% for alerta in caso_alertas %}
+                <option value="{{ alerta.id }}" {% if request.args.get('alerta_id')|int == alerta.id %}selected{% endif %}>{{ alerta.titulo }} — {{ caso_aprendiz.nombre_completo }}</option>
+                {% endfor %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="fecha_limite">Fecha límite para cumplimiento</label>
+            <input type="date" id="fecha_limite" name="fecha_limite" value="{{ fecha_limite_sugerida }}">
+        </div>
+        <div class="form-group">
+            <label for="actividades">Actividades del plan</label>
+            <textarea id="actividades" name="actividades" rows="4" placeholder="Describe las actividades que el aprendiz debe realizar, los compromisos y fechas de revisión..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Crear plan de mejoramiento</button>
+    </form>
+</details>
+
+{% if planes %}
+<div class="plan-list followup-plan-list">
+    {% for plan in planes %}
+    <div class="card plan-card plan-state-{{ plan.estado }}">
+        <div class="plan-card-header">
+            <div>
+                <h3>{{ plan.aprendiz.nombre_completo }}</h3>
+                <p class="text-muted">Creado {{ plan.fecha_creacion.strftime('%d/%m/%Y') }}</p>
+            </div>
+            <span class="badge badge-{{ 'success' if plan.estado == 'cumplido' else 'danger' if plan.estado == 'vencido' else 'warning' }} plan-state-badge">
+                {{ {'pendiente': 'Pendiente', 'cumplido': 'Cumplido', 'vencido': 'Vencido'}[plan.estado] }}
+            </span>
+        </div>
+        <div class="plan-activities">
+            <strong>Actividades:</strong>
+            <p>{{ plan.actividades }}</p>
+        </div>
+        <div class="plan-meta">
+            {% if plan.fecha_limite %}<span>Límite: {{ plan.fecha_limite.strftime('%d/%m/%Y') }}</span>{% endif %}
+            {% if plan.fecha_cumplimiento %}<span>Cumplido: {{ plan.fecha_cumplimiento.strftime('%d/%m/%Y') }}</span>{% endif %}
+            {% if plan.observaciones_instructor %}<span>Nota: {{ plan.observaciones_instructor }}</span>{% endif %}
+        </div>
+        {% if plan.estado == 'pendiente' %}
+        <div class="plan-actions">
+            <form method="POST" action="{{ url_for('seguimiento.cumplir_plan', ficha_id=ficha.id, plan_id=plan.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-primary">Marcar como cumplido</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state followup-plan-empty">
+    <div class="empty-icon">📋</div>
+    <h3>Todavía no hay planes de mejoramiento</h3>
+    <p>Crea un plan cuando un aprendiz acumule incumplimientos académicos. El plan es el paso previo al comité según la Resolución 009 Art. 28.</p>
+</div>
+{% endif %}
+{% endblock %}

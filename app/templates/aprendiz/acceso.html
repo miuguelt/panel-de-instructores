@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Acceso Aprendiz - SENA Control{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo">S</div>
+            <h1>SENA Control Académico</h1>
+            {% if ficha %}
+            <p>Ficha: {{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+            {% else %}
+            <p>Ingresa tu documento para ver tu estado</p>
+            {% endif %}
+        </div>
+
+        <form method="POST" class="auth-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="documento">Número de documento</label>
+                <input type="text" id="documento" name="documento" placeholder="Tu número de documento" required
+                       pattern="[0-9]+" inputmode="numeric" autocomplete="off">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">Ver mi estado</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

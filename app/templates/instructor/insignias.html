@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Insignias - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header ranking-heading">
+    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver al ranking</a>
+    <div>
+        <span class="eyebrow">Reconocimiento positivo</span>
+        <h1>Insignias y logros</h1>
+        <p class="text-muted"><a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">{{ ficha.codigo }} · {{ ficha.nombre_programa }}</a></p>
+    </div>
+    <div class="header-actions">
+        <a href="{{ url_for('ranking.exportar_insignias', ficha_id=ficha.id, formato='excel') }}" class="btn btn-outline">Excel</a>
+        <a href="{{ url_for('ranking.exportar_insignias', ficha_id=ficha.id, formato='pdf') }}" class="btn btn-outline">PDF</a>
+    </div>
+</div>
+
+<div class="participation-note">
+    <span aria-hidden="true">🏅</span>
+    <p><strong>Reconocimientos de participación.</strong> Las insignias son permanentes, motivacionales y están separadas de la evaluación oficial.</p>
+</div>
+
+<section class="badge-catalog">
+    {% for insignia in catalogo %}
+    <article class="badge-admin-card {% if not insignia.activa %}badge-inactive{% endif %}">
+        <span class="badge-large">{{ insignia.icono }}</span>
+        <div class="badge-admin-content">
+            <div class="badge-title-row">
+                <h3>{{ insignia.nombre }}</h3>
+                <span class="badge badge-{{ 'info' if insignia.tipo == 'automatica' else 'warning' }}">
+                    {{ insignia.tipo }}
+                </span>
+            </div>
+            <p>{{ insignia.descripcion }}</p>
+            <form method="POST" action="{{ url_for('ranking.cambiar_estado_insignia', ficha_id=ficha.id, insignia_id=insignia.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline">
+                    {{ 'Activar' if not insignia.activa else 'Desactivar' }}
+                </button>
+            </form>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+
+<div class="two-column-layout">
+    <section class="card form-card">
+        <h2>Crear insignia personalizada</h2>
+        <p class="text-muted">Úsala para reconocer trabajo en equipo, actitud o aportes especiales.</p>
+        <form method="POST" action="{{ url_for('ranking.crear_insignia', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-row">
+                <div class="form-group icon-field">
+                    <label for="icono">Ícono</label>
+                    <input type="text" id="icono" name="icono" value="🏅" maxlength="20">
+                </div>
+                <div class="form-group flex-grow">
+                    <label for="nombre">Nombre</label>
+                    <input type="text" id="nombre" name="nombre" placeholder="Ej: Mejor trabajo en equipo" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="descripcion">Condición o motivo</label>
+                <textarea id="descripcion" name="descripcion" rows="3" required
+                          placeholder="Describe de forma positiva qué se reconoce."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Crear insignia</button>
+        </form>
+    </section>
+
+    <section class="card form-card">
+        <h2>Otorgar reconocimiento manual</h2>
+        <p class="text-muted">Una insignia obtenida nunca se elimina ni se duplica.</p>
+        <form method="POST" action="{{ url_for('ranking.otorgar_insignia', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="aprendiz_id">Aprendiz</label>
+                <select id="aprendiz_id" name="aprendiz_id" required>
+                    <option value="">Selecciona un aprendiz</option>
+                    {% for aprendiz in aprendices %}
+                    <option value="{{ aprendiz.id }}">{{ aprendiz.nombre_completo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="insignia_id">Insignia</label>
+                <select id="insignia_id" name="insignia_id" required>
+                    <option value="">Selecciona una insignia activa</option>
+                    {% for insignia in catalogo if insignia.activa %}
+                    <option value="{{ insignia.id }}">{{ insignia.icono }} {{ insignia.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Otorgar insignia</button>
+        </form>
+    </section>
+</div>
+
+<section>
+    <div class="section-header">
+        <div>
+            <span class="eyebrow">Reporte cualitativo</span>
+            <h2>Logros obtenidos</h2>
+        </div>
+        <form method="GET" class="filter-inline">
+            <label for="filtro_insignia">Filtrar</label>
+            <select id="filtro_insignia" name="insignia_id" onchange="this.form.submit()">
+                <option value="">Todas las insignias</option>
+                {% for insignia in catalogo %}
+                <option value="{{ insignia.id }}" {% if filtro_id == insignia.id %}selected{% endif %}>
+                    {{ insignia.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    {% if otorgamientos %}
+    <div class="achievement-report">
+        {% for item in otorgamientos %}
+        <article class="achievement-row">
+            <span class="badge-large">{{ item.insignia.icono }}</span>
+            <div>
+                <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=item.aprendiz.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">
+                    <strong>{{ item.aprendiz.nombre_completo }}</strong>
+                </a>
+                <p>{{ item.insignia.nombre }} · {{ item.fecha_obtencion.strftime('%d/%m/%Y') }}</p>
+            </div>
+            <span class="badge badge-{{ 'info' if item.otorgada_por == 'sistema' else 'warning' }}">
+                {{ item.otorgada_por }}
+            </span>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🌱</div>
+        <h3>Los primeros logros están por llegar</h3>
+        <p>Las insignias automáticas aparecerán cuando se cumplan sus condiciones.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
+

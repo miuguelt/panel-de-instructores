@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+{% block title %}Reporte integral · {{ aprendiz.nombre_completo }} - SENA Control{% endblock %}
+
+{% macro tone_for_pct(value) -%}
+    {%- if value >= 80 -%}success{%- elif value >= 60 -%}warning{%- else -%}danger{%- endif -%}
+{%- endmacro %}
+
+{% macro status_badge(label, tone='neutral') -%}
+<span class="report-badge report-badge--{{ tone }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro competency_group(tipo, title, icon) %}
+<section class="report-section report-competency-section">
+    <div class="report-section-heading">
+        <div>
+            <span class="report-eyebrow">{{ icon }} {{ tipo|capitalize }}</span>
+            <h3>{{ title }}</h3>
+        </div>
+        <div class="report-heading-meta">
+            <strong>{{ resumen_tipos[tipo].aprobados_raps }}/{{ resumen_tipos[tipo].total_raps }}</strong>
+            <span>RAPs aprobados · {{ resumen_tipos[tipo].pct_raps }}%</span>
+        </div>
+    </div>
+    {% if competencias_por_tipo[tipo] %}
+    <div class="report-competency-grid">
+        {% for comp in competencias_por_tipo[tipo] %}
+        <article class="report-competency-card">
+            <div class="report-competency-card__top">
+                <div>
+                    <span class="report-code">Competencia {{ loop.index }}</span>
+                    <h4>{{ comp.nombre }}</h4>
+                </div>
+                {{ status_badge('Completada' if comp.estado == 'completada' else ('En progreso' if comp.estado == 'en_progreso' else 'Pendiente'), 'success' if comp.estado == 'completada' else ('warning' if comp.estado == 'en_progreso' else 'neutral')) }}
+            </div>
+            <div class="report-meter report-meter--compact" aria-label="{{ comp.pct }} por ciento de avance">
+                <span class="report-meter__fill report-meter__fill--{{ 'success' if comp.estado == 'completada' else ('warning' if comp.estado == 'en_progreso' else 'neutral') }}" style="width: {{ comp.pct }}%"></span>
+            </div>
+            <div class="report-inline-stats">
+                <span><strong>{{ comp.aprobados_raps }}/{{ comp.total_raps }}</strong> RAPs</span>
+                <span>{{ comp.pct }}% avance</span>
+                <span>{% if comp.ultima_fecha %}Último: {{ comp.ultima_fecha.strftime('%d/%m/%Y') }}{% else %}Sin fecha{% endif %}</span>
+            </div>
+            <details class="report-details">
+                <summary>Ver resultados de aprendizaje <span>({{ comp.total_raps }})</span></summary>
+                <div class="report-rap-list">
+                    {% for rap in comp.raps %}
+                    <div class="report-rap-item report-rap-item--{{ 'success' if rap.aprobado else 'warning' }}">
+                        <div class="report-rap-item__head">
+                            {{ status_badge('Aprobado' if rap.aprobado else (rap.juicio or 'Por evaluar'), 'success' if rap.aprobado else 'warning') }}
+                            <time>{% if rap.fecha %}{{ rap.fecha.strftime('%d/%m/%Y') }}{% else %}Sin fecha{% endif %}</time>
+                        </div>
+                        <p>{{ rap.resultado }}</p>
+                        <small>Registró: {{ rap.instructor }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="report-empty">No se registran competencias de este tipo para el aprendiz.</div>
+    {% endif %}
+</section>
+{% endmacro %}
+
+{% block content %}
+{% set academic_tone = tone_for_pct(stats_juicios.pct_total) %}
+{% set attendance_tone = tone_for_pct(pct_asistencia) %}
+{% set task_tone = tone_for_pct(tareas_resumen.pct_a_tiempo) %}
+{% set followup_tone = 'danger' if seguimiento_resumen.alertas_rojas or seguimiento_resumen.planes_vencidos else ('warning' if seguimiento_resumen.alertas_activas or seguimiento_resumen.planes_pendientes else 'success') %}
+{% set status_tone = 'danger' if aprendiz.estado in ('CANCELADO', 'RETIRADO') else ('warning' if aprendiz.estado == 'POR_CERTIFICAR' else 'success') %}
+
+<div class="report-shell">
+    <div class="report-toolbar no-print">
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">← Volver a aprendices</a>
+        <div class="report-toolbar__actions">
+            <span class="report-toolbar__label">Informe individual · {{ resumen_reporte.generado_en.strftime('%d/%m/%Y %H:%M') }}</span>
+            <button type="button" class="btn btn-sm btn-primary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+        </div>
+    </div>
+
+    <header class="report-hero">
+        <div class="report-identity">
+            <div class="report-avatar" aria-hidden="true">{{ aprendiz.nombre[:1] }}{{ aprendiz.apellidos[:1] }}</div>
+            <div>
+                <span class="report-eyebrow">Reporte integral de seguimiento</span>
+                <h1>{{ aprendiz.nombre_completo }}</h1>
+                <div class="report-subtitle">{{ ficha.nombre_programa }}</div>
+                <div class="report-meta-list">
+                    <span><strong>{{ aprendiz.tipo_documento or 'Documento' }}</strong> {{ aprendiz.documento }}</span>
+                    {% if aprendiz.correo %}<span>{{ aprendiz.correo }}</span>{% endif %}
+                    <span>Ficha <a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}">{{ ficha.codigo }}</a></span>
+                </div>
+            </div>
+        </div>
+        <div class="report-hero__side">
+            {{ status_badge(aprendiz.estado.replace('_', ' '), status_tone) }}
+            {% if ranking %}
+            <div class="report-ranking-chip"><strong>#{{ ranking.posicion }}</strong><span>de {{ resumen_reporte.total_aprendices_ficha }} en la ficha</span></div>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="report-context-grid">
+        <div><span>Programa</span><strong>{{ ficha.nombre_programa }}</strong></div>
+        <div><span>Código de programa</span><strong>{{ ficha.codigo_programa or 'No registrado' }}</strong></div>
+        <div><span>Inicio de ficha</span><strong>{{ ficha.fecha_inicio.strftime('%d/%m/%Y') if ficha.fecha_inicio else 'No registrado' }}</strong></div>
+        <div><span>Finalización estimada</span><strong>{{ ficha.fecha_fin.strftime('%d/%m/%Y') if ficha.fecha_fin else 'No registrada' }}</strong></div>
+    </div>
+
+    {% if instructores|length > 1 %}
+    <div class="report-notice">
+        <strong>Historial consolidado multi-instructor</strong>
+        <span>Este informe reúne registros de: {{ instructores|map(attribute='nombre')|join(', ') }}.</span>
+    </div>
+    {% endif %}
+
+    <section class="report-kpi-grid" aria-label="Indicadores principales">
+        <article class="report-kpi report-kpi--{{ academic_tone }}">
+            <span class="report-kpi__label">Avance académico</span>
+            <strong class="report-kpi__value">{{ stats_juicios.pct_total }}%</strong>
+            <span>{{ stats_juicios.aprobados }} de {{ stats_juicios.total }} RAPs aprobados</span>
+            <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ academic_tone }}" style="width: {{ stats_juicios.pct_total }}%"></span></div>
+        </article>
+        <article class="report-kpi report-kpi--{{ attendance_tone }}">
+            <span class="report-kpi__label">Asistencia efectiva</span>
+            <strong class="report-kpi__value">{{ '%.0f'|format(pct_asistencia) }}%</strong>
+            <span>{{ estados_asistencia.ASISTE.count }} asistencias · {{ estados_asistencia.TARDANZA.count }} tardanzas</span>
+            <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ attendance_tone }}" style="width: {{ pct_asistencia }}%"></span></div>
+        </article>
+        <article class="report-kpi report-kpi--{{ task_tone }}">
+            <span class="report-kpi__label">Entrega a tiempo</span>
+            <strong class="report-kpi__value">{{ tareas_resumen.pct_a_tiempo }}%</strong>
+            <span>{{ tareas_resumen.entregas }} entregas · {{ tareas_resumen.total }} tareas</span>
+            <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ task_tone }}" style="width: {{ tareas_resumen.pct_a_tiempo }}%"></span></div>
+        </article>
+        <article class="report-kpi report-kpi--{{ followup_tone }}">
+            <span class="report-kpi__label">Seguimiento</span>
+            <strong class="report-kpi__value">{{ seguimiento_resumen.alertas_activas }}</strong>
+            <span>alertas activas · {{ seguimiento_resumen.planes_pendientes }} planes pendientes</span>
+            <div class="report-kpi__footer">{{ seguimiento_resumen.alertas_rojas }} prioridad alta · {{ otorgamientos|length }} insignias</div>
+        </article>
+    </section>
+
+    <nav class="report-tabs no-print" role="tablist" aria-label="Secciones del reporte">
+        <button type="button" class="report-tab is-active" data-tab="report-summary" role="tab" aria-selected="true">Resumen ejecutivo</button>
+        <button type="button" class="report-tab" data-tab="report-training" role="tab" aria-selected="false">Formación y RAPs</button>
+        <button type="button" class="report-tab" data-tab="report-attendance" role="tab" aria-selected="false">Asistencia</button>
+        <button type="button" class="report-tab" data-tab="report-tasks" role="tab" aria-selected="false">Tareas y evidencias</button>
+        <button type="button" class="report-tab" data-tab="report-followup" role="tab" aria-selected="false">Alertas y seguimiento</button>
+        <button type="button" class="report-tab" data-tab="report-judgements" role="tab" aria-selected="false">Juicios oficiales ({{ juicios|length }})</button>
+    </nav>
+
+    <main>
+        <section id="report-summary" class="report-panel is-active" role="tabpanel">
+            <div class="report-two-columns">
+                <article class="report-section">
+                    <div class="report-section-heading">
+                        <div><span class="report-eyebrow">Lectura rápida</span><h2>Estado integral del aprendiz</h2></div>
+                    </div>
+                    <div class="report-health-list">
+                        <div class="report-health-row">
+                            <div><strong>Desempeño académico</strong><small>{{ stats_juicios.aprobados }} aprobados de {{ stats_juicios.total }} resultados registrados</small></div>
+                            {{ status_badge(academic_tone == 'success' and 'Favorable' or (academic_tone == 'warning' and 'Requiere atención' or 'Prioridad alta'), academic_tone) }}
+                        </div>
+                        <div class="report-health-row">
+                            <div><strong>Asistencia</strong><small>{{ faltas_injustificadas }} faltas injustificadas · {{ faltas_justificadas }} justificadas o médicas</small></div>
+                            {{ status_badge(attendance_tone == 'success' and 'Estable' or (attendance_tone == 'warning' and 'Seguimiento' or 'Crítica'), attendance_tone) }}
+                        </div>
+                        <div class="report-health-row">
+                            <div><strong>Gestión de evidencias</strong><small>{{ tareas_resumen.calificadas }} calificadas · {% if tareas_resumen.promedio is not none %}promedio {{ tareas_resumen.promedio }}{% else %}sin promedio aún{% endif %}</small></div>
+                            {{ status_badge(task_tone == 'success' and 'Al día' or (task_tone == 'warning' and 'Parcial' or 'Pendiente'), task_tone) }}
+                        </div>
+                        <div class="report-health-row">
+                            <div><strong>Alertas institucionales</strong><small>{{ seguimiento_resumen.alertas_total }} históricas · {{ seguimiento_resumen.alertas_resueltas }} resueltas</small></div>
+                            {{ status_badge(followup_tone == 'success' and 'Sin novedades' or (followup_tone == 'warning' and 'En seguimiento' or 'Prioridad alta'), followup_tone) }}
+                        </div>
+                    </div>
+                </article>
+
+                <article class="report-section">
+                    <div class="report-section-heading">
+                        <div><span class="report-eyebrow">Trazabilidad</span><h2>Actividad registrada</h2></div>
+                    </div>
+                    <dl class="report-facts-list">
+                        <div><dt>Primera evaluación</dt><dd>{{ resumen_aprendiz_hist.primera_evaluacion.strftime('%d/%m/%Y') if resumen_aprendiz_hist.primera_evaluacion else 'Sin registro' }}</dd></div>
+                        <div><dt>Última evaluación</dt><dd>{{ resumen_aprendiz_hist.ultima_evaluacion.strftime('%d/%m/%Y') if resumen_aprendiz_hist.ultima_evaluacion else 'Sin registro' }}</dd></div>
+                        <div><dt>Última asistencia</dt><dd>{{ resumen_reporte.ultima_asistencia.strftime('%d/%m/%Y') if resumen_reporte.ultima_asistencia else 'Sin registro' }}</dd></div>
+                        <div><dt>Última entrega</dt><dd>{{ resumen_reporte.ultima_entrega.strftime('%d/%m/%Y %H:%M') if resumen_reporte.ultima_entrega else 'Sin registro' }}</dd></div>
+                        <div><dt>Competencias evaluadas</dt><dd>{{ resumen_aprendiz_hist.total_competencias }}</dd></div>
+                        <div><dt>Personas registradoras</dt><dd>{{ resumen_aprendiz_hist.total_instructores }}</dd></div>
+                    </dl>
+                </article>
+            </div>
+
+            <div class="report-two-columns">
+                <article class="report-section">
+                    <div class="report-section-heading"><div><span class="report-eyebrow">Distribución académica</span><h2>Avance por tipo de competencia</h2></div></div>
+                    <div class="report-category-list">
+                        {% for tipo, label, icon in [('tecnica', 'Técnicas', '🛠️'), ('transversal', 'Transversales', '💡'), ('ingles', 'Inglés', '🌐')] %}
+                        <div class="report-category-row">
+                            <div class="report-category-row__label"><span>{{ icon }}</span><strong>{{ label }}</strong><small>{{ resumen_tipos[tipo].completadas }}/{{ resumen_tipos[tipo].total }} competencias completas</small></div>
+                            <div class="report-category-row__value"><strong>{{ resumen_tipos[tipo].pct_raps }}%</strong><span>{{ resumen_tipos[tipo].aprobados_raps }}/{{ resumen_tipos[tipo].total_raps }} RAPs</span></div>
+                            <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ 'success' if resumen_tipos[tipo].pct_raps >= 80 else ('warning' if resumen_tipos[tipo].pct_raps >= 60 else 'danger') }}" style="width: {{ resumen_tipos[tipo].pct_raps }}%"></span></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                <article class="report-section">
+                    <div class="report-section-heading"><div><span class="report-eyebrow">Reconocimientos</span><h2>Insignias y convivencia</h2></div></div>
+                    {% if otorgamientos %}
+                    <div class="report-awards-grid">
+                        {% for item in otorgamientos %}
+                        <div class="report-award"><span>{{ item.insignia.icono }}</span><strong>{{ item.insignia.nombre }}</strong><small>{{ item.fecha_obtencion.strftime('%d/%m/%Y') }}</small></div>
+                        {% endfor %}
+                    </div>
+                    {% else %}<div class="report-empty">Aún no hay insignias otorgadas.</div>{% endif %}
+                    <div class="report-callout report-callout--neutral"><strong>Turnos de aseo cumplidos</strong><span>{{ aseo.contador.veces_aseo if aseo.contador else 0 }}</span></div>
+                </article>
+            </div>
+
+            {% if timeline_aprendiz_hist %}
+            <section class="report-section">
+                <div class="report-section-heading"><div><span class="report-eyebrow">Evolución</span><h2>Historial mensual de juicios</h2></div><span class="report-caption">Aprobados frente a resultados registrados</span></div>
+                <div class="report-timeline">
+                    {% for mes, data in timeline_aprendiz_hist %}
+                    {% set pct_mes = ((data.aprobados / data.total) * 100)|round|int if data.total else 0 %}
+                    <div class="report-timeline-row"><time>{{ mes }}</time><div class="report-meter"><span class="report-meter__fill report-meter__fill--success" style="width: {{ pct_mes }}%"></span></div><strong>{{ data.aprobados }}/{{ data.total }}</strong><small>{{ pct_mes }}%</small></div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+        </section>
+
+        <section id="report-training" class="report-panel" role="tabpanel" hidden>
+            <section class="report-section report-section--intro"><span class="report-eyebrow">Detalle curricular</span><h2>Formación y resultados de aprendizaje</h2><p>Vista desglosada de competencias, estado de avance y cada RAP registrado en el historial oficial del aprendiz.</p></section>
+            {{ competency_group('tecnica', 'Competencias técnicas del programa', '🛠️') }}
+            {{ competency_group('transversal', 'Competencias transversales', '💡') }}
+            {{ competency_group('ingles', 'Competencias de inglés', '🌐') }}
+        </section>
+
+        <section id="report-attendance" class="report-panel" role="tabpanel" hidden>
+            <section class="report-section report-section--intro"><span class="report-eyebrow">Control de asistencia</span><h2>Detalle completo de asistencia</h2><p>Se consideran como asistencia efectiva los estados <strong>Asiste</strong> y <strong>Tardanza</strong>. Las faltas justificadas se muestran separadas para facilitar el seguimiento.</p></section>
+            <div class="report-stat-grid report-stat-grid--five">
+                <div class="report-stat"><span>Registros</span><strong>{{ resumen_reporte.total_registros_asistencia }}</strong><small>sesiones con marcación</small></div>
+                <div class="report-stat report-stat--success"><span>Asistió</span><strong>{{ estados_asistencia.ASISTE.count }}</strong><small>presencias</small></div>
+                <div class="report-stat report-stat--warning"><span>Tardanzas</span><strong>{{ estados_asistencia.TARDANZA.count }}</strong><small>llegadas tarde</small></div>
+                <div class="report-stat report-stat--danger"><span>Injustificadas</span><strong>{{ faltas_injustificadas }}</strong><small>requieren gestión</small></div>
+                <div class="report-stat report-stat--info"><span>Justificadas</span><strong>{{ faltas_justificadas }}</strong><small>incluye excusa médica</small></div>
+            </div>
+
+            <div class="report-two-columns">
+                <section class="report-section">
+                    <div class="report-section-heading"><div><span class="report-eyebrow">Tendencia</span><h2>Asistencia por mes</h2></div></div>
+                    {% if asistencia_mensual %}
+                    <div class="report-month-list">
+                        {% for mes, data in asistencia_mensual %}
+                        {% set pct_mes = (((data.asistio + data.tardanzas) / data.total) * 100)|round|int if data.total else 0 %}
+                        <div class="report-month-row"><div><strong>{{ mes }}</strong><small>{{ data.total }} registros</small></div><div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ 'success' if pct_mes >= 80 else ('warning' if pct_mes >= 60 else 'danger') }}" style="width: {{ pct_mes }}%"></span></div><strong>{{ pct_mes }}%</strong></div>
+                        {% endfor %}
+                    </div>
+                    {% else %}<div class="report-empty">No hay registros de asistencia para este aprendiz.</div>{% endif %}
+                </section>
+                <section class="report-section">
+                    <div class="report-section-heading"><div><span class="report-eyebrow">Lectura de asistencia</span><h2>Indicadores de riesgo</h2></div></div>
+                    <dl class="report-facts-list">
+                        <div><dt>Faltas injustificadas</dt><dd>{{ faltas_injustificadas }}</dd></div>
+                        <div><dt>Faltas justificadas</dt><dd>{{ faltas_justificadas }}</dd></div>
+                        <div><dt>Porcentaje efectivo</dt><dd>{{ '%.1f'|format(pct_asistencia) }}%</dd></div>
+                        <div><dt>Última marcación</dt><dd>{{ resumen_reporte.ultima_asistencia.strftime('%d/%m/%Y') if resumen_reporte.ultima_asistencia else 'Sin registro' }}</dd></div>
+                    </dl>
+                    {% if faltas_injustificadas %}<div class="report-callout report-callout--danger"><strong>Revisar causales y compromisos</strong><span>El reporte registra {{ faltas_injustificadas }} falta{% if faltas_injustificadas != 1 %}s{% endif %} sin justificación.</span></div>{% else %}<div class="report-callout report-callout--success"><strong>Sin faltas injustificadas</strong><span>La asistencia no presenta faltas sin justificar.</span></div>{% endif %}
+                </section>
+            </div>
+
+            <section class="report-section">
+                <div class="report-section-heading"><div><span class="report-eyebrow">Trazabilidad de sesiones</span><h2>Registro detallado</h2></div><span class="report-caption">{{ registros_asistencia|length }} registros</span></div>
+                {% if registros_asistencia %}
+                <div class="report-table-wrap"><table class="report-table"><thead><tr><th>Fecha</th><th>Estado</th><th>Causal / soporte</th><th>Nota del registro</th><th>Observación de sesión</th></tr></thead><tbody>
+                    {% for registro in registros_asistencia %}
+                    {% set estado_info = estados_asistencia.get(registro.estado, {'label': registro.estado, 'tone': 'neutral'}) %}
+                    <tr><td><strong>{{ registro.fecha.strftime('%d/%m/%Y') if registro.fecha else 'Sin fecha' }}</strong></td><td>{{ status_badge(estado_info.label, estado_info.tone) }}</td><td>{{ registro.causal or ('Soporte adjunto' if registro.soporte else '—') }}</td><td>{{ registro.nota or '—' }}</td><td>{{ registro.observaciones_sesion or '—' }}</td></tr>
+                    {% endfor %}
+                </tbody></table></div>
+                {% else %}<div class="report-empty">No hay detalle de asistencia para mostrar.</div>{% endif %}
+            </section>
+        </section>
+
+        <section id="report-tasks" class="report-panel" role="tabpanel" hidden>
+            <section class="report-section report-section--intro"><span class="report-eyebrow">Evidencias de aprendizaje</span><h2>Tareas, entregas y retroalimentación</h2><p>Consulta el estado de cada actividad, fechas de entrega, calificaciones, revisión y comentarios registrados por el instructor.</p></section>
+            <div class="report-stat-grid report-stat-grid--five">
+                <div class="report-stat"><span>Asignadas</span><strong>{{ tareas_resumen.total }}</strong><small>actividades visibles</small></div>
+                <div class="report-stat report-stat--success"><span>Entregadas</span><strong>{{ tareas_resumen.entregas }}</strong><small>{{ tareas_resumen.pct_entrega }}% del total</small></div>
+                <div class="report-stat report-stat--info"><span>A tiempo</span><strong>{{ tareas_resumen.a_tiempo }}</strong><small>{{ tareas_resumen.pct_a_tiempo }}% del total</small></div>
+                <div class="report-stat report-stat--warning"><span>Pendientes</span><strong>{{ tareas_resumen.pendientes + tareas_resumen.vencidas }}</strong><small>pendientes o vencidas</small></div>
+                <div class="report-stat report-stat--accent"><span>Promedio</span><strong>{{ tareas_resumen.promedio if tareas_resumen.promedio is not none else '—' }}</strong><small>{{ tareas_resumen.calificadas }} calificadas</small></div>
+            </div>
+            <section class="report-section">
+                <div class="report-section-heading"><div><span class="report-eyebrow">Detalle por actividad</span><h2>Estado de las tareas</h2></div></div>
+                {% if tareas_estado %}
+                <div class="report-task-list">
+                    {% for item in tareas_estado %}
+                    {% set task_label = {'entregada': 'Entregada a tiempo', 'retraso': 'Entregada con retraso', 'pendiente': 'Pendiente', 'vencida': 'Vencida', 'correccion': 'En corrección'}.get(item.estado, item.estado) %}
+                    {% set task_tone_item = 'success' if item.estado == 'entregada' else ('danger' if item.estado in ('retraso', 'vencida') else ('warning' if item.estado in ('pendiente', 'correccion') else 'neutral')) %}
+                    <article class="report-task-card">
+                        <div class="report-task-card__main"><div class="report-task-card__title"><span class="report-code">Actividad {{ loop.index }}</span><h3>{{ item.tarea.titulo }}</h3></div>{{ status_badge(task_label, task_tone_item) }}<p>{{ item.tarea.descripcion or 'Sin descripción registrada.' }}</p></div>
+                        <dl class="report-task-card__facts"><div><dt>Fecha límite</dt><dd>{{ item.tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') if item.tarea.fecha_limite else 'Sin fecha límite' }}</dd></div><div><dt>Entrega</dt><dd>{{ item.entrega.fecha_entrega.strftime('%d/%m/%Y %H:%M') if item.entrega and item.entrega.fecha_entrega else 'No entregada' }}</dd></div><div><dt>Calificación</dt><dd>{{ item.entrega.calificacion if item.entrega and item.entrega.calificacion else 'Sin calificar' }}</dd></div><div><dt>Evidencia</dt><dd>{% if item.entrega and item.entrega.archivo_url %}Archivo cargado{% elif item.entrega and item.entrega.enlace_repositorio %}Enlace registrado{% else %}Sin archivo{% endif %}</dd></div></dl>
+                        {% if item.entrega and item.entrega.feedback %}<div class="report-feedback"><strong>Retroalimentación</strong><span>{{ item.entrega.feedback }}</span></div>{% endif %}
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}<div class="report-empty">No hay tareas asignadas en esta ficha.</div>{% endif %}
+            </section>
+        </section>
+
+        <section id="report-followup" class="report-panel" role="tabpanel" hidden>
+            <section class="report-section report-section--intro"><span class="report-eyebrow">Acompañamiento institucional</span><h2>Alertas, planes y reconocimientos</h2><p>Consolida las señales de seguimiento y las acciones de acompañamiento asociadas a este aprendiz.</p></section>
+            <div class="report-stat-grid report-stat-grid--four"><div class="report-stat report-stat--danger"><span>Alertas activas</span><strong>{{ seguimiento_resumen.alertas_activas }}</strong><small>{{ seguimiento_resumen.alertas_rojas }} de prioridad alta</small></div><div class="report-stat report-stat--info"><span>Alertas resueltas</span><strong>{{ seguimiento_resumen.alertas_resueltas }}</strong><small>{{ seguimiento_resumen.alertas_total }} históricas</small></div><div class="report-stat report-stat--warning"><span>Planes pendientes</span><strong>{{ seguimiento_resumen.planes_pendientes }}</strong><small>{{ seguimiento_resumen.planes_vencidos }} vencidos</small></div><div class="report-stat report-stat--success"><span>Planes cumplidos</span><strong>{{ seguimiento_resumen.planes_cumplidos }}</strong><small>{{ seguimiento_resumen.planes_total }} en total</small></div></div>
+            <div class="report-two-columns">
+                <section class="report-section"><div class="report-section-heading"><div><span class="report-eyebrow">Alertas</span><h2>Historial de alertas</h2></div></div>{% if alertas_aprendiz %}<div class="report-followup-list">{% for alerta in alertas_aprendiz %}<article class="report-followup-item"><div class="report-followup-item__head"><div><strong>{{ alerta.titulo }}</strong><small>{{ alerta.fecha_generada.strftime('%d/%m/%Y %H:%M') if alerta.fecha_generada else 'Sin fecha' }} · {{ alerta.tipo|capitalize }}</small></div>{{ status_badge(alerta.nivel|capitalize ~ ' · ' ~ alerta.estado|replace('_', ' ')|capitalize, 'danger' if alerta.nivel == 'roja' else ('warning' if alerta.nivel == 'amarilla' else 'neutral')) }}</div><p>{{ alerta.mensaje }}</p>{% if alerta.observaciones %}<small><strong>Observación:</strong> {{ alerta.observaciones }}</small>{% endif %}</article>{% endfor %}</div>{% else %}<div class="report-empty">No hay alertas individuales registradas.</div>{% endif %}</section>
+                <section class="report-section"><div class="report-section-heading"><div><span class="report-eyebrow">Planes de mejoramiento</span><h2>Compromisos y acciones</h2></div></div>{% if planes_aprendiz %}<div class="report-followup-list">{% for plan in planes_aprendiz %}<article class="report-followup-item"><div class="report-followup-item__head"><div><strong>Plan creado el {{ plan.fecha_creacion.strftime('%d/%m/%Y') if plan.fecha_creacion else 'Sin fecha' }}</strong><small>{% if plan.fecha_limite %}Límite: {{ plan.fecha_limite.strftime('%d/%m/%Y') }}{% else %}Sin fecha límite{% endif %}</small></div>{{ status_badge(plan.estado|capitalize, 'success' if plan.estado == 'cumplido' else ('danger' if plan.estado == 'vencido' else 'warning')) }}</div><p>{{ plan.actividades }}</p>{% if plan.observaciones_instructor %}<small><strong>Observación del instructor:</strong> {{ plan.observaciones_instructor }}</small>{% endif %}{% if plan.observaciones_aprendiz %}<small><strong>Observación del aprendiz:</strong> {{ plan.observaciones_aprendiz }}</small>{% endif %}</article>{% endfor %}</div>{% else %}<div class="report-empty">No hay planes de mejoramiento asociados.</div>{% endif %}</section>
+            </div>
+            <section class="report-section"><div class="report-section-heading"><div><span class="report-eyebrow">Equipo que interviene</span><h2>Instructores registradores</h2></div></div>{% if instructores_aprendiz_hist %}<div class="report-instructor-grid">{% for nombre, stats in instructores_aprendiz_hist.items() %}<div class="report-instructor-card"><strong>{{ nombre }}</strong><span>{{ stats.total }} juicios registrados</span><div class="report-instructor-card__footer"><small>{{ stats.aprobados }} aprobados · {{ stats.pendientes }} pendientes</small>{{ status_badge(stats.pct ~ '% aprobación', 'success' if stats.pct >= 80 else ('warning' if stats.pct >= 60 else 'danger')) }}</div></div>{% endfor %}</div>{% else %}<div class="report-empty">No hay instructores registradores en los juicios.</div>{% endif %}</section>
+        </section>
+
+        <section id="report-judgements" class="report-panel" role="tabpanel" hidden>
+            <section class="report-section report-section--intro"><span class="report-eyebrow">Fuente oficial</span><h2>Juicios evaluativos completos</h2><p>Registros importados de reportes oficiales, con competencia, RAP, juicio, fecha y funcionario registrador.</p><div class="report-filter-bar no-print"><label for="report-judgement-search">Buscar</label><input id="report-judgement-search" class="report-input" type="search" placeholder="Competencia, RAP o funcionario"><label for="report-judgement-type">Tipo</label><select id="report-judgement-type" class="report-input"><option value="">Todos</option><option value="tecnica">Técnica</option><option value="transversal">Transversal</option><option value="ingles">Inglés</option></select></div></section>
+            <section class="report-section"><div class="report-table-wrap"><table class="report-table report-table--judgements" id="report-judgements-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Competencia</th><th>Resultado de aprendizaje</th><th>Juicio</th><th>Registró</th><th>Fuente</th></tr></thead><tbody>
+                {% for juicio in juicios %}
+                {% set tipo_comp = juicio.tipo_competencia or (juicio.competencia | tipo_competencia) %}
+                {% set es_aprobado = juicio.juicio and 'APROBADO' in juicio.juicio.upper() and 'AUN NO' not in juicio.juicio.upper() and 'POR EVALUAR' not in juicio.juicio.upper() %}
+                <tr data-tipo="{{ tipo_comp }}"><td><strong>{{ juicio.fecha_juicio.strftime('%d/%m/%Y') if juicio.fecha_juicio else juicio.fecha_fuente_texto or '—' }}</strong></td><td>{{ status_badge('Inglés' if tipo_comp == 'ingles' else ('Transversal' if tipo_comp == 'transversal' else 'Técnica'), 'info' if tipo_comp == 'ingles' else ('success' if tipo_comp == 'transversal' else 'accent')) }}</td><td><strong>{{ juicio.competencia or 'Sin competencia' }}</strong></td><td>{{ juicio.resultado_aprendizaje or 'Sin descripción de resultado' }}</td><td>{{ status_badge('Aprobado' if es_aprobado else (juicio.juicio or 'Por evaluar'), 'success' if es_aprobado else 'warning') }}</td><td>{{ juicio.funcionario_registro or 'Sin registro' }}</td><td>{{ juicio.fuente_archivo or 'Importación oficial' }}</td></tr>
+                {% endfor %}
+            </tbody></table></div>{% if not juicios %}<div class="report-empty">Aún no hay juicios evaluativos registrados para este aprendiz.</div>{% endif %}</section>
+        </section>
+    </main>
+</div>
+
+<style>
+    .report-shell { display: flex; flex-direction: column; gap: 1.15rem; max-width: 1500px; margin: 0 auto; color: var(--text-main); }
+    .report-toolbar, .report-toolbar__actions, .report-identity, .report-hero__side, .report-meta-list, .report-section-heading, .report-section-heading > div, .report-task-card__title, .report-followup-item__head, .report-instructor-card__footer { display: flex; align-items: center; }
+    .report-toolbar { justify-content: space-between; gap: 1rem; }
+    .report-toolbar__actions { gap: .8rem; }
+    .report-toolbar__label, .report-caption { color: var(--text-muted); font-size: .78rem; }
+    .report-hero { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; padding: 1.8rem 2rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-left: 6px solid var(--accent-primary); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .report-identity { align-items: flex-start; gap: 1.15rem; min-width: 0; }
+    .report-avatar { flex: 0 0 auto; width: 76px; height: 76px; display: grid; place-items: center; border-radius: 20px; background: var(--accent-primary); color: var(--button-on-accent); font-size: 1.65rem; font-weight: 900; box-shadow: var(--shadow-lg); }
+    .report-eyebrow, .report-code { display: block; color: var(--text-muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .report-hero h1 { margin: .15rem 0 .25rem; color: var(--text-strong); font-size: clamp(1.45rem, 3vw, 2.2rem); line-height: 1.1; }
+    .report-subtitle { color: var(--text-main); font-weight: 700; }
+    .report-meta-list { flex-wrap: wrap; gap: .35rem .8rem; margin-top: .7rem; color: var(--text-muted); font-size: .85rem; }
+    .report-meta-list span + span { border-left: 1px solid var(--border-divider); padding-left: .8rem; }
+    .report-meta-list a { color: var(--accent-primary); font-weight: 800; }
+    .report-hero__side { flex-direction: column; align-items: flex-end; gap: .8rem; }
+    .report-ranking-chip { display: flex; flex-direction: column; align-items: flex-end; color: var(--text-muted); font-size: .78rem; }
+    .report-ranking-chip strong { color: var(--text-strong); font-size: 1.4rem; }
+    .report-badge { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-height: 1.65rem; padding: .28rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+    .report-badge--success { background: var(--success); color: var(--color-white); }
+    .report-badge--danger { background: var(--danger); color: var(--color-white); }
+    .report-badge--warning { background: var(--sena-yellow); color: var(--color-gray-900); }
+    .report-badge--info { background: var(--info); color: var(--color-white); }
+    .report-badge--accent { background: var(--accent-primary); color: var(--button-on-accent); }
+    .report-badge--neutral { background: var(--border-subtle); color: var(--text-strong); }
+    .report-context-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; overflow: hidden; background: var(--border-divider); border: 1px solid var(--border-divider); border-radius: var(--radius-sm); }
+    .report-context-grid > div { display: flex; flex-direction: column; gap: .25rem; padding: .85rem 1rem; background: var(--bg-card); }
+    .report-context-grid span { color: var(--text-muted); font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+    .report-context-grid strong { color: var(--text-strong); font-size: .86rem; }
+    .report-notice { display: flex; flex-wrap: wrap; gap: .35rem .8rem; padding: .8rem 1rem; background: var(--bg-surface); border: 1px solid var(--border-divider); border-left: 4px solid var(--info); border-radius: var(--radius-sm); color: var(--text-main); font-size: .84rem; }
+    .report-notice strong { color: var(--text-strong); }
+    .report-kpi-grid, .report-stat-grid { display: grid; gap: .9rem; }
+    .report-kpi-grid { grid-template-columns: repeat(4, 1fr); }
+    .report-kpi { display: flex; flex-direction: column; gap: .45rem; min-width: 0; padding: 1.1rem 1.15rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-top: 4px solid var(--accent-primary); border-radius: var(--radius-sm); box-shadow: var(--shadow); }
+    .report-kpi--success { border-top-color: var(--success); } .report-kpi--warning { border-top-color: var(--warning); } .report-kpi--danger { border-top-color: var(--danger); }
+    .report-kpi__label, .report-stat span { color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+    .report-kpi__value { color: var(--text-strong); font-size: 2rem; line-height: 1; }
+    .report-kpi > span:not(.report-kpi__label), .report-kpi__footer, .report-stat small { color: var(--text-muted); font-size: .76rem; }
+    .report-kpi__footer { margin-top: auto; }
+    .report-meter { display: block; width: 100%; height: .48rem; overflow: hidden; background: var(--border-divider); border-radius: 99px; }
+    .report-meter--compact { height: .38rem; }
+    .report-meter__fill { display: block; height: 100%; min-width: 0; border-radius: inherit; transition: width .25s ease; }
+    .report-meter__fill--success { background: var(--success); } .report-meter__fill--warning { background: var(--warning); } .report-meter__fill--danger { background: var(--danger); } .report-meter__fill--info { background: var(--info); } .report-meter__fill--accent { background: var(--accent-primary); } .report-meter__fill--neutral { background: var(--text-muted); }
+    .report-tabs { display: flex; gap: .45rem; overflow-x: auto; padding: .2rem; border-bottom: 1px solid var(--border-divider); }
+    .report-tab { flex: 0 0 auto; padding: .7rem .95rem; border: 1px solid var(--border-divider); border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--bg-surface); color: var(--text-main); font: inherit; font-size: .8rem; font-weight: 800; cursor: pointer; }
+    .report-tab:hover { border-color: var(--accent-primary); color: var(--text-strong); }
+    .report-tab.is-active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--button-on-accent); }
+    .report-panel { display: none; flex-direction: column; gap: 1rem; }
+    .report-panel.is-active { display: flex; }
+    .report-two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .report-section { min-width: 0; padding: 1.3rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: var(--shadow); }
+    .report-section--intro { background: var(--bg-surface); }
+    .report-section--intro h2 { margin: .25rem 0 .35rem; }
+    .report-section--intro p { margin: 0; color: var(--text-main); max-width: 74ch; }
+    .report-section h2, .report-section h3 { margin: .25rem 0 0; color: var(--text-strong); }
+    .report-section h2 { font-size: 1.15rem; } .report-section h3 { font-size: 1rem; }
+    .report-section-heading { justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    .report-section-heading > div { align-items: flex-start; flex-direction: column; gap: .1rem; }
+    .report-heading-meta { display: flex; flex-direction: column; align-items: flex-end; color: var(--text-muted); font-size: .75rem; }
+    .report-heading-meta strong { color: var(--text-strong); font-size: 1.25rem; }
+    .report-health-list, .report-facts-list, .report-category-list, .report-month-list, .report-followup-list, .report-task-list { display: flex; flex-direction: column; gap: .75rem; }
+    .report-health-row { display: flex; justify-content: space-between; align-items: center; gap: .8rem; padding: .8rem 0; border-bottom: 1px solid var(--border-divider); }
+    .report-health-row:last-child { border-bottom: 0; padding-bottom: 0; } .report-health-row:first-child { padding-top: 0; }
+    .report-health-row div, .report-category-row__label, .report-month-row > div:first-child { display: flex; flex-direction: column; gap: .2rem; }
+    .report-health-row strong, .report-facts-list dt, .report-category-row strong, .report-month-row strong { color: var(--text-strong); font-size: .85rem; }
+    .report-health-row small, .report-category-row small, .report-month-row small { color: var(--text-muted); font-size: .75rem; }
+    .report-facts-list { margin: 0; }
+    .report-facts-list > div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--border-divider); }
+    .report-facts-list > div:last-child { border-bottom: 0; padding-bottom: 0; }
+    .report-facts-list dt { font-weight: 600; } .report-facts-list dd { margin: 0; color: var(--text-main); font-size: .82rem; font-weight: 700; text-align: right; }
+    .report-category-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: .45rem .8rem; align-items: center; padding: .2rem 0 .75rem; border-bottom: 1px solid var(--border-divider); }
+    .report-category-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .report-category-row__label { display: grid; grid-template-columns: 1.3rem minmax(0, 1fr); align-items: center; column-gap: .35rem; }
+    .report-category-row__label small { grid-column: 2; } .report-category-row__value { display: flex; flex-direction: column; align-items: flex-end; }
+    .report-category-row > .report-meter { grid-column: 1 / -1; }
+    .report-awards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .6rem; }
+    .report-award { display: flex; flex-direction: column; align-items: center; gap: .2rem; padding: .8rem .5rem; background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: var(--radius-sm); text-align: center; }
+    .report-award span { font-size: 1.7rem; } .report-award strong { color: var(--text-strong); font-size: .75rem; } .report-award small { color: var(--text-muted); font-size: .7rem; }
+    .report-callout { display: flex; justify-content: space-between; align-items: center; gap: .8rem; margin-top: 1rem; padding: .75rem .85rem; border: 1px solid var(--border-divider); border-left: 4px solid var(--accent-primary); border-radius: var(--radius-sm); background: var(--bg-surface); }
+    .report-callout strong { color: var(--text-strong); font-size: .8rem; } .report-callout span { color: var(--text-main); font-size: .8rem; text-align: right; }
+    .report-callout--success { border-left-color: var(--success); } .report-callout--warning { border-left-color: var(--warning); } .report-callout--danger { border-left-color: var(--danger); }
+    .report-timeline { display: flex; flex-direction: column; gap: .7rem; }
+    .report-timeline-row { display: grid; grid-template-columns: 90px minmax(100px, 1fr) 50px 45px; gap: .7rem; align-items: center; }
+    .report-timeline-row time, .report-timeline-row strong, .report-timeline-row small { color: var(--text-main); font-size: .78rem; } .report-timeline-row strong, .report-timeline-row small { text-align: right; }
+    .report-stat-grid--five { grid-template-columns: repeat(5, 1fr); } .report-stat-grid--four { grid-template-columns: repeat(4, 1fr); }
+    .report-stat { display: flex; flex-direction: column; gap: .3rem; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-top: 3px solid var(--accent-primary); border-radius: var(--radius-sm); }
+    .report-stat strong { color: var(--text-strong); font-size: 1.55rem; line-height: 1; } .report-stat--success { border-top-color: var(--success); } .report-stat--warning { border-top-color: var(--warning); } .report-stat--danger { border-top-color: var(--danger); } .report-stat--info { border-top-color: var(--info); } .report-stat--accent { border-top-color: var(--accent-primary); }
+    .report-month-row { display: grid; grid-template-columns: 145px minmax(120px, 1fr) 50px; align-items: center; gap: .8rem; }
+    .report-month-row > strong { text-align: right; }
+    .report-table-wrap { overflow-x: auto; border: 1px solid var(--border-divider); border-radius: var(--radius-sm); }
+    .report-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: .78rem; }
+    .report-table th { padding: .75rem .7rem; background: var(--bg-surface); color: var(--text-strong); font-size: .7rem; text-align: left; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+    .report-table td { padding: .75rem .7rem; border-top: 1px solid var(--border-divider); color: var(--text-main); vertical-align: top; line-height: 1.4; }
+    .report-table td strong { color: var(--text-strong); } .report-table tr:hover td { background: var(--bg-surface); }
+    .report-competency-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .8rem; }
+    .report-competency-card, .report-followup-item, .report-task-card, .report-instructor-card { padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: var(--radius-sm); }
+    .report-competency-card { display: flex; flex-direction: column; gap: .75rem; }
+    .report-competency-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: .8rem; } .report-competency-card h4 { margin: .25rem 0 0; color: var(--text-strong); font-size: .85rem; line-height: 1.35; }
+    .report-inline-stats { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .35rem; color: var(--text-muted); font-size: .72rem; } .report-inline-stats strong { color: var(--text-strong); }
+    .report-details { border-top: 1px dashed var(--border-divider); padding-top: .65rem; } .report-details summary { color: var(--text-strong); cursor: pointer; font-size: .75rem; font-weight: 800; } .report-details summary span { color: var(--text-muted); }
+    .report-rap-list { display: flex; flex-direction: column; gap: .5rem; margin-top: .65rem; max-height: 310px; overflow-y: auto; }
+    .report-rap-item { padding: .65rem .7rem; background: var(--bg-card); border-left: 3px solid var(--border-subtle); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; } .report-rap-item--success { border-left-color: var(--success); } .report-rap-item--warning { border-left-color: var(--warning); }
+    .report-rap-item__head { justify-content: space-between; gap: .6rem; } .report-rap-item time, .report-rap-item small { color: var(--text-muted); font-size: .7rem; } .report-rap-item p { margin: .45rem 0; color: var(--text-main); font-size: .78rem; line-height: 1.4; }
+    .report-task-card { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: .9rem 1.25rem; } .report-task-card__main p { margin: .6rem 0 0; color: var(--text-main); font-size: .8rem; line-height: 1.45; } .report-task-card h3 { margin: .2rem 0 0; font-size: .95rem; }
+    .report-task-card__title { align-items: flex-start; flex-direction: column; gap: .15rem; } .report-task-card__main > .report-badge { margin-top: .7rem; }
+    .report-task-card__facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; margin: 0; } .report-task-card__facts div { padding: .5rem; border: 1px solid var(--border-divider); border-radius: var(--radius-sm); } .report-task-card__facts dt { color: var(--text-muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; } .report-task-card__facts dd { margin: .2rem 0 0; color: var(--text-strong); font-size: .75rem; font-weight: 700; }
+    .report-feedback { grid-column: 1 / -1; display: flex; flex-direction: column; gap: .25rem; padding: .7rem .8rem; background: var(--bg-card); border-left: 3px solid var(--info); border-radius: var(--radius-sm); } .report-feedback strong { color: var(--text-strong); font-size: .75rem; } .report-feedback span { color: var(--text-main); font-size: .78rem; }
+    .report-followup-item__head { justify-content: space-between; gap: .8rem; align-items: flex-start; } .report-followup-item__head > div { display: flex; flex-direction: column; gap: .2rem; } .report-followup-item strong { color: var(--text-strong); font-size: .85rem; } .report-followup-item small { color: var(--text-muted); font-size: .7rem; } .report-followup-item p { margin: .65rem 0 0; color: var(--text-main); font-size: .8rem; line-height: 1.45; }
+    .report-instructor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: .75rem; } .report-instructor-card { display: flex; flex-direction: column; gap: .35rem; } .report-instructor-card > strong { color: var(--text-strong); font-size: .85rem; } .report-instructor-card > span, .report-instructor-card small { color: var(--text-muted); font-size: .75rem; } .report-instructor-card__footer { justify-content: space-between; gap: .5rem; margin-top: .3rem; }
+    .report-filter-bar { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; } .report-filter-bar label { color: var(--text-strong); font-size: .75rem; font-weight: 800; } .report-input { min-height: 2.25rem; padding: .45rem .65rem; background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-strong); font: inherit; font-size: .78rem; } .report-input:focus { outline: none; border-color: var(--accent-primary); box-shadow: var(--focus-ring); }
+    .report-empty { padding: 1.1rem; color: var(--text-muted); background: var(--bg-surface); border: 1px dashed var(--border-subtle); border-radius: var(--radius-sm); font-size: .82rem; text-align: center; }
+    @media (max-width: 1100px) { .report-kpi-grid, .report-stat-grid--five { grid-template-columns: repeat(2, 1fr); } .report-context-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 760px) { .report-toolbar, .report-hero, .report-hero__side { align-items: flex-start; flex-direction: column; } .report-toolbar__actions, .report-hero__side { align-items: flex-start; } .report-two-columns { grid-template-columns: 1fr; } .report-kpi-grid, .report-stat-grid--four, .report-stat-grid--five { grid-template-columns: repeat(2, 1fr); } .report-task-card { grid-template-columns: 1fr; } .report-meta-list span + span { border-left: 0; padding-left: 0; } .report-timeline-row { grid-template-columns: 75px minmax(80px, 1fr) 42px; } .report-timeline-row small { display: none; } }
+    @media (max-width: 480px) { .report-shell { gap: .8rem; } .report-hero, .report-section { padding: 1rem; } .report-context-grid, .report-kpi-grid, .report-stat-grid--four, .report-stat-grid--five { grid-template-columns: 1fr; } .report-avatar { width: 60px; height: 60px; border-radius: 15px; } .report-identity { gap: .8rem; } .report-hero h1 { font-size: 1.35rem; } .report-category-row { grid-template-columns: minmax(0, 1fr) 80px; } .report-month-row { grid-template-columns: 105px minmax(80px, 1fr) 42px; } }
+    @media print { @page { margin: 12mm; } body { background: var(--color-white) !important; } .no-print, .report-tabs { display: none !important; } .report-shell { max-width: none; gap: .7rem; } .report-hero, .report-section, .report-kpi, .report-stat, .report-context-grid > div { box-shadow: none; } .report-panel { display: flex !important; page-break-before: always; } #report-summary { page-break-before: auto; } .report-table-wrap { overflow: visible; } .report-table { min-width: 0; font-size: .68rem; } .report-table th, .report-table td { padding: .45rem; } .report-competency-card, .report-task-card, .report-followup-item { break-inside: avoid; } }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tabs = Array.from(document.querySelectorAll('.report-tab'));
+    const panels = Array.from(document.querySelectorAll('.report-panel'));
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            const target = tab.dataset.tab;
+            tabs.forEach(function (item) { item.classList.toggle('is-active', item === tab); item.setAttribute('aria-selected', item === tab ? 'true' : 'false'); });
+            panels.forEach(function (panel) { const active = panel.id === target; panel.classList.toggle('is-active', active); panel.hidden = !active; });
+        });
+    });
+
+    const search = document.getElementById('report-judgement-search');
+    const type = document.getElementById('report-judgement-type');
+    const rows = Array.from(document.querySelectorAll('#report-judgements-table tbody tr'));
+    function filterJudgements() {
+        const query = (search?.value || '').trim().toLowerCase();
+        const selected = type?.value || '';
+        rows.forEach(function (row) {
+            const matchesText = !query || row.innerText.toLowerCase().includes(query);
+            const matchesType = !selected || row.dataset.tipo === selected;
+            row.hidden = !(matchesText && matchesType);
+        });
+    }
+    search?.addEventListener('input', filterJudgements);
+    type?.addEventListener('change', filterJudgements);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,47 @@
+# Secretos: nunca dentro de la imagen
+.env
+.env.*
+*.pem
+*.key
+
+# Control de versiones y herramientas
+.git
+.gitignore
+.claude/
+.vscode/
+.idea/
+.antigravityrules
+
+# Docker (no se necesitan dentro de la imagen)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Entornos y caches de Python
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
+.venv
+venv/
+venv_win/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Datos de usuarios y artefactos locales (montados por volumen, no en imagen)
+uploads/
+logs/
+instance/
+*.db
+
+# Datos sensibles y artefactos de prueba en la raiz
+*.xls
+test_*.html
+tests/
+
+# Scripts de arranque nativo Windows
+*.ps1
+
+.DS_Store

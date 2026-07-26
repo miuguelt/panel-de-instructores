@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Turnos de aseo - {{ ficha.codigo }} - Transparencia{% endblock %}
+
+{% block content %}
+<div class="page-header cleaning-page-header">
+    <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) if documento else url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver</a>
+    <div>
+        <span class="eyebrow">Transparencia del ambiente</span>
+        <h1>Turnos de aseo</h1>
+        <p class="text-muted">{{ ficha.codigo }} &middot; {{ ficha.nombre_programa }}</p>
+    </div>
+</div>
+
+<div class="cleaning-summary-grid">
+    <article class="cleaning-summary-card">
+        <span>Sesiones del mes</span>
+        <strong>{{ sesiones_mes|length }}</strong>
+    </article>
+    <article class="cleaning-summary-card">
+        <span>Programados</span>
+        <strong>{{ total_programados }}</strong>
+    </article>
+    <article class="cleaning-summary-card">
+        <span>Cumplidos</span>
+        <strong>{{ total_cumplidos }}</strong>
+    </article>
+</div>
+
+<section class="card calendar-card">
+    <div class="calendar-toolbar">
+        <a class="calendar-arrow" href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes_anterior) }}" aria-label="Mes anterior">&larr;</a>
+        <div>
+            <span class="eyebrow">Calendario mensual</span>
+            <h2>{{ nombre_mes }}</h2>
+        </div>
+        <a class="calendar-arrow" href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes_siguiente) }}" aria-label="Mes siguiente">&rarr;</a>
+    </div>
+
+    <div class="cleaning-calendar-scroll">
+        <div class="cleaning-calendar">
+            {% for nombre in ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] %}
+            <div class="calendar-weekday">{{ nombre }}</div>
+            {% endfor %}
+            {% for semana in semanas %}
+                {% for dia in semana %}
+                {% set turno = turnos_por_fecha.get(dia) %}
+                <article class="calendar-day {% if dia.month != mes.month %}outside{% endif %} {% if dia == hoy %}today{% endif %} {% if dia in sesiones_mes %}has-session{% endif %}">
+                    <div class="calendar-day-number">
+                        <span>{{ dia.day }}</span>
+                        {% if dia in sesiones_mes %}<span class="session-dot" title="Día de clase"></span>{% endif %}
+                    </div>
+                    {% if turno %}
+                    <div class="calendar-assignment state-{{ turno.estado }}">
+                        <span class="badge badge-{{ 'success' if turno.estado == 'cumplido' else 'warning' }}">{{ turno.estado }}</span>
+                        <strong class="{% if turno.estado == 'cumplido' and turno.completado_1 == false %}attendance-absent{% endif %}">{{ turno.aprendiz_1.nombre }} {{ turno.aprendiz_1.apellidos[:1] }}.</strong>
+                        <strong class="{% if turno.estado == 'cumplido' and turno.completado_2 == false %}attendance-absent{% endif %}">{{ turno.aprendiz_2.nombre }} {{ turno.aprendiz_2.apellidos[:1] }}.</strong>
+                        {% if turno.estado == 'cumplido' %}
+                        <small>
+                            {% if turno.completado_1 and turno.completado_2 %}
+                            Ambos asistieron
+                            {% elif turno.completado_1 %}
+                            {{ turno.aprendiz_1.nombre }} asistió solo
+                            {% elif turno.completado_2 %}
+                            {{ turno.aprendiz_2.nombre }} asistió solo
+                            {% else %}
+                            Ninguno asistió
+                            {% endif %}
+                        </small>
+                        {% else %}
+                        <small>{{ 'Automático' if turno.generado_por == 'sistema' else 'Ajuste manual' }}</small>
+                        {% endif %}
+                    </div>
+                    {% elif dia in sesiones_mes %}
+                    <span class="calendar-unassigned">Sin asignar</span>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+    <div class="calendar-legend">
+        <span><i class="session-dot"></i> Sesión registrada</span>
+        <span><i class="legend-block programmed"></i> Programado</span>
+        <span><i class="legend-block done"></i> Cumplido</span>
+        <span><i class="legend-absent"></i> Ausente (no suma al contador)</span>
+    </div>
+</section>
+
+<section class="card equity-card">
+    <div class="section-header compact">
+        <div>
+            <span class="eyebrow">Transparencia</span>
+            <h2>Tabla de equidad</h2>
+        </div>
+        <span class="badge badge-info">{{ equidad|length }} activos</span>
+    </div>
+    <p class="text-muted">Los contadores solo suben cuando el aprendiz está presente el día de su turno. Si falta, su puesto se conserva y el sistema lo prioriza la próxima vez.</p>
+    <div class="table-container">
+    <div class="table-responsive">
+        <table class="table equity-table">
+            <caption class="sr-only">Tabla de equidad de turnos de aseo</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='nombre') }}">Aprendiz</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Veces</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='ultima') }}">Última vez</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='proxima') }}">Próxima</a></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in equidad %}
+                <tr data-estado="{{ fila.aprendiz.estado }}"{% if aprendiz and fila.aprendiz.id == aprendiz.id %} class="is-me"{% endif %}>
+                    <td data-label="Aprendiz"><strong>{{ fila.aprendiz.nombre_completo }}</strong></td>
+                    <td data-label="Veces"><span class="equity-count">{{ fila.contador.veces_aseo }}</span></td>
+                    <td data-label="Última vez">{{ fila.contador.ultima_vez_aseo.strftime('%d/%m/%Y') if fila.contador.ultima_vez_aseo else 'Nunca' }}</td>
+                    <td data-label="Próxima">{{ fila.proxima.strftime('%d/%m/%Y') if fila.proxima else 'Sin programar' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    </div>
+</section>
+{% endblock %}

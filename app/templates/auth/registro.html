@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Registro - SENA Control{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo">S</div>
+            <h1>Registro de Instructor</h1>
+            <p>Usa tu correo institucional SENA</p>
+        </div>
+
+        <form method="POST" class="auth-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="nombre">Nombre completo</label>
+                <input type="text" id="nombre" name="nombre" placeholder="Tu nombre" required>
+            </div>
+
+            <div class="form-group">
+                <label for="correo">Correo institucional</label>
+                <input type="email" id="correo" name="correo" placeholder="tu.correo@sena.edu.co" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Contraseña (mínimo 6 caracteres)</label>
+                <input type="password" id="password" name="password" placeholder="Crea una contraseña" required minlength="6">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">Registrarme</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>¿Ya tienes cuenta?</p>
+            <a href="{{ url_for('auth.login') }}" class="btn btn-outline btn-full">Iniciar Sesión</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

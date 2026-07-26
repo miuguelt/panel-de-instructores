@@ -1,0 +1,505 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas - Ficha {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="module-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="back-link">
+        <span aria-hidden="true">←</span> Volver al inicio
+    </a>
+    <div class="header-content">
+        <h1>Estadísticas de la Ficha {{ ficha.codigo }}</h1>
+        <p class="subtitle">{{ ficha.nombre_programa }}</p>
+    </div>
+</div>
+
+{% include '_cronograma.html' %}
+
+<!-- Resumen General -->
+{% if resumen %}
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--primary);">{{ resumen.total_aprendices_con_juicios }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Aprendices evaluados</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--info);">{{ resumen.total_competencias }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Competencias únicas</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: #818cf8;">{{ resumen.total_resultados }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Resultados de aprendizaje</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--success);">{{ resumen.aprendices_con_todos }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">100% aprobados</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--danger);">{{ resumen.aprendices_sin_ninguno }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">0% aprobados</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--warning);">{{ resumen.promedio_juicios_por_aprendiz }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Prom. juicios/aprendiz</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: #818cf8;">{{ resumen.transversales_vistas }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Transversales vistas</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--warning);">{{ resumen.transversales_faltantes }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Transversales faltantes</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--success);">{{ resumen.ingles_aprobados }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Inglés aprobados</div>
+    </div>
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; padding: 16px; text-align: center;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--danger);">{{ resumen.ingles_faltantes }}</div>
+        <div style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">Inglés faltantes</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="dashboard-cards" style="margin-top: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+
+    <!-- Tarjeta de Progreso Global (Donut Chart) -->
+    <article class="card">
+        <header class="card-header">
+            <h2>Progreso de Certificación Global</h2>
+            <p>Porcentaje de juicios aprobados en la ficha</p>
+        </header>
+        <div class="card-body" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div style="position: relative; width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(var(--success) {{ pct_global }}%, var(--border-divider) 0); display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 15px rgba(0,0,0,0.1);">
+                <div style="position: absolute; width: 110px; height: 110px; background: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                    <span style="font-size: 28px; font-weight: 800; color: var(--text-primary);">{{ pct_global }}%</span>
+                </div>
+            </div>
+            <div style="margin-top: 20px; text-align: center; color: var(--gray-400); font-size: 14px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: var(--success); border-radius: 50%; margin-right: 6px;"></span> Aprobados
+                <span style="display: inline-block; width: 12px; height: 12px; background: var(--border-divider); border-radius: 50%; margin-right: 6px; margin-left: 12px;"></span> Aún no Aprobados
+            </div>
+        </div>
+    </article>
+
+    <!-- Distribución de aprobación entre aprendices -->
+    {% if distribucion_aprobacion %}
+    <article class="card">
+        <header class="card-header">
+            <h2>Distribución de Aprobación</h2>
+            <p>Aprendices por rango de juicios aprobados</p>
+        </header>
+        <div class="card-body">
+            {% set colores_rango = {'100': 'var(--success)', '76-99': 'var(--info)', '51-75': 'var(--warning)', '26-50': 'var(--danger)', '0-25': 'var(--danger)'} %}
+            {% set total_dist = distribucion_aprobacion.values()|sum %}
+            {% if total_dist > 0 %}
+            <div style="display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--border-divider); margin-bottom: 16px;">
+                {% for rango, count in distribucion_aprobacion.items() %}
+                {% if count > 0 %}<div title="{{ rango }}%: {{ count }} aprendices" style="width: {{ (count / total_dist * 100) }}%; background-color: {{ colores_rango.get(rango, 'var(--gray-500)') }};"></div>{% endif %}
+                {% endfor %}
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                {% for rango, count in distribucion_aprobacion.items() %}
+                <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 8px; background: var(--bg-surface); border-radius: 4px;">
+                    <span style="color: var(--gray-600);">{{ rango }}%</span>
+                    <span style="font-weight: 700; color: {{ colores_rango.get(rango, 'var(--gray-600)') }};">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color: var(--gray-500); text-align: center;">Sin datos</p>
+            {% endif %}
+        </div>
+    </article>
+    {% endif %}
+
+    <!-- Tarjeta de Estados de Aprendices -->
+    <article class="card">
+        <header class="card-header">
+            <h2>Estados de Aprendices</h2>
+            <p>Distribución actual del estado formativo (Total: {{ total_aprendices }})</p>
+        </header>
+        <div class="card-body">
+            {% if total_aprendices > 0 %}
+            <div style="margin-bottom: 24px;">
+                <div style="display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--border-divider);">
+                    {% set bg_colors = {'EN_FORMACION': 'var(--info)', 'CERTIFICADO': 'var(--success)', 'CANCELADO': 'var(--danger)', 'RETIRO_VOLUNTARIO': 'var(--warning)', 'POR_CERTIFICAR': 'var(--primary)'} %}
+                    {% for estado, count in estados.items() %}
+                        {% set bg = bg_colors.get(estado, 'var(--gray-500)') %}
+                        {% if count > 0 %}<div title="{{ estado|replace('_', ' ')|title }}: {{ count }} ({{ (count / total_aprendices * 100)|round|int }}%)" style="width: {{ (count / total_aprendices * 100) }}%; background-color: {{ bg }};"></div>{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+                {% for estado, count in estados.items() %}
+                <div style="background: var(--bg-surface); padding: 12px; border-radius: 8px; border: 1px solid var(--border-divider); text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: {{ bg_colors.get(estado, 'var(--gray-600)') }};">
+                        {{ (count / total_aprendices * 100)|round|int }}%
+                    </div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--gray-700); margin-top: 4px;">{{ estado|replace('_', ' ')|title }}</div>
+                    <div style="font-size: 12px; color: var(--gray-500);">{{ count }} aprendices</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>No hay aprendices registrados en esta ficha.</p>
+            </div>
+            {% endif %}
+        </div>
+    </article>
+
+
+    <!-- Timeline de Evaluaciones -->
+    {% if timeline %}
+    <article class="card" style="grid-column: 1 / -1;">
+        <header class="card-header">
+            <h2>Línea de Tiempo de Evaluaciones</h2>
+            <p>Juicios registrados por mes en la ficha</p>
+        </header>
+        <div class="card-body">
+            {% set max_timeline = timeline|map(attribute='1.total')|max %}
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                {% for mes, data in timeline %}
+                <div style="display: grid; grid-template-columns: 80px 1fr 60px; gap: 12px; align-items: center;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--gray-600);">{{ mes }}</span>
+                    <div style="display: flex; gap: 2px; align-items: center; height: 24px;">
+                        {% set ancho_total = (data.total / max_timeline * 100)|round|int if max_timeline > 0 else 0 %}
+                        {% set ancho_aprob = (data.aprobados / data.total * ancho_total)|round|int if data.total > 0 else 0 %}
+                        {% if data.aprobados > 0 %}
+                        <div style="height: 18px; width: {{ ancho_aprob }}%; background: var(--success); border-radius: 4px 0 0 4px; min-width: {{ '4px' if data.aprobados > 0 else '0' }};" title="Aprobados: {{ data.aprobados }}"></div>
+                        {% endif %}
+                        {% set pendientes = data.total - data.aprobados %}
+                        {% if pendientes > 0 %}
+                        <div style="height: 18px; width: {{ ((pendientes / data.total) * ancho_total)|round|int if data.total > 0 else 0 }}%; background: var(--border-divider); border-radius: 0 4px 4px 0; min-width: {{ '4px' if pendientes > 0 else '0' }};" title="Pendientes: {{ pendientes }}"></div>
+                        {% endif %}
+                    </div>
+                    <div style="display: flex; gap: 4px; justify-content: flex-end; font-size: 11px;">
+                        <span class="badge badge-success" style="font-size: 10px;">{{ data.aprobados }}</span>
+                        <span class="badge" style="background: var(--border-divider); color: var(--gray-700); font-size: 10px;">{{ pendientes }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div style="display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--gray-500);">
+                <span><span style="display: inline-block; width: 10px; height: 10px; background: var(--success); border-radius: 2px;"></span> Aprobados</span>
+                <span><span style="display: inline-block; width: 10px; height: 10px; background: var(--border-divider); border-radius: 2px;"></span> Pendientes</span>
+            </div>
+        </div>
+    </article>
+    {% endif %}
+
+    <!-- Tabla de Competencias -->
+    {% if competencias_stats %}
+    <article class="card" style="grid-column: 1 / -1;">
+        <header class="card-header">
+            <h2>Rendimiento por Competencia</h2>
+            <p>Tasa de aprobación detallada por cada competencia de la ficha</p>
+        </header>
+        <div class="card-body">
+            {% set tipos_orden = ['tecnica', 'transversal', 'ingles'] %}
+            {% set tipos_nombres = {'tecnica': 'Técnica', 'transversal': 'Transversal', 'ingles': 'Inglés'} %}
+            
+            {% for tipo_actual in tipos_orden %}
+                {% set comps_tipo = competencias_stats | selectattr('tipo', 'equalto', tipo_actual) | list %}
+                {% if comps_tipo %}
+                <h3 style="margin-top: {{ '0' if loop.first else '24px' }}; margin-bottom: 12px; font-size: 16px; color: var(--text-primary); border-bottom: 1px solid var(--border-divider); padding-bottom: 8px;">Competencias: {{ tipos_nombres[tipo_actual] }}</h3>
+                <div class="table-container">
+                <div class="table-responsive">
+                    <table class="table table-sena table-striped">
+                        <caption class="sr-only">Rendimiento por competencia - {{ tipos_nombres[tipo_actual] }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Competencia</th>
+                                <th scope="col" class="td-count">Total Juicios</th>
+                                <th scope="col" class="td-count">Aprobados</th>
+                                <th scope="col" class="td-count">Pendientes</th>
+                                <th scope="col" class="td-count">Aprendices</th>
+                                <th scope="col">Aprobación</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for comp in comps_tipo %}
+                            <tr class="hover-row table-clickable" tabindex="0" role="button" aria-label="Ver detalle de {{ comp.nombre }}" onclick="abrirModalCompetencia(this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); abrirModalCompetencia(this); }" data-nombre="{{ comp.nombre }}" data-resultados="{{ comp.resultados_lista|tojson|forceescape }}" data-aprendices="{{ comp.aprendices_aprobados_lista|tojson|forceescape }}">
+                                <td data-label="Competencia"><span class="td-name">{{ comp.nombre }}</span></td>
+                                <td data-label="Total" class="text-center">{{ comp.total }}</td>
+                                <td data-label="Aprobados" class="text-center td-success">{{ comp.aprobados }}</td>
+                                <td data-label="Pendientes" class="text-center td-danger">{{ comp.pendientes }}</td>
+                                <td data-label="Aprendices" class="text-center">{{ comp.num_aprendices }}</td>
+                                <td data-label="Aprobación">
+                                    <div class="progress-inline">
+                                        <div class="progress-track-inline">
+                                            {% if comp.pct > 0 %}<div class="progress-fill-inline" style="width: {{ comp.pct }}%; background: {% if comp.pct >= 80 %}var(--success){% elif comp.pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>{% endif %}
+                                        </div>
+                                        <span class="progress-label">{{ comp.pct }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </article>
+    {% endif %}
+
+    <!-- Tarjeta de Historial por Instructor -->
+    <article class="card" style="grid-column: 1 / -1;">
+        <header class="card-header">
+            <h2>Historial Evaluativo por Instructor</h2>
+            <p>Juicios registrados en SOFIA Plus consolidados a partir del Reporte de Juicios Evaluativos</p>
+        </header>
+        <div class="card-body">
+            {% if instructores_stats %}
+            <div class="table-container">
+            <div class="table-responsive">
+                <table class="table table-sena table-striped">
+                    <caption class="sr-only">Historial evaluativo por instructor</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Funcionario / Instructor</th>
+                            <th scope="col" class="td-count">Total Juicios</th>
+                            <th scope="col" class="td-count">Aprobados</th>
+                            <th scope="col" class="td-count">No Aprobados</th>
+                            <th scope="col" class="td-count">Técnicas</th>
+                            <th scope="col" class="td-count">Transversales</th>
+                            <th scope="col" class="td-count">Inglés</th>
+                            <th scope="col" class="td-count">Aprendices Eval.</th>
+                            <th scope="col" class="td-count">Aprendices Aprob.</th>
+                            <th scope="col">Efectividad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for func, stats in instructores_stats.items()|sort(attribute='1.total', reverse=True) %}
+                        <tr>
+                            <td data-label="Instructor"><strong>{{ func }}</strong></td>
+                            <td data-label="Total" class="text-center"><span class="badge badge-secondary">{{ stats.total }}</span></td>
+                            <td data-label="Aprobados" class="text-center td-success">{{ stats.aprobados }}</td>
+                            <td data-label="No Aprobados" class="text-center td-danger">{{ stats.no_aprobados }}</td>
+                            <td data-label="Técnicas" class="text-center">{{ stats.tecnica }}</td>
+                            <td data-label="Transversales" class="text-center">{{ stats.transversal }}</td>
+                            <td data-label="Inglés" class="text-center">{{ stats.ingles }}</td>
+                            <td data-label="Aprend. Eval." class="text-center"><strong>{{ stats.total_aprendices }}</strong></td>
+                            <td data-label="Aprend. Aprob." class="text-center td-success">{{ stats.total_aprendices_aprobados }}</td>
+                            <td data-label="Efectividad">
+                                {% set pct = (stats.aprobados / stats.total * 100)|round|int if stats.total > 0 else 0 %}
+                                <div class="progress-inline">
+                                    <div class="progress-track-inline">
+                                        {% if pct > 0 %}<div class="progress-fill-inline" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>{% endif %}
+                                    </div>
+                                    <span class="progress-label">{{ pct }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <h3>No hay datos de juicios</h3>
+                <p>Importa el "Reporte de Juicios Evaluativos.xls" en la vista de aprendices para generar estas estadísticas.</p>
+                <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-primary" style="margin-top: 16px;">Ir a vista de aprendices</a>
+            </div>
+            {% endif %}
+        </div>
+    </article>
+
+    <!-- Aprendices en Riesgo -->
+    <article class="card" style="grid-column: 1 / -1;">
+        <header class="card-header">
+            <h2>Alerta Académica: Aprendices en Riesgo</h2>
+            <p>Aprendices con mayor cantidad de resultados "Aún no Aprobados" o "Por Evaluar"</p>
+        </header>
+        <div class="card-body">
+            {% if top_aprendices %}
+            <div class="grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                {% for item in top_aprendices %}
+                <div style="background: rgba(220, 38, 38, 0.05); border-left: 4px solid var(--danger); padding: 16px; border-radius: 8px;">
+                    <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=item.aprendiz.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">
+                        <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 4px 0; color: var(--text-primary);">{{ item.aprendiz.nombre }} {{ item.aprendiz.apellidos }}</h3>
+                    </a>
+                    <p style="font-size: 13px; color: var(--gray-400); margin: 0 0 8px 0;">CC: {{ item.aprendiz.documento }} - Estado: <span style="font-weight: 600; color: {% if item.aprendiz.estado == 'CANCELADO' %}var(--danger){% else %}var(--info){% endif %};">{{ item.aprendiz.estado }}</span></p>
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 14px;">
+                        <span style="color: var(--gray-500);">Pendientes/No Aprobados:</span>
+                        <span class="badge" style="background: var(--danger); color: white; font-size: 14px;">{{ item.pendientes }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>No hay aprendices en riesgo detectados.</p>
+            </div>
+            {% endif %}
+        </div>
+    </article>
+
+    <!-- Resultados de Aprendizaje Críticos -->
+    <article class="card" style="grid-column: 1 / -1;">
+        <header class="card-header">
+            <h2>Resultados de Aprendizaje Críticos</h2>
+            <p>Resultados con mayor cantidad de juicios pendientes o no aprobados en la ficha</p>
+        </header>
+        <div class="card-body">
+            {% if top_resultados %}
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
+                {% for res, count in top_resultados %}
+                <li style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border-divider);">
+                    <span style="font-size: 14px; font-weight: 500; color: var(--text-primary); flex: 1; padding-right: 16px; line-height: 1.4;">{{ res }}</span>
+                    <span class="badge" style="background: var(--warning); color: var(--gray-900); font-weight: 700;">{{ count }} Pendientes</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">
+                <p>No se han detectado resultados críticos.</p>
+            </div>
+            {% endif %}
+        </div>
+    </article>
+</div>
+
+<!-- Modal Competencia -->
+<dialog id="modalCompetencia" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalCompTitulo">
+  <div class="app-modal-content app-modal-content--wide">
+    <header class="app-modal-header">
+      <div class="app-modal-header-copy">
+        <span class="app-modal-eyebrow">Detalle de competencia</span>
+        <h2 id="modalCompTitulo">Detalle de competencia</h2>
+      </div>
+      <button type="button" class="app-modal-close" onclick="cerrarModal('modalCompetencia')" aria-label="Cerrar detalle">&times;</button>
+    </header>
+    <div class="app-modal-body">
+        <section class="app-modal-section">
+            <h3 class="app-modal-section-title">Resultados de aprendizaje</h3>
+            <ul id="modalCompResultados" class="app-modal-list"></ul>
+        </section>
+        <section class="app-modal-section">
+            <h3 class="app-modal-section-title">Aprendices aprobados</h3>
+            <div id="modalCompAprendices" class="app-modal-person-grid"></div>
+        </section>
+    </div>
+    <footer class="app-modal-footer">
+      <button type="button" class="btn btn-outline" onclick="cerrarModal('modalCompetencia')">Cerrar</button>
+    </footer>
+  </div>
+</dialog>
+
+<style>
+.hover-row:hover {
+    background-color: var(--bg-hover) !important;
+    transition: background-color 0.2s ease;
+}
+.hover-row:focus-visible {
+    outline: 3px solid var(--accent-primary);
+    outline-offset: -3px;
+}
+.aprendiz-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+    padding: 10px;
+    text-decoration: none;
+    color: var(--text-strong);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+.aprendiz-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+.aprendiz-card .nombre {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.aprendiz-card .doc {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+</style>
+
+<script>
+function abrirModalCompetencia(rowEl) {
+    const nombre = rowEl.getAttribute('data-nombre');
+    const resultados = JSON.parse(rowEl.getAttribute('data-resultados') || '[]');
+    const aprendices = JSON.parse(rowEl.getAttribute('data-aprendices') || '[]');
+    
+    document.getElementById('modalCompTitulo').textContent = nombre;
+    
+    const resContainer = document.getElementById('modalCompResultados');
+    resContainer.innerHTML = '';
+    if (resultados.length > 0) {
+        resultados.forEach(r => {
+            const li = document.createElement('li');
+            li.className = 'app-modal-list-item';
+            li.textContent = r;
+            resContainer.appendChild(li);
+        });
+    } else {
+        const empty = document.createElement('li');
+        empty.className = 'app-modal-empty';
+        empty.textContent = 'No hay resultados registrados';
+        resContainer.appendChild(empty);
+    }
+    
+    const apContainer = document.getElementById('modalCompAprendices');
+    apContainer.innerHTML = '';
+    if (aprendices.length > 0) {
+        aprendices.forEach(ap => {
+            const a = document.createElement('a');
+            a.href = "{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=0) }}".replace('/0', '/' + ap.id);
+            a.className = 'app-modal-person-card';
+            const name = document.createElement('span');
+            name.className = 'app-modal-person-name';
+            name.textContent = ap.nombre_completo;
+            const documentNumber = document.createElement('span');
+            documentNumber.className = 'app-modal-person-meta';
+            documentNumber.textContent = `CC: ${ap.documento}`;
+            a.append(name, documentNumber);
+            apContainer.appendChild(a);
+        });
+    } else {
+        const empty = document.createElement('div');
+        empty.className = 'app-modal-empty';
+        empty.textContent = 'Ningún aprendiz ha aprobado completamente esta competencia aún.';
+        apContainer.appendChild(empty);
+    }
+    
+    const modal = document.getElementById('modalCompetencia');
+    modal.showModal();
+    document.body.classList.add('modal-open');
+}
+
+function cerrarModal(id) {
+    const modal = document.getElementById(id);
+    if(modal) {
+        if (modal.open) modal.close();
+        document.body.classList.remove('modal-open');
+    }
+}
+
+// Cerrar al hacer clic por fuera
+document.addEventListener('click', function(event) {
+    const dialogs = document.querySelectorAll('.app-modal-overlay');
+    dialogs.forEach(dialog => {
+        if (event.target === dialog && dialog.open) {
+            dialog.close();
+            document.body.classList.remove('modal-open');
+        }
+    });
+});
+
+document.getElementById('modalCompetencia')?.addEventListener('close', () => {
+    document.body.classList.remove('modal-open');
+});
+</script>
+{% endblock %}

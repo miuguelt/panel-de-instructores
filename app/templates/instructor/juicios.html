@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+{% block title %}Juicios Evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<style>
+    /* ── Layout ── */
+    .juicios-container { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    /* ── Stats cards ── */
+    .juicios-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 1rem;
+    }
+    .juicio-stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 14px;
+        padding: 1.25rem;
+        box-shadow: var(--shadow);
+    }
+    .juicio-stat-card h4 {
+        margin: 0 0 .4rem;
+        font-size: .82rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+    .juicio-stat-val { font-size: 1.8rem; font-weight: 800; color: var(--text-strong); line-height: 1; }
+
+    /* ── Badge helpers ── */
+    .badge-tech        { background:#4f46e5!important; color:#fff!important; font-weight:700!important; }
+    .badge-transversal { background:#059669!important; color:#fff!important; font-weight:700!important; }
+    .badge-ingles      { background:#0284c7!important; color:#fff!important; font-weight:700!important; }
+    .badge-solid-success { background:#059669!important; color:#fff!important; font-weight:700!important; }
+    .badge-solid-warning { background:#d97706!important; color:#fff!important; font-weight:700!important; }
+
+    /* ── Competencia grid ── */
+    .comp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.1rem;
+    }
+    .comp-card {
+        background: var(--bg-card);
+        border: 1.5px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 1.3rem 1.4rem 1.1rem;
+        box-shadow: var(--shadow);
+        cursor: pointer;
+        transition: border-color .22s ease, box-shadow .22s ease, transform .18s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .comp-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        border-radius: 16px 16px 0 0;
+        background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, #059669));
+        opacity: 0;
+        transition: opacity .22s;
+    }
+    .comp-card:hover {
+        border-color: var(--accent-primary);
+        box-shadow: 0 8px 32px rgba(57,169,0,.18);
+        transform: translateY(-3px);
+    }
+    .comp-card:hover::before { opacity: 1; }
+    .comp-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: .8rem; margin-bottom: .9rem; }
+    .comp-card-title { font-size: .92rem; font-weight: 700; color: var(--text-strong); line-height: 1.4; flex: 1; }
+    .comp-card-meta { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-bottom: .85rem; }
+    .comp-prog-row { display: flex; justify-content: space-between; font-size: .78rem; font-weight: 700; color: var(--text-strong); margin-bottom: .3rem; }
+    .comp-prog-bar { height: 7px; background: var(--border-divider); border-radius: 4px; overflow: hidden; }
+    .comp-prog-fill { height: 100%; border-radius: 4px; transition: width .5s ease; }
+    .comp-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: .85rem; font-size: .82rem; color: var(--text-muted); }
+    .comp-open-hint { font-size: .78rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: .3rem; }
+
+    /* ── CONTENIDO DEL MODAL ── */
+    .modal-header-info { flex: 1; min-width: 0; }
+    .modal-comp-name { font-size: 1.05rem; font-weight: 800; color: var(--text-strong); line-height: 1.4; margin-bottom: .4rem; }
+    .modal-comp-meta { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+
+    /* Stat pills row */
+    .modal-kpi-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: .8rem;
+    }
+    .modal-kpi {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: .9rem 1rem;
+        text-align: center;
+    }
+    .modal-kpi-val { font-size: 1.7rem; font-weight: 800; line-height: 1; margin-bottom: .25rem; }
+    .modal-kpi-label { font-size: .75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+    /* Progress ring */
+    .ring-wrap { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+    .ring-svg { overflow: visible; }
+    .ring-track { fill: none; stroke: var(--border-divider); stroke-width: 8; }
+    .ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
+    .ring-label { font-size: .8rem; color: var(--text-muted); font-weight: 600; }
+
+    /* RAP section */
+    .rap-section-title { font-size: .9rem; font-weight: 700; color: var(--text-strong); margin-bottom: .7rem; padding-bottom: .4rem; border-bottom: 1px solid var(--border-divider); }
+    .rap-section-title.is-danger { color: var(--danger); }
+
+    /* RAP accordion inside modal */
+    .rap-item { margin-bottom: .6rem; }
+    .rap-item-header {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        padding: .7rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: .6rem;
+        cursor: pointer;
+        transition: background .15s;
+    }
+    .rap-item-header:hover { background: var(--bg-card); }
+    .rap-item-title { font-size: .82rem; font-weight: 600; color: var(--text-main); line-height: 1.4; flex: 1; }
+    .rap-item-stats { display: flex; gap: .5rem; align-items: center; flex-shrink: 0; }
+    .rap-item-body { display: none; border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
+    .rap-item-body.open { display: block; }
+    .rap-aprendiz-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem 1rem; border-bottom: 1px solid var(--border-divider); font-size: .82rem; }
+    .rap-aprendiz-row:last-child { border-bottom: none; }
+    .rap-aprendiz-name { color: var(--text-strong); font-weight: 600; }
+    .rap-aprendiz-meta { color: var(--text-muted); font-size: .78rem; }
+    .rap-aprendiz-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+
+    /* Evaluadores table */
+    .eval-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem .75rem; border-radius: 8px; background: var(--bg-surface); gap: 1rem; font-size: .84rem; }
+    .eval-row + .eval-row { margin-top: .4rem; }
+    .eval-name { font-weight: 600; color: var(--text-strong); }
+    .eval-count { font-size: .8rem; color: var(--text-muted); }
+
+    /* Aprendices no aprobados warning */
+    .pendientes-list { display: flex; flex-direction: column; gap: .35rem; }
+    .pendiente-chip { background: rgba(220,38,38,.08); border: 1px solid rgba(220,38,38,.2); border-radius: 8px; padding: .45rem .75rem; font-size: .82rem; color: var(--text-strong); display: flex; justify-content: space-between; align-items: center; }
+    .pendiente-rap { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
+</style>
+
+<div class="juicios-container">
+    <!-- Header -->
+    <div class="page-header" style="margin-bottom: 0;">
+        <a href="{{ url_for('instructor.fichas') }}" class="btn-back">&larr; Volver a Fichas</a>
+        <div class="header-content">
+            <h1>Juicios de Evaluación Oficiales (SOFIA Plus)</h1>
+            <p class="text-muted"><a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" style="color: var(--accent-primary); font-weight: 700; text-decoration: underline;">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</a></p>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="juicios-stats-grid">
+        <div class="juicio-stat-card">
+            <h4>Total Juicios</h4>
+            <div class="juicio-stat-val">{{ estadisticas.total }}</div>
+            <small style="color:var(--text-muted)">Registros importados</small>
+        </div>
+        <div class="juicio-stat-card">
+            <h4>Aprobados</h4>
+            <div class="juicio-stat-val" style="color:#059669">{{ estadisticas.aprobados }}</div>
+            <small style="color:var(--text-muted)">Resultados logrados</small>
+        </div>
+        <div class="juicio-stat-card">
+            <h4>Por Evaluar</h4>
+            <div class="juicio-stat-val" style="color:#d97706">{{ estadisticas.por_evaluar }}</div>
+            <small style="color:var(--text-muted)">Pendientes</small>
+        </div>
+        <div class="juicio-stat-card">
+            <h4>% Aprobación</h4>
+            <div class="juicio-stat-val" style="color:{% if pct_global_juicios >= 80 %}#059669{% elif pct_global_juicios >= 50 %}#d97706{% else %}#dc2626{% endif %}">
+                {{ pct_global_juicios }}%
+            </div>
+            <small style="color:var(--text-muted)">Progreso global</small>
+        </div>
+        <div class="juicio-stat-card">
+            <h4>Técnicas</h4>
+            <div class="juicio-stat-val" style="color:#4f46e5">{{ estadisticas.tecnica }}</div>
+            <small style="color:var(--text-muted)">Juicios en ficha</small>
+        </div>
+        <div class="juicio-stat-card">
+            <h4>Transversales</h4>
+            <div class="juicio-stat-val" style="color:#059669">{{ estadisticas.transversal }}</div>
+            <small style="color:var(--text-muted)">Juicios en ficha</small>
+        </div>
+        <div class="juicio-stat-card">
+            <h4>Inglés</h4>
+            <div class="juicio-stat-val" style="color:#0284c7">{{ estadisticas.ingles }}</div>
+            <small style="color:var(--text-muted)">Juicios en ficha</small>
+        </div>
+    </div>
+
+    <!-- Search bar -->
+    <div class="card" style="margin:0; padding:1.25rem;">
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+            <h2 style="margin:0; color:var(--text-strong); font-size:1.2rem;">Competencias del Programa</h2>
+            <p style="margin:0; font-size:.83rem; color:var(--text-muted)">Haz clic en una competencia para ver el análisis detallado</p>
+            <div style="display:flex; gap:.75rem; flex-wrap:wrap;">
+                <input type="text" id="comp-search" placeholder="🔍 Buscar competencia…" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; min-width:240px; border-radius:8px;">
+                <select id="comp-type-filter" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; border-radius:8px;">
+                    <option value="">Todas las categorías</option>
+                    <option value="tecnica">Técnicas</option>
+                    <option value="transversal">Transversales</option>
+                    <option value="ingles">Inglés</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Competencia cards grid -->
+    {% if competencias_summary %}
+    {# Build JSON data for all competencies to drive the modal without extra requests #}
+    <script id="comp-data" type="application/json">
+    [
+        {% for comp in competencias_summary %}
+        {
+            "nombre": {{ comp.nombre | tojson }},
+            "tipo": {{ (comp.tipo or 'tecnica') | tojson }},
+            "total": {{ comp.total }},
+            "aprobados": {{ comp.aprobados }},
+            "pendientes": {{ comp.pendientes }},
+            "pct": {{ comp.pct }},
+            "detalles": [
+                {% for det in comp.detalles %}
+                {
+                    "nombre": {{ det.nombre | tojson }},
+                    "documento": {{ det.documento | tojson }},
+                    "rap": {{ det.rap | tojson }},
+                    "estado": {{ det.estado | tojson }},
+                    "fecha": {{ det.fecha | tojson }},
+                    "evaluador": {{ det.evaluador | tojson }}
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ]
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ]
+    </script>
+
+    <div class="comp-type-section">
+        <div class="comp-grid">
+    {% for comp in competencias_summary %}
+    {% set comp_tipo = comp.tipo or 'tecnica' %}
+    {% set tipo_label = 'Inglés' if comp_tipo == 'ingles' else ('Transversal' if comp_tipo == 'transversal' else 'Técnica') %}
+    {% set badge_cls = 'badge-ingles' if comp_tipo == 'ingles' else ('badge-transversal' if comp_tipo == 'transversal' else 'badge-tech') %}
+    {% set bar_color = '#059669' if comp.pct == 100 else ('#d97706' if comp.pct >= 50 else '#dc2626') %}
+    <div class="comp-card"
+         data-tipo="{{ comp_tipo }}"
+         data-nombre="{{ comp.nombre | lower }}"
+         data-idx="{{ loop.index0 }}"
+         onclick="openCompModal({{ loop.index0 }})"
+         role="button"
+         tabindex="0"
+         aria-label="Ver estadísticas de {{ comp.nombre }}">
+        <div class="comp-card-header">
+            <div class="comp-card-title">{{ comp.nombre }}</div>
+            {% if comp.pct == 100 %}
+                <span class="badge badge-solid-success" style="font-size:.75rem; padding:3px 8px; white-space:nowrap;">✓ Completa</span>
+            {% elif comp.aprobados > 0 %}
+                <span class="badge badge-solid-warning" style="font-size:.75rem; padding:3px 8px; white-space:nowrap;">⚡ En progreso</span>
+            {% else %}
+                <span class="badge" style="font-size:.75rem; padding:3px 8px; white-space:nowrap; background:var(--bg-surface); color:var(--text-muted); border:1px solid var(--border-subtle);">⏳ Pendiente</span>
+            {% endif %}
+        </div>
+        <div class="comp-card-meta">
+            <span class="badge {{ badge_cls }}" style="font-size:.72rem; padding:2px 7px;">{{ tipo_label }}</span>
+            <span style="font-size:.82rem; color:var(--text-muted)">{{ comp.detalles | map(attribute='rap') | unique | list | length }} RAPs</span>
+        </div>
+        <div class="comp-prog-row">
+            <span>Aprobados {{ comp.aprobados }}/{{ comp.total }}</span>
+            <span>{{ comp.pct }}%</span>
+        </div>
+        <div class="comp-prog-bar">
+            <div class="comp-prog-fill" style="width:{{ comp.pct }}%; background:{{ bar_color }};"></div>
+        </div>
+        <div class="comp-card-footer">
+            <span>{{ comp.pendientes }} pendientes</span>
+            <span class="comp-open-hint">📊 Ver análisis &rsaquo;</span>
+        </div>
+    </div>
+    {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state card">
+        <div class="empty-icon">📑</div>
+        <h3 style="color:var(--text-strong)">Sin Juicios Evaluativos</h3>
+        <p style="color:var(--text-muted)">Sube el archivo Excel oficial de SOFIA Plus para ver el desglose agrupado por competencias.</p>
+    </div>
+    {% endif %}
+
+    <!-- Avance por Aprendiz -->
+    <div class="card" style="margin-top:.5rem;">
+        <h2 style="color:var(--text-strong); margin-bottom:1rem;">Avance Global por Aprendiz</h2>
+        <div class="table-container">
+            <div class="table-responsive">
+                <table class="table table-sena table-striped">
+                    <thead>
+                        <tr>
+                            <th>Aprendiz</th>
+                            <th>Progreso Global</th>
+                            <th class="text-center">Técnicas</th>
+                            <th class="text-center">Transversales</th>
+                            <th class="text-center">Inglés</th>
+                            <th>Evaluadores</th>
+                            <th class="text-center">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in aprendices_stats %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=stat.aprendiz.id) }}" style="color:var(--text-strong); font-weight:700; text-decoration:underline;">
+                                    {{ stat.aprendiz.apellidos }} {{ stat.aprendiz.nombre }}
+                                </a>
+                                <div style="font-size:.8rem; color:var(--text-muted)">CC: {{ stat.aprendiz.documento }}</div>
+                            </td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:.5rem;">
+                                    <div style="flex:1; height:6px; background:var(--border-divider); border-radius:3px; overflow:hidden;">
+                                        <div style="width:{{ stat.pct_total }}%; height:100%; background:{% if stat.pct_total >= 80 %}#059669{% elif stat.pct_total >= 50 %}#d97706{% else %}#dc2626{% endif %};"></div>
+                                    </div>
+                                    <span class="badge {{ 'badge-solid-success' if stat.pct_total >= 80 else 'badge-solid-warning' }}" style="font-size:.75rem;">{{ stat.pct_total }}%</span>
+                                </div>
+                                <small style="color:var(--text-muted)">{{ stat.aprobados }}/{{ stat.total }} aprobados</small>
+                            </td>
+                            <td class="text-center" style="font-weight:700; color:#4f46e5;">{{ stat.pct_tecnica }}%</td>
+                            <td class="text-center" style="font-weight:700; color:#059669;">{{ stat.pct_transversal }}%</td>
+                            <td class="text-center" style="font-weight:700; color:#0284c7;">{{ stat.pct_ingles }}%</td>
+                            <td>
+                                {% if stat.get('evaluadores') %}
+                                <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                    {% for ev in stat.evaluadores[:2] %}
+                                    <span class="badge" style="background:var(--bg-surface); color:var(--text-strong); border:1px solid var(--border-subtle); font-size:.75rem;">{{ ev }}</span>
+                                    {% endfor %}
+                                    {% if stat.evaluadores|length > 2 %}
+                                    <small style="color:var(--text-muted)">+{{ stat.evaluadores|length - 2 }}</small>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <span style="color:var(--text-muted)">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=stat.aprendiz.id) }}" class="btn btn-sm btn-outline" style="border-radius:6px; font-weight:600;">Ver Historial</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: Detalle de Competencia
+══════════════════════════════════════════════════ -->
+<div id="comp-modal-overlay" class="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-comp-title">
+    <div id="comp-modal" class="app-modal-content app-modal-content--wide">
+        <!-- Header -->
+        <header class="app-modal-header">
+            <div class="modal-header-info">
+                <span class="app-modal-eyebrow">Detalle de competencia</span>
+                <div class="modal-comp-name" id="modal-comp-title">—</div>
+                <div class="modal-comp-meta" id="modal-comp-meta"></div>
+            </div>
+            <button type="button" class="app-modal-close" onclick="closeCompModal()" title="Cerrar" aria-label="Cerrar detalle">&times;</button>
+        </header>
+
+        <!-- Body -->
+        <div class="app-modal-body" id="modal-body">
+            <!-- KPI Row -->
+            <div class="app-modal-kpi-grid" id="modal-kpis"></div>
+
+            <!-- Progress ring + breakdown -->
+            <div style="display:flex; gap:1.2rem; align-items:flex-start; flex-wrap:wrap;">
+                <div class="ring-wrap" id="modal-ring-wrap">
+                    <svg class="ring-svg" width="110" height="110" viewBox="0 0 110 110">
+                        <circle class="ring-track" cx="55" cy="55" r="46"/>
+                        <circle class="ring-fill" id="modal-ring-fill" cx="55" cy="55" r="46"
+                                stroke="var(--success)"
+                                transform="rotate(-90 55 55)"
+                                stroke-dasharray="0 289"/>
+                        <text x="55" y="51" text-anchor="middle" font-size="20" font-weight="800" fill="var(--text-strong)" id="modal-ring-pct">0%</text>
+                        <text x="55" y="66" text-anchor="middle" font-size="10" fill="var(--text-muted)">aprobación</text>
+                    </svg>
+                    <span class="ring-label" id="modal-ring-label">0 / 0</span>
+                </div>
+
+                <!-- Evaluadores -->
+                <div style="flex:1; min-width:200px;">
+                    <div class="rap-section-title">👨‍🏫 Evaluadores registrados</div>
+                    <div id="modal-evaluadores"></div>
+                </div>
+            </div>
+
+            <!-- RAPs breakdown -->
+            <div>
+                <div class="rap-section-title">📋 Resultados de Aprendizaje (RAPs)</div>
+                <div id="modal-raps"></div>
+            </div>
+
+            <!-- Aprendices pendientes -->
+            <div id="modal-pendientes-section">
+                <div class="rap-section-title is-danger">⚠️ Aprendices con RAPs pendientes</div>
+                <div class="pendientes-list" id="modal-pendientes"></div>
+            </div>
+        </div>
+        <footer class="app-modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeCompModal()">Cerrar</button>
+        </footer>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    // ─── Data ───────────────────────────────────────────────
+    const rawEl = document.getElementById('comp-data');
+    const ALL_COMPS = rawEl ? JSON.parse(rawEl.textContent) : [];
+
+    // ─── Filtering ──────────────────────────────────────────
+    const searchInput   = document.getElementById('comp-search');
+    const typeSelect    = document.getElementById('comp-type-filter');
+    const cards         = document.querySelectorAll('.comp-grid .comp-card');
+
+    function filterCards() {
+        const q    = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const tipo = typeSelect  ? typeSelect.value : '';
+        cards.forEach(card => {
+            const nombre   = card.getAttribute('data-nombre') || '';
+            const cardTipo = card.getAttribute('data-tipo')   || '';
+            const matchQ   = !q    || nombre.includes(q);
+            const matchT   = !tipo || cardTipo === tipo;
+            card.style.display = (matchQ && matchT) ? '' : 'none';
+        });
+        // Ocultar secciones sin tarjetas visibles
+        document.querySelectorAll('.comp-type-section').forEach(section => {
+            const anyVisible = Array.from(section.querySelectorAll('.comp-card')).some(c => c.style.display !== 'none');
+            section.style.display = anyVisible ? '' : 'none';
+        });
+    }
+    if (searchInput) searchInput.addEventListener('input', filterCards);
+    if (typeSelect)  typeSelect.addEventListener('change', filterCards);
+
+    // keyboard navigation on cards
+    cards.forEach(card => {
+        card.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openCompModal(parseInt(card.getAttribute('data-idx'), 10));
+            }
+        });
+    });
+
+    // ─── Helpers ────────────────────────────────────────────
+    function badgeHtml(tipo) {
+        const map = { tecnica: ['badge-solid-tech','Técnica'], transversal: ['badge-solid-transversal','Transversal'], ingles: ['badge-solid-ingles','Inglés'] };
+        const [badgeClass, label] = map[tipo] || ['badge-solid-secondary', tipo];
+        return `<span class="badge ${badgeClass}">${label}</span>`;
+    }
+
+    function statusBadge(estado) {
+        if (estado === 'APROBADO')
+            return `<span class="badge badge-solid-success" style="font-size:.72rem;padding:2px 7px;">✓ APROBADO</span>`;
+        return `<span class="badge badge-solid-warning" style="font-size:.72rem;padding:2px 7px;">${estado}</span>`;
+    }
+
+    function pctColor(pct) {
+        return pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+    }
+
+    // ─── Modal DOM refs ─────────────────────────────────────
+    const overlay    = document.getElementById('comp-modal-overlay');
+    const titleEl    = document.getElementById('modal-comp-title');
+    const metaEl     = document.getElementById('modal-comp-meta');
+    const kpisEl     = document.getElementById('modal-kpis');
+    const ringFill   = document.getElementById('modal-ring-fill');
+    const ringPct    = document.getElementById('modal-ring-pct');
+    const ringLabel  = document.getElementById('modal-ring-label');
+    const evalsEl    = document.getElementById('modal-evaluadores');
+    const rapsEl     = document.getElementById('modal-raps');
+    const pendSect   = document.getElementById('modal-pendientes-section');
+    const pendEl     = document.getElementById('modal-pendientes');
+
+    const CIRC = 2 * Math.PI * 46; // circumference for r=46
+
+    // ─── Open Modal ─────────────────────────────────────────
+    window.openCompModal = function (idx) {
+        const comp = ALL_COMPS[idx];
+        if (!comp) return;
+
+        // title + meta
+        titleEl.textContent = comp.nombre;
+        metaEl.innerHTML = badgeHtml(comp.tipo) +
+            `<span style="font-size:.82rem;color:var(--text-muted)">${comp.total} juicios totales</span>`;
+
+        // KPIs
+        const uniqueRaps = [...new Set(comp.detalles.map(d => d.rap))];
+        const uniqueAprendices = [...new Set(comp.detalles.map(d => d.documento))];
+        const aprobadosAprendices = [...new Set(
+            comp.detalles.filter(d => d.estado === 'APROBADO').map(d => d.documento)
+        )];
+        const uniqueEvals = [...new Set(comp.detalles.map(d => d.evaluador).filter(e => e && e !== '-'))];
+        const pctAprendices = uniqueAprendices.length > 0
+            ? Math.round(aprobadosAprendices.length / uniqueAprendices.length * 100) : 0;
+
+        kpisEl.innerHTML = [
+            { val: comp.aprobados,             color: 'var(--success)', label: 'Juicios aprobados' },
+            { val: comp.pendientes,             color: 'var(--warning)', label: 'Pendientes' },
+            { val: uniqueRaps.length,           color: 'var(--accent-hover)', label: 'RAPs distintos' },
+            { val: uniqueAprendices.length,     color: 'var(--text-strong)', label: 'Aprendices' },
+            { val: aprobadosAprendices.length,  color: 'var(--success)', label: 'Aprendices aprobados' },
+            { val: uniqueEvals.length,          color: 'var(--info)', label: 'Evaluadores' },
+        ].map(k => `
+            <div class="app-modal-kpi">
+                <div class="app-modal-kpi-value" style="color:${k.color}">${k.val}</div>
+                <div class="app-modal-kpi-label">${k.label}</div>
+            </div>
+        `).join('');
+
+        // Progress ring
+        const pct = comp.pct;
+        const filled = (pct / 100) * CIRC;
+        ringFill.setAttribute('stroke-dasharray', `${filled} ${CIRC - filled}`);
+        ringFill.setAttribute('stroke', pctColor(pct));
+        ringPct.textContent  = pct + '%';
+        ringLabel.textContent = `${comp.aprobados} / ${comp.total} juicios`;
+
+        // Evaluadores
+        const evalMap = {};
+        comp.detalles.forEach(d => {
+            const ev = (d.evaluador && d.evaluador !== '-' && d.evaluador !== 'Sin registro') ? d.evaluador : 'Instructor Sin Nombre / SOFIA Plus';
+            evalMap[ev] = (evalMap[ev] || 0) + 1;
+        });
+        const evalSorted = Object.entries(evalMap).sort((a,b) => b[1]-a[1]);
+        evalsEl.innerHTML = evalSorted.length
+            ? evalSorted.map(([name, count]) => `
+                <div class="eval-row" style="display:flex; justify-content:space-between; align-items:center; padding:.5rem .8rem; margin-bottom:.4rem; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:8px;">
+                    <span class="eval-name" style="font-weight:700; color:var(--text-strong); font-size:.84rem;">👨‍🏫 ${name}</span>
+                    <span class="badge badge-tech" style="font-size:.75rem; padding:3px 8px;">${count} juicio${count !== 1 ? 's' : ''}</span>
+                </div>`).join('')
+            : '<p style="color:var(--text-muted);font-size:.85rem;margin:0;">Sin evaluadores registrados en SOFIA Plus.</p>';
+
+        // RAPs grouped
+        const rapMap = {};
+        comp.detalles.forEach(d => {
+            const rapKey = d.rap || 'Resultado de Aprendizaje General';
+            if (!rapMap[rapKey]) rapMap[rapKey] = [];
+            rapMap[rapKey].push(d);
+        });
+        rapsEl.innerHTML = Object.entries(rapMap).map(([rap, dets], ri) => {
+            const rapAprobados = dets.filter(d => d.estado === 'APROBADO').length;
+            const rapPct = Math.round(rapAprobados / dets.length * 100);
+            const rapColor = pctColor(rapPct);
+            const rows = dets.map(d => `
+                <div class="rap-aprendiz-row" style="display:flex; justify-content:space-between; align-items:center; padding:.6rem .9rem; border-bottom:1px solid var(--border-divider); font-size:.83rem; gap:.8rem;">
+                    <div style="flex:1; min-width:0;">
+                        <div class="rap-aprendiz-name" style="font-weight:700; color:var(--text-strong);">${d.nombre}</div>
+                        <div class="rap-aprendiz-meta" style="font-size:.78rem; color:var(--text-muted);">CC: ${d.documento} · Fecha: ${d.fecha}</div>
+                    </div>
+                    <div class="rap-aprendiz-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:.25rem; flex-shrink:0;">
+                        ${statusBadge(d.estado)}
+                        <span style="font-size:.72rem; color:var(--text-muted); font-weight:600;">👨‍🏫 ${d.evaluador && d.evaluador !== '-' ? d.evaluador : 'SOFIA Plus'}</span>
+                    </div>
+                </div>`).join('');
+
+            return `
+            <div class="rap-item" style="margin-bottom:.75rem; border:1px solid var(--border-subtle); border-radius:10px; overflow:hidden; background:var(--bg-surface);">
+                <div class="rap-item-header" onclick="toggleRap(this)" data-open="false" style="padding:.8rem 1rem; display:flex; justify-content:space-between; align-items:center; gap:.8rem; cursor:pointer; background:var(--bg-card);">
+                    <div class="rap-item-title" style="font-size:.88rem; font-weight:700; color:var(--text-strong); line-height:1.4; flex:1;">📋 ${rap}</div>
+                    <div class="rap-item-stats" style="display:flex; gap:.6rem; align-items:center; flex-shrink:0;">
+                        <span class="badge" style="background:rgba(255,255,255,0.06); color:${rapColor}; border:1px solid ${rapColor}; font-weight:800; font-size:.78rem;">${rapAprobados}/${dets.length} (${rapPct}%)</span>
+                        ${statusBadge(rapAprobados === dets.length ? 'APROBADO' : 'POR EVALUAR')}
+                        <span style="font-size:.9rem; color:var(--text-muted); transition:transform .2s" class="rap-chevron">▼</span>
+                    </div>
+                </div>
+                <div class="rap-item-body" style="display:none; background:var(--bg-surface); border-top:1px solid var(--border-subtle);">${rows}</div>
+            </div>`;
+        }).join('');
+
+        // Pendientes
+        const pendientes = comp.detalles.filter(d => d.estado !== 'APROBADO');
+        if (pendientes.length > 0) {
+            pendSect.style.display = '';
+            // group by aprendiz
+            const pendByAprendiz = {};
+            pendientes.forEach(d => {
+                if (!pendByAprendiz[d.nombre]) pendByAprendiz[d.nombre] = [];
+                pendByAprendiz[d.nombre].push(d.rap);
+            });
+            pendEl.innerHTML = Object.entries(pendByAprendiz).map(([nombre, raps]) => `
+                <div class="pendiente-chip">
+                    <div>
+                        <div style="font-weight:700">${nombre}</div>
+                        <div class="pendiente-rap">${raps.length} RAP${raps.length !== 1 ? 's' : ''} pendiente${raps.length !== 1 ? 's' : ''}</div>
+                    </div>
+                    <span class="badge badge-solid-warning" style="font-size:.75rem">${raps.length}</span>
+                </div>`).join('');
+        } else {
+            pendSect.style.display = 'none';
+        }
+
+        // Show
+        overlay.classList.add('is-open');
+        document.body.classList.add('modal-open');
+    };
+
+    // ─── Close Modal ────────────────────────────────────────
+    window.closeCompModal = function () {
+        overlay.classList.remove('is-open');
+        document.body.classList.remove('modal-open');
+    };
+
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) closeCompModal();
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeCompModal();
+    });
+
+    // ─── RAP row toggle ─────────────────────────────────────
+    window.toggleRap = function (header) {
+        const body    = header.nextElementSibling;
+        const chevron = header.querySelector('.rap-chevron');
+        const isOpen  = body.classList.toggle('open');
+        if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : '';
+    };
+})();
+</script>
+{% endblock %}

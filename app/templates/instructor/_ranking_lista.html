@@ -1,0 +1,208 @@
+{% if filas %}
+{# =============================================
+   MACRO: chip de estadística con color semántico
+   pct >= 80 → verde (high), 50-79 → amarillo (mid), < 50 → rojo (low)
+   ============================================= #}
+{% macro stat_chip(icon, value, title) %}
+{% set pct = value | float %}
+{% if pct >= 80 %}{% set level = 'high' %}
+{% elif pct >= 50 %}{% set level = 'mid' %}
+{% else %}{% set level = 'low' %}{% endif %}
+<span class="stat-chip stat-chip-{{ level }}" title="{{ title }}">{{ icon }} {{ '%.0f'|format(pct) }}%</span>
+{% endmacro %}
+
+{# ===== PODIO DESTACADO ===== #}
+{% if filas|selectattr('posicion', 'le', 3)|list %}
+<section class="ranking-podium" aria-label="Podio de participación">
+    <div class="ranking-podium-heading">
+        <div>
+            <span class="eyebrow">Puestos destacados</span>
+            <h3>El podio de la ficha</h3>
+        </div>
+        <span>Reconocimiento a la constancia</span>
+    </div>
+    <div class="ranking-podium-grid">
+        {% for fila in filas if fila.posicion <= 3 %}
+        <article class="ranking-podium-card podium-{{ fila.posicion }}">
+            <div class="podium-rank">
+                <span class="podium-medal" aria-hidden="true">{{ fila.medalla or '★' }}</span>
+                <span>Puesto {{ fila.posicion }}</span>
+            </div>
+            <strong class="podium-name">{{ fila.aprendiz.nombre_completo }}</strong>
+            <small class="podium-doc">Documento {{ fila.aprendiz.documento }}</small>
+            <div class="podium-score">
+                <span>Puntaje total</span>
+                <strong>{{ '%.1f'|format(fila.puntaje_total) }}</strong>
+            </div>
+            <div class="podium-metrics">
+                <span><small>Asistencia</small><b>{{ '%.0f'|format(fila.porcentaje_asistencia) }}%</b></span>
+                <span><small>Evidencias</small><b>{{ '%.0f'|format(fila.porcentaje_evidencias) }}%</b></span>
+                <span><small>Juicios</small><b>{{ '%.0f'|format(fila.porcentaje_aprobados) }}%</b></span>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{# ===== VISTA MÓVIL (cards) ===== #}
+<div class="ranking-mobile" aria-label="Ranking de participación">
+    {% for fila in filas %}
+    <article class="ranking-card {% if fila.posicion <= 3 %}ranking-card-top ranking-card-position-{{ fila.posicion }}{% endif %}"
+             data-estado="{{ fila.aprendiz.estado }}"
+             data-url="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}">
+
+        <div class="ranking-card-head">
+            <div class="ranking-position">
+                <span class="position-number position-{{ fila.posicion if fila.posicion <= 3 else 'default' }}" aria-label="Puesto {{ fila.posicion }}">
+                    {% if fila.medalla %}<span class="position-medal" aria-hidden="true">{{ fila.medalla }}</span>{% endif %}
+                    <span class="position-label">#{{ fila.posicion }}</span>
+                </span>
+                <div>
+                    <a class="ranking-name-link" href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}">
+                        <strong>{{ fila.aprendiz.nombre_completo }}</strong>
+                    </a>
+                    <small>{{ fila.aprendiz.documento }}</small>
+                </div>
+            </div>
+            <span class="trend-badge trend-{{ fila.tendencia }}" title="Tendencia {{ fila.tendencia }}">
+                {{ fila.tendencia_icono }} {{ fila.tendencia|capitalize }}
+            </span>
+        </div>
+
+        <div class="score-row">
+            <span>Puntaje</span>
+            <strong>{{ '%.1f'|format(fila.puntaje_total) }}</strong>
+        </div>
+        <div class="progress-track" role="progressbar"
+             aria-valuenow="{{ fila.barra_puntaje }}" aria-valuemin="0" aria-valuemax="100">
+            {% if fila.barra_puntaje > 0 %}<span style="width: {{ fila.barra_puntaje }}%;"></span>{% endif %}
+        </div>
+
+        <div class="score-sources">
+            {{ stat_chip('📅', fila.porcentaje_asistencia, 'Asistencia') }}
+            {{ stat_chip('🗂️', fila.porcentaje_evidencias, 'Evidencias') }}
+            {{ stat_chip('✅', fila.porcentaje_aprobados, 'Juicios aprobados') }}
+            {% if fila.bonus %}
+            <span class="bonus-text">✨ +{{ '%.1f'|format(fila.bonus) }}</span>
+            {% endif %}
+        </div>
+
+        {% if fila.insignias %}
+        <div class="mini-badges" aria-label="Insignias recientes">
+            {% for insignia in fila.insignias %}
+            <span title="{{ insignia.nombre }}" class="badge-icon">{{ insignia.icono }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </article>
+    {% endfor %}
+</div>
+
+{# ===== VISTA DESKTOP (tabla) ===== #}
+
+<div class="ranking-detail-heading">
+    <div>
+        <span class="eyebrow">Detalle por aprendiz</span>
+        <h3>Clasificación completa</h3>
+    </div>
+    <span>Haz clic en una fila para ver el historial</span>
+</div>
+
+<div class="table-container ranking-desktop">
+    <div class="table-responsive">
+    <table class="table ranking-table table-sena">
+        <caption class="sr-only">Ranking de participación</caption>
+        <thead>
+            <tr>
+                <th scope="col" class="td-count">Pos.</th>
+                <th scope="col">Aprendiz</th>
+                <th scope="col">Puntaje</th>
+                <th scope="col" class="td-count">Asistencia</th>
+                <th scope="col" class="td-count">Evidencias</th>
+                <th scope="col" class="td-count">Juicios</th>
+                <th scope="col" class="td-count">Tendencia</th>
+                <th scope="col" class="td-count">Logros</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fila in filas %}
+            {% set pct_a = fila.porcentaje_asistencia | float %}
+            {% set pct_e = fila.porcentaje_evidencias | float %}
+            {% set pct_j = fila.porcentaje_aprobados | float %}
+            <tr data-estado="{{ fila.aprendiz.estado }}"
+                class="{% if fila.posicion <= 3 %}ranking-row-top ranking-row-position-{{ fila.posicion }}{% endif %} table-clickable"
+                data-url="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}">
+
+                <td data-label="Pos." class="td-count">
+                    <span class="position-badge position-{{ fila.posicion if fila.posicion <= 3 else 'default' }}" aria-label="Puesto {{ fila.posicion }}">
+                        {% if fila.medalla %}<span class="position-medal" aria-hidden="true">{{ fila.medalla }}</span>{% endif %}
+                        <span class="position-label">#{{ fila.posicion }}</span>
+                    </span>
+                </td>
+
+                <td data-label="Aprendiz">
+                    <a class="ranking-name-link" href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}">
+                        <strong class="ranking-name">{{ fila.aprendiz.nombre_completo }}</strong>
+                    </a>
+                    <small class="ranking-doc">{{ fila.aprendiz.documento }}</small>
+                </td>
+
+                <td data-label="Puntaje" class="score-cell">
+                    <div class="score-row">
+                        <strong class="score-value">{{ '%.1f'|format(fila.puntaje_total) }}</strong>
+                        {% if fila.bonus %}
+                        <small class="bonus-badge">✨ +{{ '%.1f'|format(fila.bonus) }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="progress-track">
+                        {% if fila.barra_puntaje > 0 %}<span style="width: {{ fila.barra_puntaje }}%;"></span>{% endif %}
+                    </div>
+                </td>
+
+                {# Stat chips con color semántico #}
+                <td data-label="Asistencia" class="td-count ranking-stat">
+                    <span class="stat-chip stat-chip-{% if pct_a >= 80 %}high{% elif pct_a >= 50 %}mid{% else %}low{% endif %}">
+                        📅 {{ '%.0f'|format(pct_a) }}%
+                    </span>
+                </td>
+                <td data-label="Evidencias" class="td-count ranking-stat">
+                    <span class="stat-chip stat-chip-{% if pct_e >= 80 %}high{% elif pct_e >= 50 %}mid{% else %}low{% endif %}">
+                        🗂️ {{ '%.0f'|format(pct_e) }}%
+                    </span>
+                </td>
+                <td data-label="Juicios" class="td-count ranking-stat">
+                    <span class="stat-chip stat-chip-{% if pct_j >= 80 %}high{% elif pct_j >= 50 %}mid{% else %}low{% endif %}">
+                        ✅ {{ '%.0f'|format(pct_j) }}%
+                    </span>
+                </td>
+
+                <td data-label="Tendencia" class="td-count">
+                    <span class="trend-badge trend-{{ fila.tendencia }}">
+                        {{ fila.tendencia_icono }} {{ fila.tendencia|capitalize }}
+                    </span>
+                </td>
+
+                <td data-label="Logros" class="td-count">
+                    <div class="mini-badges" style="justify-content: center;">
+                        {% for insignia in fila.insignias %}
+                        <span title="{{ insignia.nombre }}" class="badge-icon">{{ insignia.icono }}</span>
+                        {% else %}
+                        <span class="no-badges">—</span>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+{% else %}
+<div class="empty-state" style="text-align: center; padding: 3rem 1rem;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">🏁</div>
+    <h3>El ranking está listo para comenzar</h3>
+    <p class="text-muted">Cuando haya aprendices en la ficha, aquí aparecerá su progreso de participación.</p>
+</div>
+{% endif %}

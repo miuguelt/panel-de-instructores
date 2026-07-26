@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#39A900">
+    <meta name="description" content="Control académico de fichas, asistencia, tareas y seguimiento SENA.">
+    <title>{% block title %}SENA Control Académico{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='4.7') }}">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    {% block head %}{% endblock %}
+    <script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('app-theme') || 'sena';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <a class="skip-link" href="#contenido-principal">Saltar al contenido principal</a>
+    {% block navbar %}
+    <header class="app-header">
+        <nav class="navbar" aria-label="Navegación principal">
+            <div class="nav-shell">
+                <a class="nav-brand" href="{{ url_for('instructor.dashboard') if current_user.is_authenticated else url_for('auth.login') }}">
+                    <span class="nav-logo" aria-hidden="true">S</span>
+                    <span class="nav-brand-copy">
+                        <strong class="nav-title">SENA Control</strong>
+                        <small>Gestión académica</small>
+                    </span>
+                </a>
+
+                {% if current_user.is_authenticated %}
+                <div class="nav-primary" aria-label="Secciones generales">
+                    <a href="{{ url_for('instructor.dashboard') }}"
+                       class="nav-link {% if request.endpoint == 'instructor.dashboard' %}is-active{% endif %}"
+                       {% if request.endpoint == 'instructor.dashboard' %}aria-current="page"{% endif %}>Inicio</a>
+                    <a href="{{ url_for('instructor.fichas') }}"
+                       class="nav-link {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}is-active{% endif %}"
+                       {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}aria-current="page"{% endif %}>Fichas</a>
+                </div>
+
+                <div class="nav-user">
+                    <span class="nav-identity">
+                        <small>Instructor</small>
+                        <strong class="nav-name">{{ current_user.nombre }}</strong>
+                    </span>
+                    <a href="{{ url_for('seguimiento.notificaciones_instructor') }}"
+                       class="nav-icon-button"
+                       aria-label="Notificaciones{% if notificaciones_no_leidas %}: {{ notificaciones_no_leidas }} sin leer{% endif %}"
+                       title="Notificaciones">
+                        <span aria-hidden="true">🔔</span>
+                        {% if notificaciones_no_leidas %}<span class="notification-count">{{ notificaciones_no_leidas }}</span>{% endif %}
+                    </a>
+                    <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline nav-logout">Salir</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </nav>
+
+        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento') %}
+        <div class="ficha-toolbar">
+            <div class="ficha-toolbar-inner">
+                <div class="ficha-context" title="{{ ficha.nombre_programa }}">
+                    <span>Ficha</span>
+                    <strong>{{ ficha.codigo }}</strong>
+                </div>
+                <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
+                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %}is-active{% endif %}">Aprendices</a>
+                    <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}">Asistencia</a>
+                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}">Tareas</a>
+                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}">Alertas</a>
+                    <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.juicios',) %}is-active{% endif %}">Juicios</a>
+                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.estadisticas',) %}is-active{% endif %}">Estadísticas</a>
+                    <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}">Seguimiento</a>
+                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}">Materiales</a>
+                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}">Ranking</a>
+                    <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'aseo.turnos' %}is-active{% endif %}">Turnos de aseo</a>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </header>
+    {% endblock %}
+
+    <div class="theme-float">
+        <button onclick="setTheme('elegant')" class="theme-float-dot" title="Elegante" data-theme-btn="elegant" style="background: #6366f1;"></button>
+        <button onclick="setTheme('sena')" class="theme-float-dot" title="SENA" data-theme-btn="sena" style="background: #39A900;"></button>
+        <button onclick="setTheme('ocean')" class="theme-float-dot" title="Oceano" data-theme-btn="ocean" style="background: #06b6d4;"></button>
+    </div>
+
+    <main id="contenido-principal" class="container" tabindex="-1">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages" aria-live="polite">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" role="status">
+                <span class="alert-content">{{ message }}</span>
+                <button type="button" class="alert-close-btn" aria-label="Cerrar mensaje" onclick="this.closest('.alert').classList.add('is-closing'); setTimeout(() => this.closest('.alert').remove(), 300);">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/table-filters.js', v='4.0') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const toasts = document.querySelectorAll('.flash-messages .alert');
+            toasts.forEach((toast, index) => {
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        toast.classList.add('is-closing');
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, 4000 + (index * 500));
+            });
+        });
+    </script>
+    <script>
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('app-theme', themeName);
+            document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
+                el.classList.toggle('is-active', el.dataset.themeBtn === themeName);
+            });
+        }
+        (function() {
+            var t = localStorage.getItem('app-theme') || 'sena';
+            if (document.documentElement.getAttribute('data-theme') !== t) {
+                document.documentElement.setAttribute('data-theme', t);
+            }
+            document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
+                if (el.dataset.themeBtn === t) el.classList.add('is-active');
+            });
+        })();
+    </script>
+</body>
+</html>

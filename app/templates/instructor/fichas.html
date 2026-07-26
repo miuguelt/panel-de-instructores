@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Fichas - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <h1>Gestión de Fichas</h1>
+</div>
+
+<div class="card form-card report-import-card">
+    <div class="import-heading">
+        <div class="import-icon" aria-hidden="true">📊</div>
+        <div>
+            <span class="eyebrow">Opción recomendada</span>
+            <h2>Crear ficha desde el reporte de juicios</h2>
+        </div>
+    </div>
+    <p id="report-help" class="text-muted">
+        Sube el <strong>Reporte de Juicios Evaluativos</strong> descargado de SOFIA Plus.
+        El sistema leerá la ficha, el programa, las fechas, los aprendices y sus juicios.
+    </p>
+    <form id="import-report-form" method="POST"
+          action="{{ url_for('instructor.importar_reporte_ficha') }}"
+          enctype="multipart/form-data"
+          class="form-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label for="reporte_juicios">Archivo del reporte (.xls o .xlsx)</label>
+            <input type="file"
+                   id="reporte_juicios"
+                   name="archivo"
+                   accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                   aria-describedby="report-help"
+                   required>
+        </div>
+        <div class="import-features" aria-label="Datos que se importarán">
+            <span>✓ Datos de la ficha</span>
+            <span>✓ Lista de aprendices</span>
+            <span>✓ Historial de juicios</span>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg btn-full">
+            Crear ficha e importar reporte
+        </button>
+    </form>
+</div>
+
+<details class="card form-card manual-create-card">
+    <summary>Crear la ficha manualmente</summary>
+    <p class="text-muted">Usa esta opción solamente si todavía no tienes el reporte. Si la ficha ya existe, el sistema la reutiliza y te vincula como instructor colaborador.</p>
+    <form method="POST" action="{{ url_for('instructor.fichas') }}" class="form-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="codigo">Código de ficha</label>
+                <input type="text" id="codigo" name="codigo" placeholder="Ej: 2890123" required>
+            </div>
+            <div class="form-group flex-grow">
+                <label for="nombre_programa">Programa de formación</label>
+                <input type="text" id="nombre_programa" name="nombre_programa" placeholder="Ej: Análisis y Desarrollo de Software" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="fecha_inicio">Fecha inicio</label>
+                <input type="date" id="fecha_inicio" name="fecha_inicio">
+            </div>
+            <div class="form-group">
+                <label for="fecha_fin">Fecha fin</label>
+                <input type="date" id="fecha_fin" name="fecha_fin">
+            </div>
+            <div class="form-group">
+                <label for="duracion_productiva_meses">Etapa productiva (meses)</label>
+                <input type="number" id="duracion_productiva_meses" name="duracion_productiva_meses" value="6" min="1" max="24">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-outline">Crear ficha manualmente</button>
+    </form>
+</details>
+
+{% if fichas %}
+<div class="table-container">
+    <div class="table-responsive" tabindex="0" aria-label="Lista de fichas">
+        <table class="table table-sena">
+            <caption class="sr-only">Fichas registradas</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Código</th>
+                    <th scope="col">Programa</th>
+                    <th scope="col">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ficha in fichas %}
+                <tr data-estado="activo">
+                    <td data-label="Código">
+                        <a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">
+                            <strong>{{ ficha.codigo }}</strong>
+                        </a>
+                    </td>
+                    <td data-label="Programa">{{ ficha.nombre_programa }}<br><small class="text-muted">{{ cronogramas[ficha.id].fase_label if cronogramas[ficha.id].configurado else 'Fechas pendientes' }} · {{ '%.1f'|format(cronogramas[ficha.id].porcentaje) }}% de tiempo</small></td>
+                    <td data-label="Acciones" class="actions-cell">
+                        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">Aprendices</a>
+                        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Asistencia</a>
+                        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Tareas</a>
+                        <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Materiales</a>
+                        <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Juicios</a>
+                        <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ranking</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📋</div>
+    <h3>Todavía no hay fichas creadas</h3>
+    <p>Crea tu primera ficha usando el formulario de arriba.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const importForm = document.getElementById('import-report-form');
+    if (importForm) {
+        importForm.addEventListener('submit', function() {
+            const btn = this.querySelector('button[type="submit"]');
+            if (btn) {
+                btn.innerHTML = '<span style="display:inline-block; margin-right:8px; animation: spin 1s linear infinite;">⌛</span> Importando y creando ficha...';
+                btn.style.opacity = '0.8';
+                btn.style.pointerEvents = 'none';
+                setTimeout(() => { btn.disabled = true; }, 10);
+            }
+        });
+    }
+});
+</script>
+<style>
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

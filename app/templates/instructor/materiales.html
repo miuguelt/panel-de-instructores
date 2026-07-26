@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block title %}Materiales de Apoyo - {{ ficha.codigo }}{% endblock %}
+
+{% block head %}
+<style>
+  :root { --modal-z: 200; }
+  .material-card {
+    display: flex;
+    flex-direction: column;
+    transition: transform .2s, box-shadow .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .material-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+  .file-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 11px; letter-spacing: .02em;
+    flex-shrink: 0;
+  }
+  .file-icon-pdf { background: #fef2f2; color: #dc2626; }
+  .file-icon-word { background: #eff6ff; color: #2563eb; }
+  .file-icon-excel { background: #f0fdf4; color: #16a34a; }
+  .file-icon-ppt { background: #fff7ed; color: #ea580c; }
+  .file-icon-zip { background: #fefce8; color: #ca8a04; }
+  .file-icon-image { background: #faf5ff; color: #9333ea; }
+  .file-icon-other { background: var(--border-divider); color: var(--text-muted); }
+
+  .drop-zone {
+    border: 2px dashed var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+  }
+  .drop-zone:hover,
+  .drop-zone.drag-over {
+    border-color: var(--accent-primary);
+    background: var(--accent-glow);
+  }
+  .drop-zone.has-file {
+    border-color: var(--accent-primary);
+    border-style: solid;
+    background: var(--accent-glow);
+  }
+  .drop-zone-icon {
+    font-size: 36px;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    transition: color .2s;
+  }
+  .drop-zone:hover .drop-zone-icon,
+  .drop-zone.drag-over .drop-zone-icon {
+    color: var(--accent-primary);
+  }
+  .drop-zone-text { font-size: 14px; color: var(--text-muted); }
+  .drop-zone-text strong { color: var(--accent-primary); }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .drop-zone-file {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-surface);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .drop-zone.has-file .drop-zone-file { display: flex; }
+  .drop-zone.has-file .drop-zone-prompt { display: none; }
+
+  .search-box {
+    width: 100%;
+    max-width: 380px;
+    padding: 10px 16px 10px 40px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--input-bg);
+    color: var(--text-main);
+    font-size: 14px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .search-box:focus {
+    border-color: var(--accent-primary);
+    box-shadow: var(--focus-ring);
+    outline: none;
+  }
+  .search-wrap { position: relative; display: inline-block; }
+  .search-wrap::before {
+    content: '\1F50D';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .preview-img {
+    max-width: 100%;
+    max-height: 70vh;
+    border-radius: 8px;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .material-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .material-meta .divider { color: var(--border-divider); }
+
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block navbar %}{{ super() }}{% endblock %}
+
+{% block content %}
+<div class="section-header" style="margin-top:0;">
+  <div>
+    <span class="eyebrow">Ficha {{ ficha.codigo }}</span>
+    <h1 style="font-size:clamp(20px,5vw,28px);color:var(--text-strong);margin:4px 0 0;">Materiales de Apoyo</h1>
+    <p class="text-muted" style="margin-top:3px;">{{ ficha.nombre_programa }}</p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">&larr; Volver</a>
+    <button onclick="abrirModal('modalSubir')" class="btn btn-primary">+ Subir Archivo</button>
+  </div>
+</div>
+
+<div class="card" style="border-left:4px solid var(--sena-orange);padding:14px 18px;margin-bottom:20px;">
+  <p style="font-size:12px;color:var(--text-muted);line-height:1.5;">
+    <strong style="color:var(--sena-orange);text-transform:uppercase;font-size:10px;letter-spacing:.05em;">&copy; Derechos de Autor &mdash;</strong>
+    Al subir archivos, declaras ser el autor original o contar con licencias para distribuci&oacute;n gratuita con fines acad&eacute;micos SENA. No est&aacute; permitido subir contenido protegido sin autorizaci&oacute;n expl&iacute;cita.
+  </p>
+</div>
+
+{% if materiales %}
+<div style="margin-bottom:18px;">
+  <div class="search-wrap">
+    <input type="search" id="buscador" class="search-box" placeholder="Buscar por nombre o descripci&oacute;n..." oninput="filtrarMateriales(this.value)">
+  </div>
+</div>
+
+<div class="cards-grid" id="gridMateriales" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">
+  {% for m in materiales %}
+  {% set ext = m.nombre_archivo.split('.')[-1].lower() if '.' in m.nombre_archivo else '' %}
+  {% set icon_class = 'file-icon-other' %}
+  {% if ext in ['pdf'] %}{% set icon_class = 'file-icon-pdf' %}{% set label = 'PDF' %}
+  {% elif ext in ['doc','docx'] %}{% set icon_class = 'file-icon-word' %}{% set label = 'DOC' %}
+  {% elif ext in ['xls','xlsx'] %}{% set icon_class = 'file-icon-excel' %}{% set label = 'XLS' %}
+  {% elif ext in ['ppt','pptx'] %}{% set icon_class = 'file-icon-ppt' %}{% set label = 'PPT' %}
+  {% elif ext in ['zip','rar','7z'] %}{% set icon_class = 'file-icon-zip' %}{% set label = 'ZIP' %}
+  {% elif ext in ['jpg','jpeg','png','gif','webp','svg'] %}{% set icon_class = 'file-icon-image' %}{% set label = 'IMG' %}
+  {% else %}{% set label = ext.upper()[:3] if ext else '---' %}{% endif %}
+  {% set es_imagen = ext in ['jpg','jpeg','png','gif','webp'] %}
+  <article class="card material-card" style="margin-bottom:0;" data-busqueda="{{ (m.nombre_archivo + ' ' + (m.descripcion or ''))|lower }}">
+    <div style="display:flex;gap:14px;align-items:flex-start;padding:16px 18px 12px;">
+      <div class="file-icon {{ icon_class }}">{{ label }}</div>
+      <div style="flex:1;min-width:0;">
+        <h3 style="font-size:15px;font-weight:700;color:var(--text-strong);margin:0 0 3px;line-height:1.3;word-break:break-word;" title="{{ m.nombre_archivo }}">{{ m.nombre_archivo }}</h3>
+        <div class="material-meta">
+          <span>{{ tamanos.get(m.id, 0)|format_size }}</span>
+          <span class="divider">|</span>
+          <span>{{ m.subido_en.strftime('%d %b %Y, %H:%M') }}</span>
+        </div>
+      </div>
+    </div>
+    {% if m.descripcion %}
+    <div style="padding:0 18px 8px;">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.45;margin:0;word-break:break-word;">{{ m.descripcion }}</p>
+    </div>
+    {% endif %}
+    <div style="padding:10px 18px 14px;border-top:1px solid var(--border-divider);display:flex;gap:6px;flex-wrap:wrap;">
+      {% if es_imagen %}
+      <button onclick="vistaPrevia('{{ url_for('aprendiz.descargar_archivo', filename=m.url_archivo, inline=1) }}','{{ m.nombre_archivo }}')" class="btn btn-sm btn-outline">Vista Previa</button>
+      {% endif %}
+      <a href="{{ url_for('aprendiz.descargar_archivo', filename=m.url_archivo) }}" class="btn btn-sm btn-primary" style="text-decoration:none;">Descargar</a>
+      {% if m.instructor_id == current_user.id or current_user.es_admin or ficha.instructor_id == current_user.id %}
+      <button onclick="confirmarEliminar({{ m.id }},'{{ m.nombre_archivo|e }}')" class="btn btn-sm btn-outline" style="color:var(--sena-red);border-color:var(--sena-red);margin-left:auto;">Eliminar</button>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">&#128193;</div>
+  <h3>Sin materiales compartidos</h3>
+  <p>Esta ficha a&uacute;n no tiene archivos o materiales de apoyo. S&eacute; el primero en compartir recursos.</p>
+  <button onclick="abrirModal('modalSubir')" class="btn btn-primary">+ Subir el primer archivo</button>
+</div>
+{% endif %}
+
+<dialog id="modalSubir" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalSubirTitulo">
+  <div class="app-modal-content">
+    <form method="POST" enctype="multipart/form-data" id="formSubir" class="app-modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <header class="app-modal-header">
+        <div class="app-modal-header-copy">
+          <span class="app-modal-eyebrow">Materiales de la ficha</span>
+          <h2 id="modalSubirTitulo">Subir material</h2>
+        </div>
+        <button type="button" class="app-modal-close" onclick="cerrarModal('modalSubir')" aria-label="Cerrar">&times;</button>
+      </header>
+      <div class="app-modal-body app-modal-body--spacious">
+        <div class="drop-zone" id="dropZone">
+          <input type="file" name="archivo" id="archivoInput" required onchange="onFileSelect(this)">
+          <div class="drop-zone-prompt">
+            <div class="drop-zone-icon">&#128228;</div>
+            <div class="drop-zone-text">Arrastra un archivo aqu&iacute; o <strong>selecciona uno</strong></div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">PDF, Word, Excel, PowerPoint, ZIP, im&aacute;genes</div>
+          </div>
+          <div class="drop-zone-file" id="dropZoneFile">
+            <span style="font-size:20px;">&#128196;</span>
+            <span id="dropZoneFileName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            <button type="button" onclick="limpiarArchivo()" style="background:none;border:none;color:var(--sena-red);cursor:pointer;font-size:16px;padding:2px 4px;" title="Quitar archivo">&times;</button>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;color:var(--text-muted);">Descripci&oacute;n <span style="font-weight:400;">(opcional)</span></label>
+          <textarea name="descripcion" rows="3" placeholder="Breve descripci&oacute;n del contenido..." style="width:100%;padding:10px 14px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--input-bg);color:var(--text-main);font:inherit;font-size:14px;resize:vertical;transition:border-color .2s;outline:none;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-subtle)'"></textarea>
+        </div>
+      </div>
+      <footer class="app-modal-footer">
+        <button type="button" class="btn btn-outline" id="btnCancelarSubir" onclick="cerrarModal('modalSubir')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSubirArchivo">Subir Archivo</button>
+      </footer>
+    </form>
+  </div>
+</dialog>
+
+<dialog id="modalEliminar" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalEliminarTitulo">
+  <div class="app-modal-content app-modal-content--compact">
+    <header class="app-modal-header">
+      <div class="app-modal-header-copy">
+        <span class="app-modal-eyebrow">Acción irreversible</span>
+        <h2 id="modalEliminarTitulo">Eliminar material</h2>
+      </div>
+      <button type="button" class="app-modal-close" onclick="cerrarModal('modalEliminar')" aria-label="Cerrar">&times;</button>
+    </header>
+    <div class="app-modal-body app-modal-body--center">
+      <div style="font-size:44px;margin-bottom:12px;">&#9888;</div>
+      <p style="font-size:15px;color:var(--text-strong);font-weight:600;margin:0 0 4px;">Confirmar eliminaci&oacute;n</p>
+      <p style="font-size:13px;color:var(--text-muted);margin:0;" id="eliminarMensaje">Se eliminar&aacute; el archivo de forma permanente.</p>
+    </div>
+    <form method="POST" id="formEliminar">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <footer class="app-modal-footer app-modal-footer--center">
+        <button type="button" class="btn btn-outline" onclick="cerrarModal('modalEliminar')">Cancelar</button>
+        <button type="submit" class="btn" style="background:var(--sena-red);color:white;border:1px solid transparent;">S&iacute;, eliminar</button>
+      </footer>
+    </form>
+  </div>
+</dialog>
+
+<dialog id="modalVistaPrevia" class="app-modal-overlay" aria-modal="true" aria-labelledby="previewTitle">
+  <div class="app-modal-content app-modal-content--wide">
+    <header class="app-modal-header">
+      <div class="app-modal-header-copy">
+        <span class="app-modal-eyebrow">Material compartido</span>
+        <h2 id="previewTitle">Vista previa</h2>
+      </div>
+      <button type="button" class="app-modal-close" onclick="cerrarModal('modalVistaPrevia')" aria-label="Cerrar">&times;</button>
+    </header>
+    <div class="app-modal-body app-modal-body--center">
+      <img id="previewImg" class="preview-img" src="" alt="Vista previa">
+    </div>
+    <footer class="app-modal-footer app-modal-footer--center">
+      <a id="previewDownload" href="#" download class="btn btn-primary" style="text-decoration:none;">Descargar</a>
+    </footer>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var materialAEliminar = null;
+
+function abrirModal(id) {
+  var m = document.getElementById(id);
+  if (m) {
+    m.showModal();
+    document.body.classList.add('modal-open');
+  }
+}
+function cerrarModal(id) {
+  var m = document.getElementById(id);
+  if (m && m.open) m.close();
+  document.body.classList.remove('modal-open');
+}
+
+document.querySelectorAll('.app-modal-overlay').forEach(function(m) {
+  m.addEventListener('click', function(e) {
+    if (e.target === m && m.open && !m.classList.contains('is-loading')) m.close();
+  });
+  m.addEventListener('close', function() { document.body.classList.remove('modal-open'); });
+});
+
+var formSubir = document.getElementById('formSubir');
+if (formSubir) {
+  formSubir.addEventListener('submit', function() {
+    var btn = document.getElementById('btnSubirArchivo');
+    var btnCancelar = document.getElementById('btnCancelarSubir');
+    var modal = document.getElementById('modalSubir');
+    if (modal) modal.classList.add('is-loading');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span style="display:inline-block; margin-right:8px; animation: spin 1s linear infinite;">&#8982;</span> Subiendo, por favor espera...';
+      btn.style.opacity = '0.8';
+      btn.style.cursor = 'not-allowed';
+    }
+    if (btnCancelar) {
+      btnCancelar.style.pointerEvents = 'none';
+      btnCancelar.style.opacity = '0.5';
+    }
+  });
+}
+
+function onFileSelect(input) {
+  var zone = document.getElementById('dropZone');
+  var nameEl = document.getElementById('dropZoneFileName');
+  if (input.files && input.files[0]) {
+    nameEl.textContent = input.files[0].name;
+    zone.classList.add('has-file');
+  } else {
+    zone.classList.remove('has-file');
+  }
+}
+function limpiarArchivo() {
+  var input = document.getElementById('archivoInput');
+  input.value = '';
+  document.getElementById('dropZone').classList.remove('has-file');
+}
+
+var dropZone = document.getElementById('dropZone');
+if (dropZone) {
+  ['dragenter','dragover'].forEach(function(ev) {
+    dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag-over'); });
+  });
+  ['dragleave','drop'].forEach(function(ev) {
+    dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drag-over'); });
+  });
+  dropZone.addEventListener('drop', function(e) {
+    var files = e.dataTransfer.files;
+    if (files.length) {
+      document.getElementById('archivoInput').files = files;
+      onFileSelect(document.getElementById('archivoInput'));
+    }
+  });
+}
+
+function confirmarEliminar(id, nombre) {
+  materialAEliminar = id;
+  var msg = document.getElementById('eliminarMensaje');
+  msg.textContent = 'Se eliminar\u00e1 permanentemente: "' + nombre + '". Esta acci\u00f3n no se puede deshacer.';
+  var form = document.getElementById('formEliminar');
+  form.action = '/instructor/fichas/{{ ficha.id }}/materiales/' + id + '/eliminar';
+  abrirModal('modalEliminar');
+}
+
+function vistaPrevia(url, nombre) {
+  document.getElementById('previewTitle').textContent = nombre;
+  document.getElementById('previewImg').src = url;
+  document.getElementById('previewDownload').href = url;
+  abrirModal('modalVistaPrevia');
+}
+
+function filtrarMateriales(valor) {
+  var term = valor.toLowerCase().trim();
+  var cards = document.querySelectorAll('#gridMateriales .material-card');
+  cards.forEach(function(c) {
+    var data = (c.getAttribute('data-busqueda') || '').toLowerCase();
+    c.style.display = (!term || data.indexOf(term) !== -1) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

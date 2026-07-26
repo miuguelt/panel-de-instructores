@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}Inicio - SENA Control{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <section class="dashboard-hero" aria-labelledby="dashboard-title">
+        <div>
+            <span class="eyebrow">Panel del instructor</span>
+            <h1 id="dashboard-title">Mis fichas</h1>
+            <p>Consulta el avance y entra directamente al módulo que necesitas.</p>
+        </div>
+        <a href="{{ url_for('instructor.fichas') }}" class="btn btn-primary btn-lg">
+            <span aria-hidden="true">＋</span> Crear o importar ficha
+        </a>
+    </section>
+
+    {% if fichas %}
+    {% set activas = [] %}
+    {% set terminadas = [] %}
+    {% for ficha in fichas %}
+        {% if cronogramas[ficha.id]['fase'] == 'finalizada' %}
+            {% set _ = terminadas.append(ficha) %}
+        {% else %}
+            {% set _ = activas.append(ficha) %}
+        {% endif %}
+    {% endfor %}
+
+    {% if activas %}
+    <div class="dashboard-cards">
+        {% for ficha in activas %}
+        {% set cronograma = cronogramas[ficha.id] %}
+        {% set extra = estadisticas_extra.get(ficha.id, {}) %}
+        {% set stats = estadisticas_fichas.get(ficha.id) %}
+        <article class="card card-ficha ficha-dashboard-active ficha-{{ cronograma.fase }}">
+            <header class="ficha-card-header">
+                <div>
+                    <div class="ficha-card-labels">
+                        <span class="card-badge">Ficha {{ ficha.codigo }}</span>
+                        {% if ficha.codigo_programa %}
+                        <span class="badge badge-secondary" title="Código del programa">Prog: {{ ficha.codigo_programa }}</span>
+                        {% endif %}
+                        {% if cronograma.configurado %}
+                        <span class="badge badge-info">{{ cronograma.fase_label }}</span>
+                        {% else %}
+                        <span class="badge badge-warning">Fechas pendientes</span>
+                        {% endif %}
+                        <span class="badge badge-secondary" title="Aprendices activos ({{ extra.get('total_aprendices_incl_inactivos', 0) }} en total)">{{ extra.get('total_aprendices', '?') }} activos</span>
+                    </div>
+                    <h2 class="card-title">{{ ficha.nombre_programa }}</h2>
+                </div>
+                <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="ficha-open-link">
+                    Ver aprendices <span aria-hidden="true">→</span>
+                </a>
+            </header>
+
+            <div class="ficha-card-body">
+                <div class="ficha-bars-container">
+                    {% include '_cronograma.html' %}
+
+                    <aside class="ficha-dashboard-summary" aria-label="Resumen de la ficha {{ ficha.codigo }}">
+                        {% if stats and stats.total > 0 %}
+                        <div class="ficha-state-summary">
+                            <div class="ficha-summary-heading">
+                                <span class="eyebrow">Estado del grupo</span>
+                                <strong>{{ extra.get('total_aprendices', stats.activos) }} activos</strong>
+                            </div>
+                            <div class="estados-bar" aria-label="Distribución del estado de aprendices">
+                                {% set bg_colors = {'EN_FORMACION': 'var(--info)', 'CERTIFICADO': 'var(--success)', 'CANCELADO': 'var(--danger)', 'RETIRO_VOLUNTARIO': 'var(--warning)', 'POR_CERTIFICAR': 'var(--primary)'} %}
+                                {% for estado, count in stats.estados.items() %}
+                                    {% set bg = bg_colors.get(estado, 'var(--gray-500)') %}
+                                    {% if count > 0 %}<div title="{{ estado|replace('_', ' ')|title }}: {{ count }} ({{ (count / stats.total * 100)|round|int }}%)" style="--state-color: {{ bg }}; width: {{ (count / stats.total * 100) }}%;"></div>{% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="estados-legend">
+                                {% for estado, count in stats.estados.items() %}
+                                    {% if count > 0 %}
+                                    <span>
+                                        <span class="estados-dot" style="--state-color: {{ bg_colors.get(estado, 'var(--gray-500)') }};"></span>
+                                        {{ count }} {{ estado|replace('_', ' ')|title }}
+                                    </span>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if extra %}
+                        {% set expected_deliveries = extra.get('tareas_totales', 0) * extra.get('total_aprendices', 0) %}
+                        {% set cert_pct = ((extra.get('aprendices_certificados', 0) / extra.get('total_aprendices', 1)) * 100)|round|int if extra.get('total_aprendices', 0) > 0 else 0 %}
+                        <div class="ficha-metric-grid">
+                            <div class="ficha-metric {% if extra.pct_asistencia >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Asistencia promedio del grupo activo">
+                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Asistencia</span><strong class="ficha-metric-value">{{ extra.pct_asistencia }}%</strong></div>
+                                <div class="ficha-metric-track"><span style="--metric-value: {{ [extra.pct_asistencia, 100]|min }}%;"></span></div>
+                                <small>{{ extra.sesiones }} sesiones</small>
+                            </div>
+                            <div class="ficha-metric {% if extra.pct_entregas >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Entregas recibidas frente a las esperadas">
+                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Entregas</span><strong class="ficha-metric-value">{{ extra.pct_entregas }}%</strong></div>
+                                <div class="ficha-metric-track"><span style="--metric-value: {{ [extra.pct_entregas, 100]|min }}%;"></span></div>
+                                <small>{% if expected_deliveries %}{{ extra.entregas_totales }} de {{ expected_deliveries }}{% else %}Sin tareas asignadas{% endif %}</small>
+                            </div>
+                            <div class="ficha-metric {% if extra.pct_juicios >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Juicios evaluativos aprobados">
+                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Juicios</span><strong class="ficha-metric-value">{{ extra.pct_juicios }}%</strong></div>
+                                <div class="ficha-metric-track"><span style="--metric-value: {{ [extra.pct_juicios, 100]|min }}%;"></span></div>
+                                <small>{{ extra.juicios_aprobados }} de {{ extra.juicios_totales }} aprobados</small>
+                            </div>
+                            <div class="ficha-metric {% if extra.alertas_activas > 0 %}is-danger{% else %}is-positive{% endif %}" title="Alertas activas en la ficha">
+                                <span class="ficha-metric-label">Alertas</span>
+                                <strong class="ficha-metric-value">{{ extra.alertas_activas }}</strong>
+                                <small>{% if extra.alertas_activas %}Requieren revisión{% else %}Sin casos activos{% endif %}</small>
+                            </div>
+                            <div class="ficha-metric {% if cert_pct >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Aprendices con todos sus juicios aprobados">
+                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Completos</span><strong class="ficha-metric-value">{{ extra.get('aprendices_certificados', 0) }}/{{ extra.get('total_aprendices', 0) }}</strong></div>
+                                <div class="ficha-metric-track"><span style="--metric-value: {{ cert_pct }}%;"></span></div>
+                                <small>Listos para certificar</small>
+                            </div>
+                        </div>
+
+
+                        {% endif %}
+                    </aside>
+                </div>
+
+                <nav class="ficha-action-grid" aria-label="Acciones de la ficha {{ ficha.codigo }}">
+                    <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
+                        <span class="module-icon" aria-hidden="true">✓</span>
+                        <span><strong>Llamado a lista</strong><small>Registrar asistencia</small></span>
+                    </a>
+                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">T</span>
+                        <span><strong>Tareas</strong><small>Asignaciones y entregas</small></span>
+                    </a>
+                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">M</span>
+                        <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                    </a>
+                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
+                        <span class="module-icon" aria-hidden="true">!</span>
+                        <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
+                    </a>
+                    <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">S</span>
+                        <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
+                    </a>
+                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon module-icon-chart" aria-hidden="true">📊</span>
+                        <span><strong>Estadísticas</strong><small>Evaluaciones</small></span>
+                    </a>
+                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">#</span>
+                        <span><strong>Ranking</strong><small>Participación del grupo</small></span>
+                    </a>
+                    <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">A</span>
+                        <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
+                    </a>
+                </nav>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if terminadas %}
+    <details class="fichas-archivadas" style="margin-top: 32px;">
+        <summary style="font-weight: 700; font-size: 16px; color: var(--gray-700); cursor: pointer; padding: 12px; background: var(--gray-100); border-radius: var(--radius-sm); border: 1px solid var(--gray-300);">Ver fichas archivadas / finalizadas ({{ terminadas|length }})</summary>
+        <div class="dashboard-cards" style="margin-top: 16px;">
+            {% for ficha in terminadas %}
+            {% set cronograma = cronogramas[ficha.id] %}
+            {% set extra = estadisticas_extra.get(ficha.id, {}) %}
+            {% set stats = estadisticas_fichas.get(ficha.id) %}
+            <article class="card card-ficha ficha-{{ cronograma.fase }}">
+                <header class="ficha-card-header">
+                    <div>
+                        <div class="ficha-card-labels">
+                            <span class="card-badge">Ficha {{ ficha.codigo }}</span>
+                            {% if cronograma.configurado %}
+                            <span class="badge badge-info">{{ cronograma.fase_label }}</span>
+                            {% else %}
+                            <span class="badge badge-warning">Fechas pendientes</span>
+                            {% endif %}
+                            <span class="badge badge-secondary">{{ extra.get('total_aprendices', '?') }} aprendices</span>
+                        </div>
+                        <h2 class="card-title">{{ ficha.nombre_programa }}</h2>
+                    </div>
+                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="ficha-open-link">
+                        Ver aprendices <span aria-hidden="true">→</span>
+                    </a>
+                </header>
+
+                <div class="ficha-card-body">
+                    <div class="ficha-progress-panel">
+                        <div class="ficha-bars-container">
+                            {% include '_cronograma.html' %}
+
+                            {% if stats and stats.total > 0 %}
+                            <div class="ficha-states-summary">
+                                <span class="eyebrow">Estado de aprendices</span>
+                                <div class="estados-bar">
+                                    {% set bg_colors = {'EN_FORMACION': 'var(--info)', 'CERTIFICADO': 'var(--success)', 'CANCELADO': 'var(--danger)', 'RETIRO_VOLUNTARIO': 'var(--warning)', 'POR_CERTIFICAR': 'var(--primary)'} %}
+                                    {% for estado, count in stats.estados.items() %}
+                                        {% set bg = bg_colors.get(estado, 'var(--gray-500)') %}
+                                        {% if count > 0 %}<div title="{{ estado|replace('_', ' ')|title }}: {{ count }} ({{ (count / stats.total * 100)|round|int }}%)" style="width: {{ (count / stats.total * 100) }}%; background-color: {{ bg }};"></div>{% endif %}
+                                    {% endfor %}
+                                </div>
+                                <div class="estados-legend">
+                                    {% for estado, count in stats.estados.items() %}
+                                        <span>
+                                            <span class="estados-dot" style="background-color: {{ bg_colors.get(estado, 'var(--gray-500)') }};"></span>
+                                            {{ count }} {{ estado|replace('_', ' ')|title }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        {% if extra %}
+                        <div class="dashboard-stats-row">
+                            <div class="dash-stat" title="Aprendices en la ficha">
+                                <strong>{{ extra.get('total_aprendices', 0) }}</strong>
+                                <span>Aprendices</span>
+                            </div>
+                            <div class="dash-stat" title="Sesiones de clase registradas">
+                                <strong>{{ extra.sesiones }}</strong>
+                                <span>Sesiones</span>
+                            </div>
+                            <div class="dash-stat" title="Asistencia promedio del grupo">
+                                <strong>{{ extra.pct_asistencia }}%</strong>
+                                <span>Asistencia</span>
+                            </div>
+                            <div class="dash-stat" title="Tareas creadas">
+                                <strong>{{ extra.tareas_totales }}</strong>
+                                <span>Tareas</span>
+                            </div>
+                            <div class="dash-stat" title="Entregas recibidas vs esperadas">
+                                <strong>{{ extra.pct_entregas }}%</strong>
+                                <span>Entregas</span>
+                            </div>
+                            <div class="dash-stat" title="Juicios evaluativos aprobados">
+                                <strong>{{ extra.pct_juicios }}%</strong>
+                                <span>Aprobados</span>
+                            </div>
+                            <div class="dash-stat dash-stat-alertas" title="Alertas activas en la ficha">
+                                <strong>{{ extra.alertas_activas }}</strong>
+                                <span>Alertas</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <nav class="ficha-action-grid" aria-label="Acciones de la ficha {{ ficha.codigo }}">
+                        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
+                            <span class="module-icon" aria-hidden="true">✓</span>
+                            <span><strong>Llamado a lista</strong><small>Registrar asistencia</small></span>
+                        </a>
+                        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">T</span>
+                            <span><strong>Tareas</strong><small>Asignaciones y entregas</small></span>
+                        </a>
+                        <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">M</span>
+                            <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                        </a>
+                        <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
+                            <span class="module-icon" aria-hidden="true">!</span>
+                            <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
+                        </a>
+                        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">S</span>
+                            <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
+                        </a>
+                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">📊</span>
+                        <span><strong>Estadísticas</strong><small>Estados y Evaluaciones</small></span>
+                    </a>
+                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">#</span>
+                        <span><strong>Ranking</strong><small>Participación del grupo</small></span>
+                    </a>
+                        <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">A</span>
+                            <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
+                        </a>
+                    </nav>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>Todavía no tienes fichas registradas</h3>
+        <p>Crea tu primera ficha para empezar a gestionar aprendices, asistencia y tareas.</p>
+        <a href="{{ url_for('instructor.fichas') }}" class="btn btn-primary">Crear mi primera ficha</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Alertas - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <h1>Rendimiento y Alertas</h1>
+    <p class="text-muted"><a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</a></p>
+    <div class="header-actions page-actions">
+        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn btn-warning">Casos a seguimiento</a>
+        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline">🔔 Centro de notificaciones</a>
+    </div>
+</div>
+
+{% set cronograma = cronograma %}
+{% include '_cronograma.html' %}
+
+{% if alertas_cronograma %}
+<div class="timeline-alert-list">
+    {% for alerta in alertas_cronograma %}
+    <div class="alert-banner alert-yellow"><strong>{{ alerta.titulo }}</strong><p>{{ alerta.mensaje }}</p></div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% set al_dia = datos_alertas|selectattr('nivel', 'equalto', 'verde')|list|length %}
+{% set en_riesgo = datos_alertas|selectattr('nivel', 'equalto', 'amarillo')|list|length %}
+{% set en_alerta = datos_alertas|selectattr('nivel', 'equalto', 'rojo')|list|length %}
+<div class="alert-summary-grid" aria-label="Resumen del estado de aprendices">
+    <div class="alert-summary-item is-green"><strong>{{ al_dia }}</strong><span>Al día</span></div>
+    <div class="alert-summary-item is-yellow"><strong>{{ en_riesgo }}</strong><span>En riesgo</span></div>
+    <div class="alert-summary-item is-red"><strong>{{ en_alerta }}</strong><span>En alerta</span></div>
+</div>
+
+<div class="card reglamento-card" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 1.25rem; margin-bottom: 1.5rem; border-radius: 8px;">
+    <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
+        <span style="font-size: 1.5rem;">⚖️</span>
+        <div>
+            <h3 style="margin: 0 0 0.25rem;">Reglas automáticas — Resolución 009 de 2024</h3>
+            <p class="text-muted" style="margin: 0; font-size: 0.85rem;">Reglamento del Aprendiz SENA. Estas reglas se evalúan automáticamente y no requieren configuración.</p>
+        </div>
+    </div>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+        <thead><tr style="border-bottom: 1px solid var(--border-color);">
+            <th style="text-align: left; padding: 0.5rem;">Regla</th>
+            <th style="text-align: left; padding: 0.5rem;">Umbral</th>
+            <th style="text-align: left; padding: 0.5rem;">Acción</th>
+        </tr></thead>
+        <tbody>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.5rem;">Inasistencias consecutivas</td>
+                <td style="padding: 0.5rem;"><strong>{{ config_comite.umbral_fallas_consecutivas }}</strong> sesiones</td>
+                <td style="padding: 0.5rem;">Alerta roja → preparar comité</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.5rem;">Faltas esporádicas en {{ config_comite.periodo_dias_esporadicas }} días</td>
+                <td style="padding: 0.5rem;"><strong>{{ config_comite.umbral_fallas_esporadicas }}</strong> faltas</td>
+                <td style="padding: 0.5rem;">Alerta roja → preparar comité</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.5rem;">% asistencia mínimo reglamentario</td>
+                <td style="padding: 0.5rem;"><strong>{{ config_comite.porcentaje_minimo_asistencia }}%</strong></td>
+                <td style="padding: 0.5rem;">Alerta roja → preparar comité</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.5rem;">Fallas acumuladas para seguimiento</td>
+                <td style="padding: 0.5rem;"><strong>{{ config_comite.umbral_fallas_acumuladas }}</strong> faltas</td>
+                <td style="padding: 0.5rem;">Alerta amarilla → plan de apoyo</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.5rem;">Tareas incumplidas</td>
+                <td style="padding: 0.5rem;"><strong>{{ config_comite.umbral_tareas_incumplidas }}</strong> tareas</td>
+                <td style="padding: 0.5rem;">Alerta roja → plan de mejoramiento</td>
+            </tr>
+            <tr>
+                <td style="padding: 0.5rem;">Auto-escalación por inacción del instructor</td>
+                <td style="padding: 0.5rem;"><strong>{{ config_comite.auto_escalar_dias }}</strong> días sin resolver</td>
+                <td style="padding: 0.5rem;">Escala automáticamente a comité</td>
+            </tr>
+        </tbody>
+    </table>
+    <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <form method="POST" action="{{ url_for('seguimiento.auto_evaluar_ficha', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary btn-sm">🔄 Ejecutar revisión automática ahora</button>
+        </form>
+        <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">📋 Planes de mejoramiento</a>
+    </div>
+</div>
+
+<details class="card form-card settings-card">
+    <summary>
+        <span>Configurar alertas de asistencia</span>
+        <small>Umbrales amarillo y rojo</small>
+    </summary>
+    <p class="text-muted">Define los umbrales de fallas para activar alertas. Estos valores son ajustables según el criterio del Centro.</p>
+    <form method="POST" action="{{ url_for('instructor.guardar_config_alertas', ficha_id=ficha.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="umbral_amarillo">Alerta amarilla (fallas no justificadas)</label>
+                <input type="number" id="umbral_amarillo" name="umbral_amarillo" value="{{ config.umbral_amarillo }}" min="1">
+            </div>
+            <div class="form-group">
+                <label for="umbral_rojo">Alerta roja (fallas no justificadas)</label>
+                <input type="number" id="umbral_rojo" name="umbral_rojo" value="{{ config.umbral_rojo }}" min="1">
+            </div>
+            <div class="form-group">
+                <label for="max_fallas_trimestre">Máx. fallas laborales/trimestre</label>
+                <input type="number" id="max_fallas_trimestre" name="max_fallas_trimestre" value="{{ config.max_fallas_trimestre_laboral }}" min="1">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar configuración</button>
+    </form>
+</details>
+
+<details class="card form-card settings-card">
+    <summary>
+        <span>Parámetros de seguimiento normativo</span>
+        <small>Basados en Resolución 009</small>
+    </summary>
+    <p class="text-muted">Estos valores están fijados por el Reglamento del Aprendiz SENA (Res. 009 de 2024). Se muestran como referencia informativa.</p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Sesiones consecutivas sin justificar</label>
+            <input type="number" value="{{ config_comite.umbral_fallas_consecutivas }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Faltas esporádicas en {{ config_comite.periodo_dias_esporadicas }} días</label>
+            <input type="number" value="{{ config_comite.umbral_fallas_esporadicas }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>% mínimo de asistencia</label>
+            <input type="number" value="{{ config_comite.porcentaje_minimo_asistencia }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Fallas acumuladas (seguimiento)</label>
+            <input type="number" value="{{ config_comite.umbral_fallas_acumuladas }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Tareas incumplidas</label>
+            <input type="number" value="{{ config_comite.umbral_tareas_incumplidas }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Días para auto-escalar a comité</label>
+            <input type="number" value="{{ config_comite.auto_escalar_dias }}" disabled>
+        </div>
+    </div>
+    <label class="checkbox-label privacy-checkbox"><input type="checkbox" disabled {% if config_comite.correo_habilitado %}checked{% endif %}> Permitir avisos por correo (configuración opcional del Centro)</label>
+</details>
+
+<div class="section-header panorama-header">
+    <h2>Panorama por Aprendiz</h2>
+    <div class="panorama-tools">
+        <span class="legend-item"><span class="dot dot-green"></span> Al día</span>
+        <span class="legend-item"><span class="dot dot-yellow"></span> Riesgo</span>
+        <span class="legend-item"><span class="dot dot-red"></span> Alerta</span>
+        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-primary btn-sm">+ Tomar Asistencia Hoy</a>
+    </div>
+</div>
+
+{% if datos_alertas %}
+<div class="panoramica-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+    {% for d in datos_alertas %}
+    <div class="card panoramica-card status-{{ d.nivel }}" style="border-top: 4px solid; display: flex; flex-direction: column; padding: 1.25rem; background: var(--bg-card); transition: all 0.3s ease;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+            <div>
+                <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=d.aprendiz.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">
+                    <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-color);">{{ d.aprendiz.nombre }} {{ d.aprendiz.apellidos }}</h3>
+                </a>
+                <span class="text-muted" style="font-size: 0.85rem;">CC/TI: {{ d.aprendiz.documento }}</span>
+            </div>
+            <span class="badge badge-{{ d.nivel }}" style="text-transform: uppercase; padding: 0.35rem 0.65rem; font-weight: bold; border-radius: 9999px; font-size: 0.75rem; letter-spacing: 0.05em;">
+                {% if d.nivel == 'rojo' %}Alerta{% elif d.nivel == 'amarillo' %}Riesgo{% else %}Al día{% endif %}
+            </span>
+        </div>
+
+        <div class="metric-group" style="margin-bottom: 1.25rem; flex-grow: 1;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.5rem;">
+                <strong>Asistencia ({{ d.pct_asistencia|round(1) }}%)</strong>
+                <span class="text-muted">{{ d.total_sesiones - d.total_faltas }} / {{ d.total_sesiones }} asistencias</span>
+            </div>
+            <div class="progress-bar-container" style="background-color: var(--border-color); border-radius: 9999px; height: 10px; overflow: hidden; margin-bottom: 0.75rem;">
+                {% if d.pct_asistencia > 0 %}<div class="progress-fill bg-{{ d.nivel }}" style="width: {{ d.pct_asistencia }}%; height: 100%; transition: width 0.5s ease;"></div>{% endif %}
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                <span>Injustificadas: <strong style="color: var(--text-color);">{{ d.no_justificadas }}</strong></span>
+                <span>Justificadas: {{ d.justificadas }}</span>
+            </div>
+        </div>
+
+        {% if d.tareas_pendientes > 0 %}
+        <div class="alert-banner" style="background-color: rgba(217, 119, 6, 0.1); color: #d97706; border: 1px solid rgba(217, 119, 6, 0.2); padding: 0.75rem; margin-bottom: 1rem; border-radius: 8px; font-size: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.2rem;">⚠️</span>
+                <span><strong>{{ d.tareas_pendientes }} Tarea(s)</strong> atrasada(s) o rechazada(s)</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert-banner" style="background-color: rgba(22, 163, 74, 0.1); color: #16a34a; border: 1px solid rgba(22, 163, 74, 0.2); padding: 0.75rem; margin-bottom: 1rem; border-radius: 8px; font-size: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.2rem;">✅</span>
+                <span><strong>Al día</strong> académicamente</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card-actions" style="display: flex; gap: 0.75rem; margin-top: auto; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+            <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=d.aprendiz.id) }}" class="btn btn-outline" style="flex: 1; text-align: center; justify-content: center; padding: 0.5rem;">📋 Ver Historial</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+    .status-rojo { border-top-color: #dc2626 !important; box-shadow: 0 4px 15px -3px rgba(220, 38, 38, 0.08); }
+    .status-amarillo { border-top-color: #d97706 !important; box-shadow: 0 4px 15px -3px rgba(217, 119, 6, 0.08); }
+    .status-verde { border-top-color: #16a34a !important; }
+    
+    .bg-rojo { background-color: #dc2626 !important; }
+    .bg-amarillo { background-color: #d97706 !important; }
+    .bg-verde { background-color: #16a34a !important; }
+    
+    .badge-rojo { background-color: #dc2626; color: white; }
+    .badge-amarillo { background-color: #f59e0b; color: #1e293b; }
+    .badge-verde { background-color: #16a34a; color: white; }
+    
+    .panorama-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .panorama-tools {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    @media (max-width: 480px) {
+        .panorama-header { flex-direction: column; align-items: stretch; }
+        .panorama-tools { justify-content: center; }
+        .panorama-tools .btn { width: 100%; }
+    }
+    
+    .panoramica-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    }
+</style>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📊</div>
+    <h3>Todavía no hay aprendices registrados</h3>
+    <p>Carga los aprendices para ver el panorama general y su estado de rendimiento.</p>
+</div>
+{% endif %}
+{% endblock %}

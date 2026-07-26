@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    container_name: adso-app
+    restart: unless-stopped
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
+      DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL en .env}
+      REDIS_URL: ${REDIS_URL:-memory://}
+      UPLOAD_FOLDER: /app/uploads
+      MAX_CONTENT_LENGTH: ${MAX_CONTENT_LENGTH:-52428800}
+      ADSO_ADMIN_EMAIL: ${ADSO_ADMIN_EMAIL:-admin@sena.edu.co}
+      ADSO_ADMIN_PASSWORD: ${ADSO_ADMIN_PASSWORD:?Define ADSO_ADMIN_PASSWORD en .env}
+      ADSO_ADMIN_NOMBRE: ${ADSO_ADMIN_NOMBRE:-Administrador}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-adso}
+      DB_NAME: ${DB_NAME:-adso_control}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "${PORT:-8009}:8009"
+
+volumes:
+  uploads:
+    name: adso_uploads

@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#39A900">
+    <meta name="description" content="Control académico de fichas, asistencia, tareas y seguimiento SENA.">
+    <title>Entregas - Jsp - SENA Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css?v=4.1">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    
+<style>
+    .entregas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+        margin-top: 24px;
+    }
+    .entrega-card {
+        display: flex;
+        flex-direction: column;
+        background: white;
+        border-radius: var(--radius);
+        padding: 24px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border-divider);
+        border-top: 4px solid var(--gray-300);
+        transition: all 0.35s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .entrega-card:hover {
+        transform: translateY(-6px);
+        box-shadow: var(--shadow-lg);
+    }
+    .entrega-card.status-entregado {
+        border-top-color: var(--sena-green);
+    }
+    .entrega-card.status-retraso {
+        border-top-color: var(--sena-orange);
+    }
+    
+    .entrega-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        gap: 12px;
+    }
+    .entrega-info h3 {
+        margin: 0 0 4px 0;
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--gray-900);
+        line-height: 1.2;
+    }
+    .entrega-info small {
+        color: var(--gray-500);
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .entrega-evidencia {
+        background: var(--bg-surface);
+        padding: 16px;
+        border-radius: var(--radius-sm);
+        margin-bottom: 24px;
+        text-align: center;
+        border: 1px dashed var(--gray-300);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 70px;
+    }
+    
+    .entrega-calificacion {
+        border-top: 1px solid var(--border-divider);
+        padding-top: 20px;
+        margin-top: auto;
+    }
+    
+    .calificacion-status {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        font-size: 14px;
+        color: var(--gray-700);
+    }
+    .calificacion-valor {
+        font-weight: 800;
+        font-size: 18px;
+        color: var(--sena-green);
+        background: var(--sena-green-light);
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+    .calificacion-pendiente {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--gray-500);
+        background: var(--gray-100);
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+    
+    .form-evaluar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .form-evaluar-row {
+        display: grid;
+        grid-template-columns: 85px 1fr;
+        gap: 10px;
+    }
+    .form-evaluar input, .form-evaluar select, .form-evaluar textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--gray-300);
+        border-radius: 8px;
+        font-size: 13px;
+        font-family: inherit;
+        background: var(--bg-surface);
+        transition: all 0.2s ease;
+    }
+    .form-evaluar input:focus, .form-evaluar select:focus, .form-evaluar textarea:focus {
+        outline: none;
+        border-color: var(--sena-green);
+        box-shadow: var(--focus-ring);
+        background: white;
+    }
+    .btn-full {
+        width: 100%;
+        justify-content: center;
+        margin-top: 8px;
+    }
+    
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+        margin-bottom: 8px;
+    }
+    .stat-card {
+        background: white;
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+    .stat-title {
+        font-size: 13px;
+        color: var(--gray-500);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+    .stat-value {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--gray-900);
+        line-height: 1;
+    }
+    .stat-success { color: var(--sena-green); }
+    .stat-warning { color: var(--sena-orange); }
+    .stat-danger { color: var(--sena-red); }
+</style>
+
+    <script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('app-theme') || 'sena';
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body class="">
+    <a class="skip-link" href="#contenido-principal">Saltar al contenido principal</a>
+    
+    <header class="app-header">
+        <nav class="navbar" aria-label="Navegación principal">
+            <div class="nav-shell">
+                <a class="nav-brand" href="/instructor/">
+                    <span class="nav-logo" aria-hidden="true">S</span>
+                    <span class="nav-brand-copy">
+                        <strong class="nav-title">SENA Control</strong>
+                        <small>Gestión académica</small>
+                    </span>
+                </a>
+
+                
+                <div class="nav-primary" aria-label="Secciones generales">
+                    <a href="/instructor/"
+                       class="nav-link "
+                       >Inicio</a>
+                    <a href="/instructor/fichas"
+                       class="nav-link "
+                       >Fichas</a>
+                </div>
+
+                <div class="nav-user">
+                    <span class="nav-identity">
+                        <small>Instructor</small>
+                        <strong class="nav-name">Administrador</strong>
+                    </span>
+                    <a href="/instructor/notificaciones"
+                       class="nav-icon-button"
+                       aria-label="Notificaciones: 2 sin leer"
+                       title="Notificaciones">
+                        <span aria-hidden="true">🔔</span>
+                        <span class="notification-count">2</span>
+                    </a>
+                    <form method="POST" action="/logout" class="logout-form">
+                        <input type="hidden" name="csrf_token" value="IjQ1MDJlNTA3M2ZlYjA3NGFkOThkYWRiMDUwOWY3MmMzZjAxYjA1NmEi.amTpJA.LhC4vp4oiOm8Xv2fyjJ48DNtndU">
+                        <button type="submit" class="btn btn-sm btn-outline nav-logout">Salir</button>
+                    </form>
+                </div>
+                
+            </div>
+        </nav>
+
+        
+        <div class="ficha-toolbar">
+            <div class="ficha-toolbar-inner">
+                <div class="ficha-context" title="ANALISIS Y DESARROLLO DE SOFTWARE.">
+                    <span>Ficha</span>
+                    <strong>3235642</strong>
+                </div>
+                <nav class="ficha-nav" aria-label="Módulos de la ficha 3235642">
+                    <a href="/instructor/fichas/3/aprendices"
+                       class="">Aprendices</a>
+                    <a href="/instructor/fichas/3/asistencia"
+                       class="">Asistencia</a>
+                    <a href="/instructor/fichas/3/tareas"
+                       class="is-active">Tareas</a>
+                    <a href="/instructor/fichas/3/alertas"
+                       class="">Alertas</a>
+                    <a href="/instructor/fichas/3/juicios"
+                       class="">Juicios</a>
+                    <a href="/instructor/fichas/3/estadisticas"
+                       class="">Estadísticas</a>
+                    <a href="/instructor/fichas/3/casos-seguimiento"
+                       class="">Seguimiento</a>
+                    <a href="/instructor/fichas/3/materiales"
+                       class="">Materiales</a>
+                    <a href="/instructor/fichas/3/ranking"
+                       class="">Ranking</a>
+                    <a href="/instructor/fichas/3/turnos-aseo"
+                       class="">Turnos de aseo</a>
+                </nav>
+            </div>
+        </div>
+        
+    </header>
+    
+
+    <div class="theme-float">
+        <button onclick="setTheme('elegant')" class="theme-float-dot" title="Elegante" data-theme-btn="elegant" style="background: #6366f1;"></button>
+        <button onclick="setTheme('sena')" class="theme-float-dot" title="SENA" data-theme-btn="sena" style="background: #39A900;"></button>
+        <button onclick="setTheme('ocean')" class="theme-float-dot" title="Oceano" data-theme-btn="ocean" style="background: #06b6d4;"></button>
+    </div>
+
+    <main id="contenido-principal" class="container" tabindex="-1">
+        
+        
+        
+
+        
+<div class="page-header">
+    <a href="/instructor/fichas/3/tareas" class="btn-back">&larr; Volver</a>
+    <h1>Entregas: Jsp</h1>
+    <p class="text-muted">3235642</p>
+</div>
+
+
+
+
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+        
+            
+        
+        
+        
+            
+                
+            
+        
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+
+<div class="stats-container">
+    <div class="stat-card">
+        <span class="stat-title">Entregas</span>
+        <span class="stat-value">1 <small style="font-size: 14px; color: var(--gray-500);">/ 27</small></span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-title">Aprobadas</span>
+        <span class="stat-value stat-success">1</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-title">Ajustes</span>
+        <span class="stat-value stat-danger">0</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-title">A tiempo</span>
+        <span class="stat-value stat-success">1</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-title">Con retraso</span>
+        <span class="stat-value stat-warning">0</span>
+    </div>
+</div>
+
+
+
+
+
+
+<div class="progress-section" style="background: white; border: 1px solid var(--border-divider); border-radius: var(--radius-sm); padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow);">
+    <h3 style="margin: 0 0 20px 0; font-size: 17px; font-weight: 700; color: var(--gray-900);">Resumen de Progreso</h3>
+    
+    <div style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+            <span style="color: var(--gray-700); font-weight: 600;">Participación (Aprendices con evidencia subida)</span>
+            <span style="font-weight: 800; color: var(--sena-red);">4%</span>
+        </div>
+        <div style="width: 100%; background-color: var(--border-divider); border-radius: 8px; height: 12px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+            <div style="width: 4%; background-color: var(--sena-red); height: 100%; border-radius: 8px; transition: width 0.8s ease-out;"></div>
+        </div>
+        <small style="color: var(--gray-500); font-size: 12px; margin-top: 6px; display: block;">1 de 27 aprendices han entregado la tarea</small>
+    </div>
+
+    <div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+            <span style="color: var(--gray-700); font-weight: 600;">Puntualidad (Entregas a tiempo)</span>
+            <span style="font-weight: 800; color: var(--sena-green);">100%</span>
+        </div>
+        <div style="width: 100%; background-color: var(--border-divider); border-radius: 8px; height: 12px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+            <div style="width: 100%; background-color: var(--sena-green); height: 100%; border-radius: 8px; transition: width 0.8s ease-out; transition-delay: 0.2s;"></div>
+        </div>
+        <small style="color: var(--gray-500); font-size: 12px; margin-top: 6px; display: block;">1 de 1 entregas fueron enviadas antes de la fecha límite</small>
+    </div>
+</div>
+
+<div class="entregas-grid">
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>FRANK ALEXANDER AGUILAR DUARTE</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1096482848
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>ROBINSON RAMIRO AGUILAR VELASCO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1233895910
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>SOFIA BAREÑO BARBOSA</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1102092036
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+        
+    
+
+    <div class="entrega-card status-entregado">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>ROLAND SCHNEIDER BELTRAN SAAVEDRA</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    74244824
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Segunda Oportunidad: Supera un periodo difícil y vuelve a una zona positiva de participación." style="font-size: 16px; cursor: help;">🌟</span>
+                    
+                    <span title="Primero en Entregar: Realiza la primera entrega anticipada de una actividad." style="font-size: 16px; cursor: help;">🚀</span>
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    
+                    <span class="badge badge-success">A tiempo</span>
+                    
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                
+                <a href="/aprendiz/descargar/entregas%5C74244824_1_257c02f21b_Faltas_y_Debido_Proceso_-_SENA_1.pdf" class="btn btn-sm btn-outline btn-full">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px; vertical-align: text-bottom;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Descargar Archivo
+                </a>
+                
+                
+                
+                
+                <a href="https://jsp.enlinea.sbs/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-full" style="margin-top: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px; vertical-align: text-bottom;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Ver Enlace
+                </a>
+                
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div class="calificacion-status">
+                    <span>Estado evaluación</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        
+                            
+                            <span class="badge badge-success" style="font-size: 11px;">Aprobada</span>
+                            
+                            
+                            
+                                <span class="calificacion-pendiente" style="font-size: 12px;">Sin nota</span>
+                            
+                        
+                    </div>
+                </div>
+                
+                <details class="calificar-details" >
+                    <summary style="cursor: pointer; font-weight: 600; color: var(--sena-green); margin-bottom: 12px;">
+                        Modificar evaluación
+                    </summary>
+                    <form method="POST" action="/instructor/entregas/1/calificar" class="form-evaluar">
+                        <input type="hidden" name="csrf_token" value="IjQ1MDJlNTA3M2ZlYjA3NGFkOThkYWRiMDUwOWY3MmMzZjAxYjA1NmEi.amTpJA.LhC4vp4oiOm8Xv2fyjJ48DNtndU">
+                        
+                        <div class="form-evaluar-row">
+                            <input type="text" name="calificacion" placeholder="Nota" value="" required>
+                            <select name="estado_revision" aria-label="Estado de la evidencia">
+                                <option value="aprobada" selected>Aprobada</option>
+                                <option value="rechazada" >Requiere ajustes</option>
+                            </select>
+                        </div>
+                        <textarea name="feedback" rows="2" placeholder="Retroalimentación al aprendiz..."></textarea>
+                        
+                        <button type="submit" class="btn btn-sm btn-primary btn-full">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px; vertical-align: text-bottom;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Guardar Evaluación
+                        </button>
+                    </form>
+                </details>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>ERICK MOISES BENAVIDES DIAZ</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1096906564
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>MILLER LEANDRO CAPERA CASTILLO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1097638752
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>LINDA CORIN CARRILLO MENDEZ</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1102364311
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>DANNA KATHERINE CUBIDES DIAZ</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101754377
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>DIYER CAMILO DIAZ AGUILAR</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1099204958
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>JUAN ESTEBAN DIAZ PARDO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1005485324
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>BRANDON JOSE DUARTE CHACON</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1097638745
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>BRAYAN YESID DUARTE SANABRIA</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101756091
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>JHONNY ALEXANDER FAJARDO GUERRERO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1099203509
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>DANIEL ANDREY HERNANDEZ VELASCO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101753393
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>EMMANUEL LUENGAS HURTADO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1099207664
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>YAHAIRA SILVANA MATEUS LEON</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101756195
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>MARIAN SOFIA MONCADA NIEVES</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101754503
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>EDWIN ESNEIDER MORENO MORENO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101754342
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>CRISTIAN YESID MUÑOZ QUIROGA</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1005248950
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>ANDRES FELIPE OSPINA PARDO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1031122126
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>DUVAN ESTEBAN RODRIGUEZ HERREÑO</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101755878
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>MARIA PAULA SANCHEZ ARIZA</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1099206691
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>JUAN ESTEBAN SARMIENTO HERNANDEZ</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1013037877
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>KEVIN JADIEL SIERRA SANABRIA</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101755660
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>JOHINER STIVEN SIERRA SANABRIA</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1101755661
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>LEONARDO SOLANO USME</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1150184608
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+
+    <div class="entrega-card status-pendiente">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>NICOLAS ROMAN TORRES RINCON</h3>
+                <small>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    1052020405
+                </small>
+                
+                <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
+                    
+                    <span title="Regreso Triunfal: Mejora de forma clara su asistencia después de un periodo difícil." style="font-size: 16px; cursor: help;">🌱</span>
+                    
+                </div>
+                
+            </div>
+            <div class="entrega-badge">
+                
+                    <span class="badge badge-secondary">Sin entregar</span>
+                
+            </div>
+        </div>
+
+        <div class="entrega-evidencia">
+            
+                <span class="text-muted">No se adjuntó evidencia</span>
+            
+        </div>
+
+        <div class="entrega-calificacion">
+            
+                <div style="text-align: center; padding: 24px 0 8px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <p class="text-muted" style="margin:0; font-size: 14px;">El aprendiz aún no ha entregado esta tarea.</p>
+                </div>
+            
+        </div>
+    </div>
+    
+</div>
+
+
+    </main>
+
+    
+    <script src="/static/js/table-filters.js?v=4.0"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const toasts = document.querySelectorAll('.flash-messages .alert');
+            toasts.forEach((toast, index) => {
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        toast.classList.add('is-closing');
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, 4000 + (index * 500));
+            });
+        });
+    </script>
+    <script>
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('app-theme', themeName);
+            document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
+                el.classList.toggle('is-active', el.dataset.themeBtn === themeName);
+            });
+        }
+        (function() {
+            var t = localStorage.getItem('app-theme') || 'sena';
+            if (document.documentElement.getAttribute('data-theme') !== t) {
+                document.documentElement.setAttribute('data-theme', t);
+            }
+            document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
+                if (el.dataset.themeBtn === t) el.classList.add('is-active');
+            });
+        })();
+    </script>
+</body>
+</html>

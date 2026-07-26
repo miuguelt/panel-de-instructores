@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block title %}Casos de seguimiento - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+{% if resumen is defined and resumen %}
+{% set page_summary = resumen %}
+{% else %}
+{% set fallback_summary = namespace(casos=casos|length, prioritarios=0, alertas_activas=0, escalados=0, planes_pendientes=0, planes_vencidos=0) %}
+{% for fallback_case in casos %}
+    {% if fallback_case.alertas|selectattr('nivel', 'equalto', 'roja')|list %}{% set fallback_summary.prioritarios = fallback_summary.prioritarios + 1 %}{% endif %}
+    {% for fallback_alert in fallback_case.alertas %}
+        {% if fallback_alert.estado == 'activa' %}{% set fallback_summary.alertas_activas = fallback_summary.alertas_activas + 1 %}{% endif %}
+        {% if fallback_alert.estado == 'escalada_comite' %}{% set fallback_summary.escalados = fallback_summary.escalados + 1 %}{% endif %}
+    {% endfor %}
+{% endfor %}
+{% set page_summary = fallback_summary %}
+{% endif %}
+{% set evaluation_time = ultima_evaluacion|default(datetime.utcnow(), true) %}
+<div class="page-header followup-page-header">
+    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver a alertas</a>
+    <div class="followup-heading">
+        <span class="eyebrow">Revisión humana · {{ ficha.codigo }}</span>
+        <h1>Casos de seguimiento</h1>
+        <p class="text-muted">
+            <a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" class="hover-link followup-ficha-link">
+                {{ ficha.nombre_programa }}
+            </a>
+        </p>
+    </div>
+    <div class="followup-header-actions">
+        {% if ultima_evaluacion is defined and ultima_evaluacion %}
+        <span class="followup-evaluation-time">Actualizado {{ evaluation_time.strftime('%d/%m/%Y %H:%M') }}</span>
+        {% endif %}
+        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline">🔔 Notificaciones</a>
+    </div>
+</div>
+
+<div class="participation-note followup-guidance">
+    <span aria-hidden="true">⚖️</span>
+    <div>
+        <strong>El sistema prioriza; el instructor decide.</strong>
+        <p>Las alertas se generan con los parámetros de la ficha. Revisa la evidencia, registra el acuerdo con el aprendiz y elige el siguiente paso: resolver, plan de mejoramiento o comité.</p>
+    </div>
+</div>
+
+<div class="followup-action-bar">
+    <form method="POST" action="{{ url_for('seguimiento.auto_evaluar_ficha', ficha_id=ficha.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-primary">🔄 Re-evaluar ahora</button>
+    </form>
+    <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="btn btn-outline">📋 Gestionar planes</a>
+    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="btn btn-outline">📊 Ver alertas</a>
+</div>
+
+<section class="followup-summary-grid" aria-label="Resumen de seguimiento">
+    <div class="followup-summary-card">
+        <span class="followup-summary-icon">👥</span>
+        <div><strong>{{ page_summary.casos }}</strong><span>Casos abiertos</span></div>
+        <small>Aprendices que requieren revisión</small>
+    </div>
+    <div class="followup-summary-card is-danger">
+        <span class="followup-summary-icon">🚩</span>
+        <div><strong>{{ page_summary.prioritarios }}</strong><span>Prioridad alta</span></div>
+        <small>Con causal roja o riesgo crítico</small>
+    </div>
+    <div class="followup-summary-card is-warning">
+        <span class="followup-summary-icon">⏳</span>
+        <div><strong>{{ page_summary.alertas_activas }}</strong><span>Alertas por gestionar</span></div>
+        <small>{{ page_summary.escalados }} escalada{{ '' if page_summary.escalados == 1 else 's' }} a comité</small>
+    </div>
+    <div class="followup-summary-card is-success">
+        <span class="followup-summary-icon">📋</span>
+        <div><strong>{{ page_summary.planes_pendientes }}</strong><span>Planes pendientes</span></div>
+        <small>{{ page_summary.planes_vencidos }} vencido{{ '' if page_summary.planes_vencidos == 1 else 's' }}</small>
+    </div>
+</section>
+
+<details class="card settings-card followup-settings">
+    <summary>
+        <span>⚙️ Parámetros de seguimiento de la ficha</span>
+        <small>Editables · última actualización: {{ config_comite.actualizada_en.strftime('%d/%m/%Y %H:%M') if config_comite.actualizada_en else 'sin registro' }}</small>
+    </summary>
+    <form method="POST" action="{{ url_for('seguimiento.configurar_alertas_comite', ficha_id=ficha.id) }}" class="followup-settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="followup-settings-grid">
+            <div class="form-group">
+                <label for="umbral_fallas_consecutivas">Faltas consecutivas</label>
+                <input id="umbral_fallas_consecutivas" name="umbral_fallas_consecutivas" type="number" min="1" max="30" value="{{ config_comite.umbral_fallas_consecutivas }}" required>
+                <small>Activa causal de comité.</small>
+            </div>
+            <div class="form-group">
+                <label for="umbral_fallas_acumuladas">Faltas acumuladas</label>
+                <input id="umbral_fallas_acumuladas" name="umbral_fallas_acumuladas" type="number" min="1" max="100" value="{{ config_comite.umbral_fallas_acumuladas }}" required>
+                <small>Activa seguimiento preventivo.</small>
+            </div>
+            <div class="form-group">
+                <label for="umbral_fallas_esporadicas">Faltas en la ventana</label>
+                <input id="umbral_fallas_esporadicas" name="umbral_fallas_esporadicas" type="number" min="1" max="100" value="{{ config_comite.umbral_fallas_esporadicas }}" required>
+                <small>Periodo: {{ config_comite.periodo_dias_esporadicas }} días.</small>
+            </div>
+            <div class="form-group">
+                <label for="periodo_dias_esporadicas">Ventana de análisis</label>
+                <input id="periodo_dias_esporadicas" name="periodo_dias_esporadicas" type="number" min="30" max="365" value="{{ config_comite.periodo_dias_esporadicas }}" required>
+                <small>Días calendario.</small>
+            </div>
+            <div class="form-group">
+                <label for="umbral_tareas_incumplidas">Tareas incumplidas</label>
+                <input id="umbral_tareas_incumplidas" name="umbral_tareas_incumplidas" type="number" min="1" max="100" value="{{ config_comite.umbral_tareas_incumplidas }}" required>
+                <small>Activa plan de mejoramiento.</small>
+            </div>
+            <div class="form-group">
+                <label for="porcentaje_minimo_asistencia">Asistencia mínima (%)</label>
+                <input id="porcentaje_minimo_asistencia" name="porcentaje_minimo_asistencia" type="number" min="1" max="100" value="{{ config_comite.porcentaje_minimo_asistencia }}" required>
+                <small>Por debajo, prioriza el caso.</small>
+            </div>
+            <div class="form-group">
+                <label for="auto_escalar_dias">Auto-escalar después de</label>
+                <input id="auto_escalar_dias" name="auto_escalar_dias" type="number" min="1" max="365" value="{{ config_comite.auto_escalar_dias }}" required>
+                <small>Días sin cierre instructor.</small>
+            </div>
+            <div class="form-group">
+                <label for="dias_plazo_justificacion">Plazo sugerido de justificación</label>
+                <input id="dias_plazo_justificacion" name="dias_plazo_justificacion" type="number" min="1" max="30" value="{{ config_comite.dias_plazo_justificacion }}" required>
+                <small>Se comunica al aprendiz.</small>
+            </div>
+        </div>
+        <label class="followup-checkbox">
+            <input type="checkbox" name="correo_habilitado" {% if config_comite.correo_habilitado %}checked{% endif %}>
+            <span>Habilitar notificaciones por correo cuando exista configuración SMTP.</span>
+        </label>
+        <div class="followup-settings-footer">
+            <p class="text-muted">Ajusta estos valores según el protocolo del Centro. El registro de cambios queda asociado a la ficha.</p>
+            <button type="submit" class="btn btn-primary">Guardar parámetros</button>
+        </div>
+    </form>
+</details>
+
+<section class="followup-workspace" aria-labelledby="followup-cases-title">
+    <div class="followup-toolbar">
+        <div>
+            <span class="eyebrow">Bandeja de trabajo</span>
+            <h2 id="followup-cases-title">Aprendices que requieren una decisión</h2>
+        </div>
+        <div class="followup-filters" role="search" aria-label="Filtrar casos">
+            <label class="sr-only" for="followup-search">Buscar por aprendiz o causal</label>
+            <input id="followup-search" class="form-control" type="search" placeholder="Buscar aprendiz, documento o causal..." data-followup-search>
+            <label class="sr-only" for="followup-priority">Filtrar por prioridad</label>
+            <select id="followup-priority" class="form-control" data-followup-priority>
+                <option value="">Todas las prioridades</option>
+                <option value="roja">Prioridad alta</option>
+                <option value="amarilla">Preventivo</option>
+            </select>
+            <label class="sr-only" for="followup-status">Filtrar por estado</label>
+            <select id="followup-status" class="form-control" data-followup-status>
+                <option value="">Todos los estados</option>
+                <option value="activa">Por gestionar</option>
+                <option value="escalada_comite">Escalado a comité</option>
+            </select>
+            <span class="followup-results-count" data-followup-count>{{ casos|length }} casos</span>
+        </div>
+    </div>
+
+    {% if casos %}
+    <div class="case-list" data-followup-list>
+        {% for caso in casos %}
+        {% set alertas_activas = caso.alertas|selectattr('estado', 'equalto', 'activa')|list %}
+        {% set alertas_escaladas = caso.alertas|selectattr('estado', 'equalto', 'escalada_comite')|list %}
+        {% set case_plans = caso.planes|default([], true) %}
+        {% set raw_indicators = caso.indicadores|default(none, true) %}
+        {% set case_values = namespace(asistencia=raw_indicators.asistencia if raw_indicators else none, sesiones=raw_indicators.sesiones if raw_indicators else caso.timeline|selectattr('tipo', 'equalto', 'asistencia')|list|length, faltas=raw_indicators.faltas if raw_indicators else 0, consecutivas=raw_indicators.consecutivas if raw_indicators else 0, tareas_incumplidas=raw_indicators.tareas_incumplidas if raw_indicators else 0) %}
+        {% if not raw_indicators %}
+            {% for case_alert in caso.alertas %}
+                {% set case_detail = case_alert.detalle_json or {} %}
+                {% if case_detail.get('pct_asistencia') is not none %}{% set case_values.asistencia = case_detail.get('pct_asistencia') %}{% endif %}
+                {% if case_detail.get('fallas_consecutivas') %}{% set case_values.consecutivas = [case_values.consecutivas, case_detail.get('fallas_consecutivas')]|max %}{% endif %}
+                {% if case_detail.get('fallas_acumuladas') %}{% set case_values.faltas = [case_values.faltas, case_detail.get('fallas_acumuladas')]|max %}{% endif %}
+                {% if case_detail.get('tareas_incumplidas') %}{% set case_values.tareas_incumplidas = [case_values.tareas_incumplidas, case_detail.get('tareas_incumplidas')]|max %}{% endif %}
+            {% endfor %}
+        {% endif %}
+        {% set case_priority = caso.prioridad|default('roja' if caso.alertas|selectattr('nivel', 'equalto', 'roja')|list else 'amarilla', true) %}
+        {% set case_status = caso.estado|default('escalada_comite' if alertas_escaladas else 'activa', true) %}
+        {% set case_attendance = case_values.asistencia %}
+        {% set planes_pendientes = case_plans|selectattr('estado', 'equalto', 'pendiente')|list %}
+        <article class="case-card {% if case_priority == 'roja' %}case-red{% endif %}" data-followup-case data-case-search="{{ (caso.aprendiz.nombre_completo ~ ' ' ~ caso.aprendiz.documento ~ ' ' ~ caso.alertas|map(attribute='titulo')|join(' '))|lower }}" data-case-priority="{{ case_priority }}" data-case-status="{{ case_status }}">
+            <header class="case-card-header">
+                <div class="case-person">
+                    <span class="case-avatar" aria-hidden="true">{{ caso.aprendiz.nombre[0] }}{{ caso.aprendiz.apellidos[0] }}</span>
+                    <div>
+                        <div class="case-priority-line">
+                            <span class="case-priority-label">{{ 'Prioridad alta' if case_priority == 'roja' else 'Seguimiento preventivo' }}</span>
+                            {% if alertas_escaladas %}<span class="case-state-pill is-escalated">Escalado a comité</span>{% else %}<span class="case-state-pill is-open">{{ alertas_activas|length }} por gestionar</span>{% endif %}
+                        </div>
+                        <h3><a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}" class="hover-link">{{ caso.aprendiz.nombre_completo }}</a></h3>
+                        <p class="text-muted">{{ caso.aprendiz.tipo_documento }} {{ caso.aprendiz.documento }}{% if caso.aprendiz.correo %} · {{ caso.aprendiz.correo }}{% endif %}</p>
+                    </div>
+                </div>
+                <div class="case-card-header-actions">
+                    <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}" class="btn btn-sm btn-outline">Ver historial</a>
+                    <a href="{{ url_for('seguimiento.reporte_comite', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}" class="btn btn-sm btn-outline">Generar borrador PDF</a>
+                </div>
+            </header>
+
+            <div class="case-metrics" aria-label="Indicadores del aprendiz">
+                <div class="case-metric">
+                    <span>Asistencia</span>
+                    <strong class="{% if case_attendance is not none and case_attendance < config_comite.porcentaje_minimo_asistencia %}is-danger{% elif case_attendance is not none and case_attendance < 85 %}is-warning{% else %}is-success{% endif %}">{{ case_attendance if case_attendance is not none else 'Sin datos' }}{% if case_attendance is not none %}%{% endif %}</strong>
+                    <small>{{ case_values.sesiones }} sesiones registradas</small>
+                </div>
+                <div class="case-metric">
+                    <span>Faltas sin justificar</span>
+                    <strong>{{ case_values.faltas }}</strong>
+                    <small>{{ case_values.consecutivas }} consecutivas como máximo</small>
+                </div>
+                <div class="case-metric">
+                    <span>Actividad académica</span>
+                    <strong class="{% if case_values.tareas_incumplidas %}is-warning{% else %}is-success{% endif %}">{{ case_values.tareas_incumplidas }}</strong>
+                    <small>tarea{{ '' if case_values.tareas_incumplidas == 1 else 's' }} incumplida{{ '' if case_values.tareas_incumplidas == 1 else 's' }}</small>
+                </div>
+                <div class="case-metric">
+                    <span>Gestión registrada</span>
+                    <strong>{{ case_plans|length }}</strong>
+                    <small>{{ planes_pendientes|length }} plan{{ '' if planes_pendientes|length == 1 else 'es' }} pendiente{{ '' if planes_pendientes|length == 1 else 's' }}</small>
+                </div>
+            </div>
+
+            <div class="case-alert-list">
+                {% for alerta in caso.alertas %}
+                {% set detalle = alerta.detalle_json or {} %}
+                <div class="case-alert-row" data-alert-status="{{ alerta.estado }}">
+                    <div class="case-alert-copy">
+                        <div class="case-alert-heading">
+                            <span class="badge-solid-{{ 'danger' if alerta.nivel == 'roja' else 'warning' }}">{{ 'Prioritaria' if alerta.nivel == 'roja' else 'Preventiva' }}</span>
+                            <span class="case-alert-status">{{ 'Por gestionar' if alerta.estado == 'activa' else 'Escalada a comité' }}</span>
+                        </div>
+                        <strong>{{ alerta.titulo }}</strong>
+                        <p>{{ alerta.mensaje }}</p>
+                        <div class="case-alert-facts">
+                            <span>Generada {{ alerta.fecha_generada.strftime('%d/%m/%Y %H:%M') }}</span>
+                            {% if detalle.get('fallas_consecutivas') %}<span>{{ detalle.get('fallas_consecutivas') }} faltas consecutivas</span>{% endif %}
+                            {% if detalle.get('fallas_acumuladas') %}<span>{{ detalle.get('fallas_acumuladas') }} faltas acumuladas</span>{% endif %}
+                            {% if detalle.get('tareas_incumplidas') %}<span>{{ detalle.get('tareas_incumplidas') }} tareas incumplidas</span>{% endif %}
+                            {% if detalle.get('pct_asistencia') is not none %}<span>Asistencia {{ detalle.get('pct_asistencia') }}%</span>{% endif %}
+                            {% if alerta.auto_escalada %}<span class="case-auto-escalated">Escalado automáticamente</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="case-actions">
+                        {% if alerta.estado == 'activa' %}
+                        <form method="POST" action="{{ url_for('seguimiento.resolver_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}" onsubmit="return confirm('¿Confirmas que este caso fue revisado y puede cerrarse?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-primary">Marcar revisada</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('seguimiento.escalar_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}" onsubmit="return confirm('¿Confirmas que este caso debe prepararse para comité?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-warning">Preparar comité</button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('seguimiento.resolver_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}" onsubmit="return confirm('¿Confirmas el cierre de este caso escalado?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-primary">Cerrar caso</button>
+                        </form>
+                        {% endif %}
+                        <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id, alerta_id=alerta.id) }}" class="btn btn-sm btn-outline">📋 Plan de mejora</a>
+                    </div>
+                    <form method="POST" action="{{ url_for('seguimiento.guardar_observacion', ficha_id=ficha.id, alerta_id=alerta.id) }}" class="case-note-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label for="observacion-{{ alerta.id }}">Observación del instructor</label>
+                        <textarea id="observacion-{{ alerta.id }}" name="observaciones" rows="2" placeholder="Registra contexto, conversación, soporte o acuerdo de apoyo...">{{ alerta.observaciones or '' }}</textarea>
+                        <button type="submit" class="btn btn-sm btn-outline">Guardar observación</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+
+            <details class="case-timeline">
+                <summary>Ver línea de tiempo de asistencia y evidencias ({{ caso.timeline|length }} eventos)</summary>
+                {% if caso.timeline %}
+                <div class="timeline-list">
+                    {% for evento in caso.timeline %}
+                    <div class="timeline-event">
+                        <span class="timeline-dot timeline-{{ evento.tipo }}"></span>
+                        <div>
+                            <strong>{{ evento.fecha.strftime('%d/%m/%Y') }} · {{ evento.titulo }}</strong>
+                            <p>{{ evento.detalle }}{% if evento.nota %} · {{ evento.nota }}{% endif %}</p>
+                            {% if evento.soporte_url %}<a href="{{ url_for('aprendiz.descargar_archivo', filename=evento.soporte_url) }}" class="link-download">Ver soporte adjunto</a>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted case-timeline-empty">No hay eventos registrados todavía.</p>
+                {% endif %}
+            </details>
+        </article>
+        {% endfor %}
+    </div>
+    <div class="empty-state followup-filter-empty" data-followup-empty hidden>
+        <div class="empty-icon">🔎</div>
+        <h3>No hay casos que coincidan</h3>
+        <p>Prueba con otro nombre, prioridad o estado.</p>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🌿</div>
+        <h3>No hay casos abiertos para seguimiento</h3>
+        <p>El sistema seguirá observando asistencia y entregas. Las ausencias justificadas no generan una alerta atribuible al aprendiz.</p>
+        <form method="POST" action="{{ url_for('seguimiento.auto_evaluar_ficha', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary">Ejecutar revisión ahora</button>
+        </form>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/seguimiento.js', v='1.0') }}"></script>
+{% endblock %}

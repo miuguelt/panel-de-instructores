@@ -1,0 +1,20 @@
+<section class="timeline-card {% if cronograma.fase == 'finalizada' %}timeline-finished{% endif %}">
+    <div class="timeline-card-heading">
+        <div>
+            <span class="eyebrow">Avance de la ficha</span>
+            <h2>Calendario de formación</h2>
+        </div>
+        {% if cronograma.configurado %}<strong class="timeline-percent">{{ '%.1f'|format(cronograma.porcentaje) }}%</strong>{% endif %}
+    </div>
+    {% if cronograma.configurado %}
+    <p class="text-muted timeline-explanation">La etapa lectiva va del {{ cronograma.inicio_lectiva.strftime('%d/%m/%Y') }} al {{ cronograma.fin_lectiva.strftime('%d/%m/%Y') }}. La etapa productiva inicia el <strong>{{ cronograma.inicio_productiva.strftime('%d/%m/%Y') }}</strong> y dura <strong>{{ cronograma.meses_productiva }} meses</strong>, hasta el {{ cronograma.fin_productiva.strftime('%d/%m/%Y') }}. Este porcentaje mide tiempo transcurrido de la ficha; no es una nota académica.</p>
+    <div class="timeline-progress" role="progressbar" aria-label="Avance temporal de la ficha" aria-valuenow="{{ [cronograma.porcentaje, 100]|min }}" aria-valuemin="0" aria-valuemax="100">
+        {% if cronograma.porcentaje > 0 %}<span class="timeline-progress-fill" style="--progress-value: {{ [cronograma.porcentaje, 100]|min }}%"></span>{% endif %}
+        <span class="timeline-marker timeline-marker-stage" style="--marker-position: {{ [cronograma.porcentaje_lectiva, 95]|min }}%"><i></i><b>Inicio productiva</b></span>
+        <span class="timeline-marker timeline-marker-end" style="--marker-position: 100%"><i></i><b>Fin ficha</b></span>
+    </div>
+    <div class="timeline-labels"><span>Inicio lectiva<br><strong>{{ cronograma.inicio_lectiva.strftime('%d/%m/%Y') }}</strong></span><span class="timeline-current"><strong>{{ cronograma.fase_label }}</strong>{% if cronograma.dias_restantes is not none and cronograma.dias_restantes > 0 %}<br>{{ cronograma.dias_restantes }} días restantes{% elif cronograma.fase == 'finalizada' %}<br>Histórico conservado{% endif %}</span><span>Fin productiva<br><strong>{{ cronograma.fin_productiva.strftime('%d/%m/%Y') }}</strong></span></div>
+    {% else %}
+    <p class="text-muted">{{ cronograma.mensaje }}</p>
+    {% endif %}
+</section>

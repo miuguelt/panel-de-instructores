@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Aprendices - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <h1>{{ ficha.codigo }} - {{ ficha.nombre_programa }}</h1>
+</div>
+
+<details class="card share-access-card" open>
+    <summary>Compartir panel con los aprendices (QR)</summary>
+    <p class="text-muted">Los aprendices acceden directamente ingresando su documento de identidad en este enlace, sin necesidad de crear una cuenta.</p>
+    
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem; margin-top: 1.5rem;">
+        <!-- Código QR -->
+        <div id="qr-code" style="background: white; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);"></div>
+        
+        <div class="share-access-row" style="width: 100%; max-width: 500px;">
+            <label class="sr-only" for="learner-access-url">Enlace de acceso para aprendices</label>
+            <input id="learner-access-url" type="text"
+                   value="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}"
+                   readonly>
+            <button type="button" class="btn btn-primary" id="copy-learner-access">Copiar Enlace</button>
+        </div>
+        <p class="copy-feedback" id="copy-feedback" role="status" aria-live="polite" style="margin-top: 0;"></p>
+    </div>
+</details>
+
+<div class="card form-card">
+    <h2>Actualizar o Cargar Aprendices</h2>
+    <p class="text-muted">Sube una plantilla .xlsx o el reporte oficial de Juicios de Evaluación (.xls/.xlsx). <strong>Si la ficha ya tiene datos, se actualizarán y se mantendrá el historial intacto (ideal para instructores de relevo).</strong></p>
+    <form method="POST" action="{{ url_for('instructor.cargar_excel', ficha_id=ficha.id) }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+            <div class="form-group flex-grow">
+                <label for="archivo-aprendices">Archivo Excel de aprendices</label>
+                <input type="file" id="archivo-aprendices" name="archivo" accept=".xlsx,.xls" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Actualizar Datos</button>
+        </div>
+    </form>
+    <a href="{{ url_for('instructor.descargar_plantilla', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">Descargar plantilla de ejemplo</a>
+</div>
+
+<div class="section-header">
+    <h2>Aprendices ({{ aprendices|length }})</h2>
+</div>
+
+{% if aprendices %}
+<div class="table-container">
+    <div class="table-responsive" tabindex="0" aria-label="Lista de aprendices">
+        <table class="table table-sena">
+            <caption class="sr-only">Aprendices registrados en la ficha {{ ficha.codigo }}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Documento</th>
+                    <th scope="col">Nombre</th>
+                    <th scope="col">Apellidos</th>
+                    <th scope="col" class="text-center">Tipo</th>
+                    <th scope="col" class="text-center">Estado</th>
+                    <th scope="col">Progreso Juicios</th>
+                    <th scope="col" class="text-center">Seguimiento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ap in aprendices %}
+                {% set js = juicios_stats.get(ap.id, None) %}
+                <tr data-estado="{{ ap.estado }}">
+                    <td data-label="Documento">{{ ap.documento }}</td>
+                    <td data-label="Nombre">{{ ap.nombre }}</td>
+                    <td data-label="Apellidos">{{ ap.apellidos }}</td>
+                    <td data-label="Tipo"><span class="badge">{{ ap.tipo_documento }}</span></td>
+                    <td data-label="Estado"><span class="badge badge-{{ 'success' if ap.estado == 'EN_FORMACION' else 'warning' }}">{{ ap.estado }}</span></td>
+                    <td data-label="Progreso Juicios">
+                        {% if js and js.total > 0 %}
+                        {% set pct = (js.aprobados / js.total * 100)|round|int %}
+                        <div class="progress-inline">
+                            <div class="progress-track-inline">
+                                {% if pct > 0 %}<div class="progress-fill-inline" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>{% endif %}
+                            </div>
+                            <span class="progress-label">{{ js.aprobados }}/{{ js.total }}</span>
+                        </div>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Seguimiento"><a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" class="btn btn-sm btn-outline">Ver Avance</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">👥</div>
+    <h3>Todavía no hay aprendices cargados</h3>
+    <p>Sube un archivo Excel con la lista de aprendices usando el formulario de arriba.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<!-- QR Code Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function () {
+    const button = document.getElementById('copy-learner-access');
+    const input = document.getElementById('learner-access-url');
+    const feedback = document.getElementById('copy-feedback');
+    if (!button || !input || !feedback) return;
+
+    // Generar el código QR
+    new QRCode(document.getElementById("qr-code"), {
+        text: input.value,
+        width: 180,
+        height: 180,
+        colorDark : "#050505",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+
+    button.addEventListener('click', async function () {
+        try {
+            await navigator.clipboard.writeText(input.value);
+            feedback.textContent = '¡Enlace copiado! Ya puedes compartirlo.';
+            feedback.style.color = 'var(--emerald-400)';
+            button.textContent = 'Copiado';
+            setTimeout(() => {
+                button.textContent = 'Copiar Enlace';
+                feedback.textContent = '';
+            }, 3000);
+        } catch (error) {
+            input.focus();
+            input.select();
+            feedback.textContent = 'Seleccionamos el enlace. Cópialo con Ctrl+C.';
+            feedback.style.color = 'var(--warning-color)';
+        }
+    });
+}());
+</script>
+{% endblock %}

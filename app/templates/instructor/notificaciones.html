@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Notificaciones - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    {% if aprendiz %}
+    <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver a mi panel</a>
+    <h1>Mis notificaciones</h1><p class="text-muted">{{ ficha.codigo }} · {{ aprendiz.nombre_completo }}</p>
+    {% else %}
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <h1>Centro de notificaciones</h1><p class="text-muted">Avisos informativos para revisión del instructor.</p>
+    {% endif %}
+</div>
+
+<div class="notification-toolbar">
+    <span class="badge badge-info">{{ notificaciones|selectattr('leida', 'equalto', false)|list|length }} sin leer</span>
+    {% if notificaciones %}
+    <form method="POST" action="{{ url_for('aprendiz_seguimiento.marcar_todas_aprendiz', ficha_id=ficha.id) if aprendiz else url_for('seguimiento.marcar_todas_instructor') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if aprendiz %}<input type="hidden" name="documento" value="{{ aprendiz.documento }}">{% endif %}
+        <button type="submit" class="btn btn-sm btn-outline">Marcar todas como leídas</button>
+    </form>
+    {% endif %}
+</div>
+
+{% if notificaciones %}
+<div class="notification-list">
+    {% for notificacion in notificaciones %}
+    <article class="notification-item {% if not notificacion.leida %}notification-unread{% endif %}">
+        <div class="notification-icon">{% if notificacion.tipo == 'alerta' %}⚠️{% elif notificacion.tipo == 'tarea' %}📝{% elif notificacion.tipo == 'calificacion' %}📣{% elif notificacion.tipo == 'justificacion' %}📄{% else %}🔔{% endif %}</div>
+        <div class="notification-copy"><p>{{ notificacion.mensaje }}</p><small>{{ notificacion.fecha_creada.strftime('%d/%m/%Y %H:%M') }}</small></div>
+        <div class="notification-actions">
+            {% if notificacion.url %}<a href="{{ notificacion.url }}" class="btn btn-sm btn-outline">Abrir</a>{% endif %}
+            {% if not notificacion.leida %}
+            <form method="POST" action="{{ url_for('aprendiz_seguimiento.marcar_notificacion_aprendiz', ficha_id=ficha.id, notificacion_id=notificacion.id) if aprendiz else url_for('seguimiento.marcar_notificacion_instructor', notificacion_id=notificacion.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if aprendiz %}<input type="hidden" name="documento" value="{{ aprendiz.documento }}">{% endif %}
+                <button type="submit" class="btn btn-sm btn-primary">Leída</button>
+            </form>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><div class="empty-icon">🔔</div><h3>No tienes notificaciones</h3><p>Cuando haya un aviso de seguimiento, tareas o calificaciones aparecerá aquí.</p></div>
+{% endif %}
+{% endblock %}
+

@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+{% block title %}Llamado a Lista - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <h1>Llamado a Lista</h1>
+    <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+</div>
+
+<div class="card form-card">
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-row align-center">
+            <div class="form-group">
+                <label for="fecha">Fecha de sesión</label>
+                <input type="date" id="fecha" name="fecha" value="{{ fecha_actual }}" required>
+            </div>
+        </div>
+
+        {% if aprendices %}
+        <div class="attendance-toolbar">
+            <button type="button" class="btn btn-sm btn-outline" id="mark-all-present">Marcar todos como “Asiste”</button>
+            <span id="attendance-summary" role="status" aria-live="polite"></span>
+        </div>
+        <div class="asistencia-list">
+            {% for ap in aprendices %}
+            {% set registro = registros_map.get(ap.id) %}
+            {% set stats = stats_map.get(ap.id) if stats_map.get(ap.id) else {'faltas_no_justificadas': 0, 'faltas_justificadas': 0, 'pct_asistencia': 100, 'tareas_pendientes': 0, 'nivel': 'verde'} %}
+            {% set base_faltas_nj = stats.faltas_no_justificadas %}
+            {% set base_faltas_j = stats.faltas_justificadas %}
+            {% if registro %}
+                {% if registro.estado == 'FALTA' %}
+                    {% set base_faltas_nj = base_faltas_nj - 1 %}
+                {% elif registro.estado in ['FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'] %}
+                    {% set base_faltas_j = base_faltas_j - 1 %}
+                {% endif %}
+            {% endif %}
+
+            <div class="asistencia-row stat-level-{{ stats.nivel }}" id="row-{{ ap.id }}"
+                 data-base-faltas-nj="{{ base_faltas_nj }}"
+                 data-base-faltas-j="{{ base_faltas_j }}"
+                 data-tareas="{{ stats.tareas_pendientes }}">
+
+                <!-- Nombre + doc -->  
+                <div class="col-nombre">
+                    <span class="aprendiz-name" id="aprendiz-{{ ap.id }}"
+                          hx-get="{{ url_for('instructor.asistencia_aprendiz_modal', ficha_id=ficha.id, aprendiz_id=ap.id) }}"
+                          hx-target="#modal-container" hx-trigger="click">{{ ap.nombre }} {{ ap.apellidos }}</span>
+                    <span class="aprendiz-doc">{{ ap.documento }}</span>
+                </div>
+
+                <!-- Barra + % + badges mini -->
+                <div class="col-stats">
+                    <div class="stats-inline">
+                        <div class="bar-wrap">
+                            <div class="stat-progress-bar" style="width: {{ stats.pct_asistencia }}%;"></div>
+                        </div>
+                        <strong class="stat-pct">{{ stats.pct_asistencia }}%</strong>
+                        <span class="stat-badge-nj mini-badge {% if stats.faltas_no_justificadas > 0 %}badge-nj-active{% endif %}">{{ stats.faltas_no_justificadas }}F</span>
+                        <span class="stat-badge-j mini-badge badge-j-active" style="display:{% if stats.faltas_justificadas > 0 %}inline-flex{% else %}none{% endif %};">{{ stats.faltas_justificadas }}J</span>
+                        <span class="stat-badge-tareas mini-badge badge-t-active" style="display:{% if stats.tareas_pendientes > 0 %}inline-flex{% else %}none{% endif %};">{{ stats.tareas_pendientes }}T</span>
+                    </div>
+                </div>
+
+                <!-- Botones de estado -->  
+                <div class="col-botones">
+                    <div class="asistencia-buttons" role="radiogroup" aria-labelledby="aprendiz-{{ ap.id }}">
+                        {% for valor, etiqueta in estados_asistencia %}
+                        {% set seleccionado = (registro and registro.estado == valor) or (not registro and valor == 'ASISTE') %}
+                        <label class="attendance-btn {% if seleccionado %}active state-{{ valor|lower }}{% endif %}">
+                            <input type="radio" name="asistencia_{{ ap.id }}" value="{{ valor }}"
+                                   {% if seleccionado %}checked{% endif %}
+                                   onchange="this.closest('.asistencia-row').querySelectorAll('.attendance-btn').forEach(b=>b.classList.remove('active','state-asiste','state-falta','state-falta_justificada','state-excusa_medica','state-tardanza'));this.closest('.attendance-btn').classList.add('active','state-{{ valor|lower }}')">
+                            {{ etiqueta }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div class="causal-select" id="causal_{{ ap.id }}_wrap" style="display:{% if registro and registro.causal_justificacion %}flex{% else %}none{% endif %}">
+                        <select name="causal_{{ ap.id }}" aria-label="Causal">
+                            <option value="">-- Causal --</option>
+                            {% for val, et in causales_justificadas %}
+                            <option value="{{ val }}" {% if registro and registro.causal_justificacion == val %}selected{% endif %}>{{ et }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="attendance-save-bar">
+            <button type="submit" class="btn btn-primary btn-full btn-lg">Guardar asistencia del {{ fecha_actual }}</button>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <h3>Todavía no hay aprendices en esta ficha</h3>
+            <p>Carga los aprendices antes de hacer el llamado a lista.</p>
+            <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-primary">Cargar Aprendices</a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+{% if sesiones_recientes %}
+<div class="card">
+    <h3>Sesiones recientes</h3>
+    <div class="sesiones-list">
+        {% for s in sesiones_recientes %}
+        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, fecha=s.fecha) }}" class="sesion-item">
+            {{ s.fecha.strftime('%d/%m/%Y') }}
+        </a>
+        {% endfor %}
+    </div>
+    <div class="mt-1" style="background: var(--gray-50); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);">
+        <h4 style="margin-bottom: 8px; font-size: 14px;">Exportar Reporte</h4>
+        <form method="GET" action="{{ url_for('instructor.reporte_asistencia', ficha_id=ficha.id) }}" class="form-row align-center">
+            <div class="form-group">
+                <label for="fecha_inicio">Desde</label>
+                <input type="date" id="fecha_inicio" name="fecha_inicio">
+            </div>
+            <div class="form-group">
+                <label for="fecha_fin">Hasta</label>
+                <input type="date" id="fecha_fin" name="fecha_fin">
+            </div>
+            <div class="form-group">
+                <label for="formato">Formato</label>
+                <select id="formato" name="formato">
+                    <option value="excel">Excel</option>
+                    <option value="pdf">PDF</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex: 0 0 auto;">
+                <button type="submit" class="btn btn-primary">Exportar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div id="modal-container"></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Attendance List: Compact Single-Row Layout ── */
+.asistencia-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 12px;
+}
+
+/* Una sola fila compacta por aprendiz */
+.asistencia-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px 8px 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: 8px;
+    border-left: 4px solid transparent !important;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    min-height: 44px;
+}
+.asistencia-row:hover {
+    background: var(--bg-card);
+    border-color: var(--border-subtle);
+}
+
+/* Columna nombre */
+.col-nombre {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.aprendiz-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+    transition: color 0.15s;
+}
+.aprendiz-name:hover { color: var(--accent-primary); }
+.aprendiz-doc {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Columna stats inline */
+.col-stats { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.stats-inline { display: flex; align-items: center; gap: 6px; width: 100%; }
+
+.bar-wrap {
+    flex: 1;
+    height: 5px;
+    background: var(--border-divider);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 40px;
+}
+.stat-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+
+.stat-pct {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 36px;
+    text-align: right;
+}
+
+.mini-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    background: transparent;
+}
+.badge-nj-active { color: #dc2626; border-color: rgba(220,38,38,0.3); background: rgba(220,38,38,0.08); }
+.badge-j-active  { color: #d97706; border-color: rgba(217,119,6,0.3);  background: rgba(217,119,6,0.08); }
+.badge-t-active  { color: #7c3aed; border-color: rgba(124,58,237,0.3); background: rgba(124,58,237,0.08); }
+
+/* Colores de estado */
+.asistencia-row.stat-level-verde    { border-left-color: #39A900 !important; }
+.asistencia-row.stat-level-amarillo { border-left-color: #d97706 !important; }
+.asistencia-row.stat-level-rojo     { border-left-color: #dc2626 !important; }
+
+.stat-level-verde    .stat-progress-bar { background: #39A900; }
+.stat-level-amarillo .stat-progress-bar { background: #d97706; }
+.stat-level-rojo     .stat-progress-bar { background: #dc2626; }
+
+.stat-level-verde    .stat-pct { color: #16a34a; }
+.stat-level-amarillo .stat-pct { color: #d97706; }
+.stat-level-rojo     .stat-pct { color: #dc2626; }
+
+/* Columna botones */
+.col-botones {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.asistencia-buttons {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-card);
+    padding: 3px;
+    border-radius: 7px;
+    border: 1px solid var(--border-divider);
+}
+.attendance-btn {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+.attendance-btn input[type="radio"] { display: none; }
+.attendance-btn:hover {
+    background: var(--bg-surface);
+    color: var(--text-main);
+}
+
+.attendance-btn.active.state-asiste         { background: rgba(57,169,0,0.12);  color: #16a34a;  border-color: rgba(57,169,0,0.35);  }
+.attendance-btn.active.state-falta          { background: rgba(220,38,38,0.12); color: #dc2626;  border-color: rgba(220,38,38,0.35); }
+.attendance-btn.active.state-falta_justificada,
+.attendance-btn.active.state-excusa_medica  { background: rgba(217,119,6,0.12); color: #d97706;  border-color: rgba(217,119,6,0.35); }
+.attendance-btn.active.state-tardanza       { background: rgba(14,165,233,0.12);color: #0284c7;  border-color: rgba(14,165,233,0.35);}
+
+/* Causal inline */
+.causal-select {
+    align-items: center;
+}
+.causal-select select {
+    background: var(--bg-surface);
+    border: 1px solid rgba(217,119,6,0.4);
+    color: #d97706;
+    border-radius: 5px;
+    padding: 5px 8px;
+    font-size: 11px;
+    outline: none;
+    max-width: 160px;
+}
+.causal-select select:focus { box-shadow: 0 0 0 2px rgba(217,119,6,0.15); }
+
+/* Toolbar */
+.attendance-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-surface);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-divider);
+    margin-bottom: 6px;
+    gap: 12px;
+}
+#attendance-summary {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+</style>
+
+<script>
+const umbralRojo = {{ config.umbral_rojo if config else 0 }};
+const umbralAmarillo = {{ config.umbral_amarillo if config else 0 }};
+const esNuevaSesion = {{ 'true' if not sesion else 'false' }};
+const baseTotalSesiones = {{ total_sesiones if total_sesiones else 0 }};
+const sesionesProyectadas = esNuevaSesion ? (baseTotalSesiones + 1) : Math.max(1, baseTotalSesiones);
+
+function updateRowStats(row, selectedValue) {
+    const baseNj = parseInt(row.getAttribute('data-base-faltas-nj') || '0', 10);
+    const baseJ = parseInt(row.getAttribute('data-base-faltas-j') || '0', 10);
+    const tareas = parseInt(row.getAttribute('data-tareas') || '0', 10);
+
+    let currentNj = baseNj;
+    let currentJ = baseJ;
+
+    if (selectedValue === 'FALTA') {
+        currentNj += 1;
+    } else if (selectedValue === 'FALTA_JUSTIFICADA' || selectedValue === 'EXCUSA_MEDICA') {
+        currentJ += 1;
+    }
+
+    const totalFaltas = currentNj + currentJ;
+    let pct = 100;
+    if (sesionesProyectadas > 0) {
+        pct = ((sesionesProyectadas - totalFaltas) / sesionesProyectadas) * 100;
+    }
+    pct = Math.max(0, Math.min(100, pct));
+
+    let nivel = 'verde';
+    if (currentNj >= umbralRojo || tareas >= 3) {
+        nivel = 'rojo';
+    } else if (currentNj >= umbralAmarillo || tareas >= 1) {
+        nivel = 'amarillo';
+    }
+
+    row.classList.remove('stat-level-verde', 'stat-level-amarillo', 'stat-level-rojo');
+    row.classList.add('stat-level-' + nivel);
+
+    const pctEl = row.querySelector('.stat-pct');
+    if (pctEl) pctEl.textContent = pct.toFixed(1) + '%';
+
+    const barEl = row.querySelector('.stat-progress-bar');
+    if (barEl) barEl.style.width = pct + '%';
+
+    const njBadge = row.querySelector('.stat-badge-nj');
+    if (njBadge) {
+        njBadge.textContent = currentNj + 'F';
+        njBadge.classList.toggle('badge-nj-active', currentNj > 0);
+    }
+
+    const jBadge = row.querySelector('.stat-badge-j');
+    if (jBadge) {
+        jBadge.textContent = currentJ + 'J';
+        jBadge.style.display = currentJ > 0 ? 'inline-flex' : 'none';
+    }
+}
+
+document.querySelectorAll('.asistencia-row input[type="radio"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        var row = this.closest('.asistencia-row');
+        var causalWrap = row.querySelector('.causal-select');
+        var val = this.value;
+        if (val === 'FALTA_JUSTIFICADA' || val === 'EXCUSA_MEDICA') {
+            causalWrap.style.display = 'flex';
+        } else {
+            causalWrap.style.display = 'none';
+        }
+        
+        updateRowStats(row, val);
+        updateAttendanceSummary();
+    });
+});
+
+function updateAttendanceSummary() {
+    var total = document.querySelectorAll('.asistencia-row').length;
+    var present = document.querySelectorAll('.asistencia-row input[value="ASISTE"]:checked').length;
+    var summary = document.getElementById('attendance-summary');
+    if (summary) summary.textContent = present + ' de ' + total + ' marcados como asistentes';
+}
+
+var markAllButton = document.getElementById('mark-all-present');
+if (markAllButton) {
+    markAllButton.addEventListener('click', function() {
+        document.querySelectorAll('.asistencia-row').forEach(function(row) {
+            var radio = row.querySelector('input[value="ASISTE"]');
+            if (!radio) return;
+            radio.checked = true;
+            row.querySelectorAll('.attendance-btn').forEach(function(button) {
+                button.classList.remove('active', 'state-asiste', 'state-falta', 'state-falta_justificada', 'state-excusa_medica', 'state-tardanza');
+            });
+            radio.closest('.attendance-btn').classList.add('active', 'state-asiste');
+            var causal = row.querySelector('.causal-select');
+            if (causal) causal.style.display = 'none';
+            
+            updateRowStats(row, 'ASISTE');
+        });
+        updateAttendanceSummary();
+    });
+}
+updateAttendanceSummary();
+</script>
+{% endblock %}
