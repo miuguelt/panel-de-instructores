@@ -9,20 +9,20 @@ services:
     # Con `${VAR}` Compose expandía `$hcQX...` como variable de shell y vaciaba
     # el secreto. Los valores se definen en Coolify UI → Environment Variables.
     environment:
-      - FLASK_ENV
-      - SECRET_KEY
-      - DATABASE_URL
-      - REDIS_URL
-      - UPLOAD_FOLDER
-      - MAX_CONTENT_LENGTH
-      - ADSO_ADMIN_EMAIL
-      - ADSO_ADMIN_PASSWORD
-      - ADSO_ADMIN_NOMBRE
-      - DB_HOST
-      - DB_PORT
-      - DB_USER
-      - DB_NAME
-      - DB_PASSWORD
+      - FLASK_ENV=${FLASK_ENV}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH}
+      - ADSO_ADMIN_EMAIL=${ADSO_ADMIN_EMAIL}
+      - ADSO_ADMIN_PASSWORD=${ADSO_ADMIN_PASSWORD}
+      - ADSO_ADMIN_NOMBRE=${ADSO_ADMIN_NOMBRE}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_NAME=${DB_NAME}
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - uploads:/app/uploads
     expose:
