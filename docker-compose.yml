@@ -6,7 +6,8 @@ services:
     environment:
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
-      DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL en .env}
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL_B64: ${DATABASE_URL_B64}
       REDIS_URL: ${REDIS_URL:-memory://}
       UPLOAD_FOLDER: /app/uploads
       MAX_CONTENT_LENGTH: ${MAX_CONTENT_LENGTH:-52428800}

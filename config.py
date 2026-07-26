@@ -21,12 +21,36 @@ if os.getenv('FLASK_ENV') == 'production' and _secret_key in _INSECURE_SECRETS:
     )
 
 
+_db_url = os.getenv('DATABASE_URL')
+
+# Allow overriding via DATABASE_URL_FILE (Docker secret / Coolify file mount)
+_db_url_file = os.getenv('DATABASE_URL_FILE')
+if not _db_url and _db_url_file and os.path.isfile(_db_url_file):
+    with open(_db_url_file) as _f:
+        _db_url = _f.read().strip()
+
+# Docker secret mount
+if not _db_url:
+    for _secret in ('/run/secrets/DATABASE_URL', '/run/secrets/db_url'):
+        if os.path.isfile(_secret):
+            with open(_secret) as _f:
+                _db_url = _f.read().strip()
+            break
+
+# Base64-encoded (bypasses Docker Compose $ expansion)
+if not _db_url:
+    _b64 = os.getenv('DATABASE_URL_B64')
+    if _b64:
+        import base64
+        _db_url = base64.b64decode(_b64).decode()
+
+if not _db_url:
+    _db_url = 'postgresql://adso:adso_pass@127.0.0.1:5434/adso_control'
+
+
 class Config:
     SECRET_KEY = _secret_key
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'DATABASE_URL',
-        'postgresql://adso:adso_pass@127.0.0.1:5434/adso_control',
-    )
+    SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 5,
