@@ -19,6 +19,8 @@ if [ -z "$DATABASE_URL" ]; then
   export DATABASE_URL
   echo "DATABASE_URL construida desde variables DB_*"
 else
+  # Ensure the variable is explicitly exported so Python subprocesses inherit it.
+  export DATABASE_URL
   echo "DATABASE_URL recibida directamente desde el entorno."
 fi
 
@@ -72,6 +74,10 @@ echo "Migraciones aplicadas."
 
 # --- Seed admin inicial ---
 echo "Verificando cuenta admin..."
+# Debug: verifica qué DATABASE_URL recibe Python y si existe .env en el contenedor
+echo "[DEBUG] DATABASE_URL en shell: $URL_SANITIZED"
+echo "[DEBUG] DATABASE_URL en Python: $(python3 -c 'import os; u=os.getenv("DATABASE_URL","NOT_SET"); import re; print(re.sub(r"(://[^:]+:)[^@]+(@)",r"\1****\2",u))')"
+echo "[DEBUG] Archivos .env en /app: $(ls /app/.env* 2>/dev/null || echo 'ninguno')"
 if ! python3 seed_admin.py; then
   echo "Fallo la creación del admin. Revise ADSO_ADMIN_EMAIL / ADSO_ADMIN_PASSWORD en Coolify." >&2
   exit 1
