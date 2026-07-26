@@ -13,10 +13,10 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-# The project .env is authoritative for native Windows development. Keeping
-# process variables intact also allows Docker/WSGI deployments to inject their
-# own DATABASE_URL when the project .env is intentionally not mounted.
-load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
+# override=False: environment variables set by Coolify/Docker always win over .env.
+# .env is only used as a fallback for local Windows development when the variable
+# is not already defined in the process environment.
+load_dotenv(os.path.join(BASE_DIR, '.env'), override=False)
 
 
 _INSECURE_SECRETS = {
