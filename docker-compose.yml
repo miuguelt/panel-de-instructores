@@ -4,16 +4,16 @@ services:
     container_name: adso-app
     restart: unless-stopped
     environment:
-      FLASK_ENV: production
-      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
+      FLASK_ENV: ${FLASK_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: ${DATABASE_URL}
-      DATABASE_URL_B64: ${DATABASE_URL_B64}
       REDIS_URL: ${REDIS_URL:-memory://}
-      UPLOAD_FOLDER: /app/uploads
+      UPLOAD_FOLDER: ${UPLOAD_FOLDER:-/app/uploads}
       MAX_CONTENT_LENGTH: ${MAX_CONTENT_LENGTH:-52428800}
       ADSO_ADMIN_EMAIL: ${ADSO_ADMIN_EMAIL:-admin@sena.edu.co}
-      ADSO_ADMIN_PASSWORD: ${ADSO_ADMIN_PASSWORD:?Define ADSO_ADMIN_PASSWORD en .env}
+      ADSO_ADMIN_PASSWORD: ${ADSO_ADMIN_PASSWORD}
       ADSO_ADMIN_NOMBRE: ${ADSO_ADMIN_NOMBRE:-Administrador}
+      DB_HOST: ${DB_HOST:-db}
       DB_PORT: ${DB_PORT:-5432}
       DB_USER: ${DB_USER:-adso}
       DB_NAME: ${DB_NAME:-adso_control}
@@ -22,6 +22,12 @@ services:
       - uploads:/app/uploads
     expose:
       - "8009"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - coolify
 

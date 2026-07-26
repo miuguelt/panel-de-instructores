@@ -1,38 +1,42 @@
 #!/bin/bash
 set -e
 
-# --- Resolve DATABASE_URL (priority: B64 > FILE > secret > env > parts) ---
-# DATABASE_URL_B64 bypasses Docker Compose $ expansion entirely
-if [ -n "$DATABASE_URL_B64" ]; then
-  DATABASE_URL=$(echo "$DATABASE_URL_B64" | base64 -d 2>/dev/null || python3 -c "import sys,base64; s=sys.argv[1]; s+='='*((4-len(s)%4)%4); print(base64.b64decode(s).decode())" "$DATABASE_URL_B64")
+# =============================================================================
+# docker-entrypoint.sh — Panel de Instructores ADSO
+#
+# Las variables de entorno llegan directamente desde Coolify UI (o .env local
+# en desarrollo). Ya NO se usa DATABASE_URL_B64 ni python3 -c base64 porque
+# Docker Compose corrompe los valores que contienen $ al interpolarlos.
+#
+# Coolify inyecta las variables de forma segura sin pasar por el shell del
+# compose, así que DATABASE_URL llega íntegra al contenedor.
+# =============================================================================
+
+# --- Construir DATABASE_URL desde partes si no viene completa ---
+if [ -z "$DATABASE_URL" ]; then
+  DB_HOST="${DB_HOST:-db}"
+  DB_PORT="${DB_PORT:-5432}"
+  DB_USER="${DB_USER:-adso}"
+  DB_NAME="${DB_NAME:-adso_control}"
+  if [ -z "$DB_PASSWORD" ]; then
+    echo "ERROR: DATABASE_URL y DB_PASSWORD están vacíos. Define al menos uno en Coolify." >&2
+    exit 1
+  fi
+  DATABASE_URL="postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
   export DATABASE_URL
-elif [ -n "$DATABASE_URL_FILE" ] && [ -f "$DATABASE_URL_FILE" ]; then
-  DATABASE_URL=$(cat "$DATABASE_URL_FILE")
-  export DATABASE_URL
-elif [ -f /run/secrets/DATABASE_URL ]; then
-  DATABASE_URL=$(cat /run/secrets/DATABASE_URL)
-  export DATABASE_URL
-elif [ -f /run/secrets/db_url ]; then
-  DATABASE_URL=$(cat /run/secrets/db_url)
-  export DATABASE_URL
+  echo "DATABASE_URL construida desde variables DB_*"
+else
+  echo "DATABASE_URL recibida directamente desde el entorno."
 fi
 
+# --- Esperar PostgreSQL ---
 echo "Esperando a PostgreSQL..."
 for i in $(seq 1 60); do
-  if python - <<'PY'
+  if python3 - <<'PY'
 import os, sys
-import psycopg2
-
-url = os.environ.get('DATABASE_URL')
-if not url:
-    host = os.environ.get('DB_HOST', 'db')
-    port = os.environ.get('DB_PORT', '5432')
-    user = os.environ.get('DB_USER', 'adso')
-    password = os.environ.get('DB_PASSWORD', '')
-    name = os.environ.get('DB_NAME', 'adso_control')
-    url = f'postgresql://{user}:{password}@{host}:{port}/{name}'
 try:
-    psycopg2.connect(url, connect_timeout=3).close()
+    import psycopg2
+    psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=3).close()
 except Exception:
     sys.exit(1)
 PY
@@ -40,27 +44,30 @@ PY
     break
   fi
   if [ "$i" -eq 60 ]; then
-    echo "PostgreSQL no respondio tras 60 intentos. Abortando." >&2
+    echo "PostgreSQL no respondió tras 60 intentos. Abortando." >&2
     exit 1
   fi
   sleep 1
 done
 echo "PostgreSQL listo."
 
+# --- Migraciones ---
 echo "Aplicando migraciones..."
 if ! flask db upgrade; then
-  echo "No se pudieron aplicar las migraciones. Se detiene el contenedor para proteger los datos existentes." >&2
+  echo "No se pudieron aplicar las migraciones. Abortando para proteger los datos." >&2
   exit 1
 fi
 echo "Migraciones aplicadas."
 
+# --- Seed admin inicial ---
 echo "Verificando cuenta admin..."
-if ! python seed_admin.py; then
-  echo "Fallo la creacion del admin. Revise ADSO_ADMIN_EMAIL / ADSO_ADMIN_PASSWORD." >&2
+if ! python3 seed_admin.py; then
+  echo "Fallo la creación del admin. Revise ADSO_ADMIN_EMAIL / ADSO_ADMIN_PASSWORD en Coolify." >&2
   exit 1
 fi
 
-echo "Iniciando servidor..."
+# --- Arrancar Gunicorn ---
+echo "Iniciando servidor Gunicorn en :8009..."
 exec gunicorn wsgi:app \
   --bind 0.0.0.0:8009 \
   --workers 4 \

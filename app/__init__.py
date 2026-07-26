@@ -88,6 +88,12 @@ def create_app(test_config=None):
             i += 1
         return f'{val:.1f} {units[i]}'
 
+    @app.route('/health')
+    def health():
+        """Health check endpoint — usado por Coolify y Docker HEALTHCHECK."""
+        from flask import jsonify
+        return jsonify({"status": "ok"}), 200
+
     @app.route('/')
     def index():
         from flask import redirect, url_for
