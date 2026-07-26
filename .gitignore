@@ -179,3 +179,9 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Claude Code
+#  Local-only state: ephemeral git worktrees and per-machine settings.
+#  Shared config (settings.json, agents/, skills/, commands/) stays tracked.
+.claude/worktrees/
+.claude/settings.local.json
