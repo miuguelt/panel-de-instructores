@@ -1,13 +1,6 @@
 services:
   app:
     build: .
-    # Sin container_name: Coolify asigna el suyo (app-<uuid>-<ts>) y un nombre
-    # fijo provoca colisiones al redesplegar sobre el contenedor anterior.
-    restart: unless-stopped
-    # Pass-through sin `${}`: Docker Compose NO interpola estos valores, así que
-    # un `$` dentro de SECRET_KEY o DB_PASSWORD llega íntegro al contenedor.
-    # Con `${VAR}` Compose expandía `$hcQX...` como variable de shell y vaciaba
-    # el secreto. Los valores se definen en Coolify UI → Environment Variables.
     environment:
       - FLASK_ENV=${FLASK_ENV}
       - SECRET_KEY=${SECRET_KEY}
