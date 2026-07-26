@@ -23,7 +23,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/* && \
     groupadd -r adso && useradd -r -g adso -d /app -s /bin/false adso
 
-# Copiar dependencias del stage builder
+# Copiar dependencias del stage builder.
+# /usr/local/bin completo: gunicorn, flask y alembic son consola-scripts que el
+# entrypoint necesita; copiar solo gunicorn rompe `flask db upgrade`.
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
@@ -34,8 +36,13 @@ COPY --chown=adso:adso . .
 RUN chmod +x /app/docker-entrypoint.sh && \
     mkdir -p /app/uploads && chown -R adso:adso /app/uploads
 
+# Defaults del runtime. Antes vivían en el `environment:` del compose; ahora que
+# ese bloque es pass-through puro, la imagen aporta los valores por omisión.
 ENV FLASK_APP=wsgi.py \
     FLASK_ENV=production \
+    REDIS_URL=memory:// \
+    UPLOAD_FOLDER=/app/uploads \
+    MAX_CONTENT_LENGTH=52428800 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
