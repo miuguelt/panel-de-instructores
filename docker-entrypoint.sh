@@ -50,9 +50,9 @@ PY
   if [ $STATUS -eq 0 ]; then
     echo " Conexión exitosa a PostgreSQL en el intento $i."
     break
+  else
+    echo "[Intento $i/60] Error al conectar a PostgreSQL: $ERR_MSG"
   fi
-  
-  echo "[Intento $i/60] Aún esperando a PostgreSQL... Detalle: $ERR_MSG"
   
   if [ "$i" -eq 60 ]; then
     echo " PostgreSQL no respondió tras 60 intentos. Último error: $ERR_MSG" >&2
