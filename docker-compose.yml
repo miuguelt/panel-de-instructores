@@ -1,23 +1,28 @@
 services:
   app:
     build: .
-    container_name: adso-app
+    # Sin container_name: Coolify asigna el suyo (app-<uuid>-<ts>) y un nombre
+    # fijo provoca colisiones al redesplegar sobre el contenedor anterior.
     restart: unless-stopped
+    # Pass-through sin `${}`: Docker Compose NO interpola estos valores, así que
+    # un `$` dentro de SECRET_KEY o DB_PASSWORD llega íntegro al contenedor.
+    # Con `${VAR}` Compose expandía `$hcQX...` como variable de shell y vaciaba
+    # el secreto. Los valores se definen en Coolify UI → Environment Variables.
     environment:
-      FLASK_ENV: ${FLASK_ENV:-production}
-      SECRET_KEY: ${SECRET_KEY}
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL:-memory://}
-      UPLOAD_FOLDER: ${UPLOAD_FOLDER:-/app/uploads}
-      MAX_CONTENT_LENGTH: ${MAX_CONTENT_LENGTH:-52428800}
-      ADSO_ADMIN_EMAIL: ${ADSO_ADMIN_EMAIL:-admin@sena.edu.co}
-      ADSO_ADMIN_PASSWORD: ${ADSO_ADMIN_PASSWORD}
-      ADSO_ADMIN_NOMBRE: ${ADSO_ADMIN_NOMBRE:-Administrador}
-      DB_HOST: ${DB_HOST:-db}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USER: ${DB_USER:-adso}
-      DB_NAME: ${DB_NAME:-adso_control}
-      DB_PASSWORD: ${DB_PASSWORD}
+      - FLASK_ENV
+      - SECRET_KEY
+      - DATABASE_URL
+      - REDIS_URL
+      - UPLOAD_FOLDER
+      - MAX_CONTENT_LENGTH
+      - ADSO_ADMIN_EMAIL
+      - ADSO_ADMIN_PASSWORD
+      - ADSO_ADMIN_NOMBRE
+      - DB_HOST
+      - DB_PORT
+      - DB_USER
+      - DB_NAME
+      - DB_PASSWORD
     volumes:
       - uploads:/app/uploads
     expose:
