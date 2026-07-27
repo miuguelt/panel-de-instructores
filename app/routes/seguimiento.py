@@ -264,7 +264,10 @@ def gestionar_planes(ficha_id):
     planes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id).order_by(
         PlanMejoramiento.fecha_creacion.desc()
     ).all()
-    aprendices = sorted(ficha.aprendices if ficha else [], key=lambda ap: ap.nombre_completo.lower())
+    aprendices = sorted(
+        (ap for ap in (ficha.aprendices if ficha else []) if ap.en_formacion),
+        key=lambda ap: ap.nombre_completo.lower(),
+    )
     casos_activos = [
         {'aprendiz': alertas[0].aprendiz, 'alertas': alertas}
         for alertas in obtener_casos(ficha_id)

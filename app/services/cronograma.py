@@ -90,7 +90,7 @@ def _alerta_ficha(ficha, tipo, nivel, titulo, mensaje, detalle, ahora):
         for instructor_id in _instructores_ficha(ficha):
             registrar_notificacion('instructor', instructor_id, mensaje, 'cronograma', clave,
                                    ficha.id, f'/instructor/fichas/{ficha.id}/alertas')
-        for aprendiz in Aprendiz.query.filter_by(ficha_id=ficha.id).all():
+        for aprendiz in Aprendiz.query_en_formacion(ficha.id).all():
             registrar_notificacion('aprendiz', aprendiz.id, mensaje, 'cronograma', clave,
                                    ficha.id, f'/aprendiz/{ficha.id}/panel?documento={aprendiz.documento}')
     return alerta

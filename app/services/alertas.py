@@ -283,7 +283,7 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
     en_productiva = fase == 'productiva'
     resultados = []
 
-    for aprendiz in Aprendiz.query.filter_by(ficha_id=ficha_id).all():
+    for aprendiz in Aprendiz.query_en_formacion(ficha_id).all():
         consecutivas = _consecutivas_injustificadas(aprendiz.id, ficha_id)
         acumuladas = RegistroAsistencia.query.join(SesionAsistencia).filter(
             SesionAsistencia.ficha_id == ficha_id,

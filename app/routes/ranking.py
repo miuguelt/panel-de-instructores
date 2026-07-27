@@ -329,7 +329,7 @@ def insignias(ficha_id):
     catalogo = Insignia.query.filter_by(ficha_id=ficha_id).order_by(
         Insignia.tipo, Insignia.nombre
     ).all()
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).order_by(
+    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(
         Aprendiz.apellidos, Aprendiz.nombre
     ).all()
     filtro_id = request.args.get('insignia_id', type=int)
@@ -434,7 +434,7 @@ def exportar_insignias(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).order_by(
+    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(
         Aprendiz.apellidos, Aprendiz.nombre
     ).all()
     otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(

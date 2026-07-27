@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta
 from statistics import mean
 
 from app import db
-from app.models.aprendiz import Aprendiz
+from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz
 from app.models.asistencia import SesionAsistencia
 from app.models.aseo import (
     ConfiguracionAseo,
@@ -16,16 +16,15 @@ from app.models.ficha import Ficha
 from app.models.juicio import JuicioEvaluativo
 
 
-ESTADOS_ACTIVOS = ('EN', 'EN_FORMACION')
+ESTADOS_ACTIVOS = ESTADOS_EN_FORMACION
 ESTADOS_PRESENTES = ('ASISTE', 'TARDANZA')
 ESTADOS_PENDIENTES = ('programado', 'intercambiado')
 
 
 def aprendices_activos(ficha_id):
-    return Aprendiz.query.filter(
-        Aprendiz.ficha_id == ficha_id,
-        Aprendiz.estado.in_(ESTADOS_ACTIVOS),
-    ).order_by(Aprendiz.apellidos, Aprendiz.nombre).all()
+    return Aprendiz.query_en_formacion(ficha_id).order_by(
+        Aprendiz.apellidos, Aprendiz.nombre
+    ).all()
 
 
 def obtener_configuracion(ficha_id, crear=True):
@@ -42,7 +41,7 @@ def asegurar_contadores(ficha_id):
         contador.aprendiz_id: contador
         for contador in ContadorAseo.query.filter_by(ficha_id=ficha_id).all()
     }
-    for aprendiz in Aprendiz.query.filter_by(ficha_id=ficha_id).all():
+    for aprendiz in Aprendiz.query_en_formacion(ficha_id).all():
         if aprendiz.id not in existentes:
             contador = ContadorAseo(
                 aprendiz_id=aprendiz.id,

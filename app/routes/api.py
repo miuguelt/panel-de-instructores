@@ -27,7 +27,7 @@ def resumen_ficha(ficha_id):
     if not puede_gestionar_ficha(ficha):
         return jsonify({'error': 'No encontrado'}), 404
 
-    total_aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).count()
+    total_aprendices = Aprendiz.query_en_formacion(ficha_id).count()
     total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
 
     return jsonify({

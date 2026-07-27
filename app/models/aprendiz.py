@@ -1,6 +1,11 @@
 from app import db
 
 
+# Estados que cuentan como "en formacion": unicos habilitados para llamado a
+# lista, turnos de aseo y ranking.
+ESTADOS_EN_FORMACION = ('EN', 'EN_FORMACION')
+
+
 class Aprendiz(db.Model):
     __tablename__ = 'aprendices'
 
@@ -21,6 +26,18 @@ class Aprendiz(db.Model):
     __table_args__ = (
         db.UniqueConstraint('documento', 'ficha_id', name='uq_aprendiz_documento_ficha'),
     )
+
+    @classmethod
+    def query_en_formacion(cls, ficha_id):
+        """Query de aprendices de la ficha que siguen en formacion."""
+        return cls.query.filter(
+            cls.ficha_id == ficha_id,
+            cls.estado.in_(ESTADOS_EN_FORMACION),
+        )
+
+    @property
+    def en_formacion(self):
+        return self.estado in ESTADOS_EN_FORMACION
 
     @property
     def nombre_completo(self):

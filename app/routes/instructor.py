@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 from pathlib import Path
 from app import db
 from app.models.ficha import Ficha
-from app.models.aprendiz import Aprendiz
+from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz
 from app.models.asistencia import SesionAsistencia, RegistroAsistencia, ESTADOS_ASISTENCIA, CAUSALES_JUSTIFICADAS
 from app.models.tarea import Tarea, Entrega
 from app.models.alertas import Alerta, ConfiguracionAlertas, PlanMejoramiento
@@ -72,7 +72,7 @@ def dashboard():
                 estadisticas_fichas[fid] = {'total': 0, 'activos': 0, 'estados': {}}
             estadisticas_fichas[fid]['estados'][estado] = cnt
             estadisticas_fichas[fid]['total'] += cnt
-            if estado in ('EN_FORMACION', 'POR_CERTIFICAR'):
+            if estado in ESTADOS_EN_FORMACION:
                 estadisticas_fichas[fid]['activos'] += cnt
 
         # --- Asistencia ---
@@ -96,7 +96,7 @@ def dashboard():
             .filter(
                 SesionAsistencia.ficha_id.in_(ficha_ids),
                 RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
-                Aprendiz.estado.in_(['EN_FORMACION', 'POR_CERTIFICAR'])
+                Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
             )
             .group_by(SesionAsistencia.ficha_id).all()
         )
@@ -143,7 +143,7 @@ def dashboard():
             JuicioEvaluativo.ficha_id, JuicioEvaluativo.juicio, func.count(JuicioEvaluativo.id)
         ).join(Aprendiz).filter(
             JuicioEvaluativo.ficha_id.in_(ficha_ids),
-            Aprendiz.estado.in_(['EN_FORMACION', 'POR_CERTIFICAR'])
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
         ).group_by(JuicioEvaluativo.ficha_id, JuicioEvaluativo.juicio).all()
         for fid, juicio, cnt in juicios_data:
             if fid not in juicios_por_ficha:
@@ -158,7 +158,7 @@ def dashboard():
             JuicioEvaluativo.ficha_id, JuicioEvaluativo.aprendiz_id, JuicioEvaluativo.juicio
         ).join(Aprendiz).filter(
             JuicioEvaluativo.ficha_id.in_(ficha_ids),
-            Aprendiz.estado.in_(['EN_FORMACION', 'POR_CERTIFICAR'])
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
         ).all()
         for fid, aid, juicio in juicios_aprendices_data:
             if aid not in estado_juicios_aprendices:
@@ -178,7 +178,7 @@ def dashboard():
             JuicioEvaluativo.ficha_id, JuicioEvaluativo.competencia, JuicioEvaluativo.juicio
         ).join(Aprendiz).filter(
             JuicioEvaluativo.ficha_id.in_(ficha_ids),
-            Aprendiz.estado.in_(['EN_FORMACION', 'POR_CERTIFICAR'])
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
         ).all()
         
         for fid, comp, juicio in comps_data:
@@ -722,7 +722,7 @@ def historial_aprendiz(ficha_id, aprendiz_id):
     ]
     resumen_reporte = {
         'generado_en': datetime.now(),
-        'total_aprendices_ficha': Aprendiz.query.filter_by(ficha_id=ficha_id).count(),
+        'total_aprendices_ficha': Aprendiz.query_en_formacion(ficha_id).count(),
         'ultima_actividad': max((_actividad_datetime(fecha) for fecha in fechas_actividad), default=None),
         'ultima_asistencia': registros_aprendiz[0].sesion.fecha if registros_aprendiz and registros_aprendiz[0].sesion else None,
         'ultima_entrega': max((entrega.fecha_entrega for entrega in entregas_aprendiz if entrega.fecha_entrega), default=None),
@@ -830,7 +830,7 @@ def asistencia(ficha_id):
             flash('La fecha de la sesión no tiene un formato válido.', 'error')
             return redirect(url_for('instructor.asistencia', ficha_id=ficha_id))
 
-        aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).order_by(Aprendiz.apellidos).all()
+        aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
         estados_validos = {valor for valor, _etiqueta in ESTADOS_ASISTENCIA}
         causales_validas = {valor for valor, _etiqueta in CAUSALES_JUSTIFICADAS}
         for aprendiz in aprendices:
@@ -923,7 +923,7 @@ def asistencia(ficha_id):
         for r in sesion.registros:
             registros_map[r.aprendiz_id] = r
 
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).order_by(Aprendiz.apellidos).all()
+    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
     sesiones_recientes = (
         SesionAsistencia.query
         .join(RegistroAsistencia)
@@ -1214,7 +1214,7 @@ def ver_entregas(tarea_id):
     entregas_map = {}
     for entrega in entregas:
         entregas_map.setdefault(entrega.aprendiz_id, entrega)
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha.id).order_by(Aprendiz.apellidos).all()
+    aprendices = Aprendiz.query_en_formacion(ficha.id).order_by(Aprendiz.apellidos).all()
 
     # Obtener insignias de la ficha
     otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
@@ -1310,7 +1310,7 @@ def alertas(ficha_id):
         db.session.add(config)
         db.session.commit()
 
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).order_by(Aprendiz.apellidos).all()
+    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
 
     total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
     tareas_ficha = tareas_visibles(ficha_id).all()
@@ -1424,8 +1424,8 @@ def reporte_asistencia(ficha_id):
     fecha_inicio_str = request.args.get('fecha_inicio')
     fecha_fin_str = request.args.get('fecha_fin')
 
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).order_by(Aprendiz.apellidos).all()
-    
+    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
+
     query_sesiones = (
         SesionAsistencia.query
         .join(RegistroAsistencia)
@@ -1649,7 +1649,11 @@ def juicios(ficha_id):
     todos = (
         JuicioEvaluativo.query
         .options(joinedload(JuicioEvaluativo.aprendiz))
-        .filter_by(ficha_id=ficha_id)
+        .join(Aprendiz, JuicioEvaluativo.aprendiz_id == Aprendiz.id)
+        .filter(
+            JuicioEvaluativo.ficha_id == ficha_id,
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION),
+        )
         .all()
     )
     estadisticas = {
@@ -1805,19 +1809,27 @@ def estadisticas(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
-    # 1. Estadísticas de estado de los aprendices
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).all()
+    # 1. Estadísticas de estado de los aprendices (el desglose incluye a todos
+    # porque su propósito es mostrar cuántos siguen o salieron de la formación).
+    todos_los_aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).all()
     estados = {}
-    total_aprendices = len(aprendices)
-    for a in aprendices:
+    total_aprendices = len(todos_los_aprendices)
+    for a in todos_los_aprendices:
         estados[a.estado] = estados.get(a.estado, 0) + 1
+
+    # El resto de métricas académicas solo considera a quienes están en formación.
+    aprendices = [a for a in todos_los_aprendices if a.en_formacion]
+    ids_en_formacion = {a.id for a in aprendices}
 
     # 2. Historial de juicios por instructor
     # Traemos todos los juicios y relacionamos con instructores si es posible.
     # Dado que un juicio puede tener varios instructores que lo importaron (en JuicioEvaluativoInstructor),
     # o usamos el funcionario_registro de JuicioEvaluativo.
-    juicios = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id).all()
-    
+    juicios = [
+        j for j in JuicioEvaluativo.query.filter_by(ficha_id=ficha_id).all()
+        if j.aprendiz_id in ids_en_formacion
+    ]
+
     # Agrupar por funcionario_registro que viene en el excel
     instructores_stats = {}
     aprendices_riesgo_dict = {}

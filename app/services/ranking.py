@@ -183,7 +183,7 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None):
 
     config = obtener_configuracion(ficha_id, crear=True)
     inicio = _inicio_periodo(config, periodo, ahora)
-    aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).all()
+    aprendices = Aprendiz.query_en_formacion(ficha_id).all()
 
     sesiones = [
         sesion

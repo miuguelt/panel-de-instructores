@@ -96,8 +96,8 @@
         {% else %}
         <div class="empty-state">
             <div class="empty-icon">👥</div>
-            <h3>Todavía no hay aprendices en esta ficha</h3>
-            <p>Carga los aprendices antes de hacer el llamado a lista.</p>
+            <h3>No hay aprendices en formación en esta ficha</h3>
+            <p>El llamado a lista solo incluye aprendices en formación. Carga o actualiza los aprendices antes de continuar.</p>
             <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-primary">Cargar Aprendices</a>
         </div>
         {% endif %}
