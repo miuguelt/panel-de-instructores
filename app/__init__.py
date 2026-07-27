@@ -52,6 +52,23 @@ def _encode_redis_url(redis_url: str) -> str:
     return redis_url
 
 
+def _sanitize_storage_uri(storage_uri: str) -> str:
+    """Enmascara las credenciales de una URI de storage antes de exponerla.
+
+    'LIMITER_BACKEND' se publica en /health, que responde sin autenticacion y
+    queda accesible tras el proxy. Devolver la URI cruda filtraria la password
+    de Redis a cualquiera que consulte el endpoint. Los valores sin credenciales
+    ('memory://', 'deshabilitado') se devuelven intactos.
+    """
+    if not storage_uri or '://' not in storage_uri:
+        return storage_uri
+    scheme, rest = storage_uri.split('://', 1)
+    if '@' not in rest:
+        return storage_uri
+    host = rest.rsplit('@', 1)[1]
+    return f'{scheme}://****@{host}'
+
+
 def _probe_redis(redis_url: str) -> str:
     """Verifica que Redis responde correctamente (incluyendo AUTH).
 
@@ -141,7 +158,8 @@ def create_app(test_config=None):
     # en memoria y ningun request devuelve 500 por culpa de Redis.
     _redis_url = os.getenv('REDIS_URL', '')
     _storage_uri = _probe_redis(_redis_url)
-    app.config['LIMITER_BACKEND'] = _storage_uri
+    # Solo la version enmascarada llega a la config: /health la publica sin auth.
+    app.config['LIMITER_BACKEND'] = _sanitize_storage_uri(_storage_uri)
     limiter._storage_uri = _storage_uri
     try:
         limiter.init_app(app)
@@ -166,7 +184,7 @@ def create_app(test_config=None):
     except Exception:
         log.exception(
             'Rate limiter no pudo inicializarse con %s. Operando sin rate-limit.',
-            _storage_uri,
+            _sanitize_storage_uri(_storage_uri),
         )
         limiter.enabled = False
         app.config['LIMITER_BACKEND'] = 'deshabilitado'
