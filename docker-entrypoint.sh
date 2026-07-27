@@ -85,11 +85,25 @@ if ! python3 seed_admin.py; then
 fi
 
 # --- Arrancar Gunicorn ---
-echo "Iniciando servidor Gunicorn en :8009..."
+# Worker class `gthread`: la app es I/O-bound (PostgreSQL + Redis) y los workers
+# `sync` bloquean el proceso entero durante cada query. psycopg2 libera el GIL
+# alrededor de libpq y redis-py usa sockets de Python, asi que los hilos si
+# solapan I/O. Se descarta gevent porque psycopg2 es una extension C y sin
+# psycogreen el hub queda bloqueado igual, sin ganancia y con mas riesgo.
+# Concurrencia total = WEB_CONCURRENCY * GUNICORN_THREADS; debe cuadrar con
+# DB_POOL_SIZE (ver config.py) y con max_connections de PostgreSQL.
+GUNICORN_WORKERS="${WEB_CONCURRENCY:-3}"
+GUNICORN_THREADS="${GUNICORN_THREADS:-8}"
+echo "Iniciando servidor Gunicorn en :8009 (${GUNICORN_WORKERS} workers x ${GUNICORN_THREADS} hilos, gthread)..."
 exec gunicorn wsgi:app \
   --bind 0.0.0.0:8009 \
-  --workers 4 \
+  --worker-class gthread \
+  --workers "$GUNICORN_WORKERS" \
+  --threads "$GUNICORN_THREADS" \
+  --worker-tmp-dir /dev/shm \
   --timeout 120 \
+  --graceful-timeout 30 \
+  --keep-alive 5 \
   --access-logfile - \
   --error-logfile - \
   --log-level info

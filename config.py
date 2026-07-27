@@ -57,9 +57,14 @@ class Config:
     SECRET_KEY = _secret_key
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # El pool es por proceso worker. Con gunicorn en modo gthread cada worker
+    # atiende GUNICORN_THREADS peticiones a la vez, asi que pool_size debe
+    # cubrir esos hilos o los ultimos se quedan esperando hasta pool_timeout.
+    # Techo de conexiones = WEB_CONCURRENCY * (pool_size + max_overflow);
+    # mantenerlo por debajo de max_connections de PostgreSQL.
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 5,
-        'max_overflow': 5,
+        'pool_size': int(os.getenv('DB_POOL_SIZE', '8')),
+        'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '4')),
         'pool_recycle': 300,
         'pool_pre_ping': True,
         'pool_timeout': 10,
