@@ -11,11 +11,6 @@ services:
       - ADSO_ADMIN_EMAIL=${ADSO_ADMIN_EMAIL}
       - ADSO_ADMIN_PASSWORD=${ADSO_ADMIN_PASSWORD}
       - ADSO_ADMIN_NOMBRE=${ADSO_ADMIN_NOMBRE}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_USER=${DB_USER}
-      - DB_NAME=${DB_NAME}
-      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - uploads:/app/uploads
     expose:

@@ -5,24 +5,13 @@ set -e
 # docker-entrypoint.sh — Panel de Instructores ADSO
 # =============================================================================
 
-# --- Construir DATABASE_URL desde partes si no viene completa ---
+# --- Verificar DATABASE_URL obligatoria ---
 if [ -z "$DATABASE_URL" ]; then
-  DB_HOST="${DB_HOST:-db}"
-  DB_PORT="${DB_PORT:-5432}"
-  DB_USER="${DB_USER:-adso}"
-  DB_NAME="${DB_NAME:-adso_control}"
-  if [ -z "$DB_PASSWORD" ]; then
-    echo "ERROR: DATABASE_URL y DB_PASSWORD están vacíos. Define al menos uno en Coolify." >&2
-    exit 1
-  fi
-  DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-  export DATABASE_URL
-  echo "DATABASE_URL construida desde variables DB_*"
-else
-  # Ensure the variable is explicitly exported so Python subprocesses inherit it.
-  export DATABASE_URL
-  echo "DATABASE_URL recibida directamente desde el entorno."
+  echo "ERROR: DATABASE_URL no está definida. Configúrala en Coolify como variable de entorno." >&2
+  exit 1
 fi
+export DATABASE_URL
+echo "DATABASE_URL recibida desde el entorno."
 
 # Muestra una versión sanitizada (ocultando la contraseña) para depurar la URL recibida
 URL_SANITIZED=$(echo "$DATABASE_URL" | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1****\2/')
