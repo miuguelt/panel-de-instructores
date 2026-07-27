@@ -120,6 +120,22 @@ def create_app(test_config=None):
     migrate.init_app(app, db)
     csrf.init_app(app)
 
+    # --- Compresion de respuestas ---
+    # Varias vistas de instructor renderizan HTML de cientos de KB (juicios
+    # supera 1 MB), que viaja sin comprimir en cada peticion. gzip lo reduce
+    # ~20x y libera al worker mucho antes. Si el paquete falta, la app sigue.
+    try:
+        from flask_compress import Compress
+        app.config.setdefault('COMPRESS_MIMETYPES', [
+            'text/html', 'text/css', 'text/javascript',
+            'application/javascript', 'application/json',
+        ])
+        app.config.setdefault('COMPRESS_LEVEL', 6)
+        app.config.setdefault('COMPRESS_MIN_SIZE', 1024)
+        Compress(app)
+    except Exception:
+        log.warning('Flask-Compress no disponible. Respuestas sin comprimir.')
+
     # --- Rate limiting con fallback graceful a memoria ---
     # Sondea Redis antes de configurarlo: si la AUTH falla, el limiter opera
     # en memoria y ningun request devuelve 500 por culpa de Redis.

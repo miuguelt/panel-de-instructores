@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
 from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import joinedload
 from pathlib import Path
 from app import db
 from app.models.ficha import Ficha
@@ -1642,8 +1643,15 @@ def juicios(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
-    # Estadísticas globales
-    todos = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id).all()
+    # Estadísticas globales. La vista recorre `todos` varias veces leyendo
+    # `j.aprendiz`, asi que se carga la relacion de una vez: sin joinedload
+    # cada aprendiz distinto dispara un SELECT extra al construir la tabla.
+    todos = (
+        JuicioEvaluativo.query
+        .options(joinedload(JuicioEvaluativo.aprendiz))
+        .filter_by(ficha_id=ficha_id)
+        .all()
+    )
     estadisticas = {
         'total': len(todos),
         'aprobados': sum(1 for j in todos if j.juicio and 'APROBADO' in j.juicio.upper()),
