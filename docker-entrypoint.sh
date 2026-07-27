@@ -17,6 +17,18 @@ echo "DATABASE_URL recibida desde el entorno."
 URL_SANITIZED=$(echo "$DATABASE_URL" | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1****\2/')
 echo "Probando conexión a base de datos: $URL_SANITIZED"
 
+# --- Debug REDIS_URL: confirma qué llega realmente al contenedor ---
+# docker-compose.yml usa pass-through "${REDIS_URL}"; si el valor puesto en
+# Coolify contiene '$' (común en passwords generados), Compose lo reinterpreta
+# como otra variable y lo vacía/corrompe antes de que Python lo vea. Este log
+# es la unica forma de confirmarlo sin exponer la contraseña.
+if [ -z "$REDIS_URL" ]; then
+  echo "[DEBUG] REDIS_URL: NO DEFINIDA (rate limiter usara memory://)."
+else
+  REDIS_SANITIZED=$(echo "$REDIS_URL" | sed -E 's/(:\/\/[^:@]*:)[^@]+(@)/\1****\2/')
+  echo "[DEBUG] REDIS_URL recibida: $REDIS_SANITIZED"
+fi
+
 # --- Esperar PostgreSQL ---
 echo "Esperando a PostgreSQL..."
 for i in $(seq 1 60); do

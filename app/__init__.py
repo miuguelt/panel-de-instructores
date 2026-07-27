@@ -62,8 +62,32 @@ def _probe_redis(redis_url: str) -> str:
     if not redis_url:
         log.info('REDIS_URL no configurada. Rate limiter usara memory://')
         return 'memory://'
+
+    # Coolify/Compose a veces dejan comillas o espacios pegados al valor de la
+    # variable (copy-paste, interpolacion de .env). Esto rompe el parseo del
+    # scheme en redis-py con "Redis URL must specify one of the following
+    # schemes" aunque la URL "se vea bien" a simple vista. Se limpia solo y se
+    # deja constancia en el log en vez de tumbar el rate limiter en silencio.
+    cleaned_url = redis_url.strip().strip('"').strip("'")
+    if cleaned_url != redis_url:
+        log.warning(
+            'REDIS_URL traia comillas o espacios sobrantes (longitud original=%d, '
+            'primeros 12 chars=%r). Se limpio automaticamente.',
+            len(redis_url), redis_url[:12],
+        )
+
+    if not cleaned_url.startswith(('redis://', 'rediss://', 'unix://')):
+        log.warning(
+            'REDIS_URL no inicia con un scheme valido (redis://, rediss://, unix://). '
+            'Primeros 12 caracteres recibidos (repr): %r. Revisa el valor en Coolify '
+            '(comillas extra, "$" sin escapar, o variable mal referenciada). '
+            'Rate limiter usara memory://.',
+            cleaned_url[:12],
+        )
+        return 'memory://'
+
     # Codifica chars especiales en el password antes de parsear la URL
-    safe_url = _encode_redis_url(redis_url)
+    safe_url = _encode_redis_url(cleaned_url)
     try:
         import redis as _redis
         # Timeout corto: no bloquear el arranque
@@ -74,8 +98,8 @@ def _probe_redis(redis_url: str) -> str:
         return safe_url
     except Exception as exc:
         log.warning(
-            'Redis no disponible (%s: %s). Rate limiter usara memory://',
-            type(exc).__name__, exc,
+            'Redis no disponible (%s: %s). Host/puerto intentados: %s. Rate limiter usara memory://',
+            type(exc).__name__, exc, safe_url.split('@')[-1],
         )
         return 'memory://'
 
