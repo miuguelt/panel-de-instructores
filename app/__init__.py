@@ -18,11 +18,66 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 migrate = Migrate()
 csrf = CSRFProtect()
+# Se inicializa con memory:// hasta que _probe_redis() confirme que Redis
+# responde correctamente (incluyendo autenticacion). Esto evita que un Redis
+# caido o mal configurado tumbe cada request con AuthenticationError.
 limiter = Limiter(
     key_func=get_remote_address,
-    storage_uri=os.getenv('REDIS_URL', 'redis://127.0.0.1:6380/1'),
+    storage_uri='memory://',
 )
 
+
+def _encode_redis_url(redis_url: str) -> str:
+    """URL-encodea el password en una redis:// URL para soportar caracteres especiales.
+
+    urlparse falla si el password contiene '/' porque lo confunde con el path.
+    Se usa regex para extraer y recodificar el password de forma segura antes
+    de que cualquier parser de URL lo procese.
+    """
+    import re
+    from urllib.parse import quote
+    # Captura: scheme://[usuario:]password@host[:port][/db]
+    # El password puede contener cualquier char antes del primer '@'
+    pattern = r'^(rediss?://)([^:@]*):([^@]+)@(.+)$'
+    match = re.match(pattern, redis_url)
+    if match:
+        scheme_prefix = match.group(1)
+        username = match.group(2)
+        password = match.group(3)
+        rest = match.group(4)   # host:port/db
+        if any(c in password for c in '/@=+#?&'):
+            encoded = quote(password, safe='')
+            user_part = f'{username}:{encoded}' if username else f':{encoded}'
+            return f'{scheme_prefix}{user_part}@{rest}'
+    return redis_url
+
+
+def _probe_redis(redis_url: str) -> str:
+    """Verifica que Redis responde correctamente (incluyendo AUTH).
+
+    Retorna la URL (con password codificado si aplica) si la conexión es exitosa,
+    o 'memory://' si Redis no está disponible o las credenciales son inválidas.
+    Nunca lanza excepciones al caller.
+    """
+    if not redis_url:
+        log.info('REDIS_URL no configurada. Rate limiter usara memory://')
+        return 'memory://'
+    # Codifica chars especiales en el password antes de parsear la URL
+    safe_url = _encode_redis_url(redis_url)
+    try:
+        import redis as _redis
+        # Timeout corto: no bloquear el arranque
+        client = _redis.from_url(safe_url, socket_connect_timeout=3, socket_timeout=3)
+        client.ping()
+        client.close()
+        log.info('Redis disponible: %s. Rate limiter activo.', safe_url.split('@')[-1])
+        return safe_url
+    except Exception as exc:
+        log.warning(
+            'Redis no disponible (%s: %s). Rate limiter usara memory://',
+            type(exc).__name__, exc,
+        )
+        return 'memory://'
 
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -41,24 +96,40 @@ def create_app(test_config=None):
     migrate.init_app(app, db)
     csrf.init_app(app)
 
-    # Redis es un servicio secundario: si el backend de rate limiting no arranca,
-    # la app degrada a limitador en memoria en vez de tumbar el worker.
-    app.config['LIMITER_BACKEND'] = os.getenv('REDIS_URL', 'redis://127.0.0.1:6380/1')
+    # --- Rate limiting con fallback graceful a memoria ---
+    # Sondea Redis antes de configurarlo: si la AUTH falla, el limiter opera
+    # en memoria y ningun request devuelve 500 por culpa de Redis.
+    _redis_url = os.getenv('REDIS_URL', '')
+    _storage_uri = _probe_redis(_redis_url)
+    app.config['LIMITER_BACKEND'] = _storage_uri
+    limiter._storage_uri = _storage_uri
     try:
         limiter.init_app(app)
+        # Captura errores de Redis en runtime (auth rotada, timeout, etc.)
+        # Deshabilita el limiter y deja pasar el request en vez de devolver 500.
+        @app.errorhandler(Exception)
+        def _handle_limiter_runtime_error(exc):
+            import redis.exceptions as _re
+            if isinstance(exc, (_re.AuthenticationError, _re.ConnectionError,
+                                _re.TimeoutError, _re.RedisError)):
+                log.warning(
+                    'Redis fallo en runtime (%s). Deshabilitando rate-limit y continuando.',
+                    type(exc).__name__,
+                )
+                limiter.enabled = False
+                app.config['LIMITER_BACKEND'] = 'deshabilitado (fallo en runtime)'
+                # Re-ejecuta el request sin rate limiting
+                from flask import request as _req
+                return app.view_functions[_req.endpoint](**_req.view_args or {})
+            raise exc
+
     except Exception:
         log.exception(
-            'No se pudo inicializar el rate limiter con %s. Degradando a memory://',
-            app.config['LIMITER_BACKEND'],
+            'Rate limiter no pudo inicializarse con %s. Operando sin rate-limit.',
+            _storage_uri,
         )
-        limiter._storage_uri = 'memory://'
-        app.config['LIMITER_BACKEND'] = 'memory:// (degradado)'
-        try:
-            limiter.init_app(app)
-        except Exception:
-            log.exception('Rate limiter deshabilitado tras fallo del fallback en memoria.')
-            limiter.enabled = False
-            app.config['LIMITER_BACKEND'] = 'deshabilitado'
+        limiter.enabled = False
+        app.config['LIMITER_BACKEND'] = 'deshabilitado'
 
     # Registro tolerante a fallos: un import roto en un modulo de rutas no debe
     # impedir que el proceso arranque. Sin esto gunicorn muere en el boot y el
