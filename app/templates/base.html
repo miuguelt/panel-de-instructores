@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='4.7') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     {% block head %}{% endblock %}
     <script>
@@ -125,7 +125,7 @@
     </main>
 
     {% block scripts %}{% endblock %}
-    <script src="{{ url_for('static', filename='js/table-filters.js', v='4.0') }}"></script>
+    <script src="{{ url_for('static', filename='js/table-filters.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const toasts = document.querySelectorAll('.flash-messages .alert');

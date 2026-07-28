@@ -120,6 +120,58 @@ def _probe_redis(redis_url: str) -> str:
         )
         return 'memory://'
 
+STATIC_MAX_AGE = 31536000  # 1 año: la URL cambia cuando cambia el archivo
+
+
+def _registrar_cache_estaticos(app):
+    """Sirve /static/ con caducidad larga y cache-busting por mtime.
+
+    El fingerprint se calcula una sola vez por archivo y se memoriza: en
+    produccion los estaticos no cambian mientras el contenedor vive, y hacer un
+    stat() por cada url_for anularia parte del ahorro. En debug no se memoriza
+    para que editar el CSS se refleje sin reiniciar.
+    """
+    versiones = {}
+
+    def _version(filename):
+        if not app.static_folder:
+            return ''
+        ruta = os.path.join(app.static_folder, filename)
+        try:
+            return str(int(os.stat(ruta).st_mtime))
+        except OSError:
+            # Nombre inexistente o path traversal: se devuelve la URL sin ?v=
+            # en vez de romper el render de la plantilla.
+            return ''
+
+    @app.url_defaults
+    def _agregar_version(endpoint, values):
+        if endpoint != 'static' or 'v' in values:
+            return
+        filename = values.get('filename')
+        if not filename:
+            return
+        if app.debug:
+            version = _version(filename)
+        else:
+            version = versiones.get(filename)
+            if version is None:
+                version = _version(filename)
+                versiones[filename] = version
+        if version:
+            values['v'] = version
+
+    @app.after_request
+    def _cachear_estaticos(response):
+        # Solo el endpoint 'static': las descargas de uploads y los reportes
+        # generados siguen con la politica por defecto.
+        if request.endpoint == 'static' and response.status_code < 400:
+            response.headers['Cache-Control'] = (
+                f'public, max-age={STATIC_MAX_AGE}, immutable'
+            )
+        return response
+
+
 def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -152,6 +204,14 @@ def create_app(test_config=None):
         Compress(app)
     except Exception:
         log.warning('Flask-Compress no disponible. Respuestas sin comprimir.')
+
+    # --- Cache de archivos estaticos ---
+    # Cada navegacion volvia a descargar styles.css (150 KB) y table-filters.js
+    # porque SEND_FILE_MAX_AGE_DEFAULT=0 emite `Cache-Control: no-cache`: el
+    # navegador revalida en cada clic y el worker gasta I/O en devolver bytes
+    # identicos. Se sirve con caducidad larga y se invalida por contenido: cada
+    # url_for('static') lleva ?v=<mtime>, que cambia solo al editar el archivo.
+    _registrar_cache_estaticos(app)
 
     # --- Rate limiting con fallback graceful a memoria ---
     # Sondea Redis antes de configurarlo: si la AUTH falla, el limiter opera
@@ -220,12 +280,6 @@ def create_app(test_config=None):
             'La aplicacion arranco en modo DEGRADADO. Rutas no disponibles: %s',
             ' | '.join(app.config['STARTUP_ERRORS']),
         )
-
-    @app.after_request
-    def cache_static_responses(response):
-        if response.status_code == 200 and request.path.startswith('/static/'):
-            response.headers.setdefault('Cache-Control', 'public, max-age=31536000, immutable')
-        return response
 
     @app.context_processor
     def inyectar_notificaciones():

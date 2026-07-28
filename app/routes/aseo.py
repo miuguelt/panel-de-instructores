@@ -98,7 +98,15 @@ def turnos(ficha_id):
     }
 
     config = obtener_configuracion(ficha_id)
-    contadores = asegurar_contadores(ficha_id)
+    asegurar_contadores(ficha_id)
+    # Se confirma antes de leer lo que va a la plantilla: al hacerlo al final,
+    # el commit expiraba aprendices y contadores y el render los recargaba de
+    # uno en uno.
+    db.session.commit()
+    contadores = {
+        contador.aprendiz_id: contador
+        for contador in ContadorAseo.query.filter_by(ficha_id=ficha_id).all()
+    }
     aprendices = aprendices_activos(ficha_id)
     proximos = {}
     for turno in TurnoAseo.query.filter(
@@ -139,7 +147,6 @@ def turnos(ficha_id):
             )
         )
 
-    db.session.commit()
     return render_template(
         'turnos_aseo.html',
         ficha=ficha,

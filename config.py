@@ -89,5 +89,13 @@ class Config:
         int(os.environ['WTF_CSRF_TIME_LIMIT'])
         if os.getenv('WTF_CSRF_TIME_LIMIT') else None
     )
-    TEMPLATES_AUTO_RELOAD = True
-    SEND_FILE_MAX_AGE_DEFAULT = 31536000 if os.getenv('FLASK_ENV') == 'production' else 0
+    # En produccion las plantillas no cambian mientras el contenedor vive, y
+    # auto_reload obliga a Jinja a hacer un stat() por plantilla heredada en
+    # cada render. En local se mantiene activo para no reiniciar al editar.
+    TEMPLATES_AUTO_RELOAD = os.getenv('FLASK_ENV') != 'production'
+    # Politica por defecto para send_file/send_from_directory (uploads,
+    # reportes generados): sin cache. Subir la caducidad aqui tambien alargaria
+    # la de los archivos subidos y los reportes descargables. Los archivos de
+    # /static/ se sirven con caducidad larga desde _registrar_cache_estaticos(),
+    # que ademas versiona su URL.
+    SEND_FILE_MAX_AGE_DEFAULT = 0

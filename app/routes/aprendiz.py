@@ -3,6 +3,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 from app import db, limiter
 from app.models.ficha import Ficha
 from app.models.aprendiz import Aprendiz
@@ -128,15 +129,53 @@ def panel(ficha_id):
 
     pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones else 100
 
+    actualizar_participacion_ficha(ficha_id)
+
+    # Las insignias nuevas se marcan aqui, antes de armar el resto de la vista:
+    # este es el ultimo commit del request y un commit expira los objetos vivos
+    # de la sesion, de modo que todo lo cargado despues llega intacto a la
+    # plantilla en vez de recargarse fila por fila durante el render.
+    otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
+        InsigniaOtorgada.aprendiz_id == aprendiz.id,
+        Insignia.ficha_id == ficha_id,
+    ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
+    ids_nuevas = {item.id for item in otorgamientos if not item.notificada}
+    if ids_nuevas:
+        for item in otorgamientos:
+            if item.id in ids_nuevas:
+                item.notificada = True
+        db.session.commit()
+        otorgamientos = InsigniaOtorgada.query.join(Insignia).options(
+            joinedload(InsigniaOtorgada.insignia)
+        ).filter(
+            InsigniaOtorgada.aprendiz_id == aprendiz.id,
+            Insignia.ficha_id == ficha_id,
+        ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
+    ids_obtenidas = {item.insignia_id for item in otorgamientos}
+    nuevas_insignias = [item for item in otorgamientos if item.id in ids_nuevas]
+    catalogo_insignias = Insignia.query.filter_by(
+        ficha_id=ficha_id, activa=True
+    ).order_by(Insignia.nombre).all()
+
     tareas = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite).all()
+    # Todas las entregas del aprendiz en una consulta: recorrer tarea por tarea
+    # costaba un SELECT por actividad de la ficha.
+    entregas_aprendiz = {}
+    if tareas:
+        for entrega in (
+            Entrega.query
+            .filter(
+                Entrega.aprendiz_id == aprendiz.id,
+                Entrega.tarea_id.in_([tarea.id for tarea in tareas]),
+            )
+            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
+            .all()
+        ):
+            entregas_aprendiz.setdefault(entrega.tarea_id, entrega)
+
     tareas_estado = []
     for tarea in tareas:
-        entrega = (
-            Entrega.query
-            .filter_by(tarea_id=tarea.id, aprendiz_id=aprendiz.id)
-            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-            .first()
-        )
+        entrega = entregas_aprendiz.get(tarea.id)
         estado = 'pendiente'
         if entrega:
             if entrega.estado_revision == 'rechazada':
@@ -149,7 +188,6 @@ def panel(ficha_id):
             estado = 'vencida'
         tareas_estado.append({'tarea': tarea, 'entrega': entrega, 'estado': estado})
 
-    actualizar_participacion_ficha(ficha_id)
     filas_ranking, config_ranking = calcular_ranking(ficha_id)
     fila_propia = next(
         (fila for fila in filas_ranking if fila['aprendiz'].id == aprendiz.id),
@@ -170,19 +208,6 @@ def panel(ficha_id):
             round(anterior['puntaje_total'] - fila_propia['puntaje_total'] + 0.01, 2),
             0.01,
         )
-
-    otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
-        InsigniaOtorgada.aprendiz_id == aprendiz.id,
-        Insignia.ficha_id == ficha_id,
-    ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
-    ids_obtenidas = {item.insignia_id for item in otorgamientos}
-    catalogo_insignias = Insignia.query.filter_by(
-        ficha_id=ficha_id, activa=True
-    ).order_by(Insignia.nombre).all()
-    nuevas_insignias = [item for item in otorgamientos if not item.notificada]
-    for item in nuevas_insignias:
-        item.notificada = True
-    db.session.commit()
 
     alertas_activas = Alerta.query.filter_by(
         ficha_id=ficha_id, aprendiz_id=aprendiz.id, estado='activa'
@@ -342,7 +367,9 @@ def panel(ficha_id):
         ),
     }
     
-    db.session.commit()
+    # Sin commit aqui: desde que se marcaron las insignias no hay escrituras
+    # pendientes, y confirmar justo antes del render expiraba tareas, entregas
+    # e insignias, que la plantilla volvia a leer una por una.
 
     cronograma = obtener_cronograma(ficha)
     return render_template('panel.html',

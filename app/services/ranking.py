@@ -401,14 +401,19 @@ def guardar_snapshot(ficha_id, filas, ahora=None, tipo='automatico'):
         historico.posicion = fila['posicion']
 
 
-def _otorgar(aprendiz_id, insignia, nuevas):
+def _otorgar(aprendiz_id, insignia, nuevas, otorgadas=None):
     if not insignia or not insignia.activa:
         return
-    existe = InsigniaOtorgada.query.filter_by(
-        aprendiz_id=aprendiz_id, insignia_id=insignia.id
-    ).first()
-    if existe:
-        return
+    if otorgadas is not None:
+        if (aprendiz_id, insignia.id) in otorgadas:
+            return
+        otorgadas.add((aprendiz_id, insignia.id))
+    else:
+        existe = InsigniaOtorgada.query.filter_by(
+            aprendiz_id=aprendiz_id, insignia_id=insignia.id
+        ).first()
+        if existe:
+            return
     otorgamiento = InsigniaOtorgada(
         aprendiz_id=aprendiz_id,
         insignia_id=insignia.id,
@@ -418,67 +423,96 @@ def _otorgar(aprendiz_id, insignia, nuevas):
     nuevas.append(otorgamiento)
 
 
-def _cumple_puntualidad_mes(aprendiz_id, ficha_id, ahora, minimo=4):
-    inicio = datetime(ahora.year, ahora.month, 1).date()
-    registros = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        SesionAsistencia.fecha >= inicio,
-        SesionAsistencia.fecha <= ahora.date(),
-        RegistroAsistencia.aprendiz_id == aprendiz_id,
-    ).all()
-    return len(registros) >= minimo and all(
-        registro.estado != 'TARDANZA' for registro in registros
-    )
+class _DatosInsignias:
+    """Datos de la ficha necesarios para evaluar las insignias de todos sus aprendices.
 
+    Cada condicion se comprobaba consultando la BD por aprendiz (y en el caso de
+    'Primero en Entregar', por aprendiz y tarea). En una ficha de 30 aprendices
+    con 10 tareas eran mas de 400 consultas; aqui son seis, una por conjunto.
+    """
 
-def _fue_primero_en_entregar(aprendiz_id, ficha_id):
-    tareas = Tarea.query.filter_by(ficha_id=ficha_id).all()
-    for tarea in tareas:
-        primera = Entrega.query.filter_by(tarea_id=tarea.id).order_by(
-            Entrega.fecha_entrega.asc()
-        ).first()
-        if (
-            primera
-            and primera.aprendiz_id == aprendiz_id
-            and (
-                not tarea.fecha_limite
-                or (
-                    primera.fecha_entrega
-                    and primera.fecha_entrega <= tarea.fecha_limite
-                )
+    def __init__(self, ficha_id, ahora):
+        inicio_mes = datetime(ahora.year, ahora.month, 1).date()
+        self.registros_mes = defaultdict(list)
+        filas = (
+            db.session.query(RegistroAsistencia.aprendiz_id, RegistroAsistencia.estado)
+            .join(SesionAsistencia, RegistroAsistencia.sesion_id == SesionAsistencia.id)
+            .filter(
+                SesionAsistencia.ficha_id == ficha_id,
+                SesionAsistencia.fecha >= inicio_mes,
+                SesionAsistencia.fecha <= ahora.date(),
             )
-        ):
-            return True
-    return False
+            .all()
+        )
+        for aprendiz_id, estado in filas:
+            self.registros_mes[aprendiz_id].append(estado)
+
+        tareas = Tarea.query.filter_by(ficha_id=ficha_id).all()
+        limites = {tarea.id: tarea.fecha_limite for tarea in tareas}
+        entregas = (
+            Entrega.query
+            .join(Tarea, Entrega.tarea_id == Tarea.id)
+            .filter(Tarea.ficha_id == ficha_id)
+            .order_by(Entrega.fecha_entrega.asc(), Entrega.id.asc())
+            .all()
+        )
+
+        # Primera entrega de cada tarea, siempre que llegara dentro del plazo.
+        primera_por_tarea = {}
+        for entrega in entregas:
+            primera_por_tarea.setdefault(entrega.tarea_id, entrega)
+        self.primeros_en_entregar = set()
+        for tarea_id, entrega in primera_por_tarea.items():
+            limite = limites.get(tarea_id)
+            if not limite or (entrega.fecha_entrega and entrega.fecha_entrega <= limite):
+                self.primeros_en_entregar.add(entrega.aprendiz_id)
+
+        # Ultimas cinco entregas de cada aprendiz, de la mas reciente a la mas antigua.
+        self.ultimas_entregas = defaultdict(list)
+        for entrega in reversed(entregas):
+            self.ultimas_entregas[entrega.aprendiz_id].append(
+                (entrega.fecha_entrega, limites.get(entrega.tarea_id))
+            )
+
+        self.historicos = defaultdict(list)
+        for historico in PuntajeHistorico.query.filter_by(ficha_id=ficha_id).order_by(
+            PuntajeHistorico.fecha_corte.asc()
+        ).all():
+            self.historicos[historico.aprendiz_id].append(historico)
+
+        self.otorgadas = {
+            (otorgada.aprendiz_id, otorgada.insignia_id)
+            for otorgada in InsigniaOtorgada.query.join(Insignia).filter(
+                Insignia.ficha_id == ficha_id
+            ).all()
+        }
 
 
-def _cinco_entregas_tempranas(aprendiz_id, ficha_id):
-    entregas = Entrega.query.join(Tarea).filter(
-        Tarea.ficha_id == ficha_id,
-        Entrega.aprendiz_id == aprendiz_id,
-    ).order_by(Entrega.fecha_entrega.desc()).limit(5).all()
+def _cumple_puntualidad_mes(aprendiz_id, datos, minimo=4):
+    estados = datos.registros_mes.get(aprendiz_id, [])
+    return len(estados) >= minimo and all(estado != 'TARDANZA' for estado in estados)
+
+
+def _fue_primero_en_entregar(aprendiz_id, datos):
+    return aprendiz_id in datos.primeros_en_entregar
+
+
+def _cinco_entregas_tempranas(aprendiz_id, datos):
+    entregas = datos.ultimas_entregas.get(aprendiz_id, [])[:5]
     return len(entregas) == 5 and all(
-        entrega.tarea.fecha_limite
-        and entrega.fecha_entrega
-        and entrega.fecha_entrega < entrega.tarea.fecha_limite
-        for entrega in entregas
+        limite and fecha_entrega and fecha_entrega < limite
+        for fecha_entrega, limite in entregas
     )
 
 
-def _historial_mejora(aprendiz_id, ficha_id, campo, actual, minimo_anterior, mejora):
-    historicos = PuntajeHistorico.query.filter_by(
-        aprendiz_id=aprendiz_id, ficha_id=ficha_id
-    ).order_by(PuntajeHistorico.fecha_corte.asc()).all()
-    valores = [getattr(item, campo) for item in historicos]
+def _historial_mejora(aprendiz_id, datos, campo, actual, minimo_anterior, mejora):
+    valores = [getattr(item, campo) for item in datos.historicos.get(aprendiz_id, [])]
     return bool(valores) and min(valores) <= minimo_anterior and actual >= min(valores) + mejora
 
 
-def _cumple_constancia(aprendiz_id, ficha_id):
-    historicos = PuntajeHistorico.query.filter_by(
-        aprendiz_id=aprendiz_id, ficha_id=ficha_id
-    ).order_by(PuntajeHistorico.fecha_corte.asc()).all()
+def _cumple_constancia(aprendiz_id, datos):
     por_mes = {}
-    for item in historicos:
+    for item in datos.historicos.get(aprendiz_id, []):
         por_mes[(item.fecha_corte.year, item.fecha_corte.month)] = item.puntaje_total
     ultimos = list(por_mes.values())[-3:]
     return len(ultimos) == 3 and all(
@@ -495,37 +529,39 @@ def evaluar_insignias(ficha_id, filas, ahora=None):
         if insignia.codigo
     }
     nuevas = []
+    datos = _DatosInsignias(ficha_id, ahora)
+    otorgadas = datos.otorgadas
 
     for fila in filas:
         aprendiz_id = fila['aprendiz'].id
         if fila['tiene_racha']:
-            _otorgar(aprendiz_id, catalogo.get('RACHA_HIERRO'), nuevas)
-        if _cumple_puntualidad_mes(aprendiz_id, ficha_id, ahora):
-            _otorgar(aprendiz_id, catalogo.get('PUNTUALIDAD_TOTAL'), nuevas)
-        if _fue_primero_en_entregar(aprendiz_id, ficha_id):
-            _otorgar(aprendiz_id, catalogo.get('PRIMERO_ENTREGAR'), nuevas)
-        if _cinco_entregas_tempranas(aprendiz_id, ficha_id):
-            _otorgar(aprendiz_id, catalogo.get('NUNCA_TARDE'), nuevas)
+            _otorgar(aprendiz_id, catalogo.get('RACHA_HIERRO'), nuevas, otorgadas)
+        if _cumple_puntualidad_mes(aprendiz_id, datos):
+            _otorgar(aprendiz_id, catalogo.get('PUNTUALIDAD_TOTAL'), nuevas, otorgadas)
+        if _fue_primero_en_entregar(aprendiz_id, datos):
+            _otorgar(aprendiz_id, catalogo.get('PRIMERO_ENTREGAR'), nuevas, otorgadas)
+        if _cinco_entregas_tempranas(aprendiz_id, datos):
+            _otorgar(aprendiz_id, catalogo.get('NUNCA_TARDE'), nuevas, otorgadas)
         if _historial_mejora(
             aprendiz_id,
-            ficha_id,
+            datos,
             'puntaje_asistencia',
             fila['puntaje_asistencia'],
             25,
             15,
         ):
-            _otorgar(aprendiz_id, catalogo.get('REGRESO_TRIUNFAL'), nuevas)
+            _otorgar(aprendiz_id, catalogo.get('REGRESO_TRIUNFAL'), nuevas, otorgadas)
         if _historial_mejora(
             aprendiz_id,
-            ficha_id,
+            datos,
             'puntaje_total',
             fila['puntaje_total'],
             60,
             20,
         ) and fila['puntaje_total'] >= 80:
-            _otorgar(aprendiz_id, catalogo.get('SEGUNDA_OPORTUNIDAD'), nuevas)
-        if _cumple_constancia(aprendiz_id, ficha_id):
-            _otorgar(aprendiz_id, catalogo.get('CONSTANCIA'), nuevas)
+            _otorgar(aprendiz_id, catalogo.get('SEGUNDA_OPORTUNIDAD'), nuevas, otorgadas)
+        if _cumple_constancia(aprendiz_id, datos):
+            _otorgar(aprendiz_id, catalogo.get('CONSTANCIA'), nuevas, otorgadas)
 
     escaladas = [
         (
@@ -540,7 +576,7 @@ def evaluar_insignias(ficha_id, filas, ahora=None):
         mayor = max(escalada for escalada, _ in escaladas)
         for escalada, aprendiz_id in escaladas:
             if escalada == mayor:
-                _otorgar(aprendiz_id, catalogo.get('MAYOR_ESCALADA'), nuevas)
+                _otorgar(aprendiz_id, catalogo.get('MAYOR_ESCALADA'), nuevas, otorgadas)
 
     return nuevas
 
@@ -552,7 +588,13 @@ def actualizar_participacion_ficha(ficha_id, ahora=None):
     filas, _ = calcular_ranking(ficha_id, periodo='general', ahora=ahora)
     nuevas = evaluar_insignias(ficha_id, filas, ahora=ahora)
     guardar_snapshot(ficha_id, filas, ahora=ahora)
+    # Los ids se leen antes del commit: al confirmar, SQLAlchemy expira los
+    # objetos y quien recorra las filas despues recargaria un aprendiz por
+    # consulta. Una sola lectura en bloque los repuebla.
+    ids_aprendices = [fila['aprendiz'].id for fila in filas]
     db.session.commit()
+    if ids_aprendices:
+        Aprendiz.query.filter(Aprendiz.id.in_(ids_aprendices)).all()
     return filas, nuevas
 
 

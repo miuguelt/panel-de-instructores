@@ -4,6 +4,8 @@ from email.message import EmailMessage
 import smtplib
 
 from flask import current_app
+from sqlalchemy.orm import joinedload
+
 from app import db
 from app.models.alertas import (
     Alerta,
@@ -37,6 +39,110 @@ from app.services.asistencia import contar_sesiones_registradas
 # ─────────────────────────────────────────────
 
 
+_SIN_CARGAR = object()
+
+
+class ContextoFicha:
+    """Datos de una ficha cargados de una sola vez para evaluar a todos sus aprendices.
+
+    Las reglas del reglamento se evaluan aprendiz por aprendiz. Consultadas de
+    forma individual, una ficha de 30 aprendices con 20 sesiones y 10 tareas
+    disparaba cientos de SELECT por peticion (un COUNT de faltas por aprendiz,
+    un SELECT de entrega por tarea y aprendiz...). Aqui se traen los mismos
+    datos en cuatro consultas y las funciones de calculo leen de estos indices.
+    """
+
+    def __init__(self, ficha_id, ahora=None):
+        self.ficha_id = ficha_id
+        self.ahora = ahora or datetime.utcnow()
+
+        # aprendiz_id -> [(fecha_sesion, estado)] ordenado por fecha ascendente
+        self.asistencia = defaultdict(list)
+        filas = (
+            db.session.query(
+                RegistroAsistencia.aprendiz_id,
+                SesionAsistencia.fecha,
+                RegistroAsistencia.estado,
+            )
+            .join(SesionAsistencia, RegistroAsistencia.sesion_id == SesionAsistencia.id)
+            .filter(SesionAsistencia.ficha_id == ficha_id)
+            .order_by(SesionAsistencia.fecha.asc())
+            .all()
+        )
+        for aprendiz_id, fecha, estado in filas:
+            self.asistencia[aprendiz_id].append((fecha, estado))
+
+        self.total_sesiones = contar_sesiones_registradas(ficha_id)
+        self.tareas = Tarea.query.filter_by(ficha_id=ficha_id).all()
+
+        # aprendiz_id -> {tarea_id: entrega mas reciente}
+        self.entregas = defaultdict(dict)
+        entregas = (
+            Entrega.query
+            .join(Tarea, Entrega.tarea_id == Tarea.id)
+            .filter(Tarea.ficha_id == ficha_id)
+            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
+            .all()
+        )
+        for entrega in entregas:
+            self.entregas[entrega.aprendiz_id].setdefault(entrega.tarea_id, entrega)
+
+        # Se llenan bajo demanda: solo actualizar_alertas_ficha los necesita.
+        self._alertas = None
+        self._claves_notificacion = None
+        self._instructores = None
+        self._config_correo = _SIN_CARGAR
+
+    def registros(self, aprendiz_id):
+        return self.asistencia.get(aprendiz_id, [])
+
+    def entregas_de(self, aprendiz_id):
+        return self.entregas.get(aprendiz_id, {})
+
+    def alertas_de(self, aprendiz_id):
+        if self._alertas is None:
+            self._alertas = defaultdict(list)
+            for alerta in Alerta.query.filter(
+                Alerta.ficha_id == self.ficha_id,
+                Alerta.aprendiz_id.isnot(None),
+            ).order_by(Alerta.fecha_generada.desc()).all():
+                self._alertas[alerta.aprendiz_id].append(alerta)
+        return self._alertas[aprendiz_id]
+
+    def registrar_alerta(self, alerta):
+        """Indexa una alerta recien creada para que el resto del bucle la vea."""
+        if self._alertas is not None:
+            self._alertas[alerta.aprendiz_id].insert(0, alerta)
+
+    def notificacion_existe(self, destinatario_tipo, destinatario_id, clave):
+        if self._claves_notificacion is None:
+            self._claves_notificacion = {
+                (tipo, destino, clave_existente)
+                for tipo, destino, clave_existente in db.session.query(
+                    Notificacion.destinatario_tipo,
+                    Notificacion.destinatario_id,
+                    Notificacion.clave,
+                ).filter(Notificacion.ficha_id == self.ficha_id).all()
+            }
+        return (destinatario_tipo, destinatario_id, clave) in self._claves_notificacion
+
+    def anotar_notificacion(self, destinatario_tipo, destinatario_id, clave):
+        if self._claves_notificacion is not None:
+            self._claves_notificacion.add((destinatario_tipo, destinatario_id, clave))
+
+    def instructores(self, ficha):
+        if self._instructores is None:
+            self._instructores = _instructores_ficha(ficha)
+        return self._instructores
+
+    def config_correo(self):
+        if self._config_correo is _SIN_CARGAR:
+            self._config_correo = ConfiguracionAlertasComite.query.filter_by(
+                ficha_id=self.ficha_id
+            ).first()
+        return self._config_correo
+
+
 def obtener_config_comite(ficha_id, crear=True):
     config = ConfiguracionAlertasComite.query.filter_by(ficha_id=ficha_id).first()
     if not config and crear:
@@ -59,27 +165,40 @@ def obtener_config_asistencia(ficha_id, crear=True):
 
 
 def registrar_notificacion(destinatario_tipo, destinatario_id, mensaje, tipo,
-                           clave, ficha_id=None, url=None):
+                           clave, ficha_id=None, url=None, contexto=None):
+    """Crea la notificacion si no existe ya una con la misma clave.
+
+    Con ``contexto`` la deteccion de duplicados se resuelve contra el indice de
+    claves ya cargado (y devuelve None si la notificacion ya existia); sin el,
+    consulta la BD como antes. El indice evita un SELECT por notificacion
+    cuando se recorren todos los aprendices de una ficha.
+    """
     if not destinatario_id:
         return None
-    existente = Notificacion.query.filter_by(
-        destinatario_tipo=destinatario_tipo,
-        destinatario_id=destinatario_id,
-        clave=clave[:180],
-    ).first()
-    if existente:
-        return existente
+    clave_recortada = clave[:180]
+    if contexto is not None:
+        if contexto.notificacion_existe(destinatario_tipo, destinatario_id, clave_recortada):
+            return None
+        contexto.anotar_notificacion(destinatario_tipo, destinatario_id, clave_recortada)
+    else:
+        existente = Notificacion.query.filter_by(
+            destinatario_tipo=destinatario_tipo,
+            destinatario_id=destinatario_id,
+            clave=clave_recortada,
+        ).first()
+        if existente:
+            return existente
     notificacion = Notificacion(
         destinatario_tipo=destinatario_tipo,
         destinatario_id=destinatario_id,
         ficha_id=ficha_id,
         mensaje=mensaje,
         tipo=tipo,
-        clave=clave[:180],
+        clave=clave_recortada,
         url=url,
     )
     db.session.add(notificacion)
-    _enviar_correo_opcional(destinatario_tipo, destinatario_id, mensaje, ficha_id)
+    _enviar_correo_opcional(destinatario_tipo, destinatario_id, mensaje, ficha_id, contexto)
     return notificacion
 
 
@@ -89,15 +208,23 @@ def _instructores_ficha(ficha):
     return ids
 
 
-def _notificar_instructores(ficha, mensaje, tipo, clave, url):
-    for instructor_id in _instructores_ficha(ficha):
-        registrar_notificacion('instructor', instructor_id, mensaje, tipo, clave, ficha.id, url)
+def _notificar_instructores(ficha, mensaje, tipo, clave, url, contexto=None):
+    destinatarios = (
+        contexto.instructores(ficha) if contexto is not None else _instructores_ficha(ficha)
+    )
+    for instructor_id in destinatarios:
+        registrar_notificacion('instructor', instructor_id, mensaje, tipo, clave,
+                               ficha.id, url, contexto=contexto)
 
 
-def _enviar_correo_opcional(destinatario_tipo, destinatario_id, mensaje, ficha_id):
+def _enviar_correo_opcional(destinatario_tipo, destinatario_id, mensaje, ficha_id,
+                            contexto=None):
     if not ficha_id or not current_app.config.get('SMTP_HOST'):
         return
-    config = ConfiguracionAlertasComite.query.filter_by(ficha_id=ficha_id).first()
+    if contexto is not None:
+        config = contexto.config_correo()
+    else:
+        config = ConfiguracionAlertasComite.query.filter_by(ficha_id=ficha_id).first()
     if not config or not config.correo_habilitado:
         return
     if destinatario_tipo == 'aprendiz':
@@ -126,13 +253,25 @@ def _enviar_correo_opcional(destinatario_tipo, destinatario_id, mensaje, ficha_i
 # ── Alertas ─────────────────────────────────
 
 
-def _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora):
-    abierta = Alerta.query.filter(
-        Alerta.ficha_id == ficha.id,
-        Alerta.aprendiz_id == aprendiz.id,
-        Alerta.tipo == tipo,
-        Alerta.estado.in_(['activa', 'escalada_comite']),
-    ).order_by(Alerta.fecha_generada.desc()).first()
+def _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora,
+                  contexto=None):
+    if contexto is not None:
+        # alertas_de() viene ordenado por fecha_generada descendente, igual que
+        # la consulta original, asi que la primera coincidencia es la vigente.
+        abierta = next(
+            (
+                a for a in contexto.alertas_de(aprendiz.id)
+                if a.tipo == tipo and a.estado in ('activa', 'escalada_comite')
+            ),
+            None,
+        )
+    else:
+        abierta = Alerta.query.filter(
+            Alerta.ficha_id == ficha.id,
+            Alerta.aprendiz_id == aprendiz.id,
+            Alerta.tipo == tipo,
+            Alerta.estado.in_(['activa', 'escalada_comite']),
+        ).order_by(Alerta.fecha_generada.desc()).first()
     if abierta:
         cambio_nivel = abierta.nivel != nivel
         abierta.nivel = nivel
@@ -147,12 +286,14 @@ def _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora)
                 ficha, f'{aprendiz.nombre_completo}: {titulo}.', 'alerta',
                 f'alerta:{abierta.id}:{nivel}',
                 f'/instructor/fichas/{ficha.id}/casos-seguimiento',
+                contexto=contexto,
             )
             registrar_notificacion(
                 'aprendiz', aprendiz.id,
                 mensaje,
                 'alerta', f'alerta:{abierta.id}:{nivel}', ficha.id,
                 f'/aprendiz/{ficha.id}/panel?documento={aprendiz.documento}',
+                contexto=contexto,
             )
         return abierta, False
 
@@ -169,28 +310,34 @@ def _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora)
     )
     db.session.add(alerta)
     db.session.flush()
+    if contexto is not None:
+        contexto.registrar_alerta(alerta)
     _notificar_instructores(
         ficha, f'{aprendiz.nombre_completo}: {titulo}.', 'alerta',
         f'alerta:{alerta.id}:nueva',
         f'/instructor/fichas/{ficha.id}/casos-seguimiento',
+        contexto=contexto,
     )
     registrar_notificacion(
         'aprendiz', aprendiz.id,
         mensaje,
         'alerta', f'alerta:{alerta.id}:nueva', ficha.id,
         f'/aprendiz/{ficha.id}/panel?documento={aprendiz.documento}',
+        contexto=contexto,
     )
     return alerta, True
 
 
-def _consecutivas_injustificadas(aprendiz_id, ficha_id):
-    filas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz_id,
-    ).order_by(SesionAsistencia.fecha.asc()).all()
+def _contexto(ficha_id, contexto=None, ahora=None):
+    """Devuelve el contexto recibido o construye uno para un uso aislado."""
+    return contexto if contexto is not None else ContextoFicha(ficha_id, ahora)
+
+
+def _consecutivas_injustificadas(aprendiz_id, ficha_id, contexto=None):
+    ctx = _contexto(ficha_id, contexto)
     maximo = actual = 0
-    for registro in filas:
-        if registro.estado == 'FALTA':
+    for _fecha, estado in ctx.registros(aprendiz_id):
+        if estado == 'FALTA':
             actual += 1
             maximo = max(maximo, actual)
         else:
@@ -198,26 +345,20 @@ def _consecutivas_injustificadas(aprendiz_id, ficha_id):
     return maximo
 
 
-def _faltas_esporadicas_en_ventana(aprendiz_id, ficha_id, periodo_dias=90):
-    hoy = date.today()
-    inicio_ventana = hoy - timedelta(days=periodo_dias)
-    return RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz_id,
-        RegistroAsistencia.estado == 'FALTA',
-        SesionAsistencia.fecha >= inicio_ventana,
-    ).count()
+def _faltas_esporadicas_en_ventana(aprendiz_id, ficha_id, periodo_dias=90, contexto=None):
+    ctx = _contexto(ficha_id, contexto)
+    inicio_ventana = date.today() - timedelta(days=periodo_dias)
+    return sum(
+        1
+        for fecha, estado in ctx.registros(aprendiz_id)
+        if estado == 'FALTA' and fecha >= inicio_ventana
+    )
 
 
-def _incumplimientos_academicos(aprendiz_id, ficha_id, ahora):
-    tareas = Tarea.query.filter_by(ficha_id=ficha_id).all()
-    entregas = Entrega.query.join(Tarea).filter(
-        Tarea.ficha_id == ficha_id,
-        Entrega.aprendiz_id == aprendiz_id,
-    ).order_by(Entrega.fecha_entrega.desc()).all()
-    por_tarea = {}
-    for entrega in entregas:
-        por_tarea.setdefault(entrega.tarea_id, entrega)
+def _incumplimientos_academicos(aprendiz_id, ficha_id, ahora, contexto=None):
+    ctx = _contexto(ficha_id, contexto, ahora)
+    tareas = ctx.tareas
+    por_tarea = ctx.entregas_de(aprendiz_id)
 
     incumplidas = []
     for tarea in tareas:
@@ -230,15 +371,12 @@ def _incumplimientos_academicos(aprendiz_id, ficha_id, ahora):
     return incumplidas
 
 
-def _porcentaje_asistencia(aprendiz_id, ficha_id):
-    total = contar_sesiones_registradas(ficha_id)
+def _porcentaje_asistencia(aprendiz_id, ficha_id, contexto=None):
+    ctx = _contexto(ficha_id, contexto)
+    total = ctx.total_sesiones
     if total == 0:
         return 100.0
-    faltas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz_id,
-        RegistroAsistencia.estado == 'FALTA',
-    ).count()
+    faltas = sum(1 for _fecha, estado in ctx.registros(aprendiz_id) if estado == 'FALTA')
     return round((total - faltas) / total * 100, 1)
 
 
@@ -282,19 +420,20 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
     fase = _fase_ficha(ficha, hoy)
     en_productiva = fase == 'productiva'
     resultados = []
+    # Un solo indice para toda la ficha: sin el, cada aprendiz repetia los
+    # mismos COUNT de asistencia y SELECT de entregas.
+    contexto = ContextoFicha(ficha_id, ahora)
 
     for aprendiz in Aprendiz.query_en_formacion(ficha_id).all():
-        consecutivas = _consecutivas_injustificadas(aprendiz.id, ficha_id)
-        acumuladas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-            SesionAsistencia.ficha_id == ficha_id,
-            RegistroAsistencia.aprendiz_id == aprendiz.id,
-            RegistroAsistencia.estado == 'FALTA',
-        ).count()
-        esporadicas = _faltas_esporadicas_en_ventana(
-            aprendiz.id, ficha_id, config.periodo_dias_esporadicas
+        consecutivas = _consecutivas_injustificadas(aprendiz.id, ficha_id, contexto)
+        acumuladas = sum(
+            1 for _fecha, estado in contexto.registros(aprendiz.id) if estado == 'FALTA'
         )
-        incumplidas = _incumplimientos_academicos(aprendiz.id, ficha_id, ahora)
-        pct_asistencia = _porcentaje_asistencia(aprendiz.id, ficha_id)
+        esporadicas = _faltas_esporadicas_en_ventana(
+            aprendiz.id, ficha_id, config.periodo_dias_esporadicas, contexto
+        )
+        incumplidas = _incumplimientos_academicos(aprendiz.id, ficha_id, ahora, contexto)
+        pct_asistencia = _porcentaje_asistencia(aprendiz.id, ficha_id, contexto)
         reglas = []
 
         # ── R1: 3 sesiones consecutivas injustificadas → COMITÉ (Art. 22) ──
@@ -374,11 +513,10 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
         tipos_activos = set()
         for tipo, nivel, titulo, mensaje, detalle in reglas:
             tipos_activos.add(tipo)
-            _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora)
+            _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora,
+                          contexto=contexto)
 
-        activas = Alerta.query.filter_by(
-            ficha_id=ficha_id, aprendiz_id=aprendiz.id, estado='activa'
-        ).all()
+        activas = [a for a in contexto.alertas_de(aprendiz.id) if a.estado == 'activa']
         for alerta in activas:
             if alerta.tipo in ('asistencia', 'academica', 'comite_desercion') and alerta.tipo not in tipos_activos:
                 alerta.estado = 'resuelta'
@@ -388,18 +526,20 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
     db.session.commit()
     from app.services.cronograma import actualizar_alertas_cronograma
     actualizar_alertas_cronograma(ficha_id, ahora=ahora)
-    auto_escalar_casos_pendientes(ficha_id, ahora)
+    auto_escalar_casos_pendientes(ficha_id, ahora, contexto=contexto)
     return resultados
 
 
 # ── Auto-escalación ──────────────────────────
 
 
-def auto_escalar_casos_pendientes(ficha_id, ahora=None):
+def auto_escalar_casos_pendientes(ficha_id, ahora=None, contexto=None):
     ahora = ahora or datetime.utcnow()
     config = obtener_config_comite(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
-    alertas = Alerta.query.filter_by(
+    # joinedload del aprendiz: el mensaje de escalamiento usa su nombre y sin
+    # esto cada alerta escalada dispara un SELECT adicional.
+    alertas = Alerta.query.options(joinedload(Alerta.aprendiz)).filter_by(
         ficha_id=ficha_id, estado='activa'
     ).filter(
         Alerta.aprendiz_id.isnot(None)
@@ -418,6 +558,7 @@ def auto_escalar_casos_pendientes(ficha_id, ahora=None):
                     'escalamiento',
                     f'escalamiento:{alerta.id}',
                     f'/instructor/fichas/{ficha.id}/casos-seguimiento',
+                    contexto=contexto,
                 )
             escaladas += 1
     if escaladas:
@@ -511,15 +652,22 @@ def crear_recordatorios_aprendiz(ficha_id, aprendiz_id, ahora=None):
         return
     config = obtener_config_comite(ficha_id)
     tareas = Tarea.query.filter_by(ficha_id=ficha_id).all()
+    # Las entregas del aprendiz se traen de una vez: una consulta por tarea
+    # multiplicaba el costo del panel, que el grupo entero abre a la vez.
+    entregas_aprendiz = {}
+    for entrega in (
+        Entrega.query
+        .join(Tarea, Entrega.tarea_id == Tarea.id)
+        .filter(Tarea.ficha_id == ficha_id, Entrega.aprendiz_id == aprendiz_id)
+        .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
+        .all()
+    ):
+        entregas_aprendiz.setdefault(entrega.tarea_id, entrega)
+
     for tarea in tareas:
         if not tarea.fecha_limite:
             continue
-        entrega = (
-            Entrega.query
-            .filter_by(tarea_id=tarea.id, aprendiz_id=aprendiz_id)
-            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-            .first()
-        )
+        entrega = entregas_aprendiz.get(tarea.id)
         if entrega and entrega.entregada_a_tiempo:
             continue
         horas = (tarea.fecha_limite - ahora).total_seconds() / 3600
@@ -593,7 +741,8 @@ def asegurar_resumen_semanal(ficha, ahora=None):
 
 
 def obtener_casos(ficha_id):
-    alertas = Alerta.query.filter(
+    # joinedload del aprendiz: la vista lee alertas[0].aprendiz de cada caso.
+    alertas = Alerta.query.options(joinedload(Alerta.aprendiz)).filter(
         Alerta.ficha_id == ficha_id,
         Alerta.aprendiz_id.isnot(None),
         Alerta.estado.in_(['activa', 'escalada_comite']),
@@ -612,33 +761,95 @@ def obtener_casos(ficha_id):
     )
 
 
-def obtener_indicadores_caso(aprendiz_id, ficha_id, ahora=None):
-    """Return decision-ready indicators for one learner's follow-up case."""
+def obtener_indicadores_caso(aprendiz_id, ficha_id, ahora=None, contexto=None):
+    """Return decision-ready indicators for one learner's follow-up case.
+
+    ``contexto`` permite reutilizar el indice de la ficha cuando la vista de
+    casos recorre a varios aprendices seguidos.
+    """
     ahora = ahora or datetime.utcnow()
-    registros = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz_id,
-    ).all()
-    tareas_incumplidas = _incumplimientos_academicos(aprendiz_id, ficha_id, ahora)
+    ctx = _contexto(ficha_id, contexto, ahora)
+    registros = ctx.registros(aprendiz_id)
+    tareas_incumplidas = _incumplimientos_academicos(aprendiz_id, ficha_id, ahora, ctx)
     return {
-        'asistencia': _porcentaje_asistencia(aprendiz_id, ficha_id),
-        'sesiones': contar_sesiones_registradas(ficha_id),
-        'faltas': sum(registro.estado == 'FALTA' for registro in registros),
+        'asistencia': _porcentaje_asistencia(aprendiz_id, ficha_id, ctx),
+        'sesiones': ctx.total_sesiones,
+        'faltas': sum(estado == 'FALTA' for _fecha, estado in registros),
         'justificadas': sum(
-            registro.estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
-            for registro in registros
+            estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
+            for _fecha, estado in registros
         ),
-        'consecutivas': _consecutivas_injustificadas(aprendiz_id, ficha_id),
+        'consecutivas': _consecutivas_injustificadas(aprendiz_id, ficha_id, ctx),
         'tareas_incumplidas': len(tareas_incumplidas),
+    }
+
+
+def obtener_lineas_tiempo(ficha_id, aprendiz_ids):
+    """Linea de tiempo de varios aprendices con dos consultas para toda la ficha.
+
+    La vista de casos la pedia aprendiz por aprendiz, dos consultas cada uno.
+    """
+    ids = list(aprendiz_ids)
+    if not ids:
+        return {}
+    eventos = defaultdict(list)
+    registros = (
+        RegistroAsistencia.query
+        .options(joinedload(RegistroAsistencia.sesion))
+        .join(SesionAsistencia)
+        .filter(
+            SesionAsistencia.ficha_id == ficha_id,
+            RegistroAsistencia.aprendiz_id.in_(ids),
+        )
+        .all()
+    )
+    for registro in registros:
+        eventos[registro.aprendiz_id].append({
+            'fecha': registro.sesion.fecha,
+            'tipo': 'asistencia',
+            'titulo': 'Asistencia',
+            'detalle': registro.estado.replace('_', ' ').capitalize(),
+            'nota': registro.nota,
+            'soporte_url': registro.soporte_url,
+        })
+    entregas = (
+        Entrega.query
+        .options(joinedload(Entrega.tarea))
+        .join(Tarea)
+        .filter(
+            Tarea.ficha_id == ficha_id,
+            Entrega.aprendiz_id.in_(ids),
+        )
+        .all()
+    )
+    for entrega in entregas:
+        eventos[entrega.aprendiz_id].append({
+            'fecha': (entrega.fecha_entrega or datetime.utcnow()).date(),
+            'tipo': 'academica',
+            'titulo': entrega.tarea.titulo,
+            'detalle': 'Entrega ' + (entrega.estado_revision or 'pendiente'),
+            'nota': entrega.feedback,
+        })
+    return {
+        aprendiz_id: sorted(lista, key=lambda evento: evento['fecha'], reverse=True)
+        for aprendiz_id, lista in eventos.items()
     }
 
 
 def obtener_linea_tiempo(aprendiz_id, ficha_id):
     eventos = []
-    registros = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz_id,
-    ).all()
+    # joinedload de sesion y tarea: la linea de tiempo lee la fecha de cada
+    # sesion y el titulo de cada tarea, un SELECT por evento sin esto.
+    registros = (
+        RegistroAsistencia.query
+        .options(joinedload(RegistroAsistencia.sesion))
+        .join(SesionAsistencia)
+        .filter(
+            SesionAsistencia.ficha_id == ficha_id,
+            RegistroAsistencia.aprendiz_id == aprendiz_id,
+        )
+        .all()
+    )
     for registro in registros:
         eventos.append({
             'fecha': registro.sesion.fecha,
@@ -648,10 +859,16 @@ def obtener_linea_tiempo(aprendiz_id, ficha_id):
             'nota': registro.nota,
             'soporte_url': registro.soporte_url,
         })
-    entregas = Entrega.query.join(Tarea).filter(
-        Tarea.ficha_id == ficha_id,
-        Entrega.aprendiz_id == aprendiz_id,
-    ).all()
+    entregas = (
+        Entrega.query
+        .options(joinedload(Entrega.tarea))
+        .join(Tarea)
+        .filter(
+            Tarea.ficha_id == ficha_id,
+            Entrega.aprendiz_id == aprendiz_id,
+        )
+        .all()
+    )
     for entrega in entregas:
         eventos.append({
             'fecha': (entrega.fecha_entrega or datetime.utcnow()).date(),

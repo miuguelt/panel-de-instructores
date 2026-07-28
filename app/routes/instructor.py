@@ -41,6 +41,102 @@ import openpyxl
 instructor_bp = Blueprint('instructor', __name__, template_folder='../templates/instructor')
 
 
+ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
+
+
+def _faltas_por_aprendiz(ficha_id):
+    """Cuenta faltas por aprendiz y estado en una sola consulta agregada.
+
+    Devuelve ``{aprendiz_id: {estado: cantidad}}``. Antes cada aprendiz costaba
+    dos COUNT independientes, asi que una ficha de 30 aprendices emitia 60
+    consultas solo para pintar el semaforo.
+    """
+    filas = (
+        db.session.query(
+            RegistroAsistencia.aprendiz_id,
+            RegistroAsistencia.estado,
+            func.count(RegistroAsistencia.id),
+        )
+        .join(SesionAsistencia, RegistroAsistencia.sesion_id == SesionAsistencia.id)
+        .filter(
+            SesionAsistencia.ficha_id == ficha_id,
+            RegistroAsistencia.estado.in_(ESTADOS_FALTA),
+        )
+        .group_by(RegistroAsistencia.aprendiz_id, RegistroAsistencia.estado)
+        .all()
+    )
+    conteo = {}
+    for aprendiz_id, estado, cantidad in filas:
+        conteo.setdefault(aprendiz_id, {})[estado] = cantidad
+    return conteo
+
+
+def _ultima_entrega_por_aprendiz(tareas):
+    """Mapa ``{(tarea_id, aprendiz_id): entrega mas reciente}`` en una consulta."""
+    ids_tareas = [t.id for t in tareas]
+    if not ids_tareas:
+        return {}
+    entregas = (
+        Entrega.query
+        .filter(Entrega.tarea_id.in_(ids_tareas))
+        .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
+        .all()
+    )
+    ultimas = {}
+    for entrega in entregas:
+        ultimas.setdefault((entrega.tarea_id, entrega.aprendiz_id), entrega)
+    return ultimas
+
+
+def calcular_semaforo(ficha_id, aprendices, config, ahora=None):
+    """Nivel de riesgo, faltas y tareas pendientes de cada aprendiz de la ficha.
+
+    Las vistas de asistencia y de alertas mostraban el mismo semaforo
+    resolviendolo aprendiz por aprendiz (dos COUNT mas un SELECT por tarea).
+    Aqui se resuelve con tres consultas para toda la ficha.
+    """
+    ahora = ahora or datetime.utcnow()
+    total_sesiones = contar_sesiones_registradas(ficha_id)
+    faltas = _faltas_por_aprendiz(ficha_id)
+    tareas_ficha = tareas_visibles(ficha_id).all()
+    ultimas_entregas = _ultima_entrega_por_aprendiz(tareas_ficha)
+
+    stats_map = {}
+    for aprendiz in aprendices:
+        conteo = faltas.get(aprendiz.id, {})
+        faltas_no_justificadas = conteo.get('FALTA', 0)
+        total_faltas = sum(conteo.values())
+        faltas_justificadas = total_faltas - faltas_no_justificadas
+        pct_asistencia = (
+            (total_sesiones - total_faltas) / total_sesiones * 100
+            if total_sesiones > 0 else 100.0
+        )
+
+        tareas_pendientes = 0
+        for tarea in tareas_ficha:
+            entrega = ultimas_entregas.get((tarea.id, aprendiz.id))
+            if entrega and entrega.estado_revision == 'rechazada':
+                tareas_pendientes += 1
+            elif not entrega and tarea.fecha_limite and tarea.fecha_limite < ahora:
+                tareas_pendientes += 1
+
+        if faltas_no_justificadas >= config.umbral_rojo or tareas_pendientes >= 3:
+            nivel = 'rojo'
+        elif faltas_no_justificadas >= config.umbral_amarillo or tareas_pendientes >= 1:
+            nivel = 'amarillo'
+        else:
+            nivel = 'verde'
+
+        stats_map[aprendiz.id] = {
+            'faltas_no_justificadas': faltas_no_justificadas,
+            'faltas_justificadas': faltas_justificadas,
+            'pct_asistencia': round(pct_asistencia, 1),
+            'tareas_pendientes': tareas_pendientes,
+            'nivel': nivel,
+        }
+    return stats_map, total_sesiones
+
+
 def obtener_fichas():
     if current_user.es_admin:
         return Ficha.query.order_by(Ficha.codigo).all()
@@ -923,7 +1019,6 @@ def asistencia(ficha_id):
         for r in sesion.registros:
             registros_map[r.aprendiz_id] = r
 
-    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
     sesiones_recientes = (
         SesionAsistencia.query
         .join(RegistroAsistencia)
@@ -940,55 +1035,12 @@ def asistencia(ficha_id):
         db.session.add(config)
         db.session.commit()
 
-    tareas_ficha = tareas_visibles(ficha_id).all()
-    now = datetime.utcnow()
-    
-    total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
+    # Los aprendices se cargan despues del commit: al confirmar la sesion
+    # SQLAlchemy expira los objetos vivos y volver a leer aprendiz.id
+    # recargaria cada fila una por una.
+    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
 
-    stats_map = {}
-    for ap in aprendices:
-        total_faltas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-            SesionAsistencia.ficha_id == ficha_id,
-            RegistroAsistencia.aprendiz_id == ap.id,
-            RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
-        ).count()
-        
-        faltas_no_justificadas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-            SesionAsistencia.ficha_id == ficha_id,
-            RegistroAsistencia.aprendiz_id == ap.id,
-            RegistroAsistencia.estado == 'FALTA',
-        ).count()
-        
-        faltas_justificadas = total_faltas - faltas_no_justificadas
-        pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones > 0 else 100
-
-        tareas_pendientes = 0
-        for t in tareas_ficha:
-            entrega = (
-                Entrega.query
-                .filter_by(tarea_id=t.id, aprendiz_id=ap.id)
-                .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-                .first()
-            )
-            if entrega and entrega.estado_revision == 'rechazada':
-                tareas_pendientes += 1
-            elif not entrega and t.fecha_limite and t.fecha_limite < now:
-                tareas_pendientes += 1
-                
-        if faltas_no_justificadas >= config.umbral_rojo or tareas_pendientes >= 3:
-            nivel = 'rojo'
-        elif faltas_no_justificadas >= config.umbral_amarillo or tareas_pendientes >= 1:
-            nivel = 'amarillo'
-        else:
-            nivel = 'verde'
-            
-        stats_map[ap.id] = {
-            'faltas_no_justificadas': faltas_no_justificadas,
-            'faltas_justificadas': faltas_justificadas,
-            'pct_asistencia': round(pct_asistencia, 1),
-            'tareas_pendientes': tareas_pendientes,
-            'nivel': nivel
-        }
+    stats_map, total_sesiones = calcular_semaforo(ficha_id, aprendices, config)
 
     return render_template('asistencia.html',
                            ficha=ficha,
@@ -1312,56 +1364,20 @@ def alertas(ficha_id):
 
     aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
 
-    total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
-    tareas_ficha = tareas_visibles(ficha_id).all()
-    now = datetime.utcnow()
+    stats_map, total_sesiones = calcular_semaforo(ficha_id, aprendices, config)
 
     datos_alertas = []
     for ap in aprendices:
-        total_faltas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-            SesionAsistencia.ficha_id == ficha_id,
-            RegistroAsistencia.aprendiz_id == ap.id,
-            RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
-        ).count()
-
-        faltas_no_justificadas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-            SesionAsistencia.ficha_id == ficha_id,
-            RegistroAsistencia.aprendiz_id == ap.id,
-            RegistroAsistencia.estado == 'FALTA',
-        ).count()
-
-        faltas_justificadas = total_faltas - faltas_no_justificadas
-        pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones > 0 else 100.0
-
-        tareas_pendientes = 0
-        for t in tareas_ficha:
-            entrega = (
-                Entrega.query
-                .filter_by(tarea_id=t.id, aprendiz_id=ap.id)
-                .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-                .first()
-            )
-            if entrega and entrega.estado_revision == 'rechazada':
-                tareas_pendientes += 1
-            elif not entrega and t.fecha_limite and t.fecha_limite < now:
-                tareas_pendientes += 1
-
-        if faltas_no_justificadas >= config.umbral_rojo or tareas_pendientes >= 3:
-            nivel = 'rojo'
-        elif faltas_no_justificadas >= config.umbral_amarillo or tareas_pendientes >= 1:
-            nivel = 'amarillo'
-        else:
-            nivel = 'verde'
-
+        stats = stats_map[ap.id]
         datos_alertas.append({
             'aprendiz': ap,
             'total_sesiones': total_sesiones,
-            'pct_asistencia': pct_asistencia,
-            'tareas_pendientes': tareas_pendientes,
-            'total_faltas': total_faltas,
-            'no_justificadas': faltas_no_justificadas,
-            'justificadas': faltas_justificadas,
-            'nivel': nivel,
+            'pct_asistencia': stats['pct_asistencia'],
+            'tareas_pendientes': stats['tareas_pendientes'],
+            'total_faltas': stats['faltas_no_justificadas'] + stats['faltas_justificadas'],
+            'no_justificadas': stats['faltas_no_justificadas'],
+            'justificadas': stats['faltas_justificadas'],
+            'nivel': stats['nivel'],
         })
 
     from app.services.alertas import obtener_config_comite

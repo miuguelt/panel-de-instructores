@@ -14,6 +14,7 @@ from app.models.alertas import (
 from app.models.aprendiz import Aprendiz
 from app.models.ficha import Ficha
 from app.services.alertas import (
+    ContextoFicha,
     actualizar_alertas_ficha,
     asegurar_resumen_semanal,
     crear_plan_mejoramiento,
@@ -23,6 +24,7 @@ from app.services.alertas import (
     obtener_config_comite,
     obtener_indicadores_caso,
     obtener_linea_tiempo,
+    obtener_lineas_tiempo,
     registrar_notificacion,
     vencer_planes_pendientes,
 )
@@ -95,14 +97,21 @@ def casos_seguimiento(ficha_id):
     ahora = datetime.utcnow()
     planes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id).all()
     casos = []
-    for alertas in obtener_casos(ficha_id):
+    # Indice compartido por todos los casos: los indicadores de cada aprendiz
+    # salen de la misma carga de asistencia y entregas.
+    contexto = ContextoFicha(ficha_id, ahora)
+    casos_alertas = obtener_casos(ficha_id)
+    lineas_tiempo = obtener_lineas_tiempo(
+        ficha_id, {alertas[0].aprendiz_id for alertas in casos_alertas}
+    )
+    for alertas in casos_alertas:
         aprendiz = alertas[0].aprendiz
-        indicadores = obtener_indicadores_caso(aprendiz.id, ficha_id, ahora)
+        indicadores = obtener_indicadores_caso(aprendiz.id, ficha_id, ahora, contexto)
         planes_aprendiz = [plan for plan in planes if plan.aprendiz_id == aprendiz.id]
         casos.append({
             'aprendiz': aprendiz,
             'alertas': alertas,
-            'timeline': obtener_linea_tiempo(aprendiz.id, ficha_id),
+            'timeline': lineas_tiempo.get(aprendiz.id, []),
             'indicadores': indicadores,
             'planes': planes_aprendiz,
             'prioridad': 'roja' if any(alerta.nivel == 'roja' for alerta in alertas) else 'amarilla',
