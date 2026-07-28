@@ -1,7 +1,7 @@
 import logging
 import os
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
@@ -220,6 +220,12 @@ def create_app(test_config=None):
             'La aplicacion arranco en modo DEGRADADO. Rutas no disponibles: %s',
             ' | '.join(app.config['STARTUP_ERRORS']),
         )
+
+    @app.after_request
+    def cache_static_responses(response):
+        if response.status_code == 200 and request.path.startswith('/static/'):
+            response.headers.setdefault('Cache-Control', 'public, max-age=31536000, immutable')
+        return response
 
     @app.context_processor
     def inyectar_notificaciones():

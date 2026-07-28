@@ -1656,18 +1656,34 @@ def juicios(ficha_id):
         )
         .all()
     )
-    estadisticas = {
-        'total': len(todos),
-        'aprobados': sum(1 for j in todos if j.juicio and 'APROBADO' in j.juicio.upper()),
-        'por_evaluar': sum(1 for j in todos if not j.juicio or 'EVALUAR' in j.juicio.upper()),
-        'tecnica': sum(1 for j in todos if j.tipo_competencia == 'tecnica'),
-        'transversal': sum(1 for j in todos if j.tipo_competencia == 'transversal'),
-        'ingles': sum(1 for j in todos if j.tipo_competencia == 'ingles')
-    }
 
-    # Agrupar por aprendiz
+    _tipo_prioridad = {'tecnica': 0, 'transversal': 1, 'ingles': 2}
+    estadisticas = {
+        'total': 0, 'aprobados': 0, 'por_evaluar': 0,
+        'tecnica': 0, 'transversal': 0, 'ingles': 0,
+    }
     aprendices_dict = {}
+    competencias_summary = {}
+    instructores_resumen = {}
+    rango_aprobacion = {'100%': 0, '75-99%': 0, '50-74%': 0, '25-49%': 0, '0-24%': 0}
+    primera_evaluacion = None
+    ultima_evaluacion = None
+
     for j in todos:
+        juicio_upper = j.juicio.upper() if j.juicio else ''
+        es_aprobado_global = bool(j.juicio and 'APROBADO' in juicio_upper)
+        es_aprobado_comp = es_aprobado_global and 'AUN NO' not in juicio_upper
+        tipo = j.tipo_competencia or 'tecnica'
+        func = j.funcionario_registro or 'Sin registro'
+
+        estadisticas['total'] += 1
+        if es_aprobado_global:
+            estadisticas['aprobados'] += 1
+        if not j.juicio or 'EVALUAR' in juicio_upper:
+            estadisticas['por_evaluar'] += 1
+        if tipo in estadisticas:
+            estadisticas[tipo] += 1
+
         if j.aprendiz_id not in aprendices_dict:
             aprendices_dict[j.aprendiz_id] = {
                 'aprendiz': j.aprendiz,
@@ -1676,25 +1692,51 @@ def juicios(ficha_id):
                 'transversal': 0, 'transversal_aprobada': 0,
                 'ingles': 0, 'ingles_aprobada': 0,
             }
-        
         datos = aprendices_dict[j.aprendiz_id]
         datos['total'] += 1
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper())
-        if es_aprobado:
+        if es_aprobado_global:
             datos['aprobados'] += 1
-            
-        tipo = j.tipo_competencia or 'tecnica'
         datos[tipo] += 1
-        if es_aprobado:
+        if es_aprobado_global:
             datos[f"{tipo}_aprobada"] += 1
-
-        # Colectar evaluadores únicos
         if j.funcionario_registro:
-            if 'evaluadores' not in datos:
-                datos['evaluadores'] = set()
-            datos['evaluadores'].add(j.funcionario_registro)
-            
-    # Calcular porcentajes y convertir evaluadores
+            datos.setdefault('evaluadores', set()).add(j.funcionario_registro)
+
+        comp = j.competencia or 'Sin nombre'
+        if comp not in competencias_summary:
+            competencias_summary[comp] = {
+                'nombre': comp, 'tipo': tipo,
+                'total': 0, 'aprobados': 0, 'pendientes': 0,
+                'detalles': [],
+            }
+        competencias_summary[comp]['total'] += 1
+        if es_aprobado_comp:
+            competencias_summary[comp]['aprobados'] += 1
+        else:
+            competencias_summary[comp]['pendientes'] += 1
+        competencias_summary[comp]['detalles'].append({
+            'documento': j.aprendiz.documento if j.aprendiz else '-',
+            'nombre': f"{j.aprendiz.apellidos} {j.aprendiz.nombre}" if j.aprendiz else '-',
+            'rap': j.resultado_aprendizaje or '-',
+            'estado': 'APROBADO' if es_aprobado_comp else 'POR EVALUAR',
+            'fecha': j.fecha_juicio.strftime('%d/%m/%Y') if j.fecha_juicio else '-',
+            'evaluador': j.funcionario_registro or '-',
+        })
+
+        if func not in instructores_resumen:
+            instructores_resumen[func] = {'total': 0, 'aprobados': 0, 'pendientes': 0}
+        instructores_resumen[func]['total'] += 1
+        if es_aprobado_comp:
+            instructores_resumen[func]['aprobados'] += 1
+        else:
+            instructores_resumen[func]['pendientes'] += 1
+
+        if j.fecha_juicio:
+            if primera_evaluacion is None or j.fecha_juicio < primera_evaluacion:
+                primera_evaluacion = j.fecha_juicio
+            if ultima_evaluacion is None or j.fecha_juicio > ultima_evaluacion:
+                ultima_evaluacion = j.fecha_juicio
+
     for d in aprendices_dict.values():
         d['pct_total'] = round((d['aprobados'] / d['total'] * 100)) if d['total'] > 0 else 0
         d['pct_tecnica'] = round((d['tecnica_aprobada'] / d['tecnica'] * 100)) if d['tecnica'] > 0 else 0
@@ -1702,79 +1744,6 @@ def juicios(ficha_id):
         d['pct_ingles'] = round((d['ingles_aprobada'] / d['ingles'] * 100)) if d['ingles'] > 0 else 0
         if 'evaluadores' in d:
             d['evaluadores'] = sorted(d['evaluadores'])
-        
-    aprendices_stats = sorted(aprendices_dict.values(), key=lambda x: x['aprendiz'].apellidos)
-
-    # ---- NUEVAS ESTADÍSTICAS ----
-    pct_global_juicios = round((estadisticas['aprobados'] / estadisticas['total'] * 100)) if estadisticas['total'] > 0 else 0
-
-    # Resumen por competencia
-    competencias_summary = {}
-    for j in todos:
-        comp = j.competencia or 'Sin nombre'
-        if comp not in competencias_summary:
-            competencias_summary[comp] = {
-                'nombre': comp,
-                'tipo': j.tipo_competencia or 'tecnica',
-                'total': 0, 'aprobados': 0, 'pendientes': 0,
-                'detalles': []
-            }
-        competencias_summary[comp]['total'] += 1
-        estado = 'POR EVALUAR'
-        es_aprobado = j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper()
-        
-        if es_aprobado:
-            competencias_summary[comp]['aprobados'] += 1
-            estado = 'APROBADO'
-        else:
-            competencias_summary[comp]['pendientes'] += 1
-
-        competencias_summary[comp]['detalles'].append({
-            'documento': j.aprendiz.documento if j.aprendiz else '-',
-            'nombre': f"{j.aprendiz.apellidos} {j.aprendiz.nombre}" if j.aprendiz else '-',
-            'rap': j.resultado_aprendizaje or '-',
-            'estado': estado,
-            'fecha': j.fecha_juicio.strftime('%d/%m/%Y') if j.fecha_juicio else '-',
-            'evaluador': j.funcionario_registro or '-'
-        })
-
-    for comp in competencias_summary.values():
-        comp['pct'] = round((comp['aprobados'] / comp['total'] * 100)) if comp['total'] > 0 else 0
-        comp['detalles'] = sorted(comp['detalles'], key=lambda x: x['nombre'])
-
-    # Orden: primero las ya evaluadas (mayor % de aprobación y aprobados), luego por prioridad de tipo y total
-    _tipo_prioridad = {'tecnica': 0, 'transversal': 1, 'ingles': 2}
-    competencias_ordenadas_juicios = sorted(
-        competencias_summary.values(),
-        key=lambda x: (
-            0 if x['aprobados'] > 0 else 1,  # 0: Ya evaluadas (tienen aprobados), 1: No evaluadas
-            -x['pct'],                        # Mayor porcentaje de aprobación primero
-            -x['aprobados'],                  # Mayor número de aprobados
-            _tipo_prioridad.get(x.get('tipo') or 'tecnica', 99),
-            -x['total']
-        )
-    )
-
-    # Resumen por instructor
-    instructores_resumen = {}
-    for j in todos:
-        func = j.funcionario_registro or 'Sin registro'
-        if func not in instructores_resumen:
-            instructores_resumen[func] = {'total': 0, 'aprobados': 0, 'pendientes': 0}
-        instructores_resumen[func]['total'] += 1
-        if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper():
-            instructores_resumen[func]['aprobados'] += 1
-        else:
-            instructores_resumen[func]['pendientes'] += 1
-
-    for func in instructores_resumen.values():
-        func['pct'] = round((func['aprobados'] / func['total'] * 100)) if func['total'] > 0 else 0
-
-    instructores_ordenados = sorted(instructores_resumen.items(), key=lambda x: x[1]['total'], reverse=True)
-
-    # Contadores de aprendices por rango de aprobación
-    rango_aprobacion = {'100%': 0, '75-99%': 0, '50-74%': 0, '25-49%': 0, '0-24%': 0}
-    for d in aprendices_dict.values():
         pct = d['pct_total']
         if pct == 100:
             rango_aprobacion['100%'] += 1
@@ -1787,10 +1756,28 @@ def juicios(ficha_id):
         else:
             rango_aprobacion['0-24%'] += 1
 
-    # Fechas relevantes
-    fechas_juicios = [j.fecha_juicio for j in todos if j.fecha_juicio]
-    primera_evaluacion = min(fechas_juicios) if fechas_juicios else None
-    ultima_evaluacion = max(fechas_juicios) if fechas_juicios else None
+    aprendices_stats = sorted(aprendices_dict.values(), key=lambda x: x['aprendiz'].apellidos)
+    pct_global_juicios = round((estadisticas['aprobados'] / estadisticas['total'] * 100)) if estadisticas['total'] > 0 else 0
+
+    for comp in competencias_summary.values():
+        comp['pct'] = round((comp['aprobados'] / comp['total'] * 100)) if comp['total'] > 0 else 0
+        comp['detalles'] = sorted(comp['detalles'], key=lambda x: x['nombre'])
+
+    competencias_ordenadas_juicios = sorted(
+        competencias_summary.values(),
+        key=lambda x: (
+            0 if x['aprobados'] > 0 else 1,
+            -x['pct'],
+            -x['aprobados'],
+            _tipo_prioridad.get(x.get('tipo') or 'tecnica', 99),
+            -x['total'],
+        ),
+    )
+
+    for func in instructores_resumen.values():
+        func['pct'] = round((func['aprobados'] / func['total'] * 100)) if func['total'] > 0 else 0
+
+    instructores_ordenados = sorted(instructores_resumen.items(), key=lambda x: x[1]['total'], reverse=True)
 
     return render_template('juicios.html', ficha=ficha, estadisticas=estadisticas, 
                            aprendices_stats=aprendices_stats, cronograma=obtener_cronograma(ficha),

@@ -90,4 +90,4 @@ class Config:
         if os.getenv('WTF_CSRF_TIME_LIMIT') else None
     )
     TEMPLATES_AUTO_RELOAD = True
-    SEND_FILE_MAX_AGE_DEFAULT = 0
+    SEND_FILE_MAX_AGE_DEFAULT = 31536000 if os.getenv('FLASK_ENV') == 'production' else 0
