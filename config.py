@@ -82,5 +82,12 @@ class Config:
     SMTP_USER = os.getenv('SMTP_USER')
     SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
     SMTP_FROM = os.getenv('SMTP_FROM')
+    # Sin limite de tiempo propio: el token sigue firmado con SECRET_KEY y atado
+    # a la sesion, pero deja de caducar a la hora. Una pestana abierta durante la
+    # jornada (el caso normal en el aula) ya no rechaza el POST del aprendiz.
+    WTF_CSRF_TIME_LIMIT = (
+        int(os.environ['WTF_CSRF_TIME_LIMIT'])
+        if os.getenv('WTF_CSRF_TIME_LIMIT') else None
+    )
     TEMPLATES_AUTO_RELOAD = True
     SEND_FILE_MAX_AGE_DEFAULT = 0

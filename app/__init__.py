@@ -5,7 +5,7 @@ from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFError, CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -165,21 +165,22 @@ def create_app(test_config=None):
         limiter.init_app(app)
         # Captura errores de Redis en runtime (auth rotada, timeout, etc.)
         # Deshabilita el limiter y deja pasar el request en vez de devolver 500.
-        @app.errorhandler(Exception)
+        # Se registra sobre RedisError y NO sobre Exception: un handler generico
+        # se aplica tambien a las HTTPException (404, 400, CSRFError...), y el
+        # `raise exc` final las convertia en 500.
+        import redis.exceptions as _redis_exc
+
+        @app.errorhandler(_redis_exc.RedisError)
         def _handle_limiter_runtime_error(exc):
-            import redis.exceptions as _re
-            if isinstance(exc, (_re.AuthenticationError, _re.ConnectionError,
-                                _re.TimeoutError, _re.RedisError)):
-                log.warning(
-                    'Redis fallo en runtime (%s). Deshabilitando rate-limit y continuando.',
-                    type(exc).__name__,
-                )
-                limiter.enabled = False
-                app.config['LIMITER_BACKEND'] = 'deshabilitado (fallo en runtime)'
-                # Re-ejecuta el request sin rate limiting
-                from flask import request as _req
-                return app.view_functions[_req.endpoint](**_req.view_args or {})
-            raise exc
+            log.warning(
+                'Redis fallo en runtime (%s). Deshabilitando rate-limit y continuando.',
+                type(exc).__name__,
+            )
+            limiter.enabled = False
+            app.config['LIMITER_BACKEND'] = 'deshabilitado (fallo en runtime)'
+            # Re-ejecuta el request sin rate limiting
+            from flask import request as _req
+            return app.view_functions[_req.endpoint](**_req.view_args or {})
 
     except Exception:
         log.exception(
@@ -296,6 +297,28 @@ def create_app(test_config=None):
             titulo='Página no encontrada',
             mensaje='El enlace puede estar incompleto o el recurso ya no está disponible.',
         ), 404
+
+    @app.errorhandler(CSRFError)
+    def token_csrf_invalido(error):
+        """Token expirado o sesion perdida: reintentar, no un 500.
+
+        Se devuelve al formulario original con un GET, que emite un token nuevo,
+        en vez de mostrar un error tecnico al aprendiz.
+        """
+        from flask import flash, redirect, request
+        log.info('CSRF rechazado en %s: %s', request.path, error.description)
+        flash(
+            'La sesión del formulario expiró. Vuelve a intentarlo.',
+            'error',
+        )
+        if request.method == 'POST':
+            return redirect(request.path)
+        return render_template(
+            'errors/error.html',
+            codigo=400,
+            titulo='Sesión expirada',
+            mensaje='Vuelve a cargar la página e inténtalo de nuevo.',
+        ), 400
 
     @app.errorhandler(413)
     def archivo_demasiado_grande(_error):
