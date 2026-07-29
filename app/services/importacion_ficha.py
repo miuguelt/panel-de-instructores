@@ -348,36 +348,73 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
 
     nuevos = actualizados = juicios_nuevos = juicios_repetidos = 0
     errores = []
-    
-    # Precarga en memoria para optimizar rendimiento (O(1) lookups)
-    aprendices_db = {a.documento: a for a in Aprendiz.query.filter_by(ficha_id=ficha.id).all()}
-    
-    # Pre-calcular todas las huellas de los registros del excel
+
+    # Precarga en memoria para que cada fila se resuelva con O(1) lookups.
+    # La importación oficial suele traer miles de filas; no conviene hacer un
+    # round-trip a PostgreSQL por cada aprendiz o juicio.
+    aprendices_db = {
+        a.documento: a
+        for a in Aprendiz.query.filter_by(ficha_id=ficha.id).all()
+    }
+
+    # Precalcular las huellas y consultar solo los juicios presentes en este
+    # archivo. Se deduplican los parámetros del IN porque el reporte puede
+    # repetir la misma evaluación.
     huellas_excel = []
     for registro in registros:
         if registro['competencia'] or registro['resultado_aprendizaje'] or registro['juicio']:
-            partes = [str(ficha.id), registro['documento'], registro['competencia'],
-                      registro['resultado_aprendizaje'], registro['juicio'],
-                      (registro['fecha_juicio'].isoformat() if registro['fecha_juicio']
-                       else registro['fecha_fuente_texto']), registro['funcionario_registro']]
-            registro['huella_calc'] = hashlib.sha256('|'.join(_texto(p) for p in partes).encode('utf-8')).hexdigest()
+            partes = [
+                str(ficha.id), registro['documento'], registro['competencia'],
+                registro['resultado_aprendizaje'], registro['juicio'],
+                (registro['fecha_juicio'].isoformat() if registro['fecha_juicio']
+                 else registro['fecha_fuente_texto']), registro['funcionario_registro'],
+            ]
+            registro['huella_calc'] = hashlib.sha256(
+                '|'.join(_texto(p) for p in partes).encode('utf-8')
+            ).hexdigest()
             huellas_excel.append(registro['huella_calc'])
-            
-    juicios_db = {j.huella: j for j in JuicioEvaluativo.query.filter(JuicioEvaluativo.huella.in_(huellas_excel)).all()} if huellas_excel else {}
-    juicios_instructor_db = {ji.juicio_id for ji in JuicioEvaluativoInstructor.query.filter_by(instructor_id=instructor_id).all()}
 
+    huellas_excel = list(dict.fromkeys(huellas_excel))
+    juicios_db = {
+        j.huella: j
+        for j in (
+            JuicioEvaluativo.query
+            .filter(JuicioEvaluativo.huella.in_(huellas_excel))
+            .all()
+            if huellas_excel else []
+        )
+    }
+
+    # Primera pasada: preparar aprendices nuevos y actualizar los existentes.
+    # Los nuevos se insertan con bulk_insert_mappings más abajo; crear objetos
+    # ORM y hacer flush por fila vuelve la importación sensible a la latencia.
+    aprendices_pendientes = {}
+    registros_validos = []
     for registro in registros:
         documento = registro['documento']
         aprendiz = aprendices_db.get(documento)
         if not aprendiz:
             if not registro['nombre']:
-                errores.append(f"Fila {registro['fila']}: el documento {documento} no tiene nombre.")
+                errores.append(
+                    f"Fila {registro['fila']}: el documento {documento} no tiene nombre."
+                )
                 continue
-            aprendiz = Aprendiz(documento=documento, nombre=registro['nombre'],
-                                apellidos=registro['apellidos'], tipo_documento=registro['tipo_documento'],
-                                estado=registro['estado'], ficha_id=ficha.id)
-            db.session.add(aprendiz)
-            db.session.flush() # Flush necesario para obtener aprendiz.id para el juicio
+            aprendiz = Aprendiz(
+                documento=documento,
+                nombre=registro['nombre'],
+                apellidos=registro['apellidos'],
+                tipo_documento=registro['tipo_documento'],
+                estado=registro['estado'],
+                ficha_id=ficha.id,
+            )
+            aprendices_pendientes[documento] = {
+                'documento': documento,
+                'nombre': registro['nombre'],
+                'apellidos': registro['apellidos'],
+                'tipo_documento': registro['tipo_documento'],
+                'estado': registro['estado'],
+                'ficha_id': ficha.id,
+            }
             aprendices_db[documento] = aprendiz
             nuevos += 1
         else:
@@ -389,50 +426,133 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
                     cambios = True
             if cambios:
                 actualizados += 1
-                
-        if 'huella_calc' in registro:
-            huella = registro['huella_calc']
-            juicio = juicios_db.get(huella)
-            if not juicio:
-                juicio = JuicioEvaluativo(
-                    ficha_id=ficha.id, aprendiz_id=aprendiz.id,
-                    competencia=registro['competencia'],
-                    tipo_competencia=clasificar_competencia(registro['competencia']),
-                    resultado_aprendizaje=registro['resultado_aprendizaje'],
-                    juicio=registro['juicio'], fecha_juicio=registro['fecha_juicio'],
-                    fecha_fuente_texto=registro['fecha_fuente_texto'],
-                    funcionario_registro=registro['funcionario_registro'],
-                    fuente_archivo=_texto(archivo.filename)[:255], huella=huella,
-                )
-                db.session.add(juicio)
-                db.session.flush()
-                juicios_db[huella] = juicio
-                juicios_nuevos += 1
-            else:
-                juicios_repetidos += 1
-                
-            if juicio.id not in juicios_instructor_db:
-                db.session.add(JuicioEvaluativoInstructor(
-                    juicio_id=juicio.id, instructor_id=instructor_id
-                ))
-                juicios_instructor_db.add(juicio.id)
+        registros_validos.append((registro, documento))
 
+    if aprendices_pendientes:
+        db.session.bulk_insert_mappings(
+            Aprendiz,
+            list(aprendices_pendientes.values()),
+        )
+        db.session.flush()
+        aprendices_db.update({
+            aprendiz.documento: aprendiz
+            for aprendiz in Aprendiz.query.filter(
+                Aprendiz.ficha_id == ficha.id,
+                Aprendiz.documento.in_(list(aprendices_pendientes)),
+            ).all()
+        })
+
+    # Segunda pasada: preparar todos los juicios para una inserción masiva.
+    # Los duplicados dentro del mismo archivo se resuelven en memoria.
+    juicios_pendientes = {}
+    for registro, documento in registros_validos:
+        if 'huella_calc' not in registro:
+            continue
+        huella = registro['huella_calc']
+        if huella not in juicios_db and huella not in juicios_pendientes:
+            aprendiz = aprendices_db[documento]
+            juicios_pendientes[huella] = {
+                'ficha_id': ficha.id,
+                'aprendiz_id': aprendiz.id,
+                'competencia': registro['competencia'],
+                'tipo_competencia': clasificar_competencia(registro['competencia']),
+                'resultado_aprendizaje': registro['resultado_aprendizaje'],
+                'juicio': registro['juicio'],
+                'fecha_juicio': registro['fecha_juicio'],
+                'fecha_fuente_texto': registro['fecha_fuente_texto'],
+                'funcionario_registro': registro['funcionario_registro'],
+                'fuente_archivo': _texto(archivo.filename)[:255],
+                'huella': huella,
+                'importado_en': datetime.utcnow(),
+            }
+            juicios_nuevos += 1
+        else:
+            juicios_repetidos += 1
+
+    if juicios_pendientes:
+        db.session.bulk_insert_mappings(
+            JuicioEvaluativo,
+            list(juicios_pendientes.values()),
+        )
+        db.session.flush()
+        # Recuperar una sola vez los IDs de los juicios nuevos y conservar la
+        # misma forma de lookup para los ya existentes.
+        huellas_consulta = list(juicios_pendientes) + list(juicios_db)
+        juicios_db = {
+            juicio.huella: juicio
+            for juicio in JuicioEvaluativo.query.filter(
+                JuicioEvaluativo.huella.in_(huellas_consulta)
+            ).all()
+        }
+
+    # Consultar únicamente los vínculos relevantes. Antes se cargaba todo el
+    # historial de juicios del instructor en cada importación.
+    juicio_ids = {juicio.id for juicio in juicios_db.values() if juicio.id}
+    vinculos_existentes = set()
+    if juicio_ids:
+        vinculos_existentes = {
+            juicio_id
+            for (juicio_id,) in (
+                db.session.query(JuicioEvaluativoInstructor.juicio_id)
+                .filter(
+                    JuicioEvaluativoInstructor.instructor_id == instructor_id,
+                    JuicioEvaluativoInstructor.juicio_id.in_(juicio_ids),
+                )
+                .all()
+            )
+        }
+
+    vinculos_pendientes = [
+        {
+            'juicio_id': juicio.id,
+            'instructor_id': instructor_id,
+            'fecha_importacion': datetime.utcnow(),
+        }
+        for juicio in juicios_db.values()
+        if juicio.id not in vinculos_existentes
+    ]
+    if vinculos_pendientes:
+        db.session.bulk_insert_mappings(
+            JuicioEvaluativoInstructor,
+            vinculos_pendientes,
+        )
+
+    # Resolver las sesiones en una consulta, en lugar de ejecutar un SELECT
+    # por cada fecha distinta del reporte.
     sesiones_creadas = 0
     fechas_unicas = sorted({
         registro['fecha_juicio'].date()
         for registro in registros
         if registro['fecha_juicio'] is not None
     })
-    for fecha_sesion in fechas_unicas:
-        if not SesionAsistencia.query.filter_by(
-            ficha_id=ficha.id, fecha=fecha_sesion
-        ).first():
-            db.session.add(SesionAsistencia(
-                ficha_id=ficha.id,
-                fecha=fecha_sesion,
-                observaciones='Creada automáticamente al importar juicios.',
-            ))
-            sesiones_creadas += 1
+    if fechas_unicas:
+        fechas_existentes = {
+            fecha
+            for (fecha,) in (
+                db.session.query(SesionAsistencia.fecha)
+                .filter(
+                    SesionAsistencia.ficha_id == ficha.id,
+                    SesionAsistencia.fecha.in_(fechas_unicas),
+                )
+                .all()
+            )
+        }
+        sesiones_pendientes = [
+            {
+                'ficha_id': ficha.id,
+                'fecha': fecha_sesion,
+                'observaciones': 'Creada automáticamente al importar juicios.',
+                'creada_en': datetime.utcnow(),
+            }
+            for fecha_sesion in fechas_unicas
+            if fecha_sesion not in fechas_existentes
+        ]
+        if sesiones_pendientes:
+            db.session.bulk_insert_mappings(
+                SesionAsistencia,
+                sesiones_pendientes,
+            )
+            sesiones_creadas = len(sesiones_pendientes)
 
     return {
         'ficha': ficha, 'ficha_creada': ficha_creada,

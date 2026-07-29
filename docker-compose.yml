@@ -6,6 +6,8 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
+      - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}
+      - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER}
       - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH}
       - ADSO_ADMIN_EMAIL=${ADSO_ADMIN_EMAIL}
@@ -21,6 +23,27 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    networks:
+      - coolify
+
+  worker:
+    build: .
+    environment:
+      - PROCESS_TYPE=worker
+      - FLASK_ENV=${FLASK_ENV}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}
+      - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH}
+      - ADSO_ADMIN_EMAIL=${ADSO_ADMIN_EMAIL}
+      - ADSO_ADMIN_PASSWORD=${ADSO_ADMIN_PASSWORD}
+      - ADSO_ADMIN_NOMBRE=${ADSO_ADMIN_NOMBRE}
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
     networks:
       - coolify
 

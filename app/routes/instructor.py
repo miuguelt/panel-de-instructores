@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, send_from_directory
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, send_from_directory, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -35,8 +35,13 @@ from app.services.cronograma import obtener_cronograma
 from app.models.ficha_instructor import FichaInstructor
 from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor
 from app.models.material import MaterialFicha
+from app.models.importacion import ImportacionJob
+from app.services.importacion_jobs import encolar_importacion, ColaImportacionesNoDisponible
 from datetime import datetime, date
+import os
+from uuid import uuid4
 import openpyxl
+from werkzeug.utils import secure_filename
 
 instructor_bp = Blueprint('instructor', __name__, template_folder='../templates/instructor')
 
@@ -861,20 +866,57 @@ def cargar_excel(ficha_id):
         flash('Debes subir un archivo Excel (.xlsx o .xls).', 'error')
         return redirect(url_for('instructor.aprendices', ficha_id=ficha_id))
 
+    importacion_job_id = None
     try:
-        resultado = importar_archivo(archivo, ficha, current_user.id)
-        ficha = resultado['ficha']
-        db.session.commit()
-        actualizar_alertas_ficha(ficha.id)
-        actualizar_participacion_ficha(ficha.id)
+        if current_app.config.get('IMPORTACIONES_ASINCRONAS'):
+            nombre_archivo = secure_filename(archivo.filename) or 'reporte.xls'
+            carpeta = os.path.join(current_app.config['UPLOAD_FOLDER'], 'importaciones')
+            os.makedirs(carpeta, exist_ok=True)
+            ruta = os.path.join(carpeta, f'{uuid4().hex}_{nombre_archivo}')
+            archivo.save(ruta)
 
-        msg = _resumen_importacion(resultado)
-        if resultado['errores']:
-            flash(msg + f" {len(resultado['errores'])} errores.", 'warning')
-            for err in resultado['errores'][:10]:
-                flash(err, 'error')
+            job = ImportacionJob(
+                ficha_id=ficha.id,
+                instructor_id=current_user.id,
+                archivo_path=ruta,
+                nombre_archivo=nombre_archivo,
+                estado='encolado',
+            )
+            db.session.add(job)
+            db.session.commit()
+            importacion_job_id = job.id
+            try:
+                encolar_importacion(job.id, current_app.config['IMPORT_QUEUE_NAME'])
+            except ColaImportacionesNoDisponible as exc:
+                db.session.rollback()
+                try:
+                    os.remove(ruta)
+                except OSError:
+                    pass
+                raise RuntimeError(
+                    'No fue posible poner la importación en cola. '
+                    'Revisa REDIS_URL y que el worker esté activo.'
+                ) from exc
+
+            flash(
+                f'Importación encolada (trabajo #{job.id}). '
+                'Puedes seguir usando el panel; el archivo se procesará en segundo plano.',
+                'success',
+            )
         else:
-            flash(msg, 'success')
+            resultado = importar_archivo(archivo, ficha, current_user.id)
+            ficha = resultado['ficha']
+            db.session.commit()
+            actualizar_alertas_ficha(ficha.id)
+            actualizar_participacion_ficha(ficha.id)
+
+            msg = _resumen_importacion(resultado)
+            if resultado['errores']:
+                flash(msg + f" {len(resultado['errores'])} errores.", 'warning')
+                for err in resultado['errores'][:10]:
+                    flash(err, 'error')
+            else:
+                flash(msg, 'success')
 
     except (ErrorImportacion, RuntimeError) as exc:
         db.session.rollback()
@@ -884,7 +926,29 @@ def cargar_excel(ficha_id):
         current_app.logger.exception('Error inesperado al importar aprendices')
         flash('No fue posible procesar el archivo. Verifica el Excel e inténtalo de nuevo.', 'error')
 
-    return redirect(url_for('instructor.aprendices', ficha_id=ficha.id))
+    parametros = {'ficha_id': ficha.id}
+    if importacion_job_id:
+        parametros['importacion_id'] = importacion_job_id
+    return redirect(url_for('instructor.aprendices', **parametros))
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/importaciones/<int:job_id>', methods=['GET'])
+@login_required
+def estado_importacion(ficha_id, job_id):
+    """Estado consultable para una barra de progreso del frontend."""
+    ficha = db.session.get(Ficha, ficha_id)
+    job = db.session.get(ImportacionJob, job_id)
+    if not job or job.ficha_id != ficha_id or not puede_gestionar_ficha(ficha):
+        return jsonify({'error': 'Importación no encontrada.'}), 404
+    return jsonify({
+        'id': job.id,
+        'estado': job.estado,
+        'resultado': job.resultado,
+        'error': job.error,
+        'creado_en': job.creado_en.isoformat() if job.creado_en else None,
+        'iniciado_en': job.iniciado_en.isoformat() if job.iniciado_en else None,
+        'terminado_en': job.terminado_en.isoformat() if job.terminado_en else None,
+    })
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/plantilla-excel')

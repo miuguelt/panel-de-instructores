@@ -21,6 +21,7 @@ from app.models.aseo import (
     TurnoAseo,
 )
 from app.models.material import MaterialFicha
+from app.models.importacion import ImportacionJob
 
 __all__ = [
     'Instructor', 'Ficha', 'Aprendiz',
@@ -31,5 +32,5 @@ __all__ = [
     'Insignia', 'InsigniaOtorgada',
     'FichaInstructor', 'JuicioEvaluativo', 'JuicioEvaluativoInstructor',
     'ConfiguracionAseo', 'ContadorAseo', 'TurnoAseo', 'IntercambioAseo',
-    'MaterialFicha',
+    'MaterialFicha', 'ImportacionJob',
 ]

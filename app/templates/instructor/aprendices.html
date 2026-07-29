@@ -7,6 +7,44 @@
     <h1>{{ ficha.codigo }} - {{ ficha.nombre_programa }}</h1>
 </div>
 
+{% set importacion_id = request.args.get('importacion_id')|int %}
+{% if importacion_id %}
+<div class="card" id="import-status" data-status-url="{{ url_for('instructor.estado_importacion', ficha_id=ficha.id, job_id=importacion_id) }}" style="margin-bottom: 1rem;">
+    <strong>Importación en segundo plano</strong>
+    <p id="import-status-message" class="text-muted" role="status" aria-live="polite">Consultando el estado del trabajo #{{ importacion_id }}…</p>
+</div>
+<script>
+(function () {
+    const box = document.getElementById('import-status');
+    const message = document.getElementById('import-status-message');
+    if (!box || !message) return;
+    let intentos = 0;
+    const consultar = () => fetch(box.dataset.statusUrl, { credentials: 'same-origin' })
+        .then(res => res.json())
+        .then(job => {
+            if (job.estado === 'completado') {
+                message.textContent = 'Importación completada. Actualizando los datos…';
+                setTimeout(() => window.location.reload(), 700);
+                return;
+            }
+            if (job.estado === 'error') {
+                message.textContent = 'La importación falló: ' + (job.error || 'revisa los logs del worker.');
+                box.classList.add('alert', 'alert-error');
+                return;
+            }
+            message.textContent = job.estado === 'procesando'
+                ? 'El reporte se está procesando. Puedes seguir navegando por el panel.'
+                : 'El reporte está en cola. Puedes seguir navegando por el panel.';
+            if (++intentos < 150) setTimeout(consultar, 2000);
+        })
+        .catch(() => {
+            if (++intentos < 150) setTimeout(consultar, 4000);
+        });
+    consultar();
+})();
+</script>
+{% endif %}
+
 <details class="card share-access-card" open>
     <summary>Compartir panel con los aprendices (QR)</summary>
     <p class="text-muted">Los aprendices acceden directamente ingresando su documento de identidad en este enlace, sin necesidad de crear una cuenta.</p>

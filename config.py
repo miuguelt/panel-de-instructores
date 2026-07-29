@@ -99,3 +99,10 @@ class Config:
     # /static/ se sirven con caducidad larga desde _registrar_cache_estaticos(),
     # que ademas versiona su URL.
     SEND_FILE_MAX_AGE_DEFAULT = 0
+    # En produccion el XLS se procesa en el servicio worker de Compose. En
+    # local/tests se conserva el flujo sincrono para no exigir Redis.
+    IMPORTACIONES_ASINCRONAS = (
+        os.getenv('IMPORTACIONES_ASINCRONAS', 'true' if os.getenv('FLASK_ENV') == 'production' else 'false')
+        .strip().lower() in ('1', 'true', 'yes', 'on')
+    )
+    IMPORT_QUEUE_NAME = os.getenv('IMPORT_QUEUE_NAME', 'adso:importaciones')

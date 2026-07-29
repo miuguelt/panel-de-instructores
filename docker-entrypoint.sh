@@ -84,6 +84,12 @@ if ! python3 seed_admin.py; then
   exit 1
 fi
 
+# --- Arrancar proceso ---
+if [ "${PROCESS_TYPE:-web}" = "worker" ]; then
+  echo "Iniciando worker de importaciones Excel..."
+  exec python3 worker.py
+fi
+
 # --- Arrancar Gunicorn ---
 # Worker class `gthread`: la app es I/O-bound (PostgreSQL + Redis) y los workers
 # `sync` bloquean el proceso entero durante cada query. psycopg2 libera el GIL

@@ -41,6 +41,8 @@ RUN chmod +x /app/docker-entrypoint.sh && \
 ENV FLASK_APP=wsgi.py \
     FLASK_ENV=production \
     REDIS_URL=memory:// \
+    IMPORTACIONES_ASINCRONAS=true \
+    IMPORT_QUEUE_NAME=adso:importaciones \
     UPLOAD_FOLDER=/app/uploads \
     MAX_CONTENT_LENGTH=52428800 \
     PYTHONUNBUFFERED=1 \
