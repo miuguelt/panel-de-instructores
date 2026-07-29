@@ -133,6 +133,10 @@
                         <span class="module-icon" aria-hidden="true">M</span>
                         <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
                     </a>
+                    <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">📓</span>
+                        <span><strong>Observador</strong><small>Formación integral</small></span>
+                    </a>
                     <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
                         <span class="module-icon" aria-hidden="true">!</span>
                         <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
@@ -260,6 +264,10 @@
                         <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
                             <span class="module-icon" aria-hidden="true">M</span>
                             <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                        </a>
+                        <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">📓</span>
+                            <span><strong>Observador</strong><small>Formación integral</small></span>
                         </a>
                         <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
                             <span class="module-icon" aria-hidden="true">!</span>

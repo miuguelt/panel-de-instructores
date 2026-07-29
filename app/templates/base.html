@@ -80,6 +80,8 @@
                        class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}">Asistencia</a>
                     <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}">Tareas</a>
+                    <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'instructor.observador' %}is-active{% endif %}">Observador</a>
                     <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}">Alertas</a>
                     <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}"

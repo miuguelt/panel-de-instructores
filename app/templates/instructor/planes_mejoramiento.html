@@ -54,6 +54,30 @@
         </div>
         <button type="submit" class="btn btn-primary">Crear plan de mejoramiento</button>
     </form>
+
+    {% if aprendiz_preseleccionado %}
+    <div class="observador-historial">
+        <h3>Historial del observador</h3>
+        {% if notas_observador %}
+        <p class="text-muted">Hechos fechados de la formación integral. Cítalos en las actividades para que el plan se sustente en el historial.</p>
+        <ul class="observador-historial-lista">
+            {% for nota in notas_observador %}
+            <li>
+                <span class="badge badge-{{ 'success' if nota.tipo == 'positiva' else 'danger' }}">{{ nota.etiqueta_tipo }}</span>
+                <strong>{{ nota.fecha.strftime('%d/%m/%Y') }} · {{ nota.etiqueta_categoria }}</strong>
+                <p>{{ nota.descripcion }}{% if nota.autor %} <small>— {{ nota.autor.nombre }}</small>{% endif %}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">
+            Este aprendiz no tiene reconocimientos ni llamados de atención registrados.
+            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=aprendiz_preseleccionado) }}#registrar">Registrar una observación</a>
+            deja constancia fechada para el próximo plan o comité.
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
 </details>
 
 {% if planes %}
@@ -76,13 +100,25 @@
         <div class="plan-meta">
             {% if plan.fecha_limite %}<span>Límite: {{ plan.fecha_limite.strftime('%d/%m/%Y') }}</span>{% endif %}
             {% if plan.fecha_cumplimiento %}<span>Cumplido: {{ plan.fecha_cumplimiento.strftime('%d/%m/%Y') }}</span>{% endif %}
+            {% if plan.evidencia_enviada_en %}<span>Evidencia enviada: {{ plan.evidencia_enviada_en.strftime('%d/%m/%Y %H:%M') }}</span>{% endif %}
             {% if plan.observaciones_instructor %}<span>Nota: {{ plan.observaciones_instructor }}</span>{% endif %}
         </div>
+        {% if plan.evidencia_url %}
+        <div class="plan-evidence-review">
+            <strong>📎 Evidencia del aprendiz</strong>
+            {% if plan.observaciones_aprendiz %}<p>{{ plan.observaciones_aprendiz }}</p>{% endif %}
+            <a href="{{ url_for('instructor.descargar_evidencia_plan', plan_id=plan.id) }}" class="btn btn-sm btn-outline">⬇️ Descargar evidencia</a>
+        </div>
+        {% elif plan.estado == 'pendiente' %}
+        <div class="alert alert-warning plan-evidence-missing">El aprendiz aún no ha enviado evidencia. El plan no se puede marcar como cumplido.</div>
+        {% endif %}
         {% if plan.estado == 'pendiente' %}
         <div class="plan-actions">
             <form method="POST" action="{{ url_for('seguimiento.cumplir_plan', ficha_id=ficha.id, plan_id=plan.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-sm btn-primary">Marcar como cumplido</button>
+                <label for="plan-nota-{{ plan.id }}" class="sr-only">Observación del instructor</label>
+                <input id="plan-nota-{{ plan.id }}" type="text" name="observaciones_instructor" placeholder="Observación de cierre (opcional)">
+                <button type="submit" class="btn btn-sm btn-primary" {% if not plan.evidencia_url %}disabled title="Espera la evidencia del aprendiz"{% endif %}>Marcar como cumplido</button>
             </form>
         </div>
         {% endif %}

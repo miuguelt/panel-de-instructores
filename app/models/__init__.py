@@ -22,6 +22,7 @@ from app.models.aseo import (
 )
 from app.models.material import MaterialFicha
 from app.models.importacion import ImportacionJob
+from app.models.observador import NotaObservador
 
 __all__ = [
     'Instructor', 'Ficha', 'Aprendiz',
@@ -32,5 +33,5 @@ __all__ = [
     'Insignia', 'InsigniaOtorgada',
     'FichaInstructor', 'JuicioEvaluativo', 'JuicioEvaluativoInstructor',
     'ConfiguracionAseo', 'ContadorAseo', 'TurnoAseo', 'IntercambioAseo',
-    'MaterialFicha', 'ImportacionJob',
+    'MaterialFicha', 'ImportacionJob', 'NotaObservador',
 ]

@@ -7,8 +7,22 @@ from app import db
 from app.models.ficha import Ficha
 from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz
 from app.models.asistencia import SesionAsistencia, RegistroAsistencia, ESTADOS_ASISTENCIA, CAUSALES_JUSTIFICADAS
-from app.models.tarea import Tarea, Entrega
+from app.models.tarea import (
+    MODALIDAD_CLASE,
+    MODALIDAD_EVIDENCIA,
+    MODALIDADES_TAREA,
+    Tarea,
+    Entrega,
+)
 from app.models.alertas import Alerta, ConfiguracionAlertas, PlanMejoramiento
+from app.models.observador import (
+    CATEGORIAS_NOTA,
+    CLAVES_CATEGORIA,
+    TIPOS_NOTA,
+    TIPO_NEGATIVA,
+    TIPO_NEUTRA,
+    NotaObservador,
+)
 from app.models.insignia import Insignia, InsigniaOtorgada
 from app.models.ranking import ConfiguracionRanking
 from app.models.aseo import ConfiguracionAseo
@@ -18,6 +32,7 @@ from app.services.alertas import (
     asegurar_resumen_semanal,
     notificar_calificacion,
     obtener_config_comite,
+    registrar_notificacion,
 )
 from app.services.aseo import ajustar_turno_por_asistencia
 from app.services.asistencia import (
@@ -835,7 +850,16 @@ def historial_aprendiz(ficha_id, aprendiz_id):
         'total_registros_asistencia': len(registros_aprendiz),
     }
 
+    notas_observador = (
+        NotaObservador.query
+        .options(joinedload(NotaObservador.autor))
+        .filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id)
+        .order_by(NotaObservador.fecha.desc(), NotaObservador.id.desc())
+        .all()
+    )
+
     return render_template('instructor/historial_aprendiz.html', ficha=ficha, aprendiz=aprendiz,
+                           notas_observador=notas_observador,
                            juicios=juicios, instructores=instructores,
                            pct_asistencia=pct_asistencia, total_sesiones=total_sesiones, total_faltas=total_faltas,
                            tareas_estado=tareas_estado, otorgamientos=otorgamientos,
@@ -1253,6 +1277,66 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
                            config_alertas=config_alertas)
 
 
+class _DatosTareaInvalidos(Exception):
+    """El formulario de la tarea no cumple las validaciones mínimas."""
+
+
+def _leer_datos_tarea(form):
+    """Normaliza el formulario que comparten la creación y la edición."""
+    titulo = form.get('titulo', '').strip()
+    if not titulo:
+        raise _DatosTareaInvalidos('El título es obligatorio.')
+
+    modalidad = form.get('modalidad', MODALIDAD_EVIDENCIA).strip()
+    if modalidad not in MODALIDADES_TAREA:
+        modalidad = MODALIDAD_EVIDENCIA
+
+    fecha_limite = None
+    fecha_limite_str = form.get('fecha_limite', '')
+    if fecha_limite_str:
+        try:
+            fecha_limite = datetime.strptime(fecha_limite_str, '%Y-%m-%dT%H:%M')
+        except ValueError:
+            raise _DatosTareaInvalidos('La fecha límite no tiene un formato válido.')
+
+    return {
+        'titulo': titulo,
+        'descripcion': form.get('descripcion', '').strip(),
+        'enlace_externo': form.get('enlace_externo', '').strip() or None,
+        'fecha_limite': fecha_limite,
+        'modalidad': modalidad,
+        # Una actividad de aula no admite subidas: forzar el indicador evita
+        # que el panel del aprendiz exija un archivo que nadie va a revisar.
+        'requiere_archivo': modalidad == MODALIDAD_EVIDENCIA and 'requiere_archivo' in form,
+    }
+
+
+def _guardar_material_apoyo(archivo, ficha_id):
+    """Guarda el material de apoyo de una tarea y devuelve su URL relativa."""
+    resultado = ArchivoService.guardar(
+        archivo=archivo,
+        carpeta=TiposCarpeta.MATERIALES_TAREA,
+        # Keep support material inside the same instructor scope
+        # as the task. This prevents files with the same logical
+        # task name from being mixed across shared fichas.
+        subcarpeta=f'ficha_{ficha_id}/instructor_{current_user.id}',
+        prefijo_extra=f'tarea_{current_user.id}',
+        check_magic=True,
+    )
+    return resultado.url
+
+
+def _tarea_gestionable(ficha_id, tarea_id):
+    """Devuelve la tarea si el usuario puede operarla dentro de esa ficha."""
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        return None, None
+    tarea = db.session.get(Tarea, tarea_id)
+    if not tarea or tarea.ficha_id != ficha_id or not puede_gestionar_tarea(tarea):
+        return ficha, None
+    return ficha, tarea
+
+
 @instructor_bp.route('/fichas/<int:ficha_id>/tareas', methods=['GET', 'POST'])
 @login_required
 def tareas(ficha_id):
@@ -1262,39 +1346,17 @@ def tareas(ficha_id):
         return redirect(url_for('instructor.fichas'))
 
     if request.method == 'POST':
-        titulo = request.form.get('titulo', '').strip()
-        descripcion = request.form.get('descripcion', '').strip()
-        enlace = request.form.get('enlace_externo', '').strip()
-        fecha_limite_str = request.form.get('fecha_limite', '')
-        requiere_archivo = 'requiere_archivo' in request.form
-
-        if not titulo:
-            flash('El título es obligatorio.', 'error')
+        try:
+            datos = _leer_datos_tarea(request.form)
+        except _DatosTareaInvalidos as exc:
+            flash(str(exc), 'error')
             return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
-
-        fecha_limite = None
-        if fecha_limite_str:
-            try:
-                fecha_limite = datetime.strptime(fecha_limite_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                flash('La fecha límite no tiene un formato válido.', 'error')
-                return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
         material_url = None
         archivo_material = request.files.get('material_apoyo')
         if archivo_material and archivo_material.filename:
             try:
-                resultado = ArchivoService.guardar(
-                    archivo=archivo_material,
-                    carpeta=TiposCarpeta.MATERIALES_TAREA,
-                    # Keep support material inside the same instructor scope
-                    # as the task. This prevents files with the same logical
-                    # task name from being mixed across shared fichas.
-                    subcarpeta=f'ficha_{ficha_id}/instructor_{current_user.id}',
-                    prefijo_extra=f'tarea_{current_user.id}',
-                    check_magic=True,
-                )
-                material_url = resultado.url
+                material_url = _guardar_material_apoyo(archivo_material, ficha_id)
             except ErrorArchivo as exc:
                 flash(str(exc), 'error')
                 return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
@@ -1302,22 +1364,200 @@ def tareas(ficha_id):
         tarea = Tarea(
             ficha_id=ficha_id,
             instructor_id=current_user.id,
-            titulo=titulo,
-            descripcion=descripcion,
-            enlace_externo=enlace or None,
             material_apoyo_url=material_url,
-            fecha_limite=fecha_limite,
-            requiere_archivo=requiere_archivo,
+            **datos,
         )
         db.session.add(tarea)
         db.session.commit()
         actualizar_alertas_ficha(ficha_id)
         actualizar_participacion_ficha(ficha_id)
-        flash(f'Tarea "{titulo}" creada correctamente.', 'success')
+        flash(f'Tarea "{datos["titulo"]}" creada correctamente.', 'success')
         return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
     lista_tareas = tareas_visibles(ficha_id).order_by(Tarea.creada_en.desc()).all()
     return render_template('tareas.html', ficha=ficha, tareas=lista_tareas, now=datetime.utcnow())
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/tareas/<int:tarea_id>/editar', methods=['POST'])
+@login_required
+def editar_tarea(ficha_id, tarea_id):
+    """Actualiza una tarea existente conservando entregas y evaluaciones."""
+    ficha, tarea = _tarea_gestionable(ficha_id, tarea_id)
+    if not ficha:
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+    if not tarea:
+        flash('No tienes permiso para editar esta tarea.', 'error')
+        return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+
+    try:
+        datos = _leer_datos_tarea(request.form)
+    except _DatosTareaInvalidos as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+
+    tiene_entregas = tarea.entregas.count() > 0
+    if tiene_entregas and datos['modalidad'] != tarea.modalidad:
+        # Cambiar de modalidad con entregas registradas dejaría evidencias
+        # huérfanas o aprobaciones de aula sin sentido. Se conserva la actual.
+        flash(
+            'No se puede cambiar la modalidad de una tarea que ya tiene registros. '
+            'El resto de los cambios sí se guardó.',
+            'error',
+        )
+        datos['modalidad'] = tarea.modalidad
+        datos['requiere_archivo'] = (
+            tarea.modalidad == MODALIDAD_EVIDENCIA and 'requiere_archivo' in request.form
+        )
+
+    material_anterior = tarea.material_apoyo_url
+    material_nuevo = None
+    archivo_material = request.files.get('material_apoyo')
+    if archivo_material and archivo_material.filename:
+        try:
+            material_nuevo = _guardar_material_apoyo(archivo_material, ficha_id)
+        except ErrorArchivo as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+
+    quitar_material = 'quitar_material' in request.form
+
+    for campo, valor in datos.items():
+        setattr(tarea, campo, valor)
+    if material_nuevo:
+        tarea.material_apoyo_url = material_nuevo
+    elif quitar_material:
+        tarea.material_apoyo_url = None
+    tarea.actualizada_en = datetime.utcnow()
+    db.session.commit()
+
+    # El archivo viejo se borra después del commit: si la transacción fallara,
+    # el registro seguiría apuntando a un archivo que ya no existe en disco.
+    if material_anterior and (material_nuevo or quitar_material):
+        ArchivoService.eliminar(material_anterior)
+
+    actualizar_alertas_ficha(ficha_id)
+    actualizar_participacion_ficha(ficha_id)
+    flash(f'Tarea "{tarea.titulo}" actualizada.', 'success')
+    return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/tareas/<int:tarea_id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_tarea(ficha_id, tarea_id):
+    """Elimina la tarea con sus entregas y los archivos asociados en disco."""
+    ficha, tarea = _tarea_gestionable(ficha_id, tarea_id)
+    if not ficha:
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+    if not tarea:
+        flash('No tienes permiso para eliminar esta tarea.', 'error')
+        return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+
+    titulo = tarea.titulo
+    # Las rutas se recogen antes del borrado: después del commit los objetos
+    # de entrega ya no están disponibles para consultar su archivo.
+    archivos = [
+        entrega.archivo_url
+        for entrega in tarea.entregas.all()
+        if entrega.archivo_url
+    ]
+    if tarea.material_apoyo_url:
+        archivos.append(tarea.material_apoyo_url)
+
+    db.session.delete(tarea)
+    db.session.commit()
+
+    for url in archivos:
+        ArchivoService.eliminar(url)
+
+    actualizar_alertas_ficha(ficha_id)
+    actualizar_participacion_ficha(ficha_id)
+    flash(f'Tarea "{titulo}" eliminada junto con sus registros.', 'success')
+    return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+
+
+@instructor_bp.route('/tareas/<int:tarea_id>/actividad-clase', methods=['POST'])
+@login_required
+def registrar_actividad_clase(tarea_id):
+    """Aprueba en bloque una actividad revisada presencialmente.
+
+    Cada aprendiz marcado recibe (o conserva) un registro de cumplimiento sin
+    archivo; los desmarcados pierden el registro previo, de modo que el
+    instructor puede corregir una aprobación equivocada.
+    """
+    tarea = db.session.get(Tarea, tarea_id)
+    if not tarea:
+        flash('Tarea no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    ficha = tarea.ficha
+    if not puede_gestionar_ficha(ficha) or not puede_gestionar_tarea(tarea):
+        flash('No tienes permiso para registrar esta actividad.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    if not tarea.es_actividad_clase:
+        flash('Esta tarea espera evidencias del aprendiz, no aprobación en aula.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
+
+    aprendices = Aprendiz.query_en_formacion(ficha.id).all()
+    ids_validos = {aprendiz.id for aprendiz in aprendices}
+    aprobados = set()
+    for valor in request.form.getlist('aprobados'):
+        try:
+            aprendiz_id = int(valor)
+        except (TypeError, ValueError):
+            continue
+        if aprendiz_id in ids_validos:
+            aprobados.add(aprendiz_id)
+
+    calificacion = request.form.get('calificacion_general', '').strip() or None
+    observacion = request.form.get('observacion_general', '').strip() or None
+
+    existentes = {
+        entrega.aprendiz_id: entrega
+        for entrega in Entrega.query.filter_by(tarea_id=tarea.id).all()
+    }
+    ahora = datetime.utcnow()
+    nuevas = 0
+    retiradas = 0
+
+    for aprendiz_id in ids_validos:
+        entrega = existentes.get(aprendiz_id)
+        if aprendiz_id in aprobados:
+            if not entrega:
+                entrega = Entrega(tarea_id=tarea.id, aprendiz_id=aprendiz_id)
+                db.session.add(entrega)
+                nuevas += 1
+            entrega.registrada_por_instructor = True
+            entrega.fecha_entrega = entrega.fecha_entrega or ahora
+            entrega.estado_revision = 'aprobada'
+            entrega.calificada = True
+            entrega.calificacion = calificacion
+            entrega.feedback = observacion
+            entrega.revisada_en = ahora
+            entrega.revisada_por_id = current_user.id
+        elif entrega and entrega.registrada_por_instructor:
+            db.session.delete(entrega)
+            retiradas += 1
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Dos instructores registrando la misma actividad a la vez: se deja
+        # ganar al primero y se informa para que el segundo recargue.
+        db.session.rollback()
+        flash('Otro instructor registró esta actividad al mismo tiempo. Revisa el resultado.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
+
+    actualizar_alertas_ficha(ficha.id)
+    actualizar_participacion_ficha(ficha.id)
+    flash(
+        f'Actividad registrada: {len(aprobados)} aprendiz(es) aprobado(s) '
+        f'({nuevas} nuevo(s), {retiradas} aprobación(es) retirada(s)).',
+        'success',
+    )
+    return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
 
 
 @instructor_bp.route('/tareas/<int:tarea_id>/entregas')
@@ -1430,6 +1670,31 @@ def calificar_entrega(entrega_id):
 
     flash('Calificación guardada.', 'success')
     return redirect(url_for('instructor.ver_entregas', tarea_id=entrega.tarea_id))
+
+
+@instructor_bp.route('/planes/<int:plan_id>/evidencia')
+@login_required
+def descargar_evidencia_plan(plan_id):
+    """Descarga la evidencia de un plan solo para instructores autorizados."""
+    plan = db.session.get(PlanMejoramiento, plan_id)
+    if (
+        not plan or not plan.evidencia_url or not plan.ficha
+        or not plan.aprendiz or plan.aprendiz.ficha_id != plan.ficha_id
+        or not puede_gestionar_ficha(plan.ficha)
+    ):
+        abort(404)
+    try:
+        raiz, relativa, _ = resolver_archivo_subido(plan.evidencia_url)
+    except FileNotFoundError:
+        abort(404)
+    return ArchivoService.enviar(
+        raiz,
+        relativa,
+        nombre_descarga=(
+            f'{plan.aprendiz.documento}_plan_{plan.id}_'
+            f'{nombre_original_desde_ruta(plan.evidencia_url)}'
+        ),
+    )
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/alertas')
@@ -1734,6 +1999,229 @@ def eliminar_material(ficha_id, material_id):
     db.session.commit()
     flash('Material eliminado.', 'success')
     return redirect(url_for('instructor.materiales', ficha_id=ficha_id))
+
+
+class _DatosNotaInvalidos(Exception):
+    """El formulario del observador no cumple las validaciones mínimas."""
+
+
+def _leer_datos_nota(form, ids_aprendices):
+    """Valida el formulario del observador y devuelve los campos normalizados."""
+    try:
+        aprendiz_id = int(form.get('aprendiz_id', ''))
+    except (TypeError, ValueError):
+        raise _DatosNotaInvalidos('Selecciona un aprendiz de la ficha.')
+    if aprendiz_id not in ids_aprendices:
+        raise _DatosNotaInvalidos('El aprendiz no pertenece a esta ficha.')
+
+    descripcion = form.get('descripcion', '').strip()
+    if not descripcion:
+        raise _DatosNotaInvalidos('Describe el hecho observado.')
+
+    tipo = form.get('tipo', TIPO_NEUTRA).strip()
+    if tipo not in TIPOS_NOTA:
+        tipo = TIPO_NEUTRA
+    categoria = form.get('categoria', 'otra').strip()
+    if categoria not in CLAVES_CATEGORIA:
+        categoria = 'otra'
+
+    fecha_str = form.get('fecha', '').strip()
+    fecha_nota = date.today()
+    if fecha_str:
+        try:
+            fecha_nota = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            raise _DatosNotaInvalidos('La fecha del hecho no tiene un formato válido.')
+    if fecha_nota > date.today():
+        # Una bitácora registra lo ocurrido; una fecha futura la vuelve
+        # inservible como evidencia ante el comité.
+        raise _DatosNotaInvalidos('No se puede registrar una observación con fecha futura.')
+
+    return {
+        'aprendiz_id': aprendiz_id,
+        'tipo': tipo,
+        'categoria': categoria,
+        'descripcion': descripcion,
+        'fecha': fecha_nota,
+    }
+
+
+def puede_gestionar_nota(nota):
+    """Solo el autor de la observación o un administrador pueden tocarla."""
+    if not nota or not current_user.is_authenticated:
+        return False
+    return current_user.es_admin or nota.instructor_id == current_user.id
+
+
+def _ids_aprendices_ficha(ficha_id):
+    """Todos los aprendices de la ficha, retirados incluidos.
+
+    La bitácora conserva las notas de quien ya salió: si la validación solo
+    aceptara a los activos, corregir la redacción de una nota vieja sería
+    imposible justo cuando el caso llega a comité.
+    """
+    return {
+        fila[0]
+        for fila in Aprendiz.query.filter_by(ficha_id=ficha_id).with_entities(Aprendiz.id).all()
+    }
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/observador', methods=['GET', 'POST'])
+@login_required
+def observador(ficha_id):
+    """Bitácora de la formación integral: hechos cortos, fechados y por aprendiz."""
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(
+        Aprendiz.apellidos, Aprendiz.nombre
+    ).all()
+
+    if request.method == 'POST':
+        try:
+            datos = _leer_datos_nota(request.form, _ids_aprendices_ficha(ficha_id))
+        except _DatosNotaInvalidos as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('instructor.observador', ficha_id=ficha_id))
+
+        nota = NotaObservador(ficha_id=ficha_id, instructor_id=current_user.id, **datos)
+        db.session.add(nota)
+        db.session.commit()
+        if nota.tipo == TIPO_NEGATIVA:
+            # Un llamado de atención que el aprendiz descubre semanas después no
+            # sirve para corregir nada: se le avisa el día que se registra.
+            aprendiz_nota = db.session.get(Aprendiz, nota.aprendiz_id)
+            registrar_notificacion(
+                'aprendiz', nota.aprendiz_id,
+                f'Se registró un llamado de atención en tu observador '
+                f'({nota.etiqueta_categoria}, {nota.fecha.strftime("%d/%m/%Y")}). '
+                'Revísalo en tu panel y habla con tu instructor.',
+                'observador', f'observador:{nota.id}', ficha_id,
+                f'/aprendiz/{ficha_id}/panel?documento={aprendiz_nota.documento}'
+                if aprendiz_nota else None,
+            )
+            db.session.commit()
+        flash('Observación registrada.', 'success')
+        return redirect(url_for('instructor.observador', ficha_id=ficha_id))
+
+    consulta = NotaObservador.query.filter_by(ficha_id=ficha_id)
+
+    filtro_aprendiz = request.args.get('aprendiz_id', '').strip()
+    if filtro_aprendiz.isdigit():
+        consulta = consulta.filter(NotaObservador.aprendiz_id == int(filtro_aprendiz))
+    filtro_tipo = request.args.get('tipo', '').strip()
+    if filtro_tipo in TIPOS_NOTA:
+        consulta = consulta.filter(NotaObservador.tipo == filtro_tipo)
+
+    notas = (
+        consulta
+        .options(joinedload(NotaObservador.aprendiz), joinedload(NotaObservador.autor))
+        .order_by(NotaObservador.fecha.desc(), NotaObservador.id.desc())
+        .all()
+    )
+
+    # Conteo por aprendiz y tipo en una sola consulta agregada: recorrer la
+    # lista aprendiz por aprendiz costaba un COUNT por cada uno.
+    filas = (
+        db.session.query(
+            NotaObservador.aprendiz_id,
+            NotaObservador.tipo,
+            func.count(NotaObservador.id),
+        )
+        .filter(NotaObservador.ficha_id == ficha_id)
+        .group_by(NotaObservador.aprendiz_id, NotaObservador.tipo)
+        .all()
+    )
+
+    # El resumen y el filtro incluyen a quien ya no está en formación pero dejó
+    # notas: al preparar un comité, el historial del retirado es justo el que se
+    # necesita, y desaparecía de la tabla al cambiarle el estado.
+    ids_activos = {ap.id for ap in aprendices}
+    ids_historicos = {aprendiz_id for aprendiz_id, _tipo, _n in filas} - ids_activos
+    historicos = []
+    if ids_historicos:
+        historicos = (
+            Aprendiz.query
+            .filter(Aprendiz.id.in_(ids_historicos))
+            .order_by(Aprendiz.apellidos, Aprendiz.nombre)
+            .all()
+        )
+    aprendices_bitacora = aprendices + historicos
+
+    resumen = {ap.id: {tipo: 0 for tipo in TIPOS_NOTA} for ap in aprendices_bitacora}
+    for aprendiz_id, tipo, cantidad in filas:
+        if aprendiz_id in resumen and tipo in resumen[aprendiz_id]:
+            resumen[aprendiz_id][tipo] = cantidad
+
+    # Un enlace desde otro módulo puede traer el aprendiz y el tipo ya
+    # elegidos. El costo de registrar debe ser un clic y un renglón de texto:
+    # si dejar constancia cuesta más que olvidarlo, nadie deja constancia.
+    tipo_sugerido = request.args.get('nota_tipo', '').strip()
+    if tipo_sugerido not in TIPOS_NOTA:
+        tipo_sugerido = TIPO_NEUTRA
+
+    return render_template(
+        'observador.html',
+        ficha=ficha,
+        aprendices=aprendices,
+        aprendices_bitacora=aprendices_bitacora,
+        notas=notas,
+        resumen=resumen,
+        categorias=CATEGORIAS_NOTA,
+        hoy=date.today(),
+        filtro_aprendiz=filtro_aprendiz,
+        filtro_tipo=filtro_tipo,
+        tipo_sugerido=tipo_sugerido,
+        puede_gestionar_nota=puede_gestionar_nota,
+    )
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/observador/<int:nota_id>/editar', methods=['POST'])
+@login_required
+def editar_nota_observador(ficha_id, nota_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    nota = db.session.get(NotaObservador, nota_id)
+    if not nota or nota.ficha_id != ficha_id or not puede_gestionar_nota(nota):
+        flash('Solo el instructor que registró la observación puede editarla.', 'error')
+        return redirect(url_for('instructor.observador', ficha_id=ficha_id))
+
+    try:
+        datos = _leer_datos_nota(request.form, _ids_aprendices_ficha(ficha_id))
+    except _DatosNotaInvalidos as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('instructor.observador', ficha_id=ficha_id))
+
+    for campo, valor in datos.items():
+        setattr(nota, campo, valor)
+    nota.actualizada_en = datetime.utcnow()
+    db.session.commit()
+    flash('Observación actualizada.', 'success')
+    return redirect(url_for('instructor.observador', ficha_id=ficha_id))
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/observador/<int:nota_id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_nota_observador(ficha_id, nota_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    nota = db.session.get(NotaObservador, nota_id)
+    if not nota or nota.ficha_id != ficha_id or not puede_gestionar_nota(nota):
+        flash('Solo el instructor que registró la observación puede eliminarla.', 'error')
+        return redirect(url_for('instructor.observador', ficha_id=ficha_id))
+
+    db.session.delete(nota)
+    db.session.commit()
+    flash('Observación eliminada.', 'success')
+    return redirect(url_for('instructor.observador', ficha_id=ficha_id))
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/juicios')

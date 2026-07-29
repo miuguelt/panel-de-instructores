@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
+from xml.sax.saxutils import escape
 import io
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for, session
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 
 from app import db
 from app.models.alertas import (
@@ -13,6 +15,7 @@ from app.models.alertas import (
 )
 from app.models.aprendiz import Aprendiz
 from app.models.ficha import Ficha
+from app.models.observador import TIPO_NEGATIVA, TIPO_POSITIVA, NotaObservador
 from app.services.alertas import (
     ContextoFicha,
     actualizar_alertas_ficha,
@@ -158,6 +161,9 @@ def configurar_alertas_comite(ficha_id):
             100, max(1, int(request.form.get('porcentaje_minimo_asistencia', 75)))
         )
         config.auto_escalar_dias = max(1, int(request.form.get('auto_escalar_dias', 15)))
+        # El cero es válido: desactiva la regla de la bitácora sin borrar notas.
+        config.umbral_notas_negativas = max(0, int(request.form.get('umbral_notas_negativas', 3)))
+        config.periodo_dias_notas = max(1, int(request.form.get('periodo_dias_notas', 30)))
         config.correo_habilitado = 'correo_habilitado' in request.form
         db.session.commit()
     except (TypeError, ValueError):
@@ -283,8 +289,23 @@ def gestionar_planes(ficha_id):
         if alertas and alertas[0].aprendiz
     ]
     fecha_limite_sugerida = (datetime.utcnow().date() + timedelta(days=15)).isoformat()
+    # Historial del observador del aprendiz preseleccionado: el plan se redacta
+    # sobre hechos fechados, no sobre la impresión del día en que se abre.
+    aprendiz_preseleccionado = request.args.get('aprendiz_id', type=int)
+    notas_observador = []
+    if aprendiz_preseleccionado:
+        notas_observador = (
+            NotaObservador.query
+            .options(joinedload(NotaObservador.autor))
+            .filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz_preseleccionado)
+            .filter(NotaObservador.tipo.in_((TIPO_NEGATIVA, TIPO_POSITIVA)))
+            .order_by(NotaObservador.fecha.desc(), NotaObservador.id.desc())
+            .all()
+        )
     return render_template('planes_mejoramiento.html', ficha=ficha, planes=planes,
                            aprendices=aprendices, casos_activos=casos_activos,
+                           notas_observador=notas_observador,
+                           aprendiz_preseleccionado=aprendiz_preseleccionado,
                            fecha_limite_sugerida=fecha_limite_sugerida)
 
 
@@ -299,6 +320,12 @@ def cumplir_plan(ficha_id, plan_id):
     if not plan_existente or plan_existente.ficha_id != ficha_id:
         flash('Plan no encontrado para esta ficha.', 'error')
         return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
+    if plan_existente.estado == 'pendiente' and not plan_existente.evidencia_url:
+        flash('El aprendiz aún no ha enviado evidencia. Revísala antes de marcar el plan como cumplido.', 'warning')
+        return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
+    if request.form.get('observaciones_instructor', '').strip():
+        plan_existente.observaciones_instructor = request.form['observaciones_instructor'].strip()
+        db.session.commit()
     plan = cumplir_plan_mejoramiento(plan_id)
     if plan:
         flash('Plan de mejoramiento marcado como cumplido.', 'success')
@@ -337,7 +364,7 @@ def reporte_comite(ficha_id, aprendiz_id):
 def _generar_reporte_comite(ficha, aprendiz, alertas, timeline):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     from reportlab.lib.enums import TA_CENTER
@@ -383,13 +410,20 @@ def _generar_reporte_comite(ficha, aprendiz, alertas, timeline):
     elementos.append(tabla_alertas)
     elementos.append(Spacer(1, 12))
     elementos.append(Paragraph('Línea de tiempo relevante', estilos['Heading2']))
+    # Las notas del observador son texto libre y largo. En una celda de tabla
+    # una cadena suelta no se parte y se desborda de la columna: cada detalle
+    # va como Paragraph para que reportlab lo ajuste al ancho disponible.
+    estilo_celda = ParagraphStyle(
+        'celda_timeline', parent=estilos['Normal'], fontSize=8, leading=9.5
+    )
     datos_timeline = [['Fecha', 'Tipo', 'Evento', 'Detalle']]
     for evento in timeline:
+        detalle = evento['detalle'] + (f" · {evento['nota']}" if evento.get('nota') else '')
         datos_timeline.append([
             evento['fecha'].strftime('%d/%m/%Y'),
             evento['tipo'],
-            evento['titulo'],
-            evento['detalle'] + (f" · {evento['nota']}" if evento.get('nota') else ''),
+            Paragraph(escape(evento['titulo']), estilo_celda),
+            Paragraph(escape(detalle), estilo_celda),
         ])
     tabla_timeline = Table(datos_timeline, colWidths=[ancho_util*0.15, ancho_util*0.15, ancho_util*0.35, ancho_util*0.35], repeatRows=1, hAlign='CENTER')
     tabla_timeline.setStyle(TableStyle([

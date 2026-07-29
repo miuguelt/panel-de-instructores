@@ -119,6 +119,16 @@
                 <small>Días sin cierre instructor.</small>
             </div>
             <div class="form-group">
+                <label for="umbral_notas_negativas">Llamados de atención</label>
+                <input id="umbral_notas_negativas" name="umbral_notas_negativas" type="number" min="0" max="50" value="{{ config_comite.umbral_notas_negativas }}" required>
+                <small>Notas negativas del observador que abren caso. 0 desactiva la regla.</small>
+            </div>
+            <div class="form-group">
+                <label for="periodo_dias_notas">Ventana del observador</label>
+                <input id="periodo_dias_notas" name="periodo_dias_notas" type="number" min="1" max="365" value="{{ config_comite.periodo_dias_notas }}" required>
+                <small>Días hacia atrás que se cuentan.</small>
+            </div>
+            <div class="form-group">
                 <label for="dias_plazo_justificacion">Plazo sugerido de justificación</label>
                 <input id="dias_plazo_justificacion" name="dias_plazo_justificacion" type="number" min="1" max="30" value="{{ config_comite.dias_plazo_justificacion }}" required>
                 <small>Se comunica al aprendiz.</small>
@@ -196,6 +206,7 @@
                 </div>
                 <div class="case-card-header-actions">
                     <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}" class="btn btn-sm btn-outline">Ver historial</a>
+                    <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}#registrar" class="btn btn-sm btn-outline">Registrar observación</a>
                     <a href="{{ url_for('seguimiento.reporte_comite', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}" class="btn btn-sm btn-outline">Generar borrador PDF</a>
                 </div>
             </header>
@@ -272,7 +283,7 @@
             </div>
 
             <details class="case-timeline">
-                <summary>Ver línea de tiempo de asistencia y evidencias ({{ caso.timeline|length }} eventos)</summary>
+                <summary>Ver línea de tiempo de asistencia, evidencias y observador ({{ caso.timeline|length }} eventos)</summary>
                 {% if caso.timeline %}
                 <div class="timeline-list">
                     {% for evento in caso.timeline %}

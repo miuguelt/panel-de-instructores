@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}Observador - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block head %}
+<style>
+    .nota-card {
+        background: white;
+        border: 1px solid var(--border-divider);
+        border-left: 4px solid var(--gray-300);
+        border-radius: var(--radius-sm);
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        box-shadow: var(--shadow);
+    }
+    .nota-positiva { border-left-color: var(--sena-green); }
+    .nota-negativa { border-left-color: var(--sena-red); }
+    .nota-neutra { border-left-color: var(--info); }
+    .nota-encabezado {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .nota-encabezado h3 { margin: 0; font-size: 16px; font-weight: 700; }
+    .nota-meta { font-size: 12px; color: var(--gray-500); }
+    .nota-texto { margin: 10px 0 0; color: var(--gray-700); white-space: pre-line; }
+    .nota-acciones { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .resumen-tabla { width: 100%; border-collapse: collapse; }
+    .resumen-tabla th, .resumen-tabla td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-divider);
+        font-size: 14px;
+    }
+    .resumen-tabla th { color: var(--gray-500); font-size: 12px; text-transform: uppercase; }
+    .contador { font-weight: 800; }
+    .contador-positiva { color: var(--sena-green); }
+    .contador-negativa { color: var(--sena-red); }
+    .contador-neutra { color: var(--info); }
+    .filtros-observador {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        margin-bottom: 16px;
+    }
+    .acciones-rapidas { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+    <h1>Observador del aprendiz</h1>
+    <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+</div>
+
+<div class="card form-card" id="registrar">
+    <h2>Registrar observación</h2>
+    <p class="text-muted">
+        Deja constancia fechada de hechos de convivencia, puntualidad, compromiso o trabajo
+        en equipo. Estas notas sustentan el plan de mejoramiento y el comité con historial,
+        no con impresiones.
+    </p>
+    <p class="text-muted">
+        <strong>El aprendiz ve estas notas en su panel</strong>, con la fecha y tu nombre.
+        Redacta el hecho, no el juicio de valor.
+    </p>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-row">
+            <div class="form-group flex-grow">
+                <label for="aprendiz_id">Aprendiz</label>
+                <select id="aprendiz_id" name="aprendiz_id" required>
+                    <option value="">Selecciona un aprendiz</option>
+                    {% for ap in aprendices_bitacora %}
+                    <option value="{{ ap.id }}" {% if filtro_aprendiz == ap.id|string %}selected{% endif %}>{{ ap.apellidos }} {{ ap.nombre }} - {{ ap.documento }}{% if not ap.en_formacion %} ({{ ap.estado.replace('_', ' ')|lower }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="fecha">Fecha del hecho</label>
+                <input type="date" id="fecha" name="fecha" value="{{ hoy.isoformat() }}" max="{{ hoy.isoformat() }}">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group flex-grow">
+                <label for="tipo">Tipo</label>
+                <select id="tipo" name="tipo">
+                    <option value="positiva" {% if tipo_sugerido == 'positiva' %}selected{% endif %}>Reconocimiento</option>
+                    <option value="neutra" {% if tipo_sugerido == 'neutra' %}selected{% endif %}>Observación</option>
+                    <option value="negativa" {% if tipo_sugerido == 'negativa' %}selected{% endif %}>Llamado de atención</option>
+                </select>
+            </div>
+            <div class="form-group flex-grow">
+                <label for="categoria">Dimensión</label>
+                <select id="categoria" name="categoria">
+                    {% for clave, etiqueta in categorias %}
+                    <option value="{{ clave }}">{{ etiqueta }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="descripcion">Hecho observado</label>
+            <textarea id="descripcion" name="descripcion" rows="3" required
+                      placeholder="Ej: Lideró la organización del ambiente antes de la sesión práctica."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Guardar observación</button>
+    </form>
+</div>
+
+{% if aprendices_bitacora %}
+<div class="card" style="padding: 24px;">
+    <h2 style="margin-top: 0;">Resumen por aprendiz</h2>
+    <div style="overflow-x: auto;">
+        <table class="resumen-tabla">
+            <thead>
+                <tr>
+                    <th>Aprendiz</th>
+                    <th>Reconocimientos</th>
+                    <th>Observaciones</th>
+                    <th>Llamados de atención</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ap in aprendices_bitacora %}
+                {% set conteo = resumen.get(ap.id, {}) %}
+                <tr>
+                    <td>
+                        {{ ap.apellidos }} {{ ap.nombre }}
+                        {% if not ap.en_formacion %}<span class="badge badge-secondary">{{ ap.estado.replace('_', ' ')|title }}</span>{% endif %}
+                    </td>
+                    <td><span class="contador contador-positiva">{{ conteo.get('positiva', 0) }}</span></td>
+                    <td><span class="contador contador-neutra">{{ conteo.get('neutra', 0) }}</span></td>
+                    <td><span class="contador contador-negativa">{{ conteo.get('negativa', 0) }}</span></td>
+                    <td>
+                        <div class="acciones-rapidas">
+                            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id, nota_tipo='positiva') }}#registrar"
+                               class="btn btn-sm btn-outline" title="Registrar un reconocimiento a {{ ap.nombre }}">+ Positiva</a>
+                            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id, nota_tipo='negativa') }}#registrar"
+                               class="btn btn-sm btn-outline" title="Registrar un llamado de atención a {{ ap.nombre }}">+ Negativa</a>
+                            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id) }}"
+                               class="btn btn-sm btn-outline">Ver notas</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card" style="padding: 24px; margin-top: 24px;">
+    <h2 style="margin-top: 0;">Bitácora</h2>
+
+    <form method="GET" class="filtros-observador">
+        <div class="form-group">
+            <label for="filtro-aprendiz">Aprendiz</label>
+            <select id="filtro-aprendiz" name="aprendiz_id">
+                <option value="">Todos</option>
+                {% for ap in aprendices_bitacora %}
+                <option value="{{ ap.id }}" {% if filtro_aprendiz == ap.id|string %}selected{% endif %}>
+                    {{ ap.apellidos }} {{ ap.nombre }}{% if not ap.en_formacion %} ({{ ap.estado.replace('_', ' ')|lower }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="filtro-tipo">Tipo</label>
+            <select id="filtro-tipo" name="tipo">
+                <option value="">Todos</option>
+                <option value="positiva" {% if filtro_tipo == 'positiva' %}selected{% endif %}>Reconocimiento</option>
+                <option value="neutra" {% if filtro_tipo == 'neutra' %}selected{% endif %}>Observación</option>
+                <option value="negativa" {% if filtro_tipo == 'negativa' %}selected{% endif %}>Llamado de atención</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+        </div>
+        <div class="form-group">
+            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Limpiar</a>
+        </div>
+    </form>
+
+    {% if notas %}
+    {% for nota in notas %}
+    <div class="nota-card nota-{{ nota.tipo }}">
+        <div class="nota-encabezado">
+            <div>
+                <h3>{{ nota.aprendiz.apellidos }} {{ nota.aprendiz.nombre }}</h3>
+                <span class="nota-meta">
+                    {{ nota.fecha.strftime('%d/%m/%Y') }} ·
+                    {{ nota.etiqueta_categoria }} ·
+                    Registró {{ nota.autor.nombre if nota.autor else 'instructor retirado' }}
+                    {%- if nota.actualizada_en %} · editada{% endif %}
+                </span>
+            </div>
+            <span class="badge badge-{{ 'success' if nota.tipo == 'positiva' else ('danger' if nota.tipo == 'negativa' else 'info') }}">
+                {{ nota.etiqueta_tipo }}
+            </span>
+        </div>
+        <p class="nota-texto">{{ nota.descripcion }}</p>
+
+        {% if puede_gestionar_nota(nota) %}
+        <div class="nota-acciones">
+            <details style="width: 100%;">
+                <summary style="cursor: pointer; font-weight: 600; color: var(--sena-green);">✏️ Editar</summary>
+                <form method="POST"
+                      action="{{ url_for('instructor.editar_nota_observador', ficha_id=ficha.id, nota_id=nota.id) }}"
+                      style="margin-top: 12px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="aprendiz_id" value="{{ nota.aprendiz_id }}">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fecha-{{ nota.id }}">Fecha</label>
+                            <input type="date" id="fecha-{{ nota.id }}" name="fecha"
+                                   value="{{ nota.fecha.isoformat() }}" max="{{ hoy.isoformat() }}">
+                        </div>
+                        <div class="form-group flex-grow">
+                            <label for="tipo-{{ nota.id }}">Tipo</label>
+                            <select id="tipo-{{ nota.id }}" name="tipo">
+                                <option value="positiva" {% if nota.tipo == 'positiva' %}selected{% endif %}>Reconocimiento</option>
+                                <option value="neutra" {% if nota.tipo == 'neutra' %}selected{% endif %}>Observación</option>
+                                <option value="negativa" {% if nota.tipo == 'negativa' %}selected{% endif %}>Llamado de atención</option>
+                            </select>
+                        </div>
+                        <div class="form-group flex-grow">
+                            <label for="categoria-{{ nota.id }}">Dimensión</label>
+                            <select id="categoria-{{ nota.id }}" name="categoria">
+                                {% for clave, etiqueta in categorias %}
+                                <option value="{{ clave }}" {% if nota.categoria == clave %}selected{% endif %}>{{ etiqueta }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="descripcion-{{ nota.id }}">Hecho observado</label>
+                        <textarea id="descripcion-{{ nota.id }}" name="descripcion" rows="3" required>{{ nota.descripcion }}</textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-sm btn-primary">Guardar cambios</button>
+                </form>
+            </details>
+            <form method="POST"
+                  action="{{ url_for('instructor.eliminar_nota_observador', ficha_id=ficha.id, nota_id=nota.id) }}"
+                  onsubmit="return confirm('Se eliminará esta observación de forma permanente. ¿Continuar?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📓</div>
+        <h3>Sin observaciones registradas</h3>
+        <p>Registra el primer hecho para empezar a construir el historial de la ficha.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

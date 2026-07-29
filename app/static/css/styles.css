@@ -1547,6 +1547,7 @@ summary:focus-visible {
 .timeline-dot { flex: 0 0 auto; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--text-muted); }
 .timeline-asistencia { background: var(--accent-primary); }
 .timeline-academica { background: var(--sena-orange); }
+.timeline-observador { background: var(--info); }
 .timeline-event strong { font-size: 12px; }
 .timeline-event p { color: var(--text-main); font-size: 12px; }
 
@@ -1568,6 +1569,33 @@ summary:focus-visible {
 .notification-copy p { color: var(--text-strong); font-size: 13px; }
 .notification-copy small { color: var(--text-muted); font-size: 11px; }
 .notification-actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 5px; }
+.learner-observer-card { border-left: 4px solid var(--info); }
+.learner-observer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.learner-observer-heading h2 { font-size: 17px; }
+.learner-observer-list { display: grid; gap: 10px; margin-top: 12px; list-style: none; padding: 0; }
+.learner-observer-item { padding: 10px 12px; border-left: 3px solid var(--border-subtle); border-radius: var(--radius-sm); }
+.learner-observer-positiva { border-left-color: var(--sena-green); }
+.learner-observer-negativa { border-left-color: var(--sena-red); }
+.learner-observer-neutra { border-left-color: var(--info); }
+.learner-observer-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.learner-observer-item small { color: var(--text-muted); font-size: 11px; }
+.learner-observer-item p { margin-top: 5px; color: var(--text-strong); font-size: 13px; white-space: pre-line; }
+.learner-plan-card { border-left: 4px solid var(--warning); }
+.learner-plan-list { display: grid; gap: 12px; margin-top: 14px; }
+.learner-plan-item { padding: 13px; border: 1px solid var(--border-divider); border-left: 3px solid var(--warning); border-radius: var(--radius-sm); }
+.learner-plan-state-cumplido { border-left-color: var(--success); }
+.learner-plan-state-vencido { border-left-color: var(--danger); }
+.learner-plan-item-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.learner-plan-item-header h3 { color: var(--text-strong); font-size: 15px; }
+.learner-plan-item-header p { margin-top: 3px; }
+.learner-plan-activities { margin: 12px 0; color: var(--text-main); }
+.learner-plan-activities p { margin-top: 4px; color: var(--text-strong); white-space: pre-line; }
+.learner-plan-next-step { margin: 10px 0; color: var(--text-muted); font-size: 13px; }
+.learner-plan-evidence-form { margin-top: 11px; }
+.learner-plan-empty { margin-top: 14px; padding: 20px; }
+.plan-evidence-review { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-glass); }
+.plan-evidence-review p { margin: 5px 0 9px; white-space: pre-line; }
+.plan-evidence-missing { margin-top: 12px; padding: 10px 12px; font-size: 13px; }
 .support-card { border-left: 4px solid var(--sena-orange); }
 .support-card h2 { font-size: 17px; }
 .support-form { display: grid; gap: 7px; padding: 11px 0; border-bottom: 1px solid var(--border-divider); }
@@ -5268,6 +5296,12 @@ summary:focus-visible {
 .plan-meta { display: flex; flex-wrap: wrap; gap: .55rem 1rem; color: var(--text-muted); font-size: .78rem; }
 .plan-actions { margin-top: .9rem; }
 .followup-plan-empty { margin-top: 2rem; }
+.observador-historial { margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--border-divider); }
+.observador-historial h3 { color: var(--text-strong); font-size: .95rem; }
+.observador-historial-lista { display: grid; gap: .7rem; margin-top: .8rem; list-style: none; padding: 0; }
+.observador-historial-lista li { padding-left: .7rem; border-left: 3px solid var(--border-divider); font-size: .8rem; }
+.observador-historial-lista strong { display: inline-block; margin-left: .4rem; color: var(--text-strong); }
+.observador-historial-lista p { margin-top: .2rem; color: var(--text-main); white-space: pre-wrap; }
 
 @media (max-width: 940px) {
     .followup-page-header { grid-template-columns: auto minmax(0, 1fr); }
@@ -5319,4 +5353,3 @@ summary:focus-visible {
     .competencia-modal-rap { align-items: flex-start; flex-direction: column; }
     .competencia-modal-rap .badge { align-self: flex-start; }
 }
-

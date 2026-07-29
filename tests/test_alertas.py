@@ -8,6 +8,7 @@ from app.models import (
     ConfiguracionAlertasComite,
     Ficha,
     Instructor,
+    NotaObservador,
     Notificacion,
     PlanMejoramiento,
     RegistroAsistencia,
@@ -121,6 +122,76 @@ class AlertasTestCase(unittest.TestCase):
         )
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(registro.nota, 'Presento soporte para revisión.')
+
+    # ── Formación integral: bitácora del observador ──
+
+    def _nota_negativa(self, dias_atras, texto='Interrumpió la sesión.'):
+        nota = NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            instructor_id=self.instructor.id,
+            tipo='negativa',
+            categoria='convivencia',
+            descripcion=texto,
+            fecha=date.today() - timedelta(days=dias_atras),
+        )
+        db.session.add(nota)
+        db.session.commit()
+        return nota
+
+    def _alerta_observador(self):
+        return Alerta.query.filter_by(
+            ficha_id=self.ficha.id, aprendiz_id=self.aprendiz.id, tipo='observador',
+        ).first()
+
+    def test_llamados_de_atencion_abren_caso_al_llegar_al_umbral(self):
+        config = ConfiguracionAlertasComite.query.filter_by(ficha_id=self.ficha.id).one()
+        config.umbral_notas_negativas = 3
+        config.periodo_dias_notas = 30
+        db.session.commit()
+
+        # Fuera de la ventana y de tipo positivo: no deben contar.
+        self._nota_negativa(60, 'Llamado antiguo, fuera de la ventana.')
+        db.session.add(NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            instructor_id=self.instructor.id,
+            tipo='positiva',
+            categoria='trabajo_equipo',
+            descripcion='Apoyó a sus compañeros.',
+            fecha=date.today(),
+        ))
+        self._nota_negativa(1)
+        self._nota_negativa(2)
+        actualizar_alertas_ficha(self.ficha.id)
+        self.assertIsNone(self._alerta_observador())
+
+        tercera = self._nota_negativa(3)
+        actualizar_alertas_ficha(self.ficha.id)
+        alerta = self._alerta_observador()
+        self.assertIsNotNone(alerta)
+        self.assertEqual(alerta.estado, 'activa')
+        self.assertEqual(alerta.nivel, 'amarilla')
+        self.assertEqual(alerta.detalle_json['notas_negativas'], 3)
+        self.assertEqual(alerta.detalle_json['periodo_dias'], 30)
+
+        # Al caer por debajo del umbral el caso se cierra solo.
+        db.session.delete(tercera)
+        db.session.commit()
+        actualizar_alertas_ficha(self.ficha.id)
+        db.session.refresh(alerta)
+        self.assertEqual(alerta.estado, 'resuelta')
+        self.assertIsNotNone(alerta.fecha_resuelta)
+
+    def test_umbral_en_cero_desactiva_la_regla_del_observador(self):
+        config = ConfiguracionAlertasComite.query.filter_by(ficha_id=self.ficha.id).one()
+        config.umbral_notas_negativas = 0
+        db.session.commit()
+        for dias in (1, 2, 3, 4):
+            self._nota_negativa(dias)
+
+        actualizar_alertas_ficha(self.ficha.id)
+        self.assertIsNone(self._alerta_observador())
 
     # ── Nuevos tests: Reglamento 009 ──
 

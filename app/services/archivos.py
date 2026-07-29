@@ -168,6 +168,7 @@ class TiposCarpeta(str, Enum):
     MATERIALES_TAREA = 'materiales'
     MATERIALES_FICHA = 'materiales_ficha'
     ENTREGAS = 'entregas'
+    PLANES_MEJORAMIENTO = 'planes_mejoramiento'
     JUSTIFICACIONES = 'justificaciones'
 
     def __str__(self) -> str:

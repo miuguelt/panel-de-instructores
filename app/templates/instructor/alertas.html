@@ -72,6 +72,13 @@
                 <td style="padding: 0.5rem;"><strong>{{ config_comite.umbral_tareas_incumplidas }}</strong> tareas</td>
                 <td style="padding: 0.5rem;">Alerta roja → plan de mejoramiento</td>
             </tr>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.5rem;">Llamados de atención del observador en {{ config_comite.periodo_dias_notas }} días</td>
+                <td style="padding: 0.5rem;">
+                    {% if config_comite.umbral_notas_negativas %}<strong>{{ config_comite.umbral_notas_negativas }}</strong> notas{% else %}Regla desactivada{% endif %}
+                </td>
+                <td style="padding: 0.5rem;">Alerta amarilla → plan de mejoramiento</td>
+            </tr>
             <tr>
                 <td style="padding: 0.5rem;">Auto-escalación por inacción del instructor</td>
                 <td style="padding: 0.5rem;"><strong>{{ config_comite.auto_escalar_dias }}</strong> días sin resolver</td>
@@ -144,6 +151,10 @@
         <div class="form-group">
             <label>Días para auto-escalar a comité</label>
             <input type="number" value="{{ config_comite.auto_escalar_dias }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Llamados de atención en {{ config_comite.periodo_dias_notas }} días</label>
+            <input type="number" value="{{ config_comite.umbral_notas_negativas }}" disabled>
         </div>
     </div>
     <label class="checkbox-label privacy-checkbox"><input type="checkbox" disabled {% if config_comite.correo_habilitado %}checked{% endif %}> Permitir avisos por correo (configuración opcional del Centro)</label>

@@ -537,6 +537,107 @@
     {% endfor %}
     {% endif %}
 
+    {% if notas_observador %}
+    <section class="card learner-observer-card" aria-labelledby="learner-observer-title">
+        <div class="learner-observer-heading">
+            <div>
+                <span class="eyebrow">Observador</span>
+                <h2 id="learner-observer-title">Constancias de tu formación integral</h2>
+            </div>
+            <span class="badge badge-secondary">{{ notas_observador|length }} registro{% if notas_observador|length != 1 %}s{% endif %}</span>
+        </div>
+        <p class="text-muted">
+            Estos hechos fechados sustentan cualquier plan de mejoramiento o comité.
+            Si no estás de acuerdo con alguno, habla con el instructor que lo registró.
+        </p>
+        <ul class="learner-observer-list">
+            {% for nota in notas_observador %}
+            <li class="learner-observer-item learner-observer-{{ nota.tipo }}">
+                <div class="learner-observer-item-head">
+                    <strong>{{ nota.etiqueta_categoria }}</strong>
+                    <span class="badge badge-{{ 'success' if nota.tipo == 'positiva' else ('danger' if nota.tipo == 'negativa' else 'info') }}">{{ nota.etiqueta_tipo }}</span>
+                </div>
+                <small>{{ nota.fecha.strftime('%d/%m/%Y') }}{% if nota.autor %} · {{ nota.autor.nombre }}{% endif %}</small>
+                <p>{{ nota.descripcion }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <section class="card learner-plan-card" aria-labelledby="learner-plan-title">
+        <div class="learner-observer-heading">
+            <div>
+                <span class="eyebrow">Debido proceso · Art. 28</span>
+                <h2 id="learner-plan-title">Mis planes de mejoramiento</h2>
+            </div>
+            <span class="badge badge-secondary">{{ planes_mejoramiento|length }} plan{% if planes_mejoramiento|length != 1 %}es{% endif %}</span>
+        </div>
+        <p class="text-muted">Aquí puedes leer las actividades acordadas, consultar la fecha límite y enviar la evidencia para que tu instructor la revise.</p>
+
+        {% if planes_mejoramiento %}
+        <div class="learner-plan-list">
+            {% for plan in planes_mejoramiento %}
+            <article class="learner-plan-item learner-plan-state-{{ plan.estado }}">
+                <div class="learner-plan-item-header">
+                    <div>
+                        <h3>Plan del {{ plan.fecha_creacion.strftime('%d/%m/%Y') }}</h3>
+                        {% if plan.fecha_limite %}
+                        <p class="task-deadline">🕒 Fecha límite: {{ plan.fecha_limite.strftime('%d/%m/%Y') }}</p>
+                        {% else %}
+                        <p class="text-muted">Sin fecha límite registrada</p>
+                        {% endif %}
+                    </div>
+                    <span class="badge badge-{{ 'success' if plan.estado == 'cumplido' else 'danger' if plan.estado == 'vencido' else 'warning' }}">
+                        {{ {'pendiente': 'Pendiente', 'cumplido': 'Cumplido', 'vencido': 'Vencido'}[plan.estado] }}
+                    </span>
+                </div>
+                <div class="learner-plan-activities">
+                    <strong>Actividades y compromisos acordados</strong>
+                    <p>{{ plan.actividades }}</p>
+                </div>
+
+                {% if plan.evidencia_url %}
+                <div class="task-feedback">
+                    <strong>📎 Evidencia enviada el {{ plan.evidencia_enviada_en.strftime('%d/%m/%Y %H:%M') if plan.evidencia_enviada_en else 'fecha no disponible' }}</strong>
+                    {% if plan.observaciones_aprendiz %}<p>{{ plan.observaciones_aprendiz }}</p>{% endif %}
+                    <a class="btn btn-outline btn-sm" href="{{ url_for('aprendiz.descargar_evidencia_plan', plan_id=plan.id) }}">📄 Descargar mi evidencia</a>
+                </div>
+                {% elif plan.estado == 'pendiente' %}
+                <p class="learner-plan-next-step">Aún no has enviado evidencia. Adjunta un archivo cuando completes las actividades.</p>
+                {% endif %}
+
+                {% if plan.fecha_cumplimiento %}
+                <p class="text-muted">Cumplido el {{ plan.fecha_cumplimiento.strftime('%d/%m/%Y') }}.</p>
+                {% elif plan.estado == 'pendiente' %}
+                <details class="entrega-form learner-plan-evidence-form">
+                    <summary class="entrega-summary">📤 Enviar o reemplazar evidencia</summary>
+                    <form method="POST" action="{{ url_for('aprendiz.subir_evidencia_plan', ficha_id=ficha.id, plan_id=plan.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="plan-evidencia-{{ plan.id }}">Archivo de evidencia</label>
+                            <input type="file" id="plan-evidencia-{{ plan.id }}" name="archivo_evidencia_plan" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar,.doc,.docx" required class="form-file-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="plan-nota-{{ plan.id }}">Nota para tu instructor (opcional)</label>
+                            <textarea id="plan-nota-{{ plan.id }}" name="observaciones_aprendiz" rows="3" placeholder="Explica brevemente cómo cumpliste las actividades.">{{ plan.observaciones_aprendiz or '' }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary full-width">Enviar evidencia para revisión</button>
+                    </form>
+                </details>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state learner-plan-empty">
+            <div class="empty-icon">✅</div>
+            <h3>No tienes planes de mejoramiento activos</h3>
+            <p>Si tu instructor acuerda un plan contigo, aparecerá aquí con sus actividades y fecha límite.</p>
+        </div>
+        {% endif %}
+    </section>
+
     {% if inasistencias_pendientes %}
     <section class="card support-card">
         <h2>Presentar soporte de una inasistencia</h2>
@@ -973,6 +1074,12 @@
                 {% endif %}
             </div>
 
+            {% if item.tarea.es_actividad_clase %}
+            <div class="task-feedback">
+                <strong>🧑‍🏫 Esta actividad se revisa en clase</strong>
+                <p>No tienes que subir nada. Tu instructor registra el cumplimiento en el sistema.</p>
+            </div>
+            {% else %}
             <details class="entrega-form">
                 <summary class="entrega-summary">
                     {% if item.entrega %}
@@ -1017,6 +1124,7 @@
                     </button>
                 </form>
             </details>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -1077,6 +1185,12 @@
                     {% endif %}
                 </div>
 
+                {% if item.tarea.es_actividad_clase %}
+                <div class="task-feedback task-feedback-success">
+                    <strong>🧑‍🏫 Cumplimiento aprobado en clase</strong>
+                    <p>Tu instructor registró esta actividad como cumplida. No requiere evidencia digital.</p>
+                </div>
+                {% else %}
                 <details class="entrega-form">
                     <summary class="entrega-summary">
                         ✏️ Editar evidencia entregada
@@ -1113,6 +1227,7 @@
                         <button type="submit" class="btn btn-primary full-width">Guardar cambios en evidencia</button>
                     </form>
                 </details>
+                {% endif %}
             </div>
             {% endfor %}
         </div>

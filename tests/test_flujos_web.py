@@ -20,6 +20,8 @@ from app.models import (
     Ficha,
     FichaInstructor,
     Instructor,
+    NotaObservador,
+    Notificacion,
     RegistroAsistencia,
     SesionAsistencia,
     Tarea,
@@ -306,6 +308,463 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertIn(b'Actividad de prueba', listado_admin.data)
         self.assertIn(b'Actividad del colaborador', listado_admin.data)
 
+    def test_editar_tarea_actualiza_datos_y_respeta_la_modalidad_con_registros(self):
+        respuesta = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas/{self.tarea.id}/editar',
+            data={
+                'titulo': 'Actividad renombrada',
+                'descripcion': 'Nuevo alcance',
+                'modalidad': 'clase',
+                'fecha_limite': '2030-01-15T10:30',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        db.session.refresh(self.tarea)
+        self.assertEqual(self.tarea.titulo, 'Actividad renombrada')
+        self.assertEqual(self.tarea.descripcion, 'Nuevo alcance')
+        self.assertEqual(self.tarea.fecha_limite, datetime(2030, 1, 15, 10, 30))
+        self.assertIsNotNone(self.tarea.actualizada_en)
+        # La tarea ya tiene una entrega: la modalidad no puede cambiar.
+        self.assertEqual(self.tarea.modalidad, 'evidencia')
+        self.assertEqual(Entrega.query.filter_by(tarea_id=self.tarea.id).count(), 1)
+
+    def test_eliminar_tarea_borra_entregas_y_archivos_del_disco(self):
+        self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas',
+            data={
+                'titulo': 'Tarea desechable',
+                'requiere_archivo': 'on',
+                'material_apoyo': (BytesIO(b'%PDF-1.4\n material\n%%EOF'), 'guia.pdf'),
+            },
+            content_type='multipart/form-data',
+        )
+        tarea = Tarea.query.filter_by(titulo='Tarea desechable').one()
+
+        cliente_publico = self.app.test_client()
+        cliente_publico.post(
+            f'/aprendiz/{self.ficha.id}/subir-evidencia/{tarea.id}',
+            data={
+                'documento': self.aprendiz.documento,
+                'archivo_evidencia': (BytesIO(b'%PDF-1.4\n evidencia\n%%EOF'), 'evidencia.pdf'),
+            },
+            content_type='multipart/form-data',
+        )
+        entrega = Entrega.query.filter_by(tarea_id=tarea.id).one()
+        rutas = [
+            os.path.join(self.uploads.name, tarea.material_apoyo_url),
+            os.path.join(self.uploads.name, entrega.archivo_url),
+        ]
+        for ruta in rutas:
+            self.assertTrue(os.path.isfile(ruta))
+
+        tarea_id = tarea.id
+        respuesta = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas/{tarea_id}/eliminar'
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIsNone(db.session.get(Tarea, tarea_id))
+        self.assertEqual(Entrega.query.filter_by(tarea_id=tarea_id).count(), 0)
+        for ruta in rutas:
+            self.assertFalse(os.path.isfile(ruta))
+
+    def test_instructor_ajeno_no_edita_ni_elimina_tarea_de_otro(self):
+        db.session.add(FichaInstructor(
+            ficha_id=self.ficha.id,
+            instructor_id=self.ajeno.id,
+        ))
+        db.session.commit()
+        self._autenticar(self.ajeno)
+
+        edicion = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas/{self.tarea.id}/editar',
+            data={'titulo': 'Secuestro de tarea'},
+        )
+        self.assertEqual(edicion.status_code, 302)
+        borrado = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas/{self.tarea.id}/eliminar'
+        )
+        self.assertEqual(borrado.status_code, 302)
+
+        db.session.refresh(self.tarea)
+        self.assertEqual(self.tarea.titulo, 'Actividad de prueba')
+        self.assertIsNotNone(db.session.get(Tarea, self.tarea.id))
+
+    def test_actividad_de_clase_se_aprueba_sin_evidencia_del_aprendiz(self):
+        respuesta = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas',
+            data={
+                'titulo': 'Sustentación en clase',
+                'modalidad': 'clase',
+                'requiere_archivo': 'on',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        actividad = Tarea.query.filter_by(titulo='Sustentación en clase').one()
+        self.assertTrue(actividad.es_actividad_clase)
+        # La modalidad de aula anula la exigencia de archivo aunque llegue marcada.
+        self.assertFalse(actividad.requiere_archivo)
+
+        listado = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/tareas')
+        self.assertEqual(listado.status_code, 200)
+        self.assertIn('Editar tarea'.encode(), listado.data)
+        self.assertIn('Se revisa en clase'.encode(), listado.data)
+
+        pantalla = self.cliente.get(f'/instructor/tareas/{actividad.id}/entregas')
+        self.assertEqual(pantalla.status_code, 200)
+        self.assertIn('Guardar cumplimiento'.encode(), pantalla.data)
+
+        cliente_publico = self.app.test_client()
+        intento = cliente_publico.post(
+            f'/aprendiz/{self.ficha.id}/subir-evidencia/{actividad.id}',
+            data={
+                'documento': self.aprendiz.documento,
+                'enlace_repositorio': 'https://example.com/no-deberia',
+            },
+        )
+        self.assertEqual(intento.status_code, 302)
+        self.assertEqual(Entrega.query.filter_by(tarea_id=actividad.id).count(), 0)
+
+        aprobacion = self.cliente.post(
+            f'/instructor/tareas/{actividad.id}/actividad-clase',
+            data={
+                'aprobados': [str(self.aprendiz.id)],
+                'calificacion_general': '4.8',
+                'observacion_general': 'Sustentó en clase',
+            },
+        )
+        self.assertEqual(aprobacion.status_code, 302)
+        registros = Entrega.query.filter_by(tarea_id=actividad.id).all()
+        self.assertEqual(len(registros), 1)
+        registro = registros[0]
+        self.assertEqual(registro.aprendiz_id, self.aprendiz.id)
+        self.assertTrue(registro.registrada_por_instructor)
+        self.assertTrue(registro.calificada)
+        self.assertEqual(registro.estado_revision, 'aprobada')
+        self.assertEqual(registro.calificacion, '4.8')
+        self.assertEqual(registro.revisada_por_id, self.instructor.id)
+        self.assertIsNone(registro.archivo_url)
+        self.assertTrue(registro.entregada_a_tiempo)
+
+        # Desmarcar retira la aprobación previamente registrada.
+        retiro = self.cliente.post(
+            f'/instructor/tareas/{actividad.id}/actividad-clase',
+            data={'aprobados': []},
+        )
+        self.assertEqual(retiro.status_code, 302)
+        self.assertEqual(Entrega.query.filter_by(tarea_id=actividad.id).count(), 0)
+
+    def test_aprobacion_en_aula_no_aplica_a_tareas_con_evidencia(self):
+        respuesta = self.cliente.post(
+            f'/instructor/tareas/{self.tarea.id}/actividad-clase',
+            data={'aprobados': [str(self.otro_aprendiz.id)]},
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(
+            Entrega.query.filter_by(
+                tarea_id=self.tarea.id, aprendiz_id=self.otro_aprendiz.id
+            ).count(),
+            0,
+        )
+
+    def test_observador_registra_una_nota_fechada_y_la_deja_a_un_clic(self):
+        respuesta = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador',
+            data={
+                'aprendiz_id': str(self.aprendiz.id),
+                'tipo': 'positiva',
+                'categoria': 'trabajo_equipo',
+                'descripcion': 'Lideró la organización del ambiente.',
+                'fecha': (date.today() - timedelta(days=1)).isoformat(),
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        nota = NotaObservador.query.one()
+        self.assertEqual(nota.aprendiz_id, self.aprendiz.id)
+        self.assertEqual(nota.instructor_id, self.instructor.id)
+        self.assertEqual(nota.tipo, 'positiva')
+        self.assertEqual(nota.categoria, 'trabajo_equipo')
+        self.assertEqual(nota.fecha, date.today() - timedelta(days=1))
+        self.assertIsNone(nota.actualizada_en)
+
+        # Un enlace con aprendiz y tipo deja el formulario listo para escribir.
+        pantalla = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/observador'
+            f'?aprendiz_id={self.aprendiz.id}&nota_tipo=negativa'
+        )
+        self.assertEqual(pantalla.status_code, 200)
+        self.assertIn(
+            f'<option value="{self.aprendiz.id}" selected>'.encode(),
+            pantalla.data.replace(b'\n', b' '),
+        )
+        self.assertIn(b'<option value="negativa" selected>', pantalla.data)
+
+        historial = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/aprendices/{self.aprendiz.id}/historial'
+        )
+        self.assertIn('Lideró la organización del ambiente.'.encode(), historial.data)
+        self.assertIn('Bitácora de formación integral'.encode(), historial.data)
+
+        # El módulo se alcanza desde la navegación de la ficha, no solo por URL.
+        self.assertIn(
+            f'/instructor/fichas/{self.ficha.id}/observador'.encode(),
+            self.cliente.get(f'/instructor/fichas/{self.ficha.id}/tareas').data,
+        )
+
+    def test_observador_rechaza_fecha_futura_y_aprendiz_de_otra_ficha(self):
+        otra_ficha = Ficha(
+            codigo='3000002',
+            codigo_ficha='3000002',
+            nombre_programa='Otro programa',
+            instructor_id=self.instructor.id,
+            fecha_inicio=date.today() - timedelta(days=10),
+            fecha_fin=date.today() + timedelta(days=100),
+        )
+        db.session.add(otra_ficha)
+        db.session.flush()
+        externo = Aprendiz(
+            documento='2000001',
+            nombre='Carla',
+            apellidos='Externa',
+            ficha_id=otra_ficha.id,
+        )
+        db.session.add(externo)
+        db.session.commit()
+
+        futura = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador',
+            data={
+                'aprendiz_id': str(self.aprendiz.id),
+                'descripcion': 'Hecho que todavía no ocurre.',
+                'fecha': (date.today() + timedelta(days=1)).isoformat(),
+            },
+        )
+        self.assertEqual(futura.status_code, 302)
+
+        ajena = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador',
+            data={
+                'aprendiz_id': str(externo.id),
+                'descripcion': 'Aprendiz de otra ficha.',
+            },
+        )
+        self.assertEqual(ajena.status_code, 302)
+
+        sin_texto = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador',
+            data={'aprendiz_id': str(self.aprendiz.id), 'descripcion': '   '},
+        )
+        self.assertEqual(sin_texto.status_code, 302)
+
+        self.assertEqual(NotaObservador.query.count(), 0)
+
+    def test_solo_el_autor_o_un_admin_gestiona_una_nota_del_observador(self):
+        db.session.add(FichaInstructor(
+            ficha_id=self.ficha.id,
+            instructor_id=self.ajeno.id,
+        ))
+        nota = NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            instructor_id=self.instructor.id,
+            tipo='negativa',
+            categoria='puntualidad',
+            descripcion='Llegó 40 minutos tarde a la sesión práctica.',
+            fecha=date.today(),
+        )
+        db.session.add(nota)
+        db.session.commit()
+
+        self._autenticar(self.ajeno)
+        edicion = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador/{nota.id}/editar',
+            data={
+                'aprendiz_id': str(self.aprendiz.id),
+                'descripcion': 'Texto reescrito por otro instructor.',
+            },
+        )
+        self.assertEqual(edicion.status_code, 302)
+        borrado = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador/{nota.id}/eliminar'
+        )
+        self.assertEqual(borrado.status_code, 302)
+        db.session.refresh(nota)
+        self.assertEqual(nota.descripcion, 'Llegó 40 minutos tarde a la sesión práctica.')
+
+        self._autenticar(self.instructor)
+        propia = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador/{nota.id}/editar',
+            data={
+                'aprendiz_id': str(self.aprendiz.id),
+                'tipo': 'negativa',
+                'categoria': 'puntualidad',
+                'descripcion': 'Llegó 40 minutos tarde; se acordó compromiso.',
+                'fecha': date.today().isoformat(),
+            },
+        )
+        self.assertEqual(propia.status_code, 302)
+        db.session.refresh(nota)
+        self.assertEqual(nota.descripcion, 'Llegó 40 minutos tarde; se acordó compromiso.')
+        self.assertIsNotNone(nota.actualizada_en)
+
+        eliminado = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador/{nota.id}/eliminar'
+        )
+        self.assertEqual(eliminado.status_code, 302)
+        self.assertEqual(NotaObservador.query.count(), 0)
+
+    def test_las_notas_alimentan_el_plan_de_mejoramiento_y_el_caso(self):
+        db.session.add(NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            instructor_id=self.instructor.id,
+            tipo='negativa',
+            categoria='convivencia',
+            descripcion='Interrumpió la sesión de forma reiterada.',
+            fecha=date.today() - timedelta(days=2),
+        ))
+        # Tipo fuera de los que la revisión automática resuelve sola: el caso
+        # debe seguir abierto cuando la vista recalcula las alertas.
+        db.session.add(Alerta(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            tipo='convivencia',
+            nivel='amarilla',
+            titulo='Convivencia en el ambiente',
+            mensaje='Requiere acompañamiento en convivencia.',
+        ))
+        db.session.commit()
+
+        plan = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/planes-mejoramiento'
+            f'?aprendiz_id={self.aprendiz.id}'
+        )
+        self.assertEqual(plan.status_code, 200)
+        self.assertIn(b'Historial del observador', plan.data)
+        self.assertIn('Interrumpió la sesión de forma reiterada.'.encode(), plan.data)
+
+        # Sin aprendiz seleccionado no se filtra nada: el bloque no aparece.
+        plan_sin_aprendiz = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/planes-mejoramiento'
+        )
+        self.assertNotIn(b'Historial del observador', plan_sin_aprendiz.data)
+
+        casos = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/casos-seguimiento')
+        self.assertEqual(casos.status_code, 200)
+        self.assertIn(b'timeline-observador', casos.data)
+        self.assertIn('Llamado de atención: Convivencia y respeto'.encode(), casos.data)
+
+        # Texto largo y con caracteres de marcado: el borrador se arma con
+        # Paragraph, así que debe ajustarse sin romper el PDF.
+        db.session.add(NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            instructor_id=self.instructor.id,
+            tipo='positiva',
+            categoria='comunicacion',
+            descripcion='Explicó <b>el ejercicio</b> a sus compañeros & sostuvo el ritmo. ' * 12,
+            fecha=date.today(),
+        ))
+        db.session.commit()
+
+        borrador = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/casos/{self.aprendiz.id}/reporte-comite'
+        )
+        self.assertEqual(borrador.status_code, 200)
+        self.assertEqual(borrador.mimetype, 'application/pdf')
+        self.assertTrue(borrador.data.startswith(b'%PDF'))
+
+    def test_el_aprendiz_ve_en_su_panel_las_notas_registradas_sobre_el(self):
+        db.session.add_all([
+            NotaObservador(
+                ficha_id=self.ficha.id,
+                aprendiz_id=self.aprendiz.id,
+                instructor_id=self.instructor.id,
+                tipo='negativa',
+                categoria='puntualidad',
+                descripcion='Llegó tarde a la sesión práctica.',
+                fecha=date.today(),
+            ),
+            NotaObservador(
+                ficha_id=self.ficha.id,
+                aprendiz_id=self.otro_aprendiz.id,
+                instructor_id=self.instructor.id,
+                tipo='negativa',
+                categoria='convivencia',
+                descripcion='Nota que pertenece a otro aprendiz.',
+                fecha=date.today(),
+            ),
+        ])
+        db.session.commit()
+
+        # Un llamado de atención registrado desde el módulo avisa al aprendiz.
+        respuesta = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador',
+            data={
+                'aprendiz_id': str(self.aprendiz.id),
+                'tipo': 'negativa',
+                'categoria': 'convivencia',
+                'descripcion': 'Interrumpió la explicación del ejercicio.',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        aviso = Notificacion.query.filter_by(
+            destinatario_tipo='aprendiz',
+            destinatario_id=self.aprendiz.id,
+            tipo='observador',
+        ).one()
+        self.assertIn('llamado de atención', aviso.mensaje)
+
+        cliente_publico = self.app.test_client()
+        panel = cliente_publico.get(
+            f'/aprendiz/{self.ficha.id}/panel?documento={self.aprendiz.documento}',
+            follow_redirects=True,
+        )
+        self.assertEqual(panel.status_code, 200)
+        self.assertIn('Constancias de tu formación integral'.encode(), panel.data)
+        self.assertIn('Llegó tarde a la sesión práctica.'.encode(), panel.data)
+        self.assertIn(b'Llamado de atenci', panel.data)
+        # Cada aprendiz solo ve su propia bitácora.
+        self.assertNotIn('Nota que pertenece a otro aprendiz.'.encode(), panel.data)
+
+    def test_la_bitacora_conserva_a_los_aprendices_retirados(self):
+        nota = NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.otro_aprendiz.id,
+            instructor_id=self.instructor.id,
+            tipo='negativa',
+            categoria='compromiso',
+            descripcion='Dejó de asistir a las asesorías acordadas.',
+            fecha=date.today() - timedelta(days=5),
+        )
+        db.session.add(nota)
+        self.otro_aprendiz.estado = 'RETIRO_VOLUNTARIO'
+        db.session.commit()
+
+        pantalla = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/observador')
+        self.assertEqual(pantalla.status_code, 200)
+        self.assertIn('Dejó de asistir a las asesorías acordadas.'.encode(), pantalla.data)
+        # Sigue en el resumen y en el filtro, marcado con su estado.
+        self.assertIn(b'Retiro Voluntario', pantalla.data)
+        self.assertIn(f'value="{self.otro_aprendiz.id}"'.encode(), pantalla.data)
+
+        # Y su nota se puede seguir corrigiendo aunque ya no esté en formación.
+        edicion = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/observador/{nota.id}/editar',
+            data={
+                'aprendiz_id': str(self.otro_aprendiz.id),
+                'tipo': 'negativa',
+                'categoria': 'compromiso',
+                'descripcion': 'Dejó de asistir a las asesorías; se notificó al acudiente.',
+                'fecha': (date.today() - timedelta(days=5)).isoformat(),
+            },
+        )
+        self.assertEqual(edicion.status_code, 302)
+        db.session.refresh(nota)
+        self.assertEqual(
+            nota.descripcion,
+            'Dejó de asistir a las asesorías; se notificó al acudiente.',
+        )
+
     def test_cargas_se_guardan_dentro_de_uploads_y_descarga_exige_acceso(self):
         respuesta = self.cliente.post(
             f'/instructor/fichas/{self.ficha.id}/tareas',
@@ -458,6 +917,33 @@ class FlujosWebTestCase(unittest.TestCase):
             ))
             db.session.commit()
         db.session.rollback()
+
+    def test_entrega_se_conserva_si_falla_un_servicio_secundario(self):
+        cliente_publico = self.app.test_client()
+        with patch(
+            'app.routes.aprendiz.actualizar_alertas_ficha',
+            side_effect=RuntimeError('alerts unavailable'),
+        ), patch(
+            'app.routes.aprendiz.actualizar_participacion_ficha',
+            side_effect=RuntimeError('ranking unavailable'),
+        ):
+            respuesta = cliente_publico.post(
+                f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
+                data={
+                    'documento': self.aprendiz.documento,
+                    'archivo_evidencia': (
+                        BytesIO(b'%PDF-1.4\n evidencia durable\n%%EOF'),
+                        'durable.pdf',
+                    ),
+                },
+                content_type='multipart/form-data',
+            )
+        self.assertEqual(respuesta.status_code, 302)
+        entrega = Entrega.query.filter_by(
+            tarea_id=self.tarea.id, aprendiz_id=self.aprendiz.id
+        ).one()
+        self.assertTrue(entrega.archivo_url)
+        self.assertTrue(os.path.isfile(os.path.join(self.uploads.name, entrega.archivo_url)))
 
     def test_resolver_alerta_general_es_atomico_y_responde(self):
         respuesta = self.cliente.post(

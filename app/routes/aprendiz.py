@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import current_user
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload
 from app import db, limiter
 from app.models.ficha import Ficha
@@ -16,13 +16,19 @@ from app.models.tarea import Tarea, Entrega
 from app.models.material import MaterialFicha
 from app.models.alertas import ConfiguracionAlertas
 from app.models.insignia import Insignia, InsigniaOtorgada
+from app.models.observador import NotaObservador
 from app.services.ranking import (
     actualizar_participacion_ficha,
     calcular_ranking,
     mensaje_motivacional,
 )
-from app.models.alertas import Alerta, Notificacion
-from app.services.alertas import actualizar_alertas_ficha, crear_recordatorios_aprendiz
+from app.models.alertas import Alerta, Notificacion, PlanMejoramiento
+from app.services.alertas import (
+    actualizar_alertas_ficha,
+    crear_recordatorios_aprendiz,
+    registrar_notificacion,
+    vencer_planes_pendientes,
+)
 from app.services.cronograma import obtener_cronograma
 from app.services.asistencia import mapa_asistencia_por_fecha
 from app.services.aseo import resumen_aprendiz
@@ -107,6 +113,7 @@ def panel(ficha_id):
 
     actualizar_alertas_ficha(ficha_id)
     crear_recordatorios_aprendiz(ficha_id, aprendiz.id)
+    vencer_planes_pendientes()
 
     total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
     total_faltas = RegistroAsistencia.query.join(SesionAsistencia).filter(
@@ -226,6 +233,23 @@ def panel(ficha_id):
         RegistroAsistencia.aprendiz_id == aprendiz.id,
         RegistroAsistencia.estado == 'FALTA',
     ).order_by(SesionAsistencia.fecha.desc()).all()
+    # El observador es la evidencia con la que se sustenta un plan de
+    # mejoramiento o un comité: el aprendiz debe poder leer lo que se registró
+    # sobre él, y con qué fecha, sin pedirlo. joinedload del autor porque la
+    # vista muestra quién dejó cada constancia.
+    notas_observador = (
+        NotaObservador.query
+        .options(joinedload(NotaObservador.autor))
+        .filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id)
+        .order_by(NotaObservador.fecha.desc(), NotaObservador.id.desc())
+        .all()
+    )
+    planes_mejoramiento = (
+        PlanMejoramiento.query
+        .filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id)
+        .order_by(PlanMejoramiento.fecha_creacion.desc(), PlanMejoramiento.id.desc())
+        .all()
+    )
     aseo = resumen_aprendiz(ficha_id, aprendiz)
 
     # El aprendiz solo recibe sus propios registros; el mismo mapa de estados
@@ -412,6 +436,8 @@ def panel(ficha_id):
                            nuevas_insignias=nuevas_insignias,
                            otorgamientos=otorgamientos,
                            alertas_activas=alertas_activas,
+                           notas_observador=notas_observador,
+                           planes_mejoramiento=planes_mejoramiento,
                            notificaciones=notificaciones_aprendiz,
                            inasistencias_pendientes=inasistencias_pendientes,
                            asistencia_calendario=asistencia_calendario,
@@ -770,6 +796,12 @@ def subir_evidencia(ficha_id, tarea_id):
         flash('Tarea no encontrada.', 'error')
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
+    if tarea.es_actividad_clase:
+        # La actividad se verifica en el aula: aceptar archivos aquí crearía
+        # una evidencia que el instructor no espera revisar.
+        flash('Esta actividad se revisa en clase; no requiere que subas nada.', 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
     enlace_repo = request.form.get('enlace_repositorio', '').strip()
     archivo = request.files.get('archivo_evidencia')
     entrega_existente = (
@@ -852,9 +884,97 @@ def subir_evidencia(ficha_id, tarea_id):
         entrega_existente.estado_revision = 'pendiente'
         entrega_existente.revisada_en = None
         db.session.commit()
-    actualizar_alertas_ficha(ficha_id)
-    actualizar_participacion_ficha(ficha_id)
-    flash('Evidencia guardada correctamente.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        if archivo_url:
+            ArchivoService.eliminar(archivo_url)
+        current_app.logger.exception(
+            'No se pudo persistir la evidencia de la tarea %s.', tarea_id
+        )
+        flash('No fue posible registrar la evidencia. Intenta nuevamente.', 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+    # La entrega principal ya está persistida. Las alertas y el ranking son
+    # derivados: una caída temporal de cualquiera no debe convertir una
+    # subida válida en un 500/502 ni obligar al aprendiz a repetirla.
+    try:
+        actualizar_alertas_ficha(ficha_id)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            'La evidencia de la tarea %s quedó guardada, pero falló la actualización de alertas.',
+            tarea_id,
+        )
+    try:
+        actualizar_participacion_ficha(ficha_id)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            'La evidencia de la tarea %s quedó guardada, pero falló la actualización del ranking.',
+            tarea_id,
+        )
+    flash('Evidencia guardada correctamente. El sistema actualizará sus indicadores en segundo plano.', 'success')
+    return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+
+@aprendiz_bp.route('/<int:ficha_id>/subir-evidencia-plan/<int:plan_id>', methods=['POST'])
+@limiter.limit("10 per minute")
+def subir_evidencia_plan(ficha_id, plan_id):
+    """Recibe la evidencia del aprendiz para un plan de mejoramiento."""
+    documento = _documento_aprendiz_para_ficha(ficha_id)
+    ficha = db.session.get(Ficha, ficha_id)
+    aprendiz = Aprendiz.query.filter_by(
+        documento=documento, ficha_id=ficha_id
+    ).first() if documento else None
+    plan = db.session.get(PlanMejoramiento, plan_id)
+
+    if not ficha or not aprendiz or not plan or plan.ficha_id != ficha_id or plan.aprendiz_id != aprendiz.id:
+        flash('No encontramos ese plan para tu ficha.', 'error')
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+    if plan.estado != 'pendiente':
+        flash('Este plan ya no acepta nuevas evidencias porque está cerrado.', 'warning')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    archivo = request.files.get('archivo_evidencia_plan')
+    if not archivo or not archivo.filename:
+        flash('Adjunta un archivo que demuestre el cumplimiento de las actividades acordadas.', 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    try:
+        resultado = ArchivoService.guardar(
+            archivo=archivo,
+            carpeta=TiposCarpeta.PLANES_MEJORAMIENTO,
+            subcarpeta=f'ficha_{ficha_id}/aprendiz_{aprendiz.id}/plan_{plan.id}',
+            prefijo_extra=f'plan_{plan.id}',
+        )
+    except ErrorArchivo as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    archivo_anterior = plan.evidencia_url
+    plan.evidencia_url = resultado.url
+    plan.evidencia_enviada_en = datetime.utcnow()
+    plan.observaciones_aprendiz = request.form.get('observaciones_aprendiz', '').strip() or None
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        ArchivoService.eliminar(resultado.url)
+        current_app.logger.exception('No se pudo registrar evidencia del plan %s', plan.id)
+        flash('No fue posible registrar la evidencia. Intenta nuevamente.', 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    if archivo_anterior and archivo_anterior != resultado.url:
+        ArchivoService.eliminar(archivo_anterior)
+
+    if plan.creado_por:
+        registrar_notificacion(
+            'instructor', plan.creado_por,
+            f'{aprendiz.nombre_completo} envió evidencia para su plan de mejoramiento.',
+            'plan_evidencia', f'plan-evidencia:{plan.id}:{plan.evidencia_enviada_en}',
+            ficha_id, f'/instructor/fichas/{ficha_id}/casos-seguimiento',
+        )
+        db.session.commit()
+    flash('Evidencia del plan enviada. Tu instructor la revisará antes de cerrar el plan.', 'success')
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
 
@@ -977,6 +1097,32 @@ def descargar_evidencia(entrega_id):
         nombre_descarga=(
             f'evidencia_{entrega.id}_'
             f'{nombre_original_desde_ruta(entrega.archivo_url)}'
+        ),
+    )
+
+
+@aprendiz_bp.route('/descargar-evidencia-plan/<int:plan_id>')
+@limiter.limit("60 per minute")
+def descargar_evidencia_plan(plan_id):
+    plan = db.session.get(PlanMejoramiento, plan_id)
+    ficha_id = session.get('aprendiz_ficha_id')
+    documento = session.get('aprendiz_documento', '').strip()
+    aprendiz = Aprendiz.query.filter_by(
+        ficha_id=ficha_id, documento=documento
+    ).first() if ficha_id and documento else None
+    if (
+        not plan or not plan.evidencia_url or not aprendiz
+        or plan.aprendiz_id != aprendiz.id or plan.ficha_id != ficha_id
+    ):
+        abort(404)
+
+    raiz, relativa, _ = _resolver_archivo_subido(plan.evidencia_url)
+    return ArchivoService.enviar(
+        raiz,
+        relativa,
+        nombre_descarga=(
+            f'plan_{plan.id}_evidencia_'
+            f'{nombre_original_desde_ruta(plan.evidencia_url)}'
         ),
     )
 

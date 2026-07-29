@@ -27,7 +27,7 @@
 <div class="notification-list">
     {% for notificacion in notificaciones %}
     <article class="notification-item {% if not notificacion.leida %}notification-unread{% endif %}">
-        <div class="notification-icon">{% if notificacion.tipo == 'alerta' %}⚠️{% elif notificacion.tipo == 'tarea' %}📝{% elif notificacion.tipo == 'calificacion' %}📣{% elif notificacion.tipo == 'justificacion' %}📄{% else %}🔔{% endif %}</div>
+        <div class="notification-icon">{% if notificacion.tipo == 'alerta' %}⚠️{% elif notificacion.tipo == 'tarea' %}📝{% elif notificacion.tipo == 'calificacion' %}📣{% elif notificacion.tipo == 'justificacion' %}📄{% elif notificacion.tipo == 'observador' %}📓{% else %}🔔{% endif %}</div>
         <div class="notification-copy"><p>{{ notificacion.mensaje }}</p><small>{{ notificacion.fecha_creada.strftime('%d/%m/%Y %H:%M') }}</small></div>
         <div class="notification-actions">
             {% if notificacion.url %}<a href="{{ notificacion.url }}" class="btn btn-sm btn-outline">Abrir</a>{% endif %}

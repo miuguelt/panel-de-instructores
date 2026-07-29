@@ -19,6 +19,7 @@ from app.models.asistencia import RegistroAsistencia, SesionAsistencia
 from app.models.ficha import Ficha
 from app.models.instructor import Instructor
 from app.models.ficha_instructor import FichaInstructor
+from app.models.observador import TIPO_NEGATIVA, NotaObservador
 from app.models.tarea import Entrega, Tarea
 from app.services.asistencia import contar_sesiones_registradas
 
@@ -89,6 +90,7 @@ class ContextoFicha:
 
         # Se llenan bajo demanda: solo actualizar_alertas_ficha los necesita.
         self._alertas = None
+        self._notas_negativas = None
         self._claves_notificacion = None
         self._instructores = None
         self._config_correo = _SIN_CARGAR
@@ -108,6 +110,26 @@ class ContextoFicha:
             ).order_by(Alerta.fecha_generada.desc()).all():
                 self._alertas[alerta.aprendiz_id].append(alerta)
         return self._alertas[aprendiz_id]
+
+    def notas_negativas_de(self, aprendiz_id):
+        """Fechas de los llamados de atencion del observador de un aprendiz.
+
+        Solo se necesitan las fechas para contar los de la ventana vigente; una
+        consulta por ficha evita un SELECT por aprendiz durante la evaluacion.
+        """
+        if self._notas_negativas is None:
+            self._notas_negativas = defaultdict(list)
+            filas = (
+                db.session.query(NotaObservador.aprendiz_id, NotaObservador.fecha)
+                .filter(
+                    NotaObservador.ficha_id == self.ficha_id,
+                    NotaObservador.tipo == TIPO_NEGATIVA,
+                )
+                .all()
+            )
+            for nota_aprendiz_id, fecha in filas:
+                self._notas_negativas[nota_aprendiz_id].append(fecha)
+        return self._notas_negativas[aprendiz_id]
 
     def registrar_alerta(self, alerta):
         """Indexa una alerta recien creada para que el resto del bucle la vea."""
@@ -510,6 +532,33 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
                 },
             ))
 
+        # ── R7: llamados de atención del observador → SEGUIMIENTO integral ──
+        # La dimensión integral (puntualidad, convivencia, trabajo en equipo)
+        # no tiene otro indicador medible: sin esta regla, tres llamados de
+        # atención fechados no abren caso hasta que alguien los lee.
+        if config.umbral_notas_negativas > 0:
+            desde = hoy - timedelta(days=config.periodo_dias_notas)
+            llamados = sum(
+                1 for fecha in contexto.notas_negativas_de(aprendiz.id) if fecha >= desde
+            )
+            if llamados >= config.umbral_notas_negativas:
+                reglas.append((
+                    'observador', 'amarilla',
+                    f'Formación integral: {llamados} llamados de atención en la bitácora',
+                    f'{aprendiz.nombre}: el observador registra {llamados} llamados de '
+                    f'atención en los últimos {config.periodo_dias_notas} días. '
+                    'Revisa la bitácora y acuerda un plan de mejoramiento antes de que el '
+                    'caso escale a comité.',
+                    {
+                        'motivo': 'notas_observador',
+                        'notas_negativas': llamados,
+                        'umbral': config.umbral_notas_negativas,
+                        'periodo_dias': config.periodo_dias_notas,
+                        'requiere_plan': True,
+                        'reglamento': 'Res. 009 Art. 28',
+                    },
+                ))
+
         tipos_activos = set()
         for tipo, nivel, titulo, mensaje, detalle in reglas:
             tipos_activos.add(tipo)
@@ -518,7 +567,9 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
 
         activas = [a for a in contexto.alertas_de(aprendiz.id) if a.estado == 'activa']
         for alerta in activas:
-            if alerta.tipo in ('asistencia', 'academica', 'comite_desercion') and alerta.tipo not in tipos_activos:
+            if alerta.tipo in (
+                'asistencia', 'academica', 'comite_desercion', 'observador'
+            ) and alerta.tipo not in tipos_activos:
                 alerta.estado = 'resuelta'
                 alerta.fecha_resuelta = ahora
         resultados.extend(reglas)
@@ -830,6 +881,23 @@ def obtener_lineas_tiempo(ficha_id, aprendiz_ids):
             'detalle': 'Entrega ' + (entrega.estado_revision or 'pendiente'),
             'nota': entrega.feedback,
         })
+    notas = (
+        NotaObservador.query
+        .options(joinedload(NotaObservador.autor))
+        .filter(
+            NotaObservador.ficha_id == ficha_id,
+            NotaObservador.aprendiz_id.in_(ids),
+        )
+        .all()
+    )
+    for nota in notas:
+        eventos[nota.aprendiz_id].append({
+            'fecha': nota.fecha,
+            'tipo': 'observador',
+            'titulo': f'{nota.etiqueta_tipo}: {nota.etiqueta_categoria}',
+            'detalle': nota.descripcion,
+            'nota': f'Registró {nota.autor.nombre}' if nota.autor else None,
+        })
     return {
         aprendiz_id: sorted(lista, key=lambda evento: evento['fecha'], reverse=True)
         for aprendiz_id, lista in eventos.items()
@@ -876,5 +944,22 @@ def obtener_linea_tiempo(aprendiz_id, ficha_id):
             'titulo': entrega.tarea.titulo,
             'detalle': 'Entrega ' + (entrega.estado_revision or 'pendiente'),
             'nota': entrega.feedback,
+        })
+    # Las notas del observador son la única traza de la dimensión integral
+    # (puntualidad, convivencia, trabajo en equipo). Sin ellas el borrador del
+    # comité solo puede argumentar con asistencia y evidencias.
+    notas = (
+        NotaObservador.query
+        .options(joinedload(NotaObservador.autor))
+        .filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz_id)
+        .all()
+    )
+    for nota in notas:
+        eventos.append({
+            'fecha': nota.fecha,
+            'tipo': 'observador',
+            'titulo': f'{nota.etiqueta_tipo}: {nota.etiqueta_categoria}',
+            'detalle': nota.descripcion,
+            'nota': f'Registró {nota.autor.nombre}' if nota.autor else None,
         })
     return sorted(eventos, key=lambda evento: evento['fecha'], reverse=True)

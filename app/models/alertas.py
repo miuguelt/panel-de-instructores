@@ -31,6 +31,17 @@ class ConfiguracionAlertasComite(db.Model):
     porcentaje_minimo_asistencia = db.Column(db.Integer, nullable=False, default=75)
     auto_escalar_dias = db.Column(db.Integer, nullable=False, default=15)
 
+    # --- Formación integral (observador del aprendiz) ---
+    # Llamados de atención en la ventana que abren un caso de seguimiento.
+    # En 0 la regla queda desactivada: hay fichas donde la bitácora se usa como
+    # registro descriptivo y no debe generar alertas por sí sola.
+    umbral_notas_negativas = db.Column(
+        db.Integer, nullable=False, default=3, server_default='3'
+    )
+    periodo_dias_notas = db.Column(
+        db.Integer, nullable=False, default=30, server_default='30'
+    )
+
     correo_habilitado = db.Column(db.Boolean, nullable=False, default=False)
     actualizada_en = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
                                onupdate=datetime.utcnow)
@@ -99,6 +110,8 @@ class PlanMejoramiento(db.Model):
     estado = db.Column(db.String(20), nullable=False, default='pendiente', index=True)
     observaciones_instructor = db.Column(db.Text, nullable=True)
     observaciones_aprendiz = db.Column(db.Text, nullable=True)
+    evidencia_url = db.Column(db.String(500), nullable=True)
+    evidencia_enviada_en = db.Column(db.DateTime, nullable=True)
     creado_por = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=True)
 
     aprendiz = db.relationship('Aprendiz', backref=db.backref('planes_mejoramiento', lazy='dynamic'))

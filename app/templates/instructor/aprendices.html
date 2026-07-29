@@ -125,7 +125,10 @@
                         <span class="text-muted">—</span>
                         {% endif %}
                     </td>
-                    <td data-label="Seguimiento"><a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" class="btn btn-sm btn-outline">Ver Avance</a></td>
+                    <td data-label="Seguimiento">
+                        <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" class="btn btn-sm btn-outline">Ver Avance</a>
+                        <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id) }}#registrar" class="btn btn-sm btn-outline" title="Registrar una observación fechada">Observador</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

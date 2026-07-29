@@ -191,6 +191,8 @@
           (LIMITE_BYTES ? ' (' + formatearTamano(LIMITE_BYTES) + ')' : '') + '.');
       } else if (xhr.status === 429) {
         mostrarError(form, 'Demasiados intentos seguidos. Espera un minuto y vuelve a enviarlo.');
+      } else if (xhr.status === 502) {
+        mostrarError(form, 'La conexión con el servidor se interrumpió (502). Comprueba que el archivo pese menos de 50 MB y vuelve a intentarlo.');
       } else {
         mostrarError(form, 'El servidor rechazó la subida (error ' + xhr.status + '). Inténtalo de nuevo.');
       }
