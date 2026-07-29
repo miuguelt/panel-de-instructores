@@ -140,6 +140,36 @@ formulario `multipart/form-data`:
 Para excluir un formulario concreto: `data-sin-progreso`. Si el navegador no
 soporta `FormData`/progreso, no se intercepta nada.
 
+## Persistencia en Coolify
+
+| Qué | Dónde |
+|---|---|
+| Evidencias, materiales, soportes | volumen `adso_uploads` → `/app/uploads` |
+| Excel en cola de importación | `/app/uploads/importaciones/` (mismo volumen; el worker corre en otro contenedor y solo comparte esto) |
+| Estado de los trabajos, rutas de archivos | PostgreSQL (servicio aparte de Coolify) |
+| Testigo de salud del worker | `/tmp` — efímero a propósito |
+
+El volumen es **nombrado**, no un bind al repositorio ni uno anónimo: un
+`docker compose up -d --build`, un redeploy o un cambio de imagen **no** lo
+tocan. Lo que sí lo borra es `docker compose down -v` o el "delete volumes" de
+Coolify. `tests/test_persistencia_despliegue.py` verifica estas condiciones sin
+necesidad de Docker.
+
+### Respaldo y restauración del volumen
+
+```bash
+docker run --rm -v adso_uploads:/datos -v "$PWD":/respaldo alpine \
+  tar czf /respaldo/adso_uploads_$(date +%F).tar.gz -C /datos .
+```
+
+```bash
+docker run --rm -v adso_uploads:/datos -v "$PWD":/respaldo alpine \
+  tar xzf /respaldo/adso_uploads_2026-07-29.tar.gz -C /datos
+```
+
+El respaldo de archivos solo sirve junto con el de PostgreSQL: las rutas y los
+permisos de cada archivo viven en la base.
+
 ## Operación
 
 - El volumen `uploads` está montado en `app` y `worker` (`docker-compose.yml`).

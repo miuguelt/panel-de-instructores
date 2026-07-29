@@ -84,6 +84,15 @@ services:
       - coolify
 
 volumes:
+  # Volumen NOMBRADO (no bind, no anónimo) y montado por `app` y `worker` en
+  # /app/uploads, que es el UPLOAD_FOLDER de ambos. Ahí viven evidencias,
+  # materiales, soportes y los Excel en cola: sobreviven a `up --build`, a un
+  # redeploy de Coolify y a un cambio de imagen, porque nada de eso toca los
+  # volúmenes. Lo único que sí los borra es un `docker compose down -v` (o el
+  # "delete volumes" de Coolify), así que el respaldo periódico sigue siendo
+  # necesario; el procedimiento está en app/services/ARCHIVOS_STANDARD.md.
+  # La verificación automática de todo esto vive en
+  # tests/test_persistencia_despliegue.py.
   uploads:
     name: adso_uploads
 
