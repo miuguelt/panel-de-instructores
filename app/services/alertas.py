@@ -750,7 +750,12 @@ def crear_recordatorios_aprendiz(ficha_id, aprendiz_id, ahora=None):
     db.session.commit()
 
 
-def notificar_calificacion(entrega, ficha_id):
+def notificar_calificacion(entrega, ficha_id, commit=True):
+    """Notifica una calificación publicada.
+
+    ``commit=False`` permite que las operaciones masivas agreguen todas las
+    notificaciones a la misma transacción que las calificaciones.
+    """
     if not entrega or not entrega.aprendiz:
         return
     registrar_notificacion(
@@ -760,7 +765,8 @@ def notificar_calificacion(entrega, ficha_id):
         'calificacion', f'calificacion:{entrega.id}:{entrega.revisada_en}', ficha_id,
         f'/aprendiz/{ficha_id}/panel?documento={entrega.aprendiz.documento}',
     )
-    db.session.commit()
+    if commit:
+        db.session.commit()
 
 
 def asegurar_resumen_semanal(ficha, ahora=None):

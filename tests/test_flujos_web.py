@@ -945,6 +945,116 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertTrue(entrega.archivo_url)
         self.assertTrue(os.path.isfile(os.path.join(self.uploads.name, entrega.archivo_url)))
 
+    def test_evaluacion_masiva_actualiza_entregas_seleccionadas(self):
+        entrega_bruno = Entrega(
+            tarea_id=self.tarea.id,
+            aprendiz_id=self.otro_aprendiz.id,
+            enlace_repositorio='https://example.com/otra-evidencia',
+        )
+        db.session.add(entrega_bruno)
+        db.session.commit()
+
+        pagina = self.cliente.get(f'/instructor/tareas/{self.tarea.id}/entregas')
+        self.assertEqual(pagina.status_code, 200)
+        self.assertIn('Evaluación masiva'.encode('utf-8'), pagina.data)
+        self.assertIn(b'data-entrega-checkbox', pagina.data)
+
+        respuesta = self.cliente.post(
+            f'/instructor/tareas/{self.tarea.id}/entregas/evaluar-en-bloque',
+            data={
+                'entrega_ids': [str(self.entrega.id), str(entrega_bruno.id)],
+                'calificacion_general': '4.5',
+                'estado_revision_general': 'aprobada',
+                'feedback_general': 'Buen trabajo.',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        for entrega in (self.entrega, entrega_bruno):
+            db.session.refresh(entrega)
+            self.assertTrue(entrega.calificada)
+            self.assertEqual(entrega.calificacion, '4.5')
+            self.assertEqual(entrega.estado_revision, 'aprobada')
+            self.assertEqual(entrega.feedback, 'Buen trabajo.')
+            self.assertEqual(entrega.revisada_por_id, self.instructor.id)
+
+        self.assertEqual(Notificacion.query.filter_by(tipo='calificacion').count(), 2)
+
+    def test_evaluacion_masiva_no_acepta_entrega_de_otra_tarea(self):
+        otra_tarea = Tarea(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            titulo='Otra actividad',
+        )
+        db.session.add(otra_tarea)
+        db.session.flush()
+        otra_entrega = Entrega(tarea_id=otra_tarea.id, aprendiz_id=self.aprendiz.id)
+        db.session.add(otra_entrega)
+        db.session.commit()
+
+        respuesta = self.cliente.post(
+            f'/instructor/tareas/{self.tarea.id}/entregas/evaluar-en-bloque',
+            data={
+                'entrega_ids': [str(self.entrega.id), str(otra_entrega.id)],
+                'calificacion_general': '5.0',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        db.session.refresh(self.entrega)
+        db.session.refresh(otra_entrega)
+        self.assertFalse(self.entrega.calificada)
+        self.assertFalse(otra_entrega.calificada)
+
+    def test_evaluacion_masiva_rechaza_nota_mayor_al_limite(self):
+        respuesta = self.cliente.post(
+            f'/instructor/tareas/{self.tarea.id}/entregas/evaluar-en-bloque',
+            data={
+                'entrega_ids': [str(self.entrega.id)],
+                'calificacion_general': '12345678901',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        db.session.refresh(self.entrega)
+        self.assertFalse(self.entrega.calificada)
+
+    def test_evaluacion_masiva_conserva_calificacion_si_falla_un_resumen(self):
+        with patch(
+            'app.routes.instructor.actualizar_alertas_ficha',
+            side_effect=RuntimeError('alerts unavailable'),
+        ), patch(
+            'app.routes.instructor.actualizar_participacion_ficha',
+            side_effect=RuntimeError('ranking unavailable'),
+        ):
+            respuesta = self.cliente.post(
+                f'/instructor/tareas/{self.tarea.id}/entregas/evaluar-en-bloque',
+                data={
+                    'entrega_ids': [str(self.entrega.id)],
+                    'calificacion_general': '4.0',
+                },
+            )
+
+        self.assertEqual(respuesta.status_code, 302)
+        db.session.refresh(self.entrega)
+        self.assertTrue(self.entrega.calificada)
+        self.assertEqual(self.entrega.calificacion, '4.0')
+
+    def test_evaluacion_individual_registra_revisor_y_aisla_resumenes(self):
+        with patch(
+            'app.routes.instructor.actualizar_alertas_ficha',
+            side_effect=RuntimeError('alerts unavailable'),
+        ), patch(
+            'app.routes.instructor.actualizar_participacion_ficha',
+            side_effect=RuntimeError('ranking unavailable'),
+        ):
+            respuesta = self.cliente.post(
+                f'/instructor/entregas/{self.entrega.id}/calificar',
+                data={'calificacion': '4.0', 'estado_revision': 'aprobada'},
+            )
+
+        self.assertEqual(respuesta.status_code, 302)
+        db.session.refresh(self.entrega)
+        self.assertTrue(self.entrega.calificada)
+        self.assertEqual(self.entrega.revisada_por_id, self.instructor.id)
+
     def test_resolver_alerta_general_es_atomico_y_responde(self):
         respuesta = self.cliente.post(
             f'/instructor/fichas/{self.ficha.id}/alertas/{self.alerta_general.id}/resolver'

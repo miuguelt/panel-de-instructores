@@ -67,6 +67,37 @@ instructor_bp = Blueprint('instructor', __name__, template_folder='../templates/
 
 
 ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
+MAX_LONGITUD_CALIFICACION = 10
+
+
+def _validar_calificacion(valor, obligatoria=False):
+    """Normaliza una nota y valida el límite definido por ``Entrega``."""
+    calificacion = (valor or '').strip()
+    if obligatoria and not calificacion:
+        return None, 'La nota es obligatoria.'
+    if len(calificacion) > MAX_LONGITUD_CALIFICACION:
+        return None, f'La nota no puede superar {MAX_LONGITUD_CALIFICACION} caracteres.'
+    return calificacion or None, None
+
+
+def _actualizar_resumenes_despues_de_evaluar(ficha_id):
+    """Ejecuta cálculos secundarios sin convertirlos en un fallo de la evaluación."""
+    errores = []
+    for nombre, funcion in (
+        ('alertas', actualizar_alertas_ficha),
+        ('ranking', actualizar_participacion_ficha),
+    ):
+        try:
+            funcion(ficha_id)
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception(
+                'La evaluación quedó guardada, pero falló la actualización de %s para ficha %s.',
+                nombre,
+                ficha_id,
+            )
+            errores.append(nombre)
+    return errores
 
 
 def _faltas_por_aprendiz(ficha_id):
@@ -1511,7 +1542,12 @@ def registrar_actividad_clase(tarea_id):
         if aprendiz_id in ids_validos:
             aprobados.add(aprendiz_id)
 
-    calificacion = request.form.get('calificacion_general', '').strip() or None
+    calificacion, error_calificacion = _validar_calificacion(
+        request.form.get('calificacion_general')
+    )
+    if error_calificacion:
+        flash(error_calificacion, 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
     observacion = request.form.get('observacion_general', '').strip() or None
 
     existentes = {
@@ -1550,13 +1586,18 @@ def registrar_actividad_clase(tarea_id):
         flash('Otro instructor registró esta actividad al mismo tiempo. Revisa el resultado.', 'error')
         return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
 
-    actualizar_alertas_ficha(ficha.id)
-    actualizar_participacion_ficha(ficha.id)
+    errores_resumen = _actualizar_resumenes_despues_de_evaluar(ficha.id)
     flash(
         f'Actividad registrada: {len(aprobados)} aprendiz(es) aprobado(s) '
         f'({nuevas} nuevo(s), {retiradas} aprobación(es) retirada(s)).',
-        'success',
+        'warning' if errores_resumen else 'success',
     )
+    if errores_resumen:
+        flash(
+            'La actividad quedó guardada, pero no se pudieron actualizar: '
+            + ', '.join(errores_resumen) + '.',
+            'warning',
+        )
     return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
 
 
@@ -1653,7 +1694,12 @@ def calificar_entrega(entrega_id):
         flash('No tienes permiso para calificar esta entrega.', 'error')
         return redirect(url_for('instructor.fichas'))
 
-    calificacion = request.form.get('calificacion', '').strip()
+    calificacion, error_calificacion = _validar_calificacion(
+        request.form.get('calificacion')
+    )
+    if error_calificacion:
+        flash(error_calificacion, 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=entrega.tarea_id))
     feedback = request.form.get('feedback', '').strip()
 
     entrega.calificacion = calificacion or None
@@ -1663,13 +1709,102 @@ def calificar_entrega(entrega_id):
         entrega.estado_revision = 'aprobada'
     entrega.calificada = True
     entrega.revisada_en = datetime.utcnow()
+    entrega.revisada_por_id = current_user.id
     db.session.commit()
-    actualizar_alertas_ficha(entrega.tarea.ficha_id)
-    actualizar_participacion_ficha(entrega.tarea.ficha_id)
+    errores_resumen = _actualizar_resumenes_despues_de_evaluar(entrega.tarea.ficha_id)
     notificar_calificacion(entrega, entrega.tarea.ficha_id)
 
     flash('Calificación guardada.', 'success')
+    if errores_resumen:
+        flash(
+            'La calificación quedó guardada, pero no se pudieron actualizar: '
+            + ', '.join(errores_resumen) + '.',
+            'warning',
+        )
     return redirect(url_for('instructor.ver_entregas', tarea_id=entrega.tarea_id))
+
+
+@instructor_bp.route('/tareas/<int:tarea_id>/entregas/evaluar-en-bloque', methods=['POST'])
+@login_required
+def evaluar_entregas_en_bloque(tarea_id):
+    """Aplica una evaluación común a varias entregas de una misma tarea."""
+    tarea = db.session.get(Tarea, tarea_id)
+    if not tarea:
+        flash('Tarea no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    ficha = tarea.ficha
+    if not puede_gestionar_ficha(ficha) or not puede_gestionar_tarea(tarea):
+        flash('No tienes permiso para evaluar estas entregas.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    entrega_ids = set()
+    for valor in request.form.getlist('entrega_ids'):
+        try:
+            entrega_ids.add(int(valor))
+        except (TypeError, ValueError):
+            continue
+
+    calificacion, error_calificacion = _validar_calificacion(
+        request.form.get('calificacion_general'), obligatoria=True
+    )
+    feedback = request.form.get('feedback_general', '').strip()
+    estado_revision = request.form.get('estado_revision_general', 'aprobada')
+    if estado_revision not in ('aprobada', 'rechazada'):
+        estado_revision = 'aprobada'
+
+    if not entrega_ids:
+        flash('Selecciona al menos una entrega para evaluar.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
+    if error_calificacion:
+        flash(error_calificacion, 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
+
+    entregas = (
+        Entrega.query
+        .join(Aprendiz, Entrega.aprendiz_id == Aprendiz.id)
+        .filter(
+            Entrega.tarea_id == tarea.id,
+            Entrega.id.in_(entrega_ids),
+            Aprendiz.ficha_id == ficha.id,
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION),
+        )
+        .all()
+    )
+    if len(entregas) != len(entrega_ids):
+        flash('Una o más entregas seleccionadas no pertenecen a esta tarea o ya no están disponibles.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
+
+    ahora = datetime.utcnow()
+    for entrega in entregas:
+        entrega.calificacion = calificacion
+        entrega.feedback = feedback or None
+        entrega.estado_revision = estado_revision
+        entrega.calificada = True
+        entrega.revisada_en = ahora
+        entrega.revisada_por_id = current_user.id
+        notificar_calificacion(entrega, ficha.id, commit=False)
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('No se pudieron guardar las evaluaciones masivas de la tarea %s.', tarea.id)
+        flash('No se pudieron guardar las evaluaciones. Inténtalo de nuevo.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
+
+    errores_resumen = _actualizar_resumenes_despues_de_evaluar(ficha.id)
+    flash(
+        f'Se evaluaron {len(entregas)} entrega(s) correctamente.',
+        'warning' if errores_resumen else 'success',
+    )
+    if errores_resumen:
+        flash(
+            'Las evaluaciones quedaron guardadas, pero no se pudieron actualizar: '
+            + ', '.join(errores_resumen) + '.',
+            'warning',
+        )
+    return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
 
 
 @instructor_bp.route('/planes/<int:plan_id>/evidencia')

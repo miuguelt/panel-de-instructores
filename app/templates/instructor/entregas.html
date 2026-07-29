@@ -167,6 +167,54 @@
     .stat-success { color: var(--sena-green); }
     .stat-warning { color: var(--sena-orange); }
     .stat-danger { color: var(--sena-red); }
+
+    .evaluacion-masiva {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-sm);
+        padding: 20px;
+        margin: 24px 0;
+    }
+    .evaluacion-masiva-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    .evaluacion-masiva-title { margin: 0; color: var(--gray-900); font-size: 17px; }
+    .evaluacion-masiva-grid {
+        display: grid;
+        grid-template-columns: minmax(120px, 160px) minmax(160px, 220px) 1fr;
+        gap: 12px;
+        align-items: start;
+    }
+    .evaluacion-masiva-grid input,
+    .evaluacion-masiva-grid select,
+    .evaluacion-masiva-grid textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border: 1px solid var(--gray-300);
+        border-radius: 8px;
+        font: inherit;
+        background: white;
+    }
+    .evaluacion-masiva-grid textarea { min-height: 42px; resize: vertical; }
+    .seleccion-entrega {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        color: var(--gray-700);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .seleccion-entrega input { width: 18px; height: 18px; accent-color: var(--sena-green); }
+    .entrega-card.is-seleccionada { box-shadow: 0 0 0 3px rgba(57, 169, 0, .2), var(--shadow-lg); }
+    @media (max-width: 700px) { .evaluacion-masiva-grid { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
 
@@ -207,7 +255,7 @@
         <div class="form-group flex-grow">
             <label for="calificacion_general">Nota para los aprobados (opcional)</label>
             <input type="text" id="calificacion_general" name="calificacion_general"
-                   placeholder="Ej: Aprobado, 4.5, Excelente">
+                   placeholder="Ej: Aprobado, 4.5, Excelente" maxlength="10">
         </div>
     </div>
     <div class="form-group">
@@ -348,6 +396,34 @@
     </div>
 </div>
 
+<form id="evaluacion-masiva" method="POST"
+      action="{{ url_for('instructor.evaluar_entregas_en_bloque', tarea_id=tarea.id) }}"
+      class="evaluacion-masiva">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="evaluacion-masiva-header">
+        <div>
+            <h3 class="evaluacion-masiva-title">Evaluación masiva</h3>
+            <small class="text-muted">Selecciona las entregas que recibirán la misma nota y retroalimentación.</small>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--gray-700);cursor:pointer;">
+            <input type="checkbox" id="seleccionar-entregas" style="width:18px;height:18px;accent-color:var(--sena-green);">
+            Seleccionar todas las entregas
+        </label>
+    </div>
+    <div class="evaluacion-masiva-grid">
+        <input type="text" name="calificacion_general" placeholder="Nota común" maxlength="10" required>
+        <select name="estado_revision_general" aria-label="Estado de las entregas">
+            <option value="aprobada">Aprobadas</option>
+            <option value="rechazada">Requieren ajustes</option>
+        </select>
+        <textarea name="feedback_general" placeholder="Retroalimentación común (opcional)" rows="1"></textarea>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;">
+        <small id="entregas-seleccionadas" class="text-muted">0 entregas seleccionadas</small>
+        <button type="submit" id="guardar-evaluacion-masiva" class="btn btn-primary" disabled>Evaluar seleccionadas</button>
+    </div>
+</form>
+
 <div class="entregas-grid">
     {% for ap in aprendices %}
     {% set entrega = entregas_map.get(ap.id) %}
@@ -358,7 +434,7 @@
         {% set status_class = 'status-entregado' if entrega.entregada_a_tiempo else 'status-retraso' %}
     {% endif %}
 
-    <div class="entrega-card {{ status_class }}">
+    <div class="entrega-card {{ status_class }}" {% if entrega %}data-entrega-card="{{ entrega.id }}"{% endif %}>
         <div class="entrega-header">
             <div class="entrega-info">
                 <h3>{{ ap.nombre }} {{ ap.apellidos }}</h3>
@@ -386,6 +462,14 @@
                 {% endif %}
             </div>
         </div>
+
+        {% if entrega %}
+        <label class="seleccion-entrega">
+            <input type="checkbox" name="entrega_ids" value="{{ entrega.id }}" form="evaluacion-masiva"
+                   data-entrega-checkbox data-entrega-calificada="{{ 'true' if entrega.calificada else 'false' }}">
+            Seleccionar para evaluación masiva
+        </label>
+        {% endif %}
 
         <div class="entrega-evidencia">
             {% if entrega and (entrega.archivo_url or (entrega.enlace_repositorio and entrega.enlace_repositorio.strip() != '')) %}
@@ -441,7 +525,7 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         
                         <div class="form-evaluar-row">
-                            <input type="text" name="calificacion" placeholder="Nota" value="{{ entrega.calificacion if entrega.calificacion and entrega.calificacion != 'None' else '' }}" required>
+                            <input type="text" name="calificacion" placeholder="Nota" maxlength="10" value="{{ entrega.calificacion if entrega.calificacion and entrega.calificacion != 'None' else '' }}" required>
                             <select name="estado_revision" aria-label="Estado de la evidencia">
                                 <option value="aprobada" {% if entrega.estado_revision != 'rechazada' %}selected{% endif %}>Aprobada</option>
                                 <option value="rechazada" {% if entrega.estado_revision == 'rechazada' %}selected{% endif %}>Requiere ajustes</option>
@@ -465,6 +549,55 @@
     </div>
     {% endfor %}
 </div>
+<script>
+    (function () {
+        var form = document.getElementById('evaluacion-masiva');
+        if (!form) return;
+        var checks = Array.prototype.slice.call(document.querySelectorAll('[data-entrega-checkbox]'));
+        var selectAll = document.getElementById('seleccionar-entregas');
+        var submit = document.getElementById('guardar-evaluacion-masiva');
+        var counter = document.getElementById('entregas-seleccionadas');
+
+        function update() {
+            var selected = checks.filter(function (check) { return check.checked; });
+            submit.disabled = selected.length === 0;
+            counter.textContent = selected.length + (selected.length === 1 ? ' entrega seleccionada' : ' entregas seleccionadas');
+            selected.forEach(function (check) {
+                var card = document.querySelector('[data-entrega-card="' + check.value + '"]');
+                if (card) card.classList.add('is-seleccionada');
+            });
+            checks.filter(function (check) { return !check.checked; }).forEach(function (check) {
+                var card = document.querySelector('[data-entrega-card="' + check.value + '"]');
+                if (card) card.classList.remove('is-seleccionada');
+            });
+            selectAll.checked = checks.length > 0 && selected.length === checks.length;
+        }
+
+        checks.forEach(function (check) { check.addEventListener('change', update); });
+        selectAll.addEventListener('change', function () {
+            checks.forEach(function (check) { check.checked = selectAll.checked; });
+            update();
+        });
+        form.addEventListener('submit', function (event) {
+            var selected = checks.filter(function (check) { return check.checked; });
+            if (selected.length === 0) {
+                event.preventDefault();
+                alert('Selecciona al menos una entrega para evaluar.');
+                return;
+            }
+            var yaEvaluadas = selected.filter(function (check) {
+                return check.dataset.entregaCalificada === 'true';
+            }).length;
+            if (yaEvaluadas > 0 && !window.confirm(
+                'Has seleccionado ' + yaEvaluadas + ' entrega(s) ya evaluada(s). '
+                + 'La nueva evaluación reemplazará la nota y retroalimentación actuales. ¿Continuar?'
+            )) {
+                event.preventDefault();
+            }
+        });
+        update();
+    })();
+</script>
 {% else %}
 <div class="empty-state">
     <div class="empty-icon" style="font-size: 48px; color: var(--gray-300); margin-bottom: 16px;">
