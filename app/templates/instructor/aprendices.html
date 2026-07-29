@@ -9,9 +9,9 @@
 
 {% set importacion_id = request.args.get('importacion_id')|int %}
 {% if importacion_id %}
-<div class="card" id="import-status" data-status-url="{{ url_for('instructor.estado_importacion', ficha_id=ficha.id, job_id=importacion_id) }}" style="margin-bottom: 1rem;">
-    <strong>Importación en segundo plano</strong>
-    <p id="import-status-message" class="text-muted" role="status" aria-live="polite">Consultando el estado del trabajo #{{ importacion_id }}…</p>
+<div class="card" id="import-status" data-status-url="{{ url_for('instructor.estado_importacion', ficha_id=ficha.id, job_id=importacion_id) }}" aria-busy="true" style="margin-bottom: 1rem;">
+    <strong>Solicitud recibida: importación en segundo plano</strong>
+    <p id="import-status-message" class="text-muted" role="status" aria-live="polite">El archivo fue recibido y está en cola (trabajo #{{ importacion_id }}). El sistema te avisará cuando termine; puedes seguir usando el panel.</p>
 </div>
 <script>
 (function () {
@@ -23,18 +23,21 @@
         .then(res => res.json())
         .then(job => {
             if (job.estado === 'completado') {
-                message.textContent = 'Importación completada. Actualizando los datos…';
+                const r = job.resultado || {};
+                message.textContent = `Importación completada: ${r.nuevos || 0} aprendices y ${r.juicios_nuevos || 0} juicios nuevos. Actualizando los datos…`;
+                box.setAttribute('aria-busy', 'false');
                 setTimeout(() => window.location.reload(), 700);
                 return;
             }
             if (job.estado === 'error') {
                 message.textContent = 'La importación falló: ' + (job.error || 'revisa los logs del worker.');
                 box.classList.add('alert', 'alert-error');
+                box.setAttribute('aria-busy', 'false');
                 return;
             }
             message.textContent = job.estado === 'procesando'
-                ? 'El reporte se está procesando. Puedes seguir navegando por el panel.'
-                : 'El reporte está en cola. Puedes seguir navegando por el panel.';
+                ? 'El sistema está leyendo y guardando el reporte. No vuelvas a enviarlo; puedes seguir navegando por el panel.'
+                : 'El reporte está en cola y será atendido por el worker. Puedes seguir navegando por el panel.';
             if (++intentos < 150) setTimeout(consultar, 2000);
         })
         .catch(() => {

@@ -38,6 +38,7 @@ from app.models.material import MaterialFicha
 from app.models.importacion import ImportacionJob
 from app.services.importacion_jobs import encolar_importacion, ColaImportacionesNoDisponible
 from datetime import datetime, date
+import json
 import os
 from uuid import uuid4
 import openpyxl
@@ -893,14 +894,22 @@ def cargar_excel(ficha_id):
                     os.remove(ruta)
                 except OSError:
                     pass
+                job = db.session.get(ImportacionJob, job.id)
+                if job:
+                    job.estado = 'error'
+                    job.error = 'No fue posible conectar con la cola de procesamiento.'
+                    job.terminado_en = datetime.utcnow()
+                    db.session.commit()
+                importacion_job_id = None
                 raise RuntimeError(
                     'No fue posible poner la importación en cola. '
                     'Revisa REDIS_URL y que el worker esté activo.'
                 ) from exc
 
             flash(
-                f'Importación encolada (trabajo #{job.id}). '
-                'Puedes seguir usando el panel; el archivo se procesará en segundo plano.',
+                f'Solicitud recibida correctamente (trabajo #{job.id}). '
+                'El archivo quedó en cola y se está procesando en segundo plano; '
+                'puedes seguir usando el panel.',
                 'success',
             )
         else:
@@ -940,10 +949,16 @@ def estado_importacion(ficha_id, job_id):
     job = db.session.get(ImportacionJob, job_id)
     if not job or job.ficha_id != ficha_id or not puede_gestionar_ficha(ficha):
         return jsonify({'error': 'Importación no encontrada.'}), 404
+    resultado = None
+    if job.resultado:
+        try:
+            resultado = json.loads(job.resultado)
+        except (TypeError, ValueError):
+            resultado = job.resultado
     return jsonify({
         'id': job.id,
         'estado': job.estado,
-        'resultado': job.resultado,
+        'resultado': resultado,
         'error': job.error,
         'creado_en': job.creado_en.isoformat() if job.creado_en else None,
         'iniciado_en': job.iniciado_en.isoformat() if job.iniciado_en else None,

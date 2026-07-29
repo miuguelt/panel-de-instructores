@@ -1,2 +1,41 @@
-# SENA Control Academico - ADSO
-# Reglas de Antigravity para este proyecto
+# SENA Control Académico - ADSO
+# DevBrain Rules — fuente única de verdad del workspace
+
+## 1. Contrato de ejecución
+
+- Cuando el usuario pide construir, cambiar, corregir o implementar, ejecutar el trabajo dentro del alcance autorizado. No limitarse a recomendar pasos.
+- Inspeccionar primero el estado real del repositorio, preservar cambios ajenos y validar el resultado antes de responder.
+- Si una acción externa necesita autoridad adicional (credenciales, publicación o un servicio no disponible), ejecutar todo lo que sí esté autorizado y reportar únicamente el bloqueo concreto.
+- La respuesta final debe indicar qué se ejecutó, qué se verificó y qué quedó pendiente; no presentar recomendaciones como si fueran acciones realizadas.
+
+## 2. Construcción por capas
+
+Cada funcionalidad nueva debe ubicarse en estas capas, evitando mezclar responsabilidades:
+
+1. **Interfaz y comunicación:** el usuario debe saber que su solicitud fue recibida, qué estado tiene, qué puede hacer mientras espera y cómo se informa un error.
+2. **Orquestación:** validar, persistir una operación, asignarle identidad y coordinarla con una cola durable cuando pueda tardar más que una petición normal.
+3. **Ejecución de fondo:** los procesos pesados deben ejecutarse en workers independientes, nunca en hilos improvisados dentro del servidor web.
+4. **Persistencia y recuperación:** cada trabajo debe ser idempotente, auditable, consultable por estado y recuperable tras reinicio.
+5. **Operación y verificación:** incluir logs útiles, health checks, métricas básicas, pruebas automatizadas y configuración reproducible de Docker/Coolify.
+
+## 3. Segunda capa de fondo
+
+- Redis + base de datos son la infraestructura estándar para trabajos asíncronos de este proyecto.
+- Todo trabajo debe tener como mínimo: `encolado`, `procesando`, `completado` y `error`, además de timestamps y mensaje de error seguro para el usuario.
+- El frontend debe consultar el estado mediante un endpoint autenticado y mostrar mensajes claros como “recibido”, “en cola”, “procesando” y “completado”.
+- Los workers deben compartir únicamente almacenamiento explícitamente definido (por ejemplo, el volumen de uploads) y no depender del estado en memoria del proceso web.
+- Las operaciones repetibles deben tolerar reintentos sin duplicar información; los commits de datos principales deben estar separados de cálculos secundarios cuando sea posible.
+
+## 4. Flujo de trabajo DevBrain desde este chat y otros chats
+
+- `AGENTS.md` apunta a este archivo; estas reglas aplican a cualquier tarea iniciada dentro de este workspace, independientemente del chat que la origine.
+- Antes de editar: leer estas reglas, revisar `git status`, identificar arquitectura y localizar pruebas relevantes.
+- Durante la edición: usar cambios pequeños y verificables, no sobrescribir trabajo ajeno y actualizar la documentación operativa cuando cambie el despliegue.
+- Antes de entregar: ejecutar compilación, pruebas enfocadas, validación de migraciones/configuración y una prueba del flujo principal. Si Docker no está disponible, declararlo y validar el Compose por inspección estática.
+- No crear automatizaciones globales fuera del workspace ni afirmar que estas reglas afectan chats o repositorios que no las carguen. Para aplicar el mismo comportamiento fuera de este proyecto se debe instalar o referenciar este contrato en el workspace correspondiente.
+
+## 5. Criterio de escalabilidad
+
+- Diseñar para que el servidor web atienda rápido y el trabajo costoso se distribuya en workers horizontales.
+- Mantener límites explícitos de concurrencia, conexiones de BD, tamaño de cola y tiempo de trabajo.
+- Preferir contratos estables (estado JSON, IDs de trabajo, migraciones) frente a lógica acoplada a una plantilla concreta.
