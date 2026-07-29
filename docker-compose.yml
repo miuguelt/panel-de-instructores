@@ -8,6 +8,7 @@ services:
       # no se reinterpretan durante el despliegue de Coolify.
       - SECRET_KEY
       - DATABASE_URL
+      - RUN_MIGRATIONS=true
       - REDIS_URL
       - ADSO_ADMIN_EMAIL
       - ADSO_ADMIN_PASSWORD

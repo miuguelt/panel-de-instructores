@@ -102,6 +102,16 @@ class PersistenciaDespliegueTestCase(unittest.TestCase):
         self.assertIn(f'mkdir -p {PUNTO_DE_MONTAJE}', dockerfile)
         self.assertIn(f'chown -R adso:adso {PUNTO_DE_MONTAJE}', dockerfile)
 
+    def test_solo_el_servicio_web_aplica_migraciones_antes_de_arrancar(self):
+        entrypoint = _leer(os.path.join(RAIZ, 'docker-entrypoint.sh'))
+        dockerfile = _leer(DOCKERFILE)
+        self.assertIn('RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"', entrypoint)
+        self.assertIn('python3 -m flask db upgrade', entrypoint)
+        self.assertIn('- RUN_MIGRATIONS=true', self.servicios['app'])
+        self.assertIn('- RUN_MIGRATIONS=false', self.servicios['worker'])
+        self.assertIn('FLASK_APP=wsgi.py', dockerfile)
+        self.assertIn('COPY --chown=adso:adso . .', dockerfile)
+
 
 if __name__ == '__main__':
     unittest.main()
