@@ -180,6 +180,39 @@
         </div>
     </section>
 
+    <section class="learner-attendance-calendar card" aria-labelledby="learner-attendance-title">
+        <div class="learner-attendance-heading">
+            <div>
+                <span class="eyebrow">Consulta personal</span>
+                <h2 id="learner-attendance-title">Mi calendario de asistencia</h2>
+                <p class="text-muted">Revisa cómo quedó registrada tu asistencia en cada sesión de formación.</p>
+            </div>
+            <span class="badge badge-secondary">{{ asistencia_calendario|length }} días marcados</span>
+        </div>
+
+        <div class="learner-calendar-toolbar">
+            <button type="button" class="btn btn-sm btn-outline" data-learner-calendar-prev aria-label="Mes anterior">&larr; Anterior</button>
+            <h3 data-learner-calendar-month>Calendario</h3>
+            <button type="button" class="btn btn-sm btn-outline" data-learner-calendar-next aria-label="Mes siguiente">Siguiente &rarr;</button>
+        </div>
+
+        <div class="learner-calendar-grid" data-learner-calendar-grid role="grid" aria-label="Calendario de asistencia">
+            <!-- Se genera para el mes visible. -->
+        </div>
+
+        <div class="learner-calendar-footer">
+            <div class="learner-calendar-legend" aria-label="Leyenda de estados">
+                <span><i class="learner-legend-dot learner-legend-dot--asiste"></i>Asistió</span>
+                <span><i class="learner-legend-dot learner-legend-dot--falta-nj"></i>Falta injustificada</span>
+                <span><i class="learner-legend-dot learner-legend-dot--falta-j"></i>Falta justificada / excusa</span>
+                <span><i class="learner-legend-dot learner-legend-dot--tardanza"></i>Tardanza</span>
+            </div>
+            <div class="learner-calendar-detail" data-learner-calendar-detail role="status" aria-live="polite">
+                Selecciona un día marcado para ver su detalle.
+            </div>
+        </div>
+    </section>
+
     <section class="metrics-grid">
         <div class="metric-card">
             <div class="metric-card-header">
@@ -1102,6 +1135,277 @@
     </div>
     {% endif %}
 </div>
+
+<style>
+.learner-attendance-calendar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.learner-attendance-heading,
+.learner-calendar-toolbar,
+.learner-calendar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.learner-attendance-heading h2,
+.learner-calendar-toolbar h3 {
+    margin: 0;
+}
+
+.learner-attendance-heading p {
+    margin: .25rem 0 0;
+}
+
+.learner-calendar-toolbar {
+    padding: .75rem 1rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: 12px;
+}
+
+.learner-calendar-toolbar h3 {
+    font-size: 1.05rem;
+    text-transform: capitalize;
+}
+
+.learner-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .5rem;
+}
+
+.learner-calendar-weekday {
+    padding: .25rem;
+    color: var(--text-muted);
+    font-size: .72rem;
+    font-weight: 800;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.learner-calendar-day {
+    min-height: 3.6rem;
+    padding: .5rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    color: var(--text-strong);
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.learner-calendar-day:hover,
+.learner-calendar-day:focus-visible {
+    z-index: 1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .12);
+    outline: none;
+}
+
+.learner-calendar-day.is-outside {
+    border-color: transparent;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: default;
+    opacity: .5;
+}
+
+.learner-calendar-day.is-today {
+    box-shadow: inset 0 0 0 2px var(--accent-primary);
+}
+
+.learner-calendar-day.is-asiste {
+    border-color: rgba(5, 150, 105, .45);
+    background: rgba(5, 150, 105, .08);
+}
+
+.learner-calendar-day.is-falta-nj {
+    border-color: #dc2626;
+    background: #dc2626;
+    color: #fff;
+}
+
+.learner-calendar-day.is-falta-j {
+    border-color: #d97706;
+    background: #d97706;
+    color: #fff;
+}
+
+.learner-calendar-day.is-tardanza {
+    border-color: #7c3aed;
+    background: #7c3aed;
+    color: #fff;
+}
+
+.learner-calendar-day-number {
+    display: block;
+    text-align: left;
+}
+
+.learner-calendar-day-state {
+    display: block;
+    margin-top: .25rem;
+    font-size: .64rem;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: left;
+}
+
+.learner-calendar-footer {
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.learner-calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem 1rem;
+    color: var(--text-muted);
+    font-size: .78rem;
+}
+
+.learner-calendar-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+}
+
+.learner-legend-dot {
+    width: .75rem;
+    height: .75rem;
+    border-radius: 4px;
+}
+
+.learner-legend-dot--asiste { background: #059669; }
+.learner-legend-dot--falta-nj { background: #dc2626; }
+.learner-legend-dot--falta-j { background: #d97706; }
+.learner-legend-dot--tardanza { background: #7c3aed; }
+
+.learner-calendar-detail {
+    min-width: min(100%, 20rem);
+    padding: .65rem .8rem;
+    border: 1px solid var(--border-divider);
+    border-radius: 9px;
+    color: var(--text-muted);
+    font-size: .8rem;
+}
+
+.learner-calendar-detail strong { color: var(--text-strong); }
+
+@media (max-width: 640px) {
+    .learner-attendance-heading,
+    .learner-calendar-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .learner-calendar-toolbar {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .learner-calendar-day {
+        min-height: 3rem;
+        padding: .35rem;
+    }
+
+    .learner-calendar-day-state { display: none; }
+}
+</style>
+
+<script>
+(function () {
+    const calendar = document.querySelector('.learner-attendance-calendar');
+    if (!calendar) return;
+
+    const records = {{ asistencia_calendario|tojson|safe }};
+    const grid = calendar.querySelector('[data-learner-calendar-grid]');
+    const title = calendar.querySelector('[data-learner-calendar-month]');
+    const detail = calendar.querySelector('[data-learner-calendar-detail]');
+    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const dayNames = ['lu', 'ma', 'mi', 'ju', 'vi', 'sá', 'do'];
+    let visibleMonth = new Date();
+    visibleMonth.setDate(1);
+
+    function toIso(year, month, day) {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    function formatDate(iso) {
+        const [year, month, day] = iso.split('-');
+        return `${day}/${month}/${year}`;
+    }
+
+    function showDetail(iso, record) {
+        if (!record) {
+            detail.textContent = 'No hay una marcación registrada para este día.';
+            return;
+        }
+        const causal = record.causal ? ` · ${record.causal}` : '';
+        detail.innerHTML = `<strong>${formatDate(iso)}</strong> · ${record.etiqueta || record.estado}${causal}`;
+    }
+
+    function render() {
+        const year = visibleMonth.getFullYear();
+        const month = visibleMonth.getMonth();
+        title.textContent = `${monthNames[month]} ${year}`;
+        grid.replaceChildren();
+
+        dayNames.forEach((name) => {
+            const heading = document.createElement('div');
+            heading.className = 'learner-calendar-weekday';
+            heading.setAttribute('role', 'columnheader');
+            heading.textContent = name;
+            grid.appendChild(heading);
+        });
+
+        const firstDay = new Date(year, month, 1);
+        const offset = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let i = 0; i < offset; i += 1) {
+            const empty = document.createElement('div');
+            empty.className = 'learner-calendar-day is-outside';
+            empty.setAttribute('aria-hidden', 'true');
+            grid.appendChild(empty);
+        }
+
+        const today = new Date();
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            const iso = toIso(year, month, day);
+            const record = records[iso];
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'learner-calendar-day';
+            if (record?.clase) button.classList.add(`is-${record.clase}`);
+            if (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day) {
+                button.classList.add('is-today');
+            }
+            button.setAttribute('role', 'gridcell');
+            button.setAttribute('aria-label', record ? `${formatDate(iso)}: ${record.etiqueta || record.estado}` : `${formatDate(iso)}: sin marcación`);
+            button.innerHTML = `<span class="learner-calendar-day-number">${day}</span>${record ? `<span class="learner-calendar-day-state">${record.etiqueta || record.estado}</span>` : ''}`;
+            button.addEventListener('click', () => showDetail(iso, record));
+            grid.appendChild(button);
+        }
+    }
+
+    calendar.querySelector('[data-learner-calendar-prev]').addEventListener('click', () => {
+        visibleMonth.setMonth(visibleMonth.getMonth() - 1);
+        render();
+    });
+    calendar.querySelector('[data-learner-calendar-next]').addEventListener('click', () => {
+        visibleMonth.setMonth(visibleMonth.getMonth() + 1);
+        render();
+    });
+    render();
+})();
+</script>
 
 <!-- openJuicioTab defined in the metrics-grid inline script above -->
 {% endblock %}

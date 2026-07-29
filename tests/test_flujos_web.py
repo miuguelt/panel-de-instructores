@@ -311,7 +311,7 @@ class FlujosWebTestCase(unittest.TestCase):
             f'/instructor/fichas/{self.ficha.id}/tareas',
             data={
                 'titulo': 'Guía con material',
-                'material_apoyo': (BytesIO(b'contenido material'), 'guia.pdf'),
+                'material_apoyo': (BytesIO(b'%PDF-1.4\n contenido material\n%%EOF'), 'guia.pdf'),
             },
             content_type='multipart/form-data',
         )
@@ -347,7 +347,7 @@ class FlujosWebTestCase(unittest.TestCase):
             f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
             data={
                 'documento': self.aprendiz.documento,
-                'archivo_evidencia': (BytesIO(b'evidencia'), 'evidencia.pdf'),
+                'archivo_evidencia': (BytesIO(b'%PDF-1.4\n evidencia\n%%EOF'), 'evidencia.pdf'),
             },
             content_type='multipart/form-data',
         )

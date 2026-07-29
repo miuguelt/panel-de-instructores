@@ -126,6 +126,8 @@
 
     {% block scripts %}{% endblock %}
     <script src="{{ url_for('static', filename='js/table-filters.js') }}"></script>
+    <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_upload_bytes | int }};</script>
+    <script src="{{ url_for('static', filename='js/uploads.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const toasts = document.querySelectorAll('.flash-messages .alert');

@@ -937,27 +937,20 @@ function renderCalendar() {
             dayDiv.className = 'cal-day-cell';
             dayDiv.textContent = i;
             
-            if (isCurrentMonth && i === currentDay) {
-                dayDiv.style.boxShadow = '0 0 0 2px #059669';
-            }
-
             const dStr = `${year}-${String(month+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
             const record = asistenciaMapData[dStr];
+
+            if (isCurrentMonth && i === currentDay && !record) {
+                dayDiv.style.boxShadow = '0 0 0 2px #059669';
+            }
             
             if (record) {
-                if (record.estado === 'FALTA') {
-                    dayDiv.classList.add('is-falta-nj');
-                    dayDiv.title = `🚨 FALTA INJUSTIFICADA (${record.fecha_fmt})`;
-                } else if (record.estado === 'FALTA_JUSTIFICADA' || record.estado === 'EXCUSA_MEDICA') {
-                    dayDiv.classList.add('is-falta-j');
-                    dayDiv.title = `📝 FALTA JUSTIFICADA: ${record.causal || 'Excusa'} (${record.fecha_fmt})`;
-                } else if (record.estado === 'TARDANZA') {
-                    dayDiv.classList.add('is-tardanza');
-                    dayDiv.title = `⏰ TARDANZA (${record.fecha_fmt})`;
-                } else if (record.estado === 'ASISTE') {
-                    dayDiv.classList.add('is-asiste');
-                    dayDiv.title = `✓ Asistió (${record.fecha_fmt})`;
-                }
+                // La clase la resuelve el servidor junto con el detalle. Así
+                // el color no depende de una segunda interpretación distinta
+                // en JavaScript y se mantiene alineado con la tarjeta lateral.
+                if (record.clase) dayDiv.classList.add(`is-${record.clase}`);
+                const detalle = record.causal ? `: ${record.causal}` : '';
+                dayDiv.title = `${record.etiqueta || record.estado}${detalle} (${record.fecha_fmt})`;
             }
             
             grid.appendChild(dayDiv);

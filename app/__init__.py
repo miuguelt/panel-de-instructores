@@ -123,6 +123,66 @@ def _probe_redis(redis_url: str) -> str:
 STATIC_MAX_AGE = 31536000  # 1 año: la URL cambia cuando cambia el archivo
 
 
+def _preparar_uploads(app):
+    """Crea la carpeta de subidas y comprueba que el proceso pueda escribir.
+
+    En Coolify `uploads` es un volumen montado en /app/uploads. Si el volumen
+    se monta con otro owner, el contenedor corre como `adso` y no puede
+    escribir: cada subida fallaba con un error genérico y el diagnóstico
+    requería entrar al contenedor. Aquí se detecta en el arranque y queda en
+    el log y en /health.
+    """
+    carpeta = app.config.get('UPLOAD_FOLDER')
+    estado = {'ruta': carpeta, 'escribible': False, 'detalle': ''}
+    try:
+        os.makedirs(carpeta, exist_ok=True)
+        testigo = os.path.join(carpeta, '.escritura')
+        with open(testigo, 'wb') as handle:
+            handle.write(b'ok')
+        os.remove(testigo)
+        estado['escribible'] = True
+        log.info('Carpeta de subidas lista y escribible: %s', carpeta)
+    except OSError as exc:
+        estado['detalle'] = f'{type(exc).__name__}: {exc}'
+        log.error(
+            'La carpeta de subidas %s NO es escribible (%s). Las cargas de '
+            'evidencias y materiales fallarán. Revisa el volumen en Coolify.',
+            carpeta, estado['detalle'],
+        )
+    app.config['UPLOADS_ESTADO'] = estado
+
+
+def _inventario_uploads(carpeta, tope=5000):
+    """Cuenta archivos del volumen y detecta los que quedaron en 0 bytes.
+
+    Un archivo de 0 bytes significa que la subida se cortó y la BD guardó una
+    referencia inservible: aparece en la interfaz pero se descarga vacío.
+    """
+    resumen = {'archivos': 0, 'vacios': 0, 'parciales': 0, 'bytes': 0, 'truncado': False}
+    if not carpeta or not os.path.isdir(carpeta):
+        return resumen
+    try:
+        for raiz, _dirs, nombres in os.walk(carpeta):
+            for nombre in nombres:
+                if resumen['archivos'] >= tope:
+                    resumen['truncado'] = True
+                    return resumen
+                if nombre.endswith('.part'):
+                    resumen['parciales'] += 1
+                    continue
+                try:
+                    tamano = os.path.getsize(os.path.join(raiz, nombre))
+                except OSError:
+                    continue
+                resumen['archivos'] += 1
+                resumen['bytes'] += tamano
+                if tamano == 0:
+                    resumen['vacios'] += 1
+    except OSError as exc:
+        resumen['error'] = f'{type(exc).__name__}: {exc}'
+    return resumen
+
+
 def _registrar_cache_estaticos(app):
     """Sirve /static/ con caducidad larga y cache-busting por mtime.
 
@@ -213,6 +273,9 @@ def create_app(test_config=None):
     # url_for('static') lleva ?v=<mtime>, que cambia solo al editar el archivo.
     _registrar_cache_estaticos(app)
 
+    # --- Almacenamiento de archivos ---
+    _preparar_uploads(app)
+
     # --- Rate limiting con fallback graceful a memoria ---
     # Sondea Redis antes de configurarlo: si la AUTH falla, el limiter opera
     # en memoria y ningun request devuelve 500 por culpa de Redis.
@@ -298,7 +361,15 @@ def create_app(test_config=None):
             except Exception:
                 log.warning('No se pudo contar notificaciones; se muestra 0.', exc_info=True)
                 db.session.rollback()
-        return {'notificaciones_no_leidas': no_leidas, 'datetime': datetime}
+        # `max_upload_bytes` y no `config.MAX_CONTENT_LENGTH`: varias vistas
+        # pasan a la plantilla una variable local llamada `config` (la
+        # configuracion de alertas, ranking o aseo de la ficha) que tapa el
+        # objeto global de Flask y romperia el render de base.html.
+        return {
+            'notificaciones_no_leidas': no_leidas,
+            'datetime': datetime,
+            'max_upload_bytes': app.config.get('MAX_CONTENT_LENGTH') or 0,
+        }
 
     @app.template_filter('tipo_competencia')
     def filtro_tipo_competencia(nombre):
@@ -326,11 +397,13 @@ def create_app(test_config=None):
         El detalle del fallo va en el cuerpo.
         """
         from flask import jsonify
+        uploads = dict(app.config.get('UPLOADS_ESTADO') or {})
         estado = {
             'status': 'ok',
             'database': 'connected',
             'rate_limiter': app.config.get('LIMITER_BACKEND'),
             'secret_key': 'efimera (revisar SECRET_KEY)' if SECRET_KEY_IS_EPHEMERAL else 'ok',
+            'uploads': uploads,
             'startup_errors': app.config.get('STARTUP_ERRORS', []),
         }
         try:
@@ -340,7 +413,14 @@ def create_app(test_config=None):
             estado['status'] = 'degraded'
             estado['database'] = f'{type(exc).__name__}: {exc}'
             log.error('Health check: sin conexion a la base de datos.', exc_info=True)
-        if estado['startup_errors'] or SECRET_KEY_IS_EPHEMERAL:
+
+        # Inventario bajo demanda: recorrer el volumen en cada latido del
+        # healthcheck de Docker seria I/O gratuito cada 30 s.
+        if request.args.get('uploads') == '1':
+            uploads.update(_inventario_uploads(app.config.get('UPLOAD_FOLDER')))
+            estado['uploads'] = uploads
+
+        if estado['startup_errors'] or SECRET_KEY_IS_EPHEMERAL or not uploads.get('escribible'):
             estado['status'] = 'degraded'
         return jsonify(estado), 200
 

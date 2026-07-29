@@ -2,12 +2,14 @@
 
 ## Principios
 
-1. **SSOT**: Toda operación de archivos pasa por `app/services/archivos.py`. Ninguna ruta implementa su propia validación, generación de nombre o almacenamiento.
+1. **SSOT**: Toda operación de archivos pasa por `app/services/archivos.py`. Ninguna ruta implementa su propia validación, generación de nombre, almacenamiento **ni envío al navegador**.
 2. **Validación en cascada**: extensión → MIME header → magic bytes → tamaño.
 3. **Nombres únicos y seguros**: `secure_filename()` + UUID prefix. Sin colisiones, sin path traversal.
-4. **Subdirectorios canónicos**: 4 categorías fijas definidas en `TiposCarpeta`.
-5. **Acceso controlado**: materiales y soportes pasan por `aprendiz.descargar_archivo`; una evidencia del instructor pasa por `instructor.descargar_archivo_entrega`, vinculada al `entrega_id`.
-6. **Aislamiento de evidencias**: las nuevas entregas se guardan en `ficha/instructor/aprendiz/tarea`; la base permite una sola entrega por pareja tarea-aprendiz.
+4. **Escritura atómica**: el contenido va a `<nombre>.part` y solo se renombra al destino si llegó completo y con tamaño > 0. Una subida cortada nunca deja un archivo de 0 bytes referenciado en la BD.
+5. **Subdirectorios canónicos**: 4 categorías fijas definidas en `TiposCarpeta`.
+6. **Acceso controlado**: materiales y soportes pasan por `aprendiz.descargar_archivo`; una evidencia del instructor pasa por `instructor.descargar_archivo_entrega`, vinculada al `entrega_id`.
+7. **Aislamiento de evidencias**: las nuevas entregas se guardan en `ficha/instructor/aprendiz/tarea`; la base permite una sola entrega por pareja tarea-aprendiz.
+8. **Descarga reanudable y con nombre legible**: `ArchivoService.enviar()` emite ETag/Last-Modified, atiende `Range` y devuelve el nombre original en vez del nombre técnico.
 
 ## Arquitectura
 
@@ -61,6 +63,29 @@ ArchivoService.eliminar(modelo.url_archivo)
 ArchivoService.obtener_tamano(modelo.url_archivo)
 ```
 
+### Descargar (en la ruta)
+
+```python
+raiz, relativa, candidatos = _resolver_archivo_subido(filename)
+# ...verificar permisos...
+return ArchivoService.enviar(
+    raiz,
+    relativa,
+    nombre_descarga='Guia_JEE.docx',   # opcional: por defecto se infiere el original
+    inline=request.args.get('inline') == '1',
+)
+```
+
+`enviar()` aporta, en un solo punto:
+
+| Comportamiento | Efecto |
+|---|---|
+| `conditional=True` | `Range` (descarga reanudable) + `304` en revisitas |
+| `download_name` | nombre original, sin el prefijo UUID |
+| `mimetype` explícito | docx/xlsx/pptx abren bien aunque la imagen slim no tenga `/etc/mime.types` |
+| `inline` restringido | solo `png/jpg/jpeg/pdf`; el resto se fuerza como adjunto |
+| `nosniff` + `Cache-Control: private` | nada se interpreta como HTML ni queda en cachés compartidas |
+
 ### Descargar / previsualizar
 
 ```jinja
@@ -92,12 +117,37 @@ Contra `ALLOWED_EXTENSIONS` en `config.py`. Actualmente:
 `check_mime=True` verifica `archivo.content_type` contra `MIME_POR_EXTENSION`.
 El cliente puede falsear este header, por eso es informativo + preventivo.
 
-### 3. Magic bytes `check_magic=False` (desactivado por defecto)
-Lee los primeros 32 bytes del archivo y los compara con firmas conocidas.
-Se recomienda activar (`check_magic=True`) en subidas de aprendices (menos confiables).
+### 3. Magic bytes `check_magic=True` (activado por defecto)
+Lee 1 KB del archivo y lo compara con firmas conocidas. Se lee 1 KB y no 32 B
+porque hay PDF válidos con bytes previos a `%PDF`. Cubre PDF, PNG, JPEG, ZIP
+(incluidos los contenedores vacíos `PK\x05\x06`), RAR y OLE (doc/xls/ppt).
 
-### 4. Tamaño (a nivel Flask, global)
-`MAX_CONTENT_LENGTH = 50MB` en `config.py`. El error 413 tiene template propio en `app/__init__.py`.
+### 4. Tamaño
+- Global, a nivel Flask: `MAX_CONTENT_LENGTH = 50MB` en `config.py`. El error 413 tiene template propio en `app/__init__.py`.
+- Por archivo, tras escribirlo: 0 bytes → `ErrorArchivoVacio`; por encima del límite → `ErrorTamano`. En ambos casos el `.part` se borra y nada llega a la BD.
+
+## Frontend
+
+`app/static/js/uploads.js` (cargado desde `base.html`) intercepta todo
+formulario `multipart/form-data`:
+
+- valida tamaño y extensión **antes** de enviar (evita esperar 50 MB para un 413);
+- muestra porcentaje real de subida y bloquea el doble envío;
+- traduce 413 / 429 / error de red a un mensaje en español;
+- al terminar navega a `xhr.responseURL`, así los mensajes flash del patrón
+  POST-Redirect-GET se ven igual que sin JavaScript.
+
+Para excluir un formulario concreto: `data-sin-progreso`. Si el navegador no
+soporta `FormData`/progreso, no se intercepta nada.
+
+## Operación
+
+- El volumen `uploads` está montado en `app` y `worker` (`docker-compose.yml`).
+- En el arranque se comprueba que la carpeta exista y sea escribible; si no lo
+  es, queda en el log y `/health` responde `status: degraded`.
+- `GET /health?uploads=1` devuelve inventario: nº de archivos, bytes totales,
+  archivos de **0 bytes** (subidas cortadas antes de este estándar) y `.part`
+  residuales.
 
 ## Seguridad
 

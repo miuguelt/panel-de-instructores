@@ -24,13 +24,12 @@ Eliminación:
 from __future__ import annotations
 
 import os
-import struct
+import re
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 from uuid import uuid4
 
-from flask import current_app
+from flask import current_app, send_from_directory
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -82,17 +81,36 @@ _MAGIC: list[tuple[bytes, int, set[str]]] = [
     (b'\x89PNG\r\n\x1a\n', 0, {'png'}),
     (b'\xff\xd8\xff', 0, {'jpg', 'jpeg'}),
     (b'PK\x03\x04', 0, {'zip', 'xlsx', 'docx', 'pptx'}),
-    (b'PK\x03\x04', 0, {'zip'}),  # zip genérico
+    # Contenedores ZIP sin entradas o divididos en volúmenes: no empiezan con
+    # la firma de registro local. Sin estas dos firmas, `check_magic` rechaza
+    # archivos válidos que Office y los compresores generan de forma legítima.
+    (b'PK\x05\x06', 0, {'zip', 'xlsx', 'docx', 'pptx'}),
+    (b'PK\x07\x08', 0, {'zip', 'xlsx', 'docx', 'pptx'}),
     (b'Rar!\x1a\x07', 0, {'rar'}),
     (b'Rar!\x1a\x07\x01\x00', 0, {'rar'}),
     (b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1', 0, {'xls', 'doc', 'ppt'}),
 ]
 
-_MAX_MAGIC_READ = 32  # bytes a leer para detectar magic
+# 1 KB en vez de 32 B: algunos PDF válidos traen basura o un BOM antes de
+# '%PDF' y con una lectura de 32 bytes se rechazaban como corruptos.
+_MAX_MAGIC_READ = 1024
+
+# Extensiones que el navegador puede abrir embebidas sin riesgo de ejecutar
+# script en el origen de la aplicación. Cualquier otra se fuerza como adjunto
+# aunque la vista pida `inline=1`.
+EXTENSIONES_INLINE: set[str] = {'png', 'jpg', 'jpeg', 'pdf'}
+
+# `{prefijo_}{uuid12}_{nombre original}`: se usa para devolverle al usuario el
+# nombre con el que subió el archivo en vez del nombre técnico del disco.
+_PREFIJO_TECNICO = re.compile(r'(?:^|_)[0-9a-f]{12}_')
 
 
 def _magic_coincide(contenido: bytes, extension: str) -> bool:
     """Verifica si los primeros bytes del contenido corresponden a la extensión."""
+    if extension == 'pdf':
+        # La cabecera puede estar desplazada; la especificación solo exige que
+        # aparezca al principio del archivo, no en el byte 0 exacto.
+        return b'%PDF' in contenido
     for firma, offset, extensiones in _MAGIC:
         if extension in extensiones:
             start = offset
@@ -106,6 +124,40 @@ def _extension_valida(extension: str) -> bool:
     """Valida contra la whitelist de config."""
     permitidas: set[str] = current_app.config.get('ALLOWED_EXTENSIONS', set())
     return extension in permitidas
+
+
+def _borrar_silencioso(ruta: str) -> None:
+    """Elimina un archivo temporal ignorando que ya no exista."""
+    try:
+        os.remove(ruta)
+    except OSError:
+        pass
+
+
+def mimetype_de(extension: str) -> str:
+    """MIME canónico de una extensión permitida.
+
+    No se delega en el módulo `mimetypes`: la imagen base `python:3.12-slim` no
+    trae la tabla completa de `/etc/mime.types`, así que docx/xlsx/pptx salían
+    como `application/octet-stream` y algunos navegadores móviles se negaban a
+    abrir el archivo descargado.
+    """
+    esperados = MIME_POR_EXTENSION.get((extension or '').lower())
+    if not esperados:
+        return 'application/octet-stream'
+    return sorted(esperados)[0]
+
+
+def nombre_original_desde_ruta(nombre_archivo: str) -> str:
+    """Recupera el nombre legible quitando el prefijo técnico del disco.
+
+    'tarea_9_ab12cd34ef56_Guia_JEE.docx' -> 'Guia_JEE.docx'
+    """
+    valor = Path(str(nombre_archivo or '')).name
+    coincidencia = _PREFIJO_TECNICO.search(valor)
+    if not coincidencia:
+        return valor
+    return valor[coincidencia.end():] or valor
 
 
 # ---------------------------------------------------------------------------
@@ -284,9 +336,15 @@ class ArchivoService:
         subcarpeta: str = '',
         prefijo_extra: str = '',
         check_mime: bool = True,
-        check_magic: bool = False,
+        check_magic: bool = True,
     ) -> ResultadoGuardar:
         """Valida, genera nombre único y guarda un archivo en disco.
+
+        La escritura es atómica: el contenido va primero a `<nombre>.part` y
+        solo se renombra al destino final si llegó completo y con tamaño mayor
+        que cero. Así una subida cortada (red del aprendiz, worker reciclado por
+        gunicorn) nunca deja en `uploads/` un archivo de 0 bytes que la BD dé
+        por bueno y que después se descargue vacío.
 
         Args:
             archivo: FileStorage de Flask (request.files['campo']).
@@ -294,16 +352,17 @@ class ArchivoService:
             subcarpeta: Subdirectorio adicional (ej. str(ficha_id)).
             prefijo_extra: Prefijo opcional en el nombre (ej. documento).
             check_mime: Validar Content-Type header.
-            check_magic: Validar magic bytes (default False por rendimiento).
+            check_magic: Validar magic bytes.
 
         Returns:
             ResultadoGuardar con url, ruta absoluta, nombre original y tamaño.
 
         Raises:
-            ErrorArchivoVacio: Si no hay archivo.
+            ErrorArchivoVacio: Si no hay archivo o llegó vacío.
             ErrorExtension: Extensión no permitida.
             ErrorMimeType: Content-Type no coincide.
-            ErrorArchivo: Magic bytes no coinciden / otro error.
+            ErrorTamano: El archivo supera MAX_CONTENT_LENGTH.
+            ErrorArchivo: Magic bytes no coinciden / fallo de escritura.
         """
         ext = ArchivoService.validar(archivo, check_mime=check_mime, check_magic=check_magic)
 
@@ -315,12 +374,43 @@ class ArchivoService:
         if subcarpeta:
             partes.append(str(subcarpeta))
         directorio = os.path.join(*partes)
-        os.makedirs(directorio, exist_ok=True)
+        try:
+            os.makedirs(directorio, exist_ok=True)
+        except OSError as exc:
+            current_app.logger.error('No se pudo crear %s: %s', directorio, exc)
+            raise ErrorArchivo(
+                'El servidor no pudo preparar la carpeta de destino. '
+                'Avisa a tu instructor e inténtalo de nuevo.'
+            ) from exc
 
         ruta_completa = os.path.join(directorio, nombre_archivo)
-        archivo.save(ruta_completa)
+        ruta_parcial = f'{ruta_completa}.part'
+        limite = current_app.config.get('MAX_CONTENT_LENGTH') or 0
 
-        tamano = os.path.getsize(ruta_completa)
+        try:
+            archivo.stream.seek(0)
+            archivo.save(ruta_parcial)
+            tamano = os.path.getsize(ruta_parcial)
+            if tamano == 0:
+                raise ErrorArchivoVacio(
+                    'El archivo llegó vacío al servidor. '
+                    'Revisa tu conexión y vuelve a subirlo.'
+                )
+            if limite and tamano > limite:
+                raise ErrorTamano(
+                    f'El archivo pesa {tamano // (1024 * 1024)} MB y el máximo '
+                    f'permitido es {limite // (1024 * 1024)} MB.'
+                )
+            os.replace(ruta_parcial, ruta_completa)
+        except ErrorArchivo:
+            _borrar_silencioso(ruta_parcial)
+            raise
+        except OSError as exc:
+            _borrar_silencioso(ruta_parcial)
+            current_app.logger.error('Fallo al escribir %s: %s', ruta_completa, exc)
+            raise ErrorArchivo(
+                'El servidor no pudo guardar el archivo. Inténtalo de nuevo.'
+            ) from exc
 
         # URL relativa (para BD)
         partes_url = [str(carpeta)]
@@ -336,6 +426,50 @@ class ArchivoService:
             nombre_archivo=nombre_archivo,
             tamano=tamano,
         )
+
+    @staticmethod
+    def guardar_crudo(
+        archivo: FileStorage,
+        carpeta: str,
+        nombre_archivo: str,
+    ) -> str:
+        """Guarda un archivo sin la validación de extensión del estándar.
+
+        Es la puerta para las importaciones Excel, que se procesan por su
+        contenido y no encajan en `TiposCarpeta`. Conserva lo que sí es
+        innegociable: escritura atómica y rechazo de un archivo vacío, para que
+        el worker nunca abra un `.xls` truncado que el navegador dejó a medias.
+
+        Returns:
+            Ruta absoluta del archivo ya confirmado en disco.
+
+        Raises:
+            ErrorArchivoVacio: El archivo llegó vacío.
+            ErrorArchivo: Fallo de escritura.
+        """
+        destino = os.path.join(current_app.config['UPLOAD_FOLDER'], carpeta)
+        ruta_completa = os.path.join(destino, nombre_archivo)
+        ruta_parcial = f'{ruta_completa}.part'
+        try:
+            os.makedirs(destino, exist_ok=True)
+            archivo.stream.seek(0)
+            archivo.save(ruta_parcial)
+            if os.path.getsize(ruta_parcial) == 0:
+                raise ErrorArchivoVacio(
+                    'El archivo llegó vacío al servidor. '
+                    'Revisa tu conexión y vuelve a subirlo.'
+                )
+            os.replace(ruta_parcial, ruta_completa)
+        except ErrorArchivo:
+            _borrar_silencioso(ruta_parcial)
+            raise
+        except OSError as exc:
+            _borrar_silencioso(ruta_parcial)
+            current_app.logger.error('Fallo al escribir %s: %s', ruta_completa, exc)
+            raise ErrorArchivo(
+                'El servidor no pudo guardar el archivo. Inténtalo de nuevo.'
+            ) from exc
+        return ruta_completa
 
     # ------------------------------------------------------------------
     # ELIMINACIÓN
@@ -382,6 +516,67 @@ class ArchivoService:
     def ruta_absoluta(url_relativa: str) -> str:
         """Convierte URL relativa a ruta absoluta."""
         return os.path.join(current_app.config['UPLOAD_FOLDER'], url_relativa)
+
+    # ------------------------------------------------------------------
+    # ENVÍO AL NAVEGADOR
+    # ------------------------------------------------------------------
+    @staticmethod
+    def enviar(
+        raiz,
+        relativa: Path,
+        nombre_descarga: str = '',
+        inline: bool = False,
+    ):
+        """Devuelve la respuesta de descarga de un archivo ya resuelto.
+
+        Punto único para toda descarga de `uploads/`. Frente al
+        `send_from_directory` suelto que había en cada ruta añade:
+
+        - `conditional=True`: emite ETag/Last-Modified y atiende `Range`, así
+          una evidencia grande se reanuda en vez de reiniciarse, y una
+          revisita responde 304 sin releer el archivo.
+        - `download_name` legible: el aprendiz recibe `Guia_JEE.docx`, no el
+          nombre técnico con UUID.
+        - MIME explícito por extensión + `nosniff`, y `inline` limitado a
+          imágenes y PDF: ningún adjunto se interpreta como HTML en el origen
+          de la aplicación.
+        - `Cache-Control: private`: los adjuntos nunca quedan en cachés
+          intermedias compartidas (Traefik/Coolify).
+
+        Args:
+            raiz: Carpeta raíz de uploads (de `resolver_archivo_subido`).
+            relativa: Ruta relativa dentro de la raíz.
+            nombre_descarga: Nombre visible; por defecto el original inferido.
+            inline: Pedir vista embebida (solo se concede a EXTENSIONES_INLINE).
+        """
+        extension = relativa.suffix.lstrip('.').lower()
+        embebido = bool(inline) and extension in EXTENSIONES_INLINE
+        nombre = nombre_descarga or nombre_original_desde_ruta(relativa.name)
+
+        ruta_absoluta = Path(raiz) / relativa
+        try:
+            if ruta_absoluta.stat().st_size == 0:
+                # No se aborta: el registro existe y el instructor debe poder
+                # ver que el archivo quedó vacío. Pero sí queda en el log con
+                # la ruta exacta para poder pedir la resubida.
+                current_app.logger.warning(
+                    'Descarga de archivo vacío (0 bytes): %s', relativa.as_posix()
+                )
+        except OSError:
+            pass
+
+        respuesta = send_from_directory(
+            str(raiz),
+            relativa.as_posix(),
+            as_attachment=not embebido,
+            download_name=nombre,
+            mimetype=mimetype_de(extension),
+            conditional=True,
+            max_age=0,
+        )
+        respuesta.headers['X-Content-Type-Options'] = 'nosniff'
+        respuesta.headers['Cache-Control'] = 'private, max-age=0, must-revalidate'
+        return respuesta
 
 
 def resolver_archivo_subido(filename: str):

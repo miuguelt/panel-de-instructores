@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort, send_from_directory, session
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import current_user
@@ -7,7 +7,11 @@ from sqlalchemy.orm import joinedload
 from app import db, limiter
 from app.models.ficha import Ficha
 from app.models.aprendiz import Aprendiz
-from app.models.asistencia import RegistroAsistencia, SesionAsistencia
+from app.models.asistencia import (
+    RegistroAsistencia,
+    SesionAsistencia,
+    CAUSALES_JUSTIFICADAS,
+)
 from app.models.tarea import Tarea, Entrega
 from app.models.material import MaterialFicha
 from app.models.alertas import ConfiguracionAlertas
@@ -20,16 +24,17 @@ from app.services.ranking import (
 from app.models.alertas import Alerta, Notificacion
 from app.services.alertas import actualizar_alertas_ficha, crear_recordatorios_aprendiz
 from app.services.cronograma import obtener_cronograma
+from app.services.asistencia import mapa_asistencia_por_fecha
 from app.services.aseo import resumen_aprendiz
 from app.services.archivos import (
     ArchivoService,
     ErrorArchivo,
     TiposCarpeta,
+    nombre_original_desde_ruta,
     resolver_archivo_subido,
 )
 from app.services.permisos import puede_gestionar_ficha, puede_gestionar_tarea
 from datetime import datetime
-from pathlib import Path
 
 aprendiz_bp = Blueprint('aprendiz', __name__, template_folder='../templates/aprendiz')
 
@@ -222,7 +227,20 @@ def panel(ficha_id):
         RegistroAsistencia.estado == 'FALTA',
     ).order_by(SesionAsistencia.fecha.desc()).all()
     aseo = resumen_aprendiz(ficha_id, aprendiz)
-    
+
+    # El aprendiz solo recibe sus propios registros; el mismo mapa de estados
+    # que usa el modal del instructor evita colores distintos entre roles.
+    registros_calendario = RegistroAsistencia.query.join(SesionAsistencia).filter(
+        SesionAsistencia.ficha_id == ficha_id,
+        RegistroAsistencia.aprendiz_id == aprendiz.id,
+    ).order_by(SesionAsistencia.fecha.asc(), RegistroAsistencia.id.asc()).all()
+    asistencia_calendario = mapa_asistencia_por_fecha(registros_calendario)
+    causales = dict(CAUSALES_JUSTIFICADAS)
+    for evento in asistencia_calendario.values():
+        evento['causal'] = causales.get(
+            evento.pop('causal_justificacion', ''), ''
+        )
+
     # Juicios Evaluativos Oficiales
     from app.models.juicio import JuicioEvaluativo
     juicios_raw = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id).all()
@@ -396,6 +414,7 @@ def panel(ficha_id):
                            alertas_activas=alertas_activas,
                            notificaciones=notificaciones_aprendiz,
                            inasistencias_pendientes=inasistencias_pendientes,
+                           asistencia_calendario=asistencia_calendario,
                            cronograma=cronograma,
                            aseo=aseo,
                            stats_juicios=stats_juicios,
@@ -910,21 +929,26 @@ def _puede_descargar_archivo(candidatos):
 
 
 @aprendiz_bp.route('/descargar/<path:filename>')
-@limiter.limit("30 per minute")
+@limiter.limit("60 per minute")
 def descargar_archivo(filename):
     raiz, relativa, candidatos = _resolver_archivo_subido(filename)
     if not _puede_descargar_archivo(candidatos):
         abort(404)
-    inline = request.args.get('inline') == '1'
-    return send_from_directory(
-        str(raiz),
-        relativa.as_posix(),
-        as_attachment=not inline,
+    # El material de ficha conserva en BD el nombre con el que se subió; es más
+    # fiable que reconstruirlo desde el nombre técnico del disco.
+    material = MaterialFicha.query.filter(
+        MaterialFicha.url_archivo.in_(candidatos)
+    ).first()
+    return ArchivoService.enviar(
+        raiz,
+        relativa,
+        nombre_descarga=(material.nombre_archivo if material else ''),
+        inline=request.args.get('inline') == '1',
     )
 
 
 @aprendiz_bp.route('/descargar-evidencia/<int:entrega_id>')
-@limiter.limit("30 per minute")
+@limiter.limit("60 per minute")
 def descargar_evidencia(entrega_id):
     entrega = db.session.get(Entrega, entrega_id)
     ficha_id = session.get('aprendiz_ficha_id')
@@ -947,17 +971,18 @@ def descargar_evidencia(entrega_id):
         abort(404)
 
     raiz, relativa, _ = _resolver_archivo_subido(entrega.archivo_url)
-    extension = Path(entrega.archivo_url).suffix
-    return send_from_directory(
-        str(raiz),
-        relativa.as_posix(),
-        as_attachment=True,
-        download_name=f'evidencia_{entrega.id}{extension}',
+    return ArchivoService.enviar(
+        raiz,
+        relativa,
+        nombre_descarga=(
+            f'evidencia_{entrega.id}_'
+            f'{nombre_original_desde_ruta(entrega.archivo_url)}'
+        ),
     )
 
 
 @aprendiz_bp.route('/descargar-soporte/<int:registro_id>')
-@limiter.limit("30 per minute")
+@limiter.limit("60 per minute")
 def descargar_soporte(registro_id):
     registro = db.session.get(RegistroAsistencia, registro_id)
     ficha_id = session.get('aprendiz_ficha_id')
@@ -978,10 +1003,11 @@ def descargar_soporte(registro_id):
         abort(404)
 
     raiz, relativa, _ = _resolver_archivo_subido(registro.soporte_url)
-    extension = Path(registro.soporte_url).suffix
-    return send_from_directory(
-        str(raiz),
-        relativa.as_posix(),
-        as_attachment=True,
-        download_name=f'soporte_inasistencia_{registro.id}{extension}',
+    return ArchivoService.enviar(
+        raiz,
+        relativa,
+        nombre_descarga=(
+            f'soporte_inasistencia_{registro.id}_'
+            f'{nombre_original_desde_ruta(registro.soporte_url)}'
+        ),
     )

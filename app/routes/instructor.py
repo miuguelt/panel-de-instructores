@@ -1,9 +1,8 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, send_from_directory, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import joinedload
-from pathlib import Path
 from app import db
 from app.models.ficha import Ficha
 from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz
@@ -21,7 +20,11 @@ from app.services.alertas import (
     obtener_config_comite,
 )
 from app.services.aseo import ajustar_turno_por_asistencia
-from app.services.asistencia import contar_sesiones_registradas, guardar_asistencia
+from app.services.asistencia import (
+    contar_sesiones_registradas,
+    guardar_asistencia,
+    mapa_asistencia_por_fecha,
+)
 from app.services.importacion_ficha import ErrorImportacion, importar_archivo, clasificar_competencia
 from app.services.permisos import puede_gestionar_ficha, puede_gestionar_tarea, tareas_visibles
 from app.services.archivos import (
@@ -29,6 +32,7 @@ from app.services.archivos import (
     ErrorArchivo,
     ErrorExtension,
     TiposCarpeta,
+    nombre_original_desde_ruta,
     resolver_archivo_subido,
 )
 from app.services.cronograma import obtener_cronograma
@@ -871,10 +875,13 @@ def cargar_excel(ficha_id):
     try:
         if current_app.config.get('IMPORTACIONES_ASINCRONAS'):
             nombre_archivo = secure_filename(archivo.filename) or 'reporte.xls'
-            carpeta = os.path.join(current_app.config['UPLOAD_FOLDER'], 'importaciones')
-            os.makedirs(carpeta, exist_ok=True)
-            ruta = os.path.join(carpeta, f'{uuid4().hex}_{nombre_archivo}')
-            archivo.save(ruta)
+            # Dentro de UPLOAD_FOLDER porque el worker corre en otro contenedor
+            # y solo comparte con el web el volumen `uploads`.
+            ruta = ArchivoService.guardar_crudo(
+                archivo,
+                carpeta='importaciones',
+                nombre_archivo=f'{uuid4().hex}_{nombre_archivo}',
+            )
 
             job = ImportacionJob(
                 ficha_id=ficha.id,
@@ -927,7 +934,7 @@ def cargar_excel(ficha_id):
             else:
                 flash(msg, 'success')
 
-    except (ErrorImportacion, RuntimeError) as exc:
+    except (ErrorArchivo, ErrorImportacion, RuntimeError) as exc:
         db.session.rollback()
         flash(str(exc), 'error')
     except Exception:
@@ -1149,7 +1156,7 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
 
     config_alertas = ConfiguracionAlertas.query.filter_by(ficha_id=ficha_id).first()
 
-    asistencia_map = {}
+    asistencia_map = mapa_asistencia_por_fecha(registros)
     faltas = {}
     faltas_detalladas = []
     total_asistencias = 0
@@ -1162,49 +1169,47 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
     MESES_ES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
     CAUSALES_DICT = dict(CAUSALES_JUSTIFICADAS)
 
-    for r in registros:
-        fecha_obj = r.sesion.fecha
-        fecha_iso = fecha_obj.isoformat()
+    for fecha_iso, evento in sorted(asistencia_map.items()):
+        fecha_obj = date.fromisoformat(fecha_iso)
         dia_nom = DIAS_SEMANA_ES[fecha_obj.weekday()]
         fecha_fmt = f"{dia_nom}, {fecha_obj.day} de {MESES_ES[fecha_obj.month]} de {fecha_obj.year}"
 
-        causal_label = CAUSALES_DICT.get(r.causal_justificacion, r.causal_justificacion or '')
+        causal_label = CAUSALES_DICT.get(
+            evento['causal_justificacion'], evento['causal_justificacion'] or ''
+        )
+        evento['causal'] = causal_label
+        evento['fecha_fmt'] = fecha_fmt
+        evento.pop('causal_justificacion', None)
+        estado = evento['estado']
 
-        asistencia_map[fecha_iso] = {
-            'estado': r.estado,
-            'causal': causal_label,
-            'nota': r.nota or '',
-            'fecha_fmt': fecha_fmt
-        }
-
-        if r.estado == 'ASISTE':
+        if estado == 'ASISTE':
             total_asistencias += 1
-        elif r.estado == 'TARDANZA':
+        elif estado == 'TARDANZA':
             total_tardanzas += 1
             total_asistencias += 1
-        elif r.estado == 'FALTA':
+        elif estado == 'FALTA':
             total_faltas_nj += 1
             conteo_dias_falta[dia_nom] = conteo_dias_falta.get(dia_nom, 0) + 1
-            faltas[fecha_iso] = {'estado': r.estado, 'causal': causal_label}
+            faltas[fecha_iso] = {'estado': estado, 'causal': causal_label}
             faltas_detalladas.append({
                 'fecha_iso': fecha_iso,
                 'fecha_fmt': fecha_fmt,
                 'dia_semana': dia_nom,
-                'estado': r.estado,
+                'estado': estado,
                 'causal': causal_label,
-                'nota': r.nota or ''
+                'nota': evento['nota'],
             })
-        elif r.estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
+        elif estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
             total_faltas_j += 1
             conteo_dias_falta[dia_nom] = conteo_dias_falta.get(dia_nom, 0) + 1
-            faltas[fecha_iso] = {'estado': r.estado, 'causal': causal_label}
+            faltas[fecha_iso] = {'estado': estado, 'causal': causal_label}
             faltas_detalladas.append({
                 'fecha_iso': fecha_iso,
                 'fecha_fmt': fecha_fmt,
                 'dia_semana': dia_nom,
-                'estado': r.estado,
+                'estado': estado,
                 'causal': causal_label,
-                'nota': r.nota or ''
+                'nota': evento['nota'],
             })
 
     # Faltas detalladas ordenadas de la más reciente a la más antigua
@@ -1383,12 +1388,13 @@ def descargar_archivo_entrega(entrega_id):
     except FileNotFoundError:
         abort(404)
 
-    extension = Path(entrega.archivo_url).suffix
-    return send_from_directory(
-        str(raiz),
-        relativa.as_posix(),
-        as_attachment=True,
-        download_name=f'evidencia_{entrega.id}{extension}',
+    return ArchivoService.enviar(
+        raiz,
+        relativa,
+        nombre_descarga=(
+            f'{entrega.aprendiz.documento}_evidencia_{entrega.id}_'
+            f'{nombre_original_desde_ruta(entrega.archivo_url)}'
+        ),
     )
 
 
