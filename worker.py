@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import datetime
 
 from redis import Redis
+from redis.exceptions import RedisError
 from werkzeug.datastructures import FileStorage
 
 from app.models import ImportacionJob, Ficha
@@ -16,10 +18,11 @@ from app.services.importacion_ficha import importar_archivo
 from app.services.ranking import actualizar_participacion_ficha
 from app.services.archivos import resolver_archivo_subido
 from app import db
-from app.services.importacion_jobs import _cliente_redis
+from app.services.importacion_jobs import _cliente_redis, _redis_destino
 from wsgi import app
 
 log = logging.getLogger(__name__)
+WORKER_READY_FILE = '/tmp/adso-worker-ready'
 
 
 def _resultado_resumido(resultado):
@@ -30,6 +33,34 @@ def _resultado_resumido(resultado):
             'juicios_repetidos', 'sesiones_creadas',
         )
     } | {'errores': len(resultado.get('errores', []))}
+
+
+def _conectar_redis():
+    """Espera Redis al arrancar y deja el error completo en los logs."""
+    max_intentos = int(os.getenv('WORKER_REDIS_RETRIES', '12'))
+    espera = float(os.getenv('WORKER_REDIS_RETRY_DELAY', '5'))
+    for intento in range(1, max_intentos + 1):
+        try:
+            cliente = _cliente_redis()
+            log.info(
+                'WORKER_REDIS_OK intento=%s destino=%s cola=%s',
+                intento, _redis_destino(), app.config['IMPORT_QUEUE_NAME'],
+            )
+            with open(WORKER_READY_FILE, 'w', encoding='utf-8') as marker:
+                marker.write(f'pid={os.getpid()}\n')
+            return cliente
+        except Exception as exc:
+            log.error(
+                'WORKER_REDIS_ERROR intento=%s/%s destino=%s detalle=%s',
+                intento, max_intentos, _redis_destino(), exc,
+                exc_info=True,
+            )
+            if intento < max_intentos:
+                time.sleep(espera)
+    raise RuntimeError(
+        f'El worker no pudo conectar con Redis después de {max_intentos} intentos. '
+        f'Destino: {_redis_destino()}'
+    )
 
 
 def _procesar(job_id):
@@ -82,11 +113,30 @@ def _procesar(job_id):
 
 
 def main():
-    redis_client: Redis = _cliente_redis()
+    redis_client: Redis = _conectar_redis()
     queue_name = app.config['IMPORT_QUEUE_NAME']
-    log.info('Worker de importaciones escuchando en %s', queue_name)
+    log.info(
+        'WORKER_START pid=%s destino=%s cola=%s',
+        os.getpid(), _redis_destino(), queue_name,
+    )
     while True:
-        _nombre, job_id = redis_client.blpop(queue_name, timeout=30) or (None, None)
+        try:
+            _nombre, job_id = redis_client.blpop(queue_name, timeout=30) or (None, None)
+        except RedisError as exc:
+            log.error(
+                'WORKER_REDIS_RUNTIME_ERROR destino=%s detalle=%s. Se reconectará.',
+                _redis_destino(), exc, exc_info=True,
+            )
+            try:
+                os.remove(WORKER_READY_FILE)
+            except FileNotFoundError:
+                pass
+            try:
+                redis_client.close()
+            except RedisError:
+                pass
+            redis_client = _conectar_redis()
+            continue
         if job_id:
             _procesar(job_id)
 

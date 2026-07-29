@@ -5,28 +5,51 @@ set -e
 # docker-entrypoint.sh — Panel de Instructores ADSO
 # =============================================================================
 
+PROCESS_ROLE="${PROCESS_TYPE:-web}"
+RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
+echo "Iniciando proceso '${PROCESS_ROLE}' en contenedor ${HOSTNAME:-desconocido}."
+
+# Resume una URL sin imprimir usuario, password ni query string. Además de ser
+# más seguro, permite distinguir inmediatamente PostgreSQL de Redis en Coolify.
+url_summary() {
+  URL_TO_SUMMARIZE="$1" python3 - <<'PY'
+import os
+from urllib.parse import urlsplit
+
+raw = (os.environ.get('URL_TO_SUMMARIZE') or '').strip().strip('"').strip("'")
+if not raw:
+    print('NO_DEFINIDA')
+    raise SystemExit
+try:
+    parsed = urlsplit(raw)
+    host = parsed.hostname or 'sin-host'
+    port = parsed.port
+    if parsed.scheme in ('redis', 'rediss') and port is None:
+        port = 6379
+    elif parsed.scheme.startswith('postgres') and port is None:
+        port = 5432
+    destino = f'{parsed.scheme or "sin-scheme"}://{host}:{port or "sin-puerto"}'
+    if parsed.path:
+        destino += parsed.path
+    print(destino)
+except Exception as exc:
+    print(f'INVALIDA ({type(exc).__name__}: {exc})')
+PY
+}
+
 # --- Verificar DATABASE_URL obligatoria ---
 if [ -z "$DATABASE_URL" ]; then
   echo "ERROR: DATABASE_URL no está definida. Configúrala en Coolify como variable de entorno." >&2
   exit 1
 fi
 export DATABASE_URL
-echo "DATABASE_URL recibida desde el entorno."
+echo "DATABASE_URL recibida desde el entorno. Destino: $(url_summary "$DATABASE_URL")"
 
-# Muestra una versión sanitizada (ocultando la contraseña) para depurar la URL recibida
-URL_SANITIZED=$(echo "$DATABASE_URL" | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1****\2/')
-echo "Probando conexión a base de datos: $URL_SANITIZED"
-
-# --- Debug REDIS_URL: confirma qué llega realmente al contenedor ---
-# docker-compose.yml usa pass-through "${REDIS_URL}"; si el valor puesto en
-# Coolify contiene '$' (común en passwords generados), Compose lo reinterpreta
-# como otra variable y lo vacía/corrompe antes de que Python lo vea. Este log
-# es la unica forma de confirmarlo sin exponer la contraseña.
+# --- Diagnóstico REDIS_URL sin exponer credenciales ---
 if [ -z "$REDIS_URL" ]; then
-  echo "[DEBUG] REDIS_URL: NO DEFINIDA (rate limiter usara memory://)."
+  echo "[ERROR] REDIS_URL no está definida. El worker no puede procesar importaciones."
 else
-  REDIS_SANITIZED=$(echo "$REDIS_URL" | sed -E 's/(:\/\/[^:@]*:)[^@]+(@)/\1****\2/')
-  echo "[DEBUG] REDIS_URL recibida: $REDIS_SANITIZED"
+  echo "REDIS_URL recibida. Destino: $(url_summary "$REDIS_URL")"
 fi
 
 # --- Esperar PostgreSQL ---
@@ -65,28 +88,34 @@ PY
 done
 echo "PostgreSQL listo."
 
-# --- Migraciones ---
-echo "Aplicando migraciones..."
-if ! python3 -m flask db upgrade; then
-  echo "No se pudieron aplicar las migraciones. Abortando para proteger los datos." >&2
-  exit 1
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+  # --- Migraciones ---
+  echo "Aplicando migraciones desde el proceso '${PROCESS_ROLE}'..."
+  if ! python3 -m flask db upgrade; then
+    echo "[ERROR] No se pudieron aplicar las migraciones. Abortando para proteger los datos." >&2
+    exit 1
+  fi
+  echo "Migraciones aplicadas."
+else
+  echo "Migraciones omitidas en el proceso '${PROCESS_ROLE}'; las ejecuta el servicio web."
 fi
-echo "Migraciones aplicadas."
 
 # --- Seed admin inicial ---
-echo "Verificando cuenta admin..."
-# Debug: verifica qué DATABASE_URL recibe Python y si existe .env en el contenedor
-echo "[DEBUG] DATABASE_URL en shell: $URL_SANITIZED"
-echo "[DEBUG] DATABASE_URL en Python: $(python3 -c 'import os; u=os.getenv("DATABASE_URL","NOT_SET"); import re; print(re.sub(r"(://[^:]+:)[^@]+(@)",r"\1****\2",u))')"
-echo "[DEBUG] Archivos .env en /app: $(ls /app/.env* 2>/dev/null || echo 'ninguno')"
-if ! python3 seed_admin.py; then
-  echo "Fallo la creación del admin. Revise ADSO_ADMIN_EMAIL / ADSO_ADMIN_PASSWORD en Coolify." >&2
-  exit 1
+if [ "$PROCESS_ROLE" = "worker" ]; then
+  echo "Seed de administrador omitido en el proceso worker."
+else
+  echo "Verificando cuenta admin..."
+  echo "[DEBUG] Destino DATABASE_URL en Python: $(url_summary "$DATABASE_URL")"
+  echo "[DEBUG] Archivos .env en /app: $(ls /app/.env* 2>/dev/null || echo 'ninguno')"
+  if ! python3 seed_admin.py; then
+    echo "[ERROR] Falló la creación del admin. Revise ADSO_ADMIN_EMAIL / ADSO_ADMIN_PASSWORD en Coolify." >&2
+    exit 1
+  fi
 fi
 
 # --- Arrancar proceso ---
-if [ "${PROCESS_TYPE:-web}" = "worker" ]; then
-  echo "Iniciando worker de importaciones Excel..."
+if [ "$PROCESS_ROLE" = "worker" ]; then
+  echo "Iniciando worker de importaciones Excel con diagnóstico Redis habilitado..."
   exec python3 worker.py
 fi
 

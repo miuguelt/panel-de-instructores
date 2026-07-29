@@ -1,18 +1,32 @@
 services:
   app:
     build: .
+    restart: unless-stopped
     environment:
-      - FLASK_ENV=${FLASK_ENV}
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
+      # Las variables sensibles se pasan por nombre, sin interpolarlas en
+      # Compose. Así los caracteres '$', '@', ':' y '/' de las credenciales
+      # no se reinterpretan durante el despliegue de Coolify.
+      - SECRET_KEY
+      - DATABASE_URL
+      - REDIS_URL
+      - ADSO_ADMIN_EMAIL
+      - ADSO_ADMIN_PASSWORD
+      - ADSO_ADMIN_NOMBRE
+      - SMTP_HOST
+      - SMTP_USER
+      - SMTP_PASSWORD
+      - SMTP_FROM
+      - WTF_CSRF_TIME_LIMIT
+      - LOG_LEVEL
+      - DB_POOL_SIZE
+      - DB_MAX_OVERFLOW
+      - WEB_CONCURRENCY
+      - GUNICORN_THREADS
+      - FLASK_ENV=${FLASK_ENV:-production}
       - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}
       - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}
-      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
-      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH}
-      - ADSO_ADMIN_EMAIL=${ADSO_ADMIN_EMAIL}
-      - ADSO_ADMIN_PASSWORD=${ADSO_ADMIN_PASSWORD}
-      - ADSO_ADMIN_NOMBRE=${ADSO_ADMIN_NOMBRE}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER:-/app/uploads}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-52428800}
     volumes:
       - uploads:/app/uploads
     expose:
@@ -28,22 +42,37 @@ services:
 
   worker:
     build: .
+    restart: unless-stopped
     environment:
       - PROCESS_TYPE=worker
-      - FLASK_ENV=${FLASK_ENV}
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
+      - RUN_MIGRATIONS=false
+      - SECRET_KEY
+      - DATABASE_URL
+      - REDIS_URL
+      - ADSO_ADMIN_EMAIL
+      - ADSO_ADMIN_PASSWORD
+      - ADSO_ADMIN_NOMBRE
+      - SMTP_HOST
+      - SMTP_USER
+      - SMTP_PASSWORD
+      - SMTP_FROM
+      - WTF_CSRF_TIME_LIMIT
+      - LOG_LEVEL
+      - DB_POOL_SIZE
+      - DB_MAX_OVERFLOW
       - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}
       - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}
-      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
-      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH}
-      - ADSO_ADMIN_EMAIL=${ADSO_ADMIN_EMAIL}
-      - ADSO_ADMIN_PASSWORD=${ADSO_ADMIN_PASSWORD}
-      - ADSO_ADMIN_NOMBRE=${ADSO_ADMIN_NOMBRE}
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER:-/app/uploads}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-52428800}
     volumes:
       - uploads:/app/uploads
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; raise SystemExit(0 if os.path.exists('/tmp/adso-worker-ready') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - coolify
 
