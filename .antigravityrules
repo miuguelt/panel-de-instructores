@@ -4,6 +4,8 @@
 ## 1. Contrato de ejecución
 
 - Cuando el usuario pide construir, cambiar, corregir o implementar, ejecutar el trabajo dentro del alcance autorizado. No limitarse a recomendar pasos.
+- Después de cada cambio, ejecutar una prueba o verificación reproducible del resultado antes de responder. Si es una aplicación, probar el flujo afectado; si es configuración, validarla; si es despliegue, comprobar su estado.
+- No declarar una tarea terminada basándose solo en que el archivo fue modificado: la finalización requiere evidencia de ejecución, prueba o diagnóstico explícito del bloqueo.
 - Inspeccionar primero el estado real del repositorio, preservar cambios ajenos y validar el resultado antes de responder.
 - Si una acción externa necesita autoridad adicional (credenciales, publicación o un servicio no disponible), ejecutar todo lo que sí esté autorizado y reportar únicamente el bloqueo concreto.
 - La respuesta final debe indicar qué se ejecutó, qué se verificó y qué quedó pendiente; no presentar recomendaciones como si fueran acciones realizadas.
