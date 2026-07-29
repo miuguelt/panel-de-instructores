@@ -6,11 +6,27 @@ from dotenv import load_dotenv
 
 # Handler a stdout antes de cualquier validacion: sin esto los fallos de arranque
 # no aparecen en `docker logs` y el contenedor parece morir en silencio.
+# Coolify puede entregar una variable declarada pero vacía. Nunca se debe pasar
+# ese valor directamente a logging.basicConfig(), porque logging lo interpreta
+# como un nivel desconocido y mata app + worker antes de cargar Flask.
+_log_level_received = os.getenv('LOG_LEVEL')
+_log_level = (_log_level_received or 'INFO').strip().upper() or 'INFO'
+_valid_log_levels = {'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET'}
+if _log_level not in _valid_log_levels:
+    _log_level = 'INFO'
 logging.basicConfig(
-    level=os.getenv('LOG_LEVEL', 'INFO').upper(),
+    level=_log_level,
     format='[%(asctime)s] %(levelname)s %(name)s: %(message)s',
 )
 log = logging.getLogger(__name__)
+if _log_level_received is not None and not _log_level_received.strip():
+    log.warning('LOG_LEVEL llegó vacío desde el entorno; se usará INFO.')
+elif _log_level_received and _log_level_received.strip().upper() not in _valid_log_levels:
+    log.warning(
+        'LOG_LEVEL=%r no es válido; se usará INFO. Valores válidos: %s.',
+        _log_level_received,
+        ', '.join(sorted(_valid_log_levels)),
+    )
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # override=False: environment variables set by Coolify/Docker always win over .env.
@@ -53,6 +69,25 @@ _db_url = _normalize_db_url(
 )
 
 
+def _env_int(name, default, minimum=None, maximum=None):
+    """Lee un entero de entorno tolerando valores vacíos o inválidos."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw.strip())
+    except (TypeError, ValueError):
+        log.warning('%s=%r no es un entero válido; se usará %r.', name, raw, default)
+        return default
+    if minimum is not None and value < minimum:
+        log.warning('%s=%r es menor que %r; se usará %r.', name, value, minimum, default)
+        return default
+    if maximum is not None and value > maximum:
+        log.warning('%s=%r es mayor que %r; se usará %r.', name, value, maximum, default)
+        return default
+    return value
+
+
 class Config:
     SECRET_KEY = _secret_key
     SQLALCHEMY_DATABASE_URI = _db_url
@@ -63,22 +98,22 @@ class Config:
     # Techo de conexiones = WEB_CONCURRENCY * (pool_size + max_overflow);
     # mantenerlo por debajo de max_connections de PostgreSQL.
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': int(os.getenv('DB_POOL_SIZE', '8')),
-        'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '4')),
+        'pool_size': _env_int('DB_POOL_SIZE', 8, minimum=1),
+        'max_overflow': _env_int('DB_MAX_OVERFLOW', 4, minimum=0),
         'pool_recycle': 300,
         'pool_pre_ping': True,
         'pool_timeout': 10,
     }
-    _upload_folder = os.getenv('UPLOAD_FOLDER', 'uploads')
+    _upload_folder = os.getenv('UPLOAD_FOLDER') or 'uploads'
     UPLOAD_FOLDER = (
         _upload_folder
         if os.path.isabs(_upload_folder)
         else os.path.join(BASE_DIR, _upload_folder)
     )
-    MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 50 * 1024 * 1024))
+    MAX_CONTENT_LENGTH = _env_int('MAX_CONTENT_LENGTH', 50 * 1024 * 1024, minimum=1)
     ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'zip', 'rar', 'xlsx', 'xls', 'doc', 'docx', 'pptx'}
     SMTP_HOST = os.getenv('SMTP_HOST')
-    SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+    SMTP_PORT = _env_int('SMTP_PORT', 587, minimum=1, maximum=65535)
     SMTP_USER = os.getenv('SMTP_USER')
     SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
     SMTP_FROM = os.getenv('SMTP_FROM')
@@ -86,8 +121,9 @@ class Config:
     # a la sesion, pero deja de caducar a la hora. Una pestana abierta durante la
     # jornada (el caso normal en el aula) ya no rechaza el POST del aprendiz.
     WTF_CSRF_TIME_LIMIT = (
-        int(os.environ['WTF_CSRF_TIME_LIMIT'])
-        if os.getenv('WTF_CSRF_TIME_LIMIT') else None
+        _env_int('WTF_CSRF_TIME_LIMIT', None, minimum=0)
+        if os.getenv('WTF_CSRF_TIME_LIMIT') and os.getenv('WTF_CSRF_TIME_LIMIT').strip()
+        else None
     )
     # En produccion las plantillas no cambian mientras el contenedor vive, y
     # auto_reload obliga a Jinja a hacer un stat() por plantilla heredada en
@@ -102,7 +138,7 @@ class Config:
     # En produccion el XLS se procesa en el servicio worker de Compose. En
     # local/tests se conserva el flujo sincrono para no exigir Redis.
     IMPORTACIONES_ASINCRONAS = (
-        os.getenv('IMPORTACIONES_ASINCRONAS', 'true' if os.getenv('FLASK_ENV') == 'production' else 'false')
+        (os.getenv('IMPORTACIONES_ASINCRONAS') or ('true' if os.getenv('FLASK_ENV') == 'production' else 'false'))
         .strip().lower() in ('1', 'true', 'yes', 'on')
     )
-    IMPORT_QUEUE_NAME = os.getenv('IMPORT_QUEUE_NAME', 'adso:importaciones')
+    IMPORT_QUEUE_NAME = os.getenv('IMPORT_QUEUE_NAME') or 'adso:importaciones'
