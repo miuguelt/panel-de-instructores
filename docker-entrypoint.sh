@@ -127,8 +127,28 @@ fi
 # psycogreen el hub queda bloqueado igual, sin ganancia y con mas riesgo.
 # Concurrencia total = WEB_CONCURRENCY * GUNICORN_THREADS; debe cuadrar con
 # DB_POOL_SIZE (ver config.py) y con max_connections de PostgreSQL.
-GUNICORN_WORKERS="${WEB_CONCURRENCY:-3}"
-GUNICORN_THREADS="${GUNICORN_THREADS:-8}"
+normalize_positive_int() {
+  local received="${1:-}"
+  local fallback="$2"
+  if [[ "$received" =~ ^[1-9][0-9]*$ ]]; then
+    printf '%s' "$received"
+  else
+    printf '%s' "$fallback"
+  fi
+}
+
+GUNICORN_WORKERS="$(normalize_positive_int "${WEB_CONCURRENCY:-}" 3)"
+GUNICORN_THREADS="$(normalize_positive_int "${GUNICORN_THREADS:-}" 8)"
+if [ "${WEB_CONCURRENCY:-}" != "$GUNICORN_WORKERS" ]; then
+  echo "[WARNING] WEB_CONCURRENCY='${WEB_CONCURRENCY:-}' no es válido; se usará ${GUNICORN_WORKERS}."
+fi
+if [ "${GUNICORN_THREADS:-}" != "$GUNICORN_THREADS" ]; then
+  echo "[WARNING] GUNICORN_THREADS='${GUNICORN_THREADS:-}' no es válido; se usarán ${GUNICORN_THREADS}."
+fi
+# Gunicorn convierte WEB_CONCURRENCY durante su importación, así que también
+# hay que exportar el valor normalizado antes de invocar el binario.
+export WEB_CONCURRENCY="$GUNICORN_WORKERS"
+export GUNICORN_THREADS
 echo "Iniciando servidor Gunicorn en :8009 (${GUNICORN_WORKERS} workers x ${GUNICORN_THREADS} hilos, gthread)..."
 exec gunicorn wsgi:app \
   --bind 0.0.0.0:8009 \

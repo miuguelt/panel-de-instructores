@@ -20,8 +20,11 @@ services:
       - LOG_LEVEL
       - DB_POOL_SIZE
       - DB_MAX_OVERFLOW
-      - WEB_CONCURRENCY
-      - GUNICORN_THREADS
+      # Gunicorn lee WEB_CONCURRENCY al importar su propio módulo, antes de
+      # que Flask pueda normalizar el entorno. Nunca debe recibir una cadena
+      # vacía desde Coolify.
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-3}
+      - GUNICORN_THREADS=${GUNICORN_THREADS:-8}
       - FLASK_ENV=${FLASK_ENV:-production}
       - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}
       - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}
