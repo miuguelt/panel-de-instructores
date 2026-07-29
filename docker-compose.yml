@@ -65,6 +65,10 @@ services:
       - DB_MAX_OVERFLOW
       - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}
       - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}
+      # El timeout de lectura debe ser mayor que el bloqueo de BLPOP. Antes era
+      # 3s vs 30s y el worker se reconectaba continuamente con la cola vacía.
+      - WORKER_BLPOP_TIMEOUT=${WORKER_BLPOP_TIMEOUT:-30}
+      - WORKER_SOCKET_TIMEOUT=${WORKER_SOCKET_TIMEOUT:-35}
       - FLASK_ENV=${FLASK_ENV:-production}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER:-/app/uploads}
       - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-52428800}

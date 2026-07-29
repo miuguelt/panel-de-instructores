@@ -24,13 +24,15 @@ class ImportacionJobsTestCase(unittest.TestCase):
 
     def test_cliente_redis_hace_ping_antes_de_entregarlo(self):
         fake = Mock()
+        factory = Mock(return_value=fake)
         with patch.dict(
             os.environ,
             {'REDIS_URL': 'redis://:secret@redis-host:6379/0'},
             clear=False,
-        ), patch('redis.Redis.from_url', return_value=fake):
-            self.assertIs(_cliente_redis(), fake)
+        ), patch('redis.Redis.from_url', factory):
+            self.assertIs(_cliente_redis(socket_timeout=35), fake)
         fake.ping.assert_called_once_with()
+        self.assertEqual(factory.call_args.kwargs['socket_timeout'], 35)
 
     def test_cliente_redis_imprime_error_util_para_endpoint_invalido(self):
         fake = Mock()

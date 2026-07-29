@@ -11,7 +11,13 @@ class ColaImportacionesNoDisponible(RuntimeError):
     """Redis no está configurado o no acepta trabajos."""
 
 
-def _cliente_redis():
+def _cliente_redis(socket_timeout=3):
+    """Crea y verifica un cliente Redis.
+
+    Las publicaciones web usan un timeout corto. El worker pasa un timeout
+    mayor que el BLPOP para que una cola vacía no se confunda con una caída de
+    Redis.
+    """
     redis_url = (os.getenv('REDIS_URL') or '').strip().strip('"').strip("'")
     if not redis_url or redis_url.startswith('memory://'):
         raise ColaImportacionesNoDisponible('REDIS_URL no está configurada para la cola.')
@@ -23,7 +29,7 @@ def _cliente_redis():
             redis_url,
             decode_responses=True,
             socket_connect_timeout=3,
-            socket_timeout=3,
+            socket_timeout=socket_timeout,
             health_check_interval=30,
         )
         # Redis.from_url() solo construye el cliente. El ping es obligatorio

@@ -25,6 +25,30 @@ log = logging.getLogger(__name__)
 WORKER_READY_FILE = '/tmp/adso-worker-ready'
 
 
+def _entero_positivo_entorno(nombre, defecto):
+    raw = os.getenv(nombre)
+    if raw is None or not raw.strip():
+        return defecto
+    try:
+        valor = int(raw)
+        if valor > 0:
+            return valor
+    except (TypeError, ValueError):
+        pass
+    log.warning('%s=%r no es válido; se usará %s.', nombre, raw, defecto)
+    return defecto
+
+
+WORKER_BLPOP_TIMEOUT = _entero_positivo_entorno('WORKER_BLPOP_TIMEOUT', 30)
+WORKER_SOCKET_TIMEOUT = _entero_positivo_entorno('WORKER_SOCKET_TIMEOUT', 35)
+if WORKER_SOCKET_TIMEOUT <= WORKER_BLPOP_TIMEOUT:
+    WORKER_SOCKET_TIMEOUT = WORKER_BLPOP_TIMEOUT + 5
+    log.warning(
+        'WORKER_SOCKET_TIMEOUT debe superar WORKER_BLPOP_TIMEOUT; se ajustó a %s segundos.',
+        WORKER_SOCKET_TIMEOUT,
+    )
+
+
 def _resultado_resumido(resultado):
     return {
         clave: resultado.get(clave, 0)
@@ -41,10 +65,11 @@ def _conectar_redis():
     espera = float(os.getenv('WORKER_REDIS_RETRY_DELAY', '5'))
     for intento in range(1, max_intentos + 1):
         try:
-            cliente = _cliente_redis()
+            cliente = _cliente_redis(socket_timeout=WORKER_SOCKET_TIMEOUT)
             log.info(
-                'WORKER_REDIS_OK intento=%s destino=%s cola=%s',
+                'WORKER_REDIS_OK intento=%s destino=%s cola=%s socket_timeout=%ss',
                 intento, _redis_destino(), app.config['IMPORT_QUEUE_NAME'],
+                WORKER_SOCKET_TIMEOUT,
             )
             with open(WORKER_READY_FILE, 'w', encoding='utf-8') as marker:
                 marker.write(f'pid={os.getpid()}\n')
@@ -116,12 +141,16 @@ def main():
     redis_client: Redis = _conectar_redis()
     queue_name = app.config['IMPORT_QUEUE_NAME']
     log.info(
-        'WORKER_START pid=%s destino=%s cola=%s',
+        'WORKER_START pid=%s destino=%s cola=%s blpop_timeout=%ss socket_timeout=%ss',
         os.getpid(), _redis_destino(), queue_name,
+        WORKER_BLPOP_TIMEOUT, WORKER_SOCKET_TIMEOUT,
     )
     while True:
         try:
-            _nombre, job_id = redis_client.blpop(queue_name, timeout=30) or (None, None)
+            _nombre, job_id = (
+                redis_client.blpop(queue_name, timeout=WORKER_BLPOP_TIMEOUT)
+                or (None, None)
+            )
         except RedisError as exc:
             log.error(
                 'WORKER_REDIS_RUNTIME_ERROR destino=%s detalle=%s. Se reconectará.',
