@@ -43,6 +43,10 @@ services:
       start_period: 30s
     networks:
       - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.app-compress.compress=true"
+
 
   worker:
     build: .
