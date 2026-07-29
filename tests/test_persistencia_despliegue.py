@@ -70,7 +70,11 @@ class PersistenciaDespliegueTestCase(unittest.TestCase):
         declaracion = self.compose.split('\nvolumes:', 1)
         self.assertEqual(len(declaracion), 2, 'No hay bloque de volúmenes de primer nivel.')
         bloque = declaracion[1]
-        self.assertRegex(bloque, r'^\s+uploads:', 'El volumen `uploads` no está declarado.')
+        self.assertRegex(
+            bloque,
+            r'(?m)^\s+uploads:\s*$',
+            'El volumen `uploads` no está declarado.',
+        )
         self.assertIn(
             f'name: {NOMBRE_VOLUMEN}',
             bloque,
