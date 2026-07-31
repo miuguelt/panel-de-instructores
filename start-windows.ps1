@@ -16,31 +16,42 @@ Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
 # Inyectar credenciales desde WCM (requiere PowerShell 7+)
 if ($PSVersionTable.PSVersion.Major -ge 7) {
     $wcmInjector = "$PSScriptRoot\..\..\_infrastructure\devbraind\scripts\Import-ProjectCredentials.ps1"
-    if (Test-Path $wcmInjector) { . $wcmInjector; Import-ProjectCredentials -Project adso }
+    if (Test-Path $wcmInjector) { . $wcmInjector -Project adso }
 } else {
     Write-Verbose "[WARN] PowerShell 7+ requerido para importar credenciales WCM. Usando vars .env por defecto."
 }
 
 Write-Host "Limpiando procesos fantasma en el puerto 8009..." -ForegroundColor Yellow
 $port = 8009
-$connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-if ($connections) {
-    foreach ($conn in $connections) {
-        $ownPid = $conn.OwningProcess
+
+function Get-PortPids($p) {
+    if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
+        $conns = Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue
+        if ($conns) { return $conns.OwningProcess | Select-Object -Unique }
+    }
+    $lines = netstat -ano 2>$null | Select-String ":$p\s+.*LISTENING\s+(\d+)"
+    $foundPids = @()
+    foreach ($l in $lines) {
+        if ($l.Matches.Groups.Count -gt 1) {
+            $foundPids += [int]$l.Matches.Groups[1].Value
+        }
+    }
+    return $foundPids | Select-Object -Unique
+}
+
+$pidsToKill = Get-PortPids $port
+if ($pidsToKill) {
+    foreach ($ownPid in $pidsToKill) {
         if ($ownPid -gt 0) {
             Write-Host "Matando proceso $ownPid que ocupa el puerto $port..." -ForegroundColor Red
             try {
-                Stop-Process -Id $ownPid -Force -ErrorAction Stop
+                Stop-Process -Id $ownPid -Force -ErrorAction SilentlyContinue
             } catch {
-                Write-Warning "No se pudo detener el proceso $ownPid. Puede requerir detener DevBrain o permisos elevados."
+                Write-Warning "No se pudo detener el proceso $ownPid."
             }
         }
     }
-    Start-Sleep -Seconds 3
-    $remaining = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-    if ($remaining) {
-        throw "El puerto $port sigue ocupado. Detén el proceso propietario antes de iniciar la aplicación."
-    }
+    Start-Sleep -Seconds 2
 }
 
 Write-Host "=== SENA Control Academico - Inicio ===" -ForegroundColor Green

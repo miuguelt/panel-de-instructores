@@ -4043,20 +4043,73 @@ summary:focus-visible {
    THEME FLOAT — Selector de temas global
    Aparece en todas las pantallas incluso login
 ========================================= */
+/* =========================================
+   THEME FLOAT — Selector de tema flotante único (Single Floating Icon FAB)
+   Reemplaza iconos/botones múltiples por un único botón flotante premium.
+========================================= */
 .theme-float {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    bottom: 24px;
+    right: 24px;
     z-index: 9999;
     display: flex;
-    gap: 4px;
-    padding: 6px 8px;
-    background: var(--bg-glass);
-    backdrop-filter: var(--blur-glass);
-    -webkit-backdrop-filter: var(--blur-glass);
-    border: 1px solid var(--border-glass);
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    background: var(--bg-glass, rgba(255, 255, 255, 0.15));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.2));
     border-radius: 999px;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 0 15px rgba(57, 169, 0, 0.2);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+.theme-float:hover {
+    transform: translateY(-3px) scale(1.06);
+    box-shadow: 0 14px 36px rgba(57, 169, 0, 0.35), 0 0 22px rgba(57, 169, 0, 0.3);
+}
+.theme-float-single-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #39A900 0%, #059669 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(57, 169, 0, 0.4);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    position: relative;
+    overflow: hidden;
+}
+.theme-float-single-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.35), transparent 70%);
+    pointer-events: none;
+}
+.theme-float-single-btn:hover {
+    transform: rotate(15deg) scale(1.06);
+    background: linear-gradient(135deg, #44ca00 0%, #10b981 100%);
+    box-shadow: 0 6px 20px rgba(57, 169, 0, 0.6);
+}
+.theme-float-single-btn:active {
+    transform: scale(0.94);
+}
+.theme-float-single-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
 }
 .theme-float-dot {
     width: 26px;

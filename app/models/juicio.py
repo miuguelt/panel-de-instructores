@@ -40,3 +40,21 @@ class JuicioEvaluativoInstructor(db.Model):
     __table_args__ = (
         db.UniqueConstraint('juicio_id', 'instructor_id', name='uq_juicio_instructor'),
     )
+
+
+class FichaCompetenciaSeleccionada(db.Model):
+    __tablename__ = 'fichas_competencias_seleccionadas'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
+    competencia = db.Column(db.String(300), nullable=False)
+    instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
+    fecha_seleccion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    ficha = db.relationship('Ficha', backref=db.backref('competencias_seleccionadas', lazy='dynamic', cascade='all, delete-orphan'))
+    instructor = db.relationship('Instructor', backref=db.backref('competencias_seleccionadas', lazy='dynamic'))
+
+    __table_args__ = (
+        db.UniqueConstraint('ficha_id', 'competencia', name='uq_ficha_competencia_sel'),
+    )
+

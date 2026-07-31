@@ -13,7 +13,7 @@ from app.models.alertas import (
 from app.models.ranking import ConfiguracionRanking, PuntajeHistorico
 from app.models.insignia import Insignia, InsigniaOtorgada
 from app.models.ficha_instructor import FichaInstructor
-from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor
+from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor, FichaCompetenciaSeleccionada
 from app.models.aseo import (
     ConfiguracionAseo,
     ContadorAseo,
@@ -32,6 +32,7 @@ __all__ = [
     'ConfiguracionRanking', 'PuntajeHistorico',
     'Insignia', 'InsigniaOtorgada',
     'FichaInstructor', 'JuicioEvaluativo', 'JuicioEvaluativoInstructor',
+    'FichaCompetenciaSeleccionada',
     'ConfiguracionAseo', 'ContadorAseo', 'TurnoAseo', 'IntercambioAseo',
     'MaterialFicha', 'ImportacionJob', 'NotaObservador',
 ]

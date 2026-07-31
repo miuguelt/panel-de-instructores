@@ -77,6 +77,67 @@
     .comp-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: .85rem; font-size: .82rem; color: var(--text-muted); }
     .comp-open-hint { font-size: .78rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: .3rem; }
 
+    /* ── Competencias Seleccionadas Highlighting ── */
+    .comp-card.is-selected-own {
+        border: 2px solid #10b981 !important;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, var(--bg-card) 100%) !important;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.28) !important;
+    }
+    .comp-card.is-selected-own::before {
+        opacity: 1 !important;
+        background: linear-gradient(90deg, #10b981, #059669) !important;
+    }
+    .comp-card.is-selected-other {
+        border: 2px solid #8b5cf6 !important;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.09) 0%, var(--bg-card) 100%) !important;
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.25) !important;
+    }
+    .comp-card.is-selected-other::before {
+        opacity: 1 !important;
+        background: linear-gradient(90deg, #8b5cf6, #6366f1) !important;
+    }
+    .comp-select-btn {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border-subtle);
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: .74rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all .2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        user-select: none;
+    }
+    .comp-select-btn:hover {
+        background: var(--accent-primary);
+        color: #fff;
+        border-color: var(--accent-primary);
+        transform: translateY(-1px);
+    }
+    .comp-select-btn.is-own {
+        background: #10b981;
+        color: #fff;
+        border-color: #10b981;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    }
+    .comp-select-btn.is-own:hover {
+        background: #059669;
+        border-color: #059669;
+    }
+    .comp-select-btn.is-other {
+        background: #8b5cf6;
+        color: #fff;
+        border-color: #8b5cf6;
+        box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+    }
+    .comp-select-btn.is-other:hover {
+        background: #7c3aed;
+        border-color: #7c3aed;
+    }
+
     /* ── CONTENIDO DEL MODAL ── */
     .modal-header-info { flex: 1; min-width: 0; }
     .modal-comp-name { font-size: 1.05rem; font-weight: 800; color: var(--text-strong); line-height: 1.4; margin-bottom: .4rem; }
@@ -227,6 +288,8 @@
             "aprobados": {{ comp.aprobados }},
             "pendientes": {{ comp.pendientes }},
             "pct": {{ comp.pct }},
+            "esta_seleccionada": {{ (comp.esta_seleccionada if comp.esta_seleccionada is defined and comp.esta_seleccionada else false) | tojson }},
+            "seleccionada_por": {{ (comp.seleccionada_por if comp.seleccionada_por is defined and comp.seleccionada_por is not none else none) | tojson }},
             "detalles": [
                 {% for det in comp.detalles %}
                 {
@@ -251,7 +314,12 @@
     {% set tipo_label = 'Inglés' if comp_tipo == 'ingles' else ('Transversal' if comp_tipo == 'transversal' else 'Técnica') %}
     {% set badge_cls = 'badge-ingles' if comp_tipo == 'ingles' else ('badge-transversal' if comp_tipo == 'transversal' else 'badge-tech') %}
     {% set bar_color = '#059669' if comp.pct == 100 else ('#d97706' if comp.pct >= 50 else '#dc2626') %}
-    <div class="comp-card"
+    {% set is_sel = comp.esta_seleccionada %}
+    {% set sel_info = comp.seleccionada_por %}
+    {% set is_own = sel_info and sel_info.es_propia %}
+    {% set sel_cls = 'is-selected-own' if is_own else ('is-selected-other' if is_sel else '') %}
+    <div class="comp-card {{ sel_cls }}"
+         id="comp-card-{{ loop.index0 }}"
          data-tipo="{{ comp_tipo }}"
          data-nombre="{{ comp.nombre | lower }}"
          data-idx="{{ loop.index0 }}"
@@ -272,6 +340,19 @@
         <div class="comp-card-meta">
             <span class="badge {{ badge_cls }}" style="font-size:.72rem; padding:2px 7px;">{{ tipo_label }}</span>
             <span style="font-size:.82rem; color:var(--text-muted)">{{ comp.detalles | map(attribute='rap') | unique | list | length }} RAPs</span>
+
+            <button type="button"
+                    class="comp-select-btn {{ 'is-own' if is_own else ('is-other' if is_sel else '') }}"
+                    onclick="event.stopPropagation(); toggleSeleccionCompetencia({{ ficha.id }}, null, {{ loop.index0 }});"
+                    title="{{ 'Clic para deseleccionar' if is_own else ('Seleccionada por ' ~ sel_info.nombre ~ ' - Clic para tomarla' if is_sel else 'Clic para seleccionar esta competencia') }}">
+                {% if is_own %}
+                    📌 Seleccionada por ti
+                {% elif is_sel %}
+                    👤 {{ sel_info.nombre }}
+                {% else %}
+                    📌 Seleccionar
+                {% endif %}
+            </button>
         </div>
         <div class="comp-prog-row">
             <span>Aprobados {{ comp.aprobados }}/{{ comp.total }}</span>
@@ -501,8 +582,21 @@
 
         // title + meta
         titleEl.textContent = comp.nombre;
+        
+        let selBadgeHtml = '';
+        if (comp.esta_seleccionada && comp.seleccionada_por) {
+            if (comp.seleccionada_por.es_propia) {
+                selBadgeHtml = `<button type="button" class="comp-select-btn is-own" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">📌 Seleccionada por ti (Deseleccionar)</button>`;
+            } else {
+                selBadgeHtml = `<button type="button" class="comp-select-btn is-other" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">👤 Seleccionada por ${comp.seleccionada_por.nombre} (Tomar)</button>`;
+            }
+        } else {
+            selBadgeHtml = `<button type="button" class="comp-select-btn" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">📌 Seleccionar competencia</button>`;
+        }
+
         metaEl.innerHTML = badgeHtml(comp.tipo) +
-            `<span style="font-size:.82rem;color:var(--text-muted)">${comp.total} juicios totales</span>`;
+            `<span style="font-size:.82rem;color:var(--text-muted)">${comp.total} juicios totales</span> ` +
+            selBadgeHtml;
 
         // KPIs
         const uniqueRaps = [...new Set(comp.detalles.map(d => d.rap))];
@@ -635,6 +729,74 @@
         const chevron = header.querySelector('.rap-chevron');
         const isOpen  = body.classList.toggle('open');
         if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : '';
+    };
+
+    // ─── Toggle Competencia Selection AJAX ─────────────────
+    window.toggleSeleccionCompetencia = function(fichaId, compNombre, idx) {
+        if (!compNombre && ALL_COMPS[idx]) {
+            compNombre = ALL_COMPS[idx].nombre;
+        }
+        if (!compNombre) return;
+
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.content : "";
+
+        fetch(`/instructor/fichas/${fichaId}/competencias/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ competencia: compNombre })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                alert(data.error || 'Error al actualizar la selección de la competencia.');
+                return;
+            }
+            const comp = ALL_COMPS[idx];
+            if (comp) {
+                comp.esta_seleccionada = data.esta_seleccionada;
+                comp.seleccionada_por = data.seleccionada_por;
+            }
+            const card = document.getElementById(`comp-card-${idx}`);
+            if (card) {
+                card.classList.remove('is-selected-own', 'is-selected-other');
+                const btn = card.querySelector('.comp-select-btn');
+                if (data.esta_seleccionada && data.seleccionada_por) {
+                    if (data.seleccionada_por.es_propia) {
+                        card.classList.add('is-selected-own');
+                        if (btn) {
+                            btn.className = 'comp-select-btn is-own';
+                            btn.innerHTML = '📌 Seleccionada por ti';
+                            btn.title = 'Clic para deseleccionar';
+                        }
+                    } else {
+                        card.classList.add('is-selected-other');
+                        if (btn) {
+                            btn.className = 'comp-select-btn is-other';
+                            btn.innerHTML = `👤 ${data.seleccionada_por.nombre}`;
+                            btn.title = `Seleccionada por ${data.seleccionada_por.nombre} - Clic para tomarla`;
+                        }
+                    }
+                } else {
+                    if (btn) {
+                        btn.className = 'comp-select-btn';
+                        btn.innerHTML = '📌 Seleccionar';
+                        btn.title = 'Clic para seleccionar esta competencia';
+                    }
+                }
+            }
+            const titleEl = document.getElementById('modal-comp-title');
+            if (titleEl && titleEl.textContent === compNombre && overlay.classList.contains('is-open')) {
+                openCompModal(idx);
+            }
+        })
+        .catch(err => {
+            console.error('Error toggling competencia:', err);
+            alert('Ocurrió un error al conectar con el servidor.');
+        });
     };
 })();
 </script>

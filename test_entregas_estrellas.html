@@ -269,9 +269,9 @@
     
 
     <div class="theme-float">
-        <button onclick="setTheme('elegant')" class="theme-float-dot" title="Elegante" data-theme-btn="elegant" style="background: #6366f1;"></button>
-        <button onclick="setTheme('sena')" class="theme-float-dot" title="SENA" data-theme-btn="sena" style="background: #39A900;"></button>
-        <button onclick="setTheme('ocean')" class="theme-float-dot" title="Oceano" data-theme-btn="ocean" style="background: #06b6d4;"></button>
+        <button type="button" onclick="toggleTheme()" class="theme-float-single-btn" title="Cambiar tema de interfaz" aria-label="Cambiar tema de interfaz">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        </button>
     </div>
 
     <main id="contenido-principal" class="container" tabindex="-1">
@@ -1734,6 +1734,12 @@
             document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
                 el.classList.toggle('is-active', el.dataset.themeBtn === themeName);
             });
+        }
+        function toggleTheme() {
+            var themes = ['sena', 'elegant', 'ocean'];
+            var current = localStorage.getItem('app-theme') || 'sena';
+            var nextIdx = (themes.indexOf(current) + 1) % themes.length;
+            setTheme(themes[nextIdx]);
         }
         (function() {
             var t = localStorage.getItem('app-theme') || 'sena';

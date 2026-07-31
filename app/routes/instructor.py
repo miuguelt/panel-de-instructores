@@ -52,7 +52,7 @@ from app.services.archivos import (
 )
 from app.services.cronograma import obtener_cronograma
 from app.models.ficha_instructor import FichaInstructor
-from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor
+from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor, FichaCompetenciaSeleccionada
 from app.models.material import MaterialFicha
 from app.models.importacion import ImportacionJob
 from app.services.importacion_jobs import encolar_importacion, ColaImportacionesNoDisponible
@@ -2483,9 +2483,26 @@ def juicios(ficha_id):
     aprendices_stats = sorted(aprendices_dict.values(), key=lambda x: x['aprendiz'].apellidos)
     pct_global_juicios = round((estadisticas['aprobados'] / estadisticas['total'] * 100)) if estadisticas['total'] > 0 else 0
 
+    # Cargar competencias seleccionadas por instructores
+    seleccionadas_list = FichaCompetenciaSeleccionada.query.options(
+        joinedload(FichaCompetenciaSeleccionada.instructor)
+    ).filter_by(ficha_id=ficha_id).all()
+
+    seleccionadas_map = {
+        s.competencia: {
+            'instructor_id': s.instructor_id,
+            'nombre': s.instructor.nombre if s.instructor else 'Instructor',
+            'es_propia': (s.instructor_id == current_user.id),
+            'fecha_seleccion': s.fecha_seleccion.strftime('%d/%m/%Y %H:%M') if s.fecha_seleccion else None
+        }
+        for s in seleccionadas_list
+    }
+
     for comp in competencias_summary.values():
         comp['pct'] = round((comp['aprobados'] / comp['total'] * 100)) if comp['total'] > 0 else 0
         comp['detalles'] = sorted(comp['detalles'], key=lambda x: x['nombre'])
+        comp['seleccionada_por'] = seleccionadas_map.get(comp['nombre'])
+        comp['esta_seleccionada'] = comp['seleccionada_por'] is not None
 
     competencias_ordenadas_juicios = sorted(
         competencias_summary.values(),
@@ -2511,6 +2528,76 @@ def juicios(ficha_id):
                            rango_aprobacion=rango_aprobacion,
                            primera_evaluacion=primera_evaluacion,
                            ultima_evaluacion=ultima_evaluacion)
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/competencias/toggle', methods=['POST'])
+@login_required
+def toggle_competencia_seleccionada(ficha_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        return jsonify({'success': False, 'error': 'No tienes permisos en esta ficha.'}), 403
+
+    data = request.get_json() or {}
+    competencia_nombre = (data.get('competencia') or '').strip()
+    if not competencia_nombre:
+        return jsonify({'success': False, 'error': 'Nombre de competencia requerido.'}), 400
+
+    sel = FichaCompetenciaSeleccionada.query.filter_by(
+        ficha_id=ficha_id,
+        competencia=competencia_nombre
+    ).first()
+
+    if sel:
+        if sel.instructor_id == current_user.id:
+            # Deseleccionar si es del mismo instructor
+            db.session.delete(sel)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'action': 'deselected',
+                'competencia': competencia_nombre,
+                'esta_seleccionada': False,
+                'seleccionada_por': None
+            })
+        else:
+            # Reasignar a este instructor
+            sel.instructor_id = current_user.id
+            sel.fecha_seleccion = datetime.utcnow()
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'action': 'selected',
+                'competencia': competencia_nombre,
+                'esta_seleccionada': True,
+                'seleccionada_por': {
+                    'instructor_id': current_user.id,
+                    'nombre': current_user.nombre,
+                    'es_propia': True,
+                    'fecha_seleccion': sel.fecha_seleccion.strftime('%d/%m/%Y %H:%M')
+                }
+            })
+    else:
+        # Crear nueva selección
+        nueva_sel = FichaCompetenciaSeleccionada(
+            ficha_id=ficha_id,
+            competencia=competencia_nombre,
+            instructor_id=current_user.id
+        )
+        db.session.add(nueva_sel)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'action': 'selected',
+            'competencia': competencia_nombre,
+            'esta_seleccionada': True,
+            'seleccionada_por': {
+                'instructor_id': current_user.id,
+                'nombre': current_user.nombre,
+                'es_propia': True,
+                'fecha_seleccion': nueva_sel.fecha_seleccion.strftime('%d/%m/%Y %H:%M')
+            }
+        })
+
 
 @instructor_bp.route('/fichas/<int:ficha_id>/estadisticas')
 @login_required
