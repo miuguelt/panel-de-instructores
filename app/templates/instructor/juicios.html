@@ -259,7 +259,7 @@
     </div>
 
     <!-- Search bar -->
-    <div class="card" style="margin:0; padding:1.25rem;">
+    <div class="card" style="margin:0; padding:1.25rem;" data-filter-region="comp-search-bar">
         <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; justify-content:space-between;">
             <h2 style="margin:0; color:var(--text-strong); font-size:1.2rem;">Competencias del Programa</h2>
             <p style="margin:0; font-size:.83rem; color:var(--text-muted)">Haz clic en una competencia para ver el análisis detallado</p>
@@ -515,20 +515,31 @@
     const cards         = document.querySelectorAll('.comp-grid .comp-card');
 
     function filterCards() {
-        const q    = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const q    = searchInput ? searchInput.value.trim() : '';
         const tipo = typeSelect  ? typeSelect.value : '';
-        cards.forEach(card => {
-            const nombre   = card.getAttribute('data-nombre') || '';
-            const cardTipo = card.getAttribute('data-tipo')   || '';
-            const matchQ   = !q    || nombre.includes(q);
-            const matchT   = !tipo || cardTipo === tipo;
-            card.style.display = (matchQ && matchT) ? '' : 'none';
-        });
-        // Ocultar secciones sin tarjetas visibles
-        document.querySelectorAll('.comp-type-section').forEach(section => {
-            const anyVisible = Array.from(section.querySelectorAll('.comp-card')).some(c => c.style.display !== 'none');
-            section.style.display = anyVisible ? '' : 'none';
-        });
+        const searchCard = document.querySelector('[data-filter-region="comp-search-bar"]');
+        const terminos = window.FiltroVista ? window.FiltroVista.terminos(q) : q.toLowerCase().split(/\s+/).filter(Boolean);
+
+        const runFilter = () => {
+            cards.forEach(card => {
+                const nombre   = card.getAttribute('data-nombre') || '';
+                const cardTipo = card.getAttribute('data-tipo')   || '';
+                const matchQ   = window.FiltroVista ? window.FiltroVista.coincide(nombre, terminos) : (!q || nombre.toLowerCase().includes(q.toLowerCase()));
+                const matchT   = !tipo || cardTipo === tipo;
+                card.style.display = (matchQ && matchT) ? '' : 'none';
+            });
+            // Ocultar secciones sin tarjetas visibles
+            document.querySelectorAll('.comp-type-section').forEach(section => {
+                const anyVisible = Array.from(section.querySelectorAll('.comp-card')).some(c => c.style.display !== 'none');
+                section.style.display = anyVisible ? '' : 'none';
+            });
+        };
+
+        if (window.FiltroVista && searchCard) {
+            window.FiltroVista.aplicar(searchCard, runFilter);
+        } else {
+            runFilter();
+        }
     }
     if (searchInput) searchInput.addEventListener('input', filterCards);
     if (typeSelect)  typeSelect.addEventListener('change', filterCards);

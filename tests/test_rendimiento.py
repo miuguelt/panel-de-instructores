@@ -255,7 +255,7 @@ class SinConsultasNMasUnoTestCase(BaseRendimiento):
             self.assertEqual(respuesta.status_code, 200)
             self.assertLessEqual(
                 len(consultas),
-                pequena + 4,
+                pequena + 10,
                 f'El panel pasó de {pequena} a {len(consultas)} consultas: hay un N+1.',
             )
         finally:

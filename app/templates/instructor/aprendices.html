@@ -84,12 +84,31 @@
 </div>
 
 <div class="section-header">
-    <h2>Aprendices ({{ aprendices|length }})</h2>
+    <h2>Aprendices ({{ aprendices|length }}{% if estado_seleccionado != 'todos' %} de {{ total_aprendices }}{% endif %})</h2>
 </div>
+
+{% if total_aprendices %}
+<div class="estado-chips" role="group" aria-label="Filtrar aprendices por estado" data-filter-region="aprendices-estado-chips">
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
+       class="estado-chip {% if estado_seleccionado == 'todos' %}is-active{% endif %}">
+        Todos los estados <span class="chip-count">{{ total_aprendices }}</span>
+    </a>
+    {% for estado, conteo in estados_disponibles %}
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id, estado=estado) }}"
+       class="estado-chip chip-{{ estado|tono_estado }} {% if estado_seleccionado == estado %}is-active{% endif %}">
+        {{ estado|etiqueta_estado }} <span class="chip-count">{{ conteo }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if estado_seleccionado != 'todos' %}
+<p class="text-muted" style="margin-top: 0;">Mostrando solo aprendices en estado <strong>{{ estado_seleccionado|etiqueta_estado }}</strong>. Con “Todos los estados” ves a todos los que entraron a la ficha, incluidos condicionados y retirados.</p>
+{% endif %}
 
 {% if aprendices %}
 <div class="table-container">
-    <div class="table-responsive" tabindex="0" aria-label="Lista de aprendices">
+    <div class="table-responsive" tabindex="0" aria-label="Lista de aprendices" data-filter-region="aprendices-tabla">
         <table class="table table-sena">
             <caption class="sr-only">Aprendices registrados en la ficha {{ ficha.codigo }}</caption>
             <thead>
@@ -111,7 +130,7 @@
                     <td data-label="Nombre">{{ ap.nombre }}</td>
                     <td data-label="Apellidos">{{ ap.apellidos }}</td>
                     <td data-label="Tipo"><span class="badge">{{ ap.tipo_documento }}</span></td>
-                    <td data-label="Estado"><span class="badge badge-{{ 'success' if ap.estado == 'EN_FORMACION' else 'warning' }}">{{ ap.estado }}</span></td>
+                    <td data-label="Estado"><span class="badge badge-{{ ap.estado|tono_estado }}">{{ ap.estado|etiqueta_estado }}</span></td>
                     <td data-label="Progreso Juicios">
                         {% if js and js.total > 0 %}
                         {% set pct = (js.aprobados / js.total * 100)|round|int %}
@@ -137,9 +156,15 @@
 </div>
 {% else %}
 <div class="empty-state">
+    {% if total_aprendices %}
+    <div class="empty-icon">🔍</div>
+    <h3>Ningún aprendiz con este estado</h3>
+    <p>No hay aprendices en estado <strong>{{ estado_seleccionado|etiqueta_estado }}</strong>. Usa el filtro de arriba para ver otro estado o a todos los que entraron a la ficha.</p>
+    {% else %}
     <div class="empty-icon">👥</div>
     <h3>Todavía no hay aprendices cargados</h3>
     <p>Sube un archivo Excel con la lista de aprendices usando el formulario de arriba.</p>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

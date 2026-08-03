@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import joinedload
 from app import db
 from app.models.ficha import Ficha
-from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz
+from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz, etiqueta_estado
 from app.models.asistencia import SesionAsistencia, RegistroAsistencia, ESTADOS_ASISTENCIA, CAUSALES_JUSTIFICADAS
 from app.models.tarea import (
     MODALIDAD_CLASE,
@@ -549,7 +549,28 @@ def aprendices(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
-    lista_aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).order_by(Aprendiz.apellidos, Aprendiz.nombre).all()
+    # El listado parte de TODOS los aprendices que entraron a la ficha, sin
+    # importar su estado (condicionados, retirados, etc.); el filtro por
+    # estado es una decision explicita del instructor via ?estado=.
+    consulta = Aprendiz.query.filter_by(ficha_id=ficha_id)
+
+    estados_disponibles = (
+        db.session.query(Aprendiz.estado, func.count(Aprendiz.id))
+        .filter(Aprendiz.ficha_id == ficha_id)
+        .group_by(Aprendiz.estado)
+        .all()
+    )
+    # Los estados activos primero, el resto en orden alfabético legible.
+    estados_disponibles.sort(
+        key=lambda par: (par[0] not in ESTADOS_EN_FORMACION, etiqueta_estado(par[0]))
+    )
+    total_aprendices = sum(conteo for _estado, conteo in estados_disponibles)
+
+    estado_seleccionado = (request.args.get('estado') or 'todos').strip()
+    if estado_seleccionado != 'todos':
+        consulta = consulta.filter(Aprendiz.estado == estado_seleccionado)
+
+    lista_aprendices = consulta.order_by(Aprendiz.apellidos, Aprendiz.nombre).all()
     aprendiz_ids = [a.id for a in lista_aprendices]
 
     # Estadísticas de juicios por aprendiz
@@ -567,7 +588,15 @@ def aprendices(ficha_id):
                 tmp[j.aprendiz_id]['aprobados'] += 1
         stats_map = dict(tmp)
 
-    return render_template('aprendices.html', ficha=ficha, aprendices=lista_aprendices, juicios_stats=stats_map)
+    return render_template(
+        'aprendices.html',
+        ficha=ficha,
+        aprendices=lista_aprendices,
+        juicios_stats=stats_map,
+        estados_disponibles=estados_disponibles,
+        total_aprendices=total_aprendices,
+        estado_seleccionado=estado_seleccionado,
+    )
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/aprendices/<int:aprendiz_id>/historial')
@@ -1067,7 +1096,7 @@ def asistencia(ficha_id):
             flash('La fecha de la sesión no tiene un formato válido.', 'error')
             return redirect(url_for('instructor.asistencia', ficha_id=ficha_id))
 
-        aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
+        aprendices = Aprendiz.query_llamado_lista(ficha_id).order_by(Aprendiz.apellidos).all()
         estados_validos = {valor for valor, _etiqueta in ESTADOS_ASISTENCIA}
         causales_validas = {valor for valor, _etiqueta in CAUSALES_JUSTIFICADAS}
         for aprendiz in aprendices:
@@ -1178,8 +1207,8 @@ def asistencia(ficha_id):
 
     # Los aprendices se cargan despues del commit: al confirmar la sesion
     # SQLAlchemy expira los objetos vivos y volver a leer aprendiz.id
-    # recargaria cada fila una por una.
-    aprendices = Aprendiz.query_en_formacion(ficha_id).order_by(Aprendiz.apellidos).all()
+    # recargaria cada fila una por una. Incluye condicionados.
+    aprendices = Aprendiz.query_llamado_lista(ficha_id).order_by(Aprendiz.apellidos).all()
 
     stats_map, total_sesiones = calcular_semaforo(ficha_id, aprendices, config)
 

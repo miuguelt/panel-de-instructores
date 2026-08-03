@@ -264,7 +264,7 @@
         {% endif %}
 
         <div class="ranking-card-container">
-            <nav class="period-tabs" aria-label="Periodo del ranking">
+            <nav class="period-tabs" aria-label="Periodo del ranking" data-filter-region="ranking-period-tabs">
                 <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='general') }}"
                    class="{% if periodo == 'general' %}active{% endif %}">General</a>
                 <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='semanal') }}"

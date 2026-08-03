@@ -46,7 +46,7 @@
 {% endif %}
 
 {# ===== VISTA MÓVIL (cards) ===== #}
-<div class="ranking-mobile" aria-label="Ranking de participación">
+<div class="ranking-mobile" aria-label="Ranking de participación" data-filter-region="ranking-mobile-lista">
     {% for fila in filas %}
     <article class="ranking-card {% if fila.posicion <= 3 %}ranking-card-top ranking-card-position-{{ fila.posicion }}{% endif %}"
              data-estado="{{ fila.aprendiz.estado }}"
@@ -109,7 +109,7 @@
     <span>Haz clic en una fila para ver el historial</span>
 </div>
 
-<div class="table-container ranking-desktop">
+<div class="table-container ranking-desktop" data-filter-region="ranking-desktop-lista">
     <div class="table-responsive">
     <table class="table ranking-table table-sena">
         <caption class="sr-only">Ranking de participación</caption>

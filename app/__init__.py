@@ -376,6 +376,16 @@ def create_app(test_config=None):
         from app.services.importacion_ficha import clasificar_competencia
         return clasificar_competencia(nombre)
 
+    @app.template_filter('etiqueta_estado')
+    def filtro_etiqueta_estado(estado):
+        from app.models.aprendiz import etiqueta_estado
+        return etiqueta_estado(estado)
+
+    @app.template_filter('tono_estado')
+    def filtro_tono_estado(estado):
+        from app.models.aprendiz import tono_estado
+        return tono_estado(estado)
+
     @app.template_filter('format_size')
     def format_size_filter(bytes_val):
         if not bytes_val or bytes_val < 0:

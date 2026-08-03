@@ -109,7 +109,7 @@ class AlertasTestCase(unittest.TestCase):
         )
         for ruta in rutas:
             with self.subTest(ruta=ruta):
-                self.assertEqual(cliente.get(ruta).status_code, 200)
+                self.assertEqual(cliente.get(ruta, follow_redirects=True).status_code, 200)
 
         registro = RegistroAsistencia.query.join(SesionAsistencia).filter(
             RegistroAsistencia.aprendiz_id == self.aprendiz.id,

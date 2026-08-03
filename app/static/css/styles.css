@@ -4049,38 +4049,40 @@ summary:focus-visible {
 ========================================= */
 .theme-float {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: 16px;
+    right: 16px;
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3px;
-    background: var(--bg-glass, rgba(255, 255, 255, 0.15));
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.2));
+    padding: 2px;
+    background: var(--bg-glass, rgba(15, 23, 42, 0.25));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 999px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 0 15px rgba(57, 169, 0, 0.2);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    opacity: 0.75;
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
 }
 .theme-float:hover {
-    transform: translateY(-3px) scale(1.06);
-    box-shadow: 0 14px 36px rgba(57, 169, 0, 0.35), 0 0 22px rgba(57, 169, 0, 0.3);
+    opacity: 1;
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 0 0 12px rgba(57, 169, 0, 0.3);
 }
 .theme-float-single-btn {
-    width: 48px;
-    height: 48px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     border: none;
-    background: linear-gradient(135deg, #39A900 0%, #059669 100%);
+    background: linear-gradient(135deg, rgba(57, 169, 0, 0.85) 0%, rgba(5, 150, 105, 0.85) 100%);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(57, 169, 0, 0.4);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     position: relative;
     overflow: hidden;
@@ -4090,41 +4092,61 @@ summary:focus-visible {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.35), transparent 70%);
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.25), transparent 70%);
     pointer-events: none;
 }
 .theme-float-single-btn:hover {
-    transform: rotate(15deg) scale(1.06);
-    background: linear-gradient(135deg, #44ca00 0%, #10b981 100%);
-    box-shadow: 0 6px 20px rgba(57, 169, 0, 0.6);
+    transform: rotate(15deg) scale(1.04);
+    background: linear-gradient(135deg, #39A900 0%, #059669 100%);
+    box-shadow: 0 4px 14px rgba(57, 169, 0, 0.5);
 }
 .theme-float-single-btn:active {
-    transform: scale(0.94);
+    transform: scale(0.92);
 }
 .theme-float-single-btn svg {
-    width: 22px;
-    height: 22px;
+    width: 17px;
+    height: 17px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2.2;
     stroke-linecap: round;
     stroke-linejoin: round;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 .theme-float-dot {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     border: 2px solid transparent;
     cursor: pointer;
     transition: border-color 0.2s, transform 0.2s;
 }
 .theme-float-dot:hover {
-    transform: scale(1.2);
+    transform: scale(1.15);
 }
 .theme-float-dot.is-active {
     border-color: white;
-    box-shadow: 0 0 8px rgba(255,255,255,0.3);
+    box-shadow: 0 0 6px rgba(255,255,255,0.3);
+}
+
+@media (max-width: 640px) {
+    .theme-float {
+        bottom: 12px;
+        right: 12px;
+        opacity: 0.65;
+    }
+    .theme-float:hover,
+    .theme-float:focus-within {
+        opacity: 1;
+    }
+    .theme-float-single-btn {
+        width: 32px;
+        height: 32px;
+    }
+    .theme-float-single-btn svg {
+        width: 15px;
+        height: 15px;
+    }
 }
 .panel-aprendiz {
     display: flex;
@@ -5405,4 +5427,59 @@ summary:focus-visible {
     .competencia-modal-section-heading,
     .competencia-modal-rap { align-items: flex-start; flex-direction: column; }
     .competencia-modal-rap .badge { align-self: flex-start; }
+}
+
+/* ── Filtro por chips de estado (vista Aprendices) ── */
+.estado-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 14px;
+}
+.estado-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+.estado-chip:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-strong);
+}
+.estado-chip .chip-count {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--border-subtle);
+    color: var(--text-strong);
+}
+.estado-chip.is-active {
+    background: var(--sena-green-light);
+    border-color: var(--accent-primary);
+    color: var(--accent-hover);
+}
+.estado-chip.is-active .chip-count {
+    background: var(--accent-primary);
+    color: #fff;
+}
+.estado-chip.chip-warning.is-active { background: rgba(217, 119, 6, 0.15); border-color: #d97706; color: #b45309; }
+.estado-chip.chip-warning.is-active .chip-count { background: #d97706; color: #fff; }
+.estado-chip.chip-danger.is-active { background: rgba(220, 38, 38, 0.12); border-color: #dc2626; color: #b91c1c; }
+.estado-chip.chip-danger.is-active .chip-count { background: #dc2626; color: #fff; }
+.estado-chip.chip-info.is-active { background: rgba(59, 130, 246, 0.12); border-color: #3b82f6; color: #1d4ed8; }
+.estado-chip.chip-info.is-active .chip-count { background: #3b82f6; color: #fff; }
+.estado-chip.chip-secondary.is-active { background: var(--border-subtle); border-color: var(--text-muted); color: var(--text-strong); }
+.estado-chip.chip-secondary.is-active .chip-count { background: var(--text-muted); color: var(--bg-surface); }
+
+@media (max-width: 480px) {
+    .estado-chip { width: 100%; justify-content: space-between; }
 }

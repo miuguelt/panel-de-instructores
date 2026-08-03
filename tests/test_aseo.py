@@ -257,7 +257,8 @@ class TurnosAseoTestCase(unittest.TestCase):
 
         panel = cliente.get(
             f'/aprendiz/{self.ficha.id}/panel'
-            f'?documento={self.aprendices[0].documento}'
+            f'?documento={self.aprendices[0].documento}',
+            follow_redirects=True
         )
         self.assertEqual(panel.status_code, 200)
         self.assertIn('Turno de aseo'.encode(), panel.data)

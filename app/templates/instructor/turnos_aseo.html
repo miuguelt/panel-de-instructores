@@ -74,7 +74,7 @@
 {% endif %}
 
 <section class="card calendar-card">
-    <div class="calendar-toolbar">
+    <div class="calendar-toolbar" data-filter-region="aseo-calendario-toolbar">
         <a class="calendar-arrow" href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes_anterior) }}" aria-label="Mes anterior">&larr;</a>
         <div>
             <span class="eyebrow">Calendario mensual</span>
@@ -172,7 +172,7 @@
     </div>
     <p class="text-muted">Los contadores solo suben cuando el aprendiz está presente el día de su turno. Si falta, su puesto se conserva y el sistema lo prioriza la próxima vez. Una exclusión temporal conserva el lugar acumulado.</p>
     <div class="table-container">
-    <div class="table-responsive">
+    <div class="table-responsive" data-filter-region="aseo-equidad-tabla">
         <table class="table equity-table">
             <caption class="sr-only">Tabla de equidad de turnos de aseo</caption>
             <thead>

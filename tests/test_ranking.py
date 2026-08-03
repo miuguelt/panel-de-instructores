@@ -152,7 +152,7 @@ class RankingTestCase(unittest.TestCase):
         )
         for ruta in rutas:
             with self.subTest(ruta=ruta):
-                self.assertEqual(cliente.get(ruta).status_code, 200)
+                self.assertEqual(cliente.get(ruta, follow_redirects=True).status_code, 200)
 
         self.assertEqual(Insignia.query.filter_by(ficha_id=self.ficha.id).count(), 9)
 

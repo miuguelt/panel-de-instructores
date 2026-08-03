@@ -127,6 +127,7 @@
         {% block content %}{% endblock %}
     </main>
 
+    <script src="{{ url_for('static', filename='js/filter-view.js') }}"></script>
     {% block scripts %}{% endblock %}
     <script src="{{ url_for('static', filename='js/table-filters.js') }}"></script>
     <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_upload_bytes | int }};</script>

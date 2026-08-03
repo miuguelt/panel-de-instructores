@@ -70,7 +70,14 @@ class FiltroEnFormacionTestCase(unittest.TestCase):
             estado='CANCELADO',
             ficha_id=self.ficha.id,
         )
-        db.session.add_all([self.activo, self.retirado, self.cancelado])
+        self.condicionado = Aprendiz(
+            documento='2004',
+            nombre='Dino',
+            apellidos='Duarte',
+            estado='CONDICIONADO',
+            ficha_id=self.ficha.id,
+        )
+        db.session.add_all([self.activo, self.retirado, self.cancelado, self.condicionado])
         db.session.add(ConfiguracionRanking(ficha_id=self.ficha.id))
         db.session.commit()
 
@@ -86,15 +93,25 @@ class FiltroEnFormacionTestCase(unittest.TestCase):
             sesion['_fresh'] = True
         return cliente
 
-    def test_llamado_a_lista_solo_muestra_aprendices_en_formacion(self):
+    def test_llamado_a_lista_incluye_en_formacion_y_condicionados(self):
         respuesta = self._cliente_autenticado().get(
             f'/instructor/fichas/{self.ficha.id}/asistencia'
         )
         self.assertEqual(respuesta.status_code, 200)
         cuerpo = respuesta.get_data(as_text=True)
         self.assertIn(f'asistencia_{self.activo.id}', cuerpo)
+        self.assertIn(f'asistencia_{self.condicionado.id}', cuerpo)
         self.assertNotIn(f'asistencia_{self.retirado.id}', cuerpo)
         self.assertNotIn(f'asistencia_{self.cancelado.id}', cuerpo)
+
+    def test_llamado_a_lista_muestra_el_estado_de_cada_aprendiz(self):
+        respuesta = self._cliente_autenticado().get(
+            f'/instructor/fichas/{self.ficha.id}/asistencia'
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        cuerpo = respuesta.get_data(as_text=True)
+        self.assertIn('estado-mini">En formación', cuerpo)
+        self.assertIn('estado-mini">Condicionado', cuerpo)
 
     def test_turnos_de_aseo_ignoran_a_quienes_no_estan_en_formacion(self):
         activos = aprendices_activos(self.ficha.id)
@@ -160,8 +177,37 @@ class FiltroEnFormacionTestCase(unittest.TestCase):
         )
         self.assertEqual(respuesta.status_code, 200)
         cuerpo = respuesta.get_data(as_text=True)
-        for aprendiz in (self.activo, self.retirado, self.cancelado):
+        for aprendiz in (self.activo, self.retirado, self.cancelado, self.condicionado):
             self.assertIn(aprendiz.apellidos, cuerpo)
+
+    def test_aprendices_condicionados_aparecen_con_su_estado(self):
+        respuesta = self._cliente_autenticado().get(
+            f'/instructor/fichas/{self.ficha.id}/aprendices'
+        )
+        cuerpo = respuesta.get_data(as_text=True)
+        self.assertIn(self.condicionado.apellidos, cuerpo)
+        self.assertIn('Condicionado', cuerpo)
+
+    def test_filtro_por_estado_muestra_solo_ese_estado(self):
+        respuesta = self._cliente_autenticado().get(
+            f'/instructor/fichas/{self.ficha.id}/aprendices?estado=CONDICIONADO'
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        cuerpo = respuesta.get_data(as_text=True)
+        self.assertIn(self.condicionado.apellidos, cuerpo)
+        for otro in (self.activo, self.retirado, self.cancelado):
+            self.assertNotIn(otro.apellidos, cuerpo)
+
+    def test_filtro_ofrece_todos_los_estados_con_conteos(self):
+        respuesta = self._cliente_autenticado().get(
+            f'/instructor/fichas/{self.ficha.id}/aprendices'
+        )
+        cuerpo = respuesta.get_data(as_text=True)
+        self.assertIn('Todos los estados <span class="chip-count">4</span>', cuerpo)
+        self.assertIn('En formación <span class="chip-count">1</span>', cuerpo)
+        self.assertIn('Condicionado <span class="chip-count">1</span>', cuerpo)
+        self.assertIn('Retiro voluntario <span class="chip-count">1</span>', cuerpo)
+        self.assertIn('Cancelado <span class="chip-count">1</span>', cuerpo)
 
 
 if __name__ == '__main__':

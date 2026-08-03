@@ -1,5 +1,6 @@
 (function () {
     function normalize(value) {
+        if (window.FiltroVista) return window.FiltroVista.normalizar(value);
         return (value || '')
             .toLocaleLowerCase('es')
             .normalize('NFD')
@@ -16,9 +17,10 @@
         const statusSelect = document.querySelector('[data-followup-status]');
         const count = document.querySelector('[data-followup-count]');
         const emptyState = document.querySelector('[data-followup-empty]');
+        const toolbar = document.querySelector('.followup-toolbar') || document.querySelector('.followup-filters');
         if (!searchInput || !prioritySelect || !statusSelect || !count) return;
 
-        const applyFilters = function () {
+        const filterAction = function () {
             const searchTerm = normalize(searchInput.value);
             const priority = prioritySelect.value;
             const status = statusSelect.value;
@@ -35,6 +37,14 @@
 
             count.textContent = `${visible} caso${visible === 1 ? '' : 's'}`;
             if (emptyState) emptyState.hidden = visible !== 0;
+        };
+
+        const applyFilters = function () {
+            if (window.FiltroVista && toolbar) {
+                window.FiltroVista.aplicar(toolbar, filterAction);
+            } else {
+                filterAction();
+            }
         };
 
         [searchInput, prioritySelect, statusSelect].forEach(function (control) {

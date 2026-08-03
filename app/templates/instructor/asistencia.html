@@ -20,8 +20,9 @@
         </div>
 
         {% if aprendices %}
-        <div class="attendance-toolbar">
+        <div class="attendance-toolbar" data-filter-region="asistencia-toolbar">
             <button type="button" class="btn btn-sm btn-outline" id="mark-all-present">Marcar todos como “Asiste”</button>
+            <input type="search" id="asistencia-search" class="form-control" placeholder="🔍 Buscar aprendiz..." style="font-size:12px; padding:4px 10px; max-width:220px; border-radius:6px;" aria-label="Buscar aprendiz en la lista de asistencia">
             <span id="attendance-summary" role="status" aria-live="polite"></span>
         </div>
         <div class="asistencia-list">
@@ -43,12 +44,12 @@
                  data-base-faltas-j="{{ base_faltas_j }}"
                  data-tareas="{{ stats.tareas_pendientes }}">
 
-                <!-- Nombre + doc -->  
+                <!-- Nombre + estado -->  
                 <div class="col-nombre">
                     <span class="aprendiz-name" id="aprendiz-{{ ap.id }}"
                           hx-get="{{ url_for('instructor.asistencia_aprendiz_modal', ficha_id=ficha.id, aprendiz_id=ap.id) }}"
                           hx-target="#modal-container" hx-trigger="click">{{ ap.nombre }} {{ ap.apellidos }}</span>
-                    <span class="aprendiz-doc">{{ ap.documento }}</span>
+                    <span class="badge badge-{{ ap.estado|tono_estado }} estado-mini">{{ ap.estado|etiqueta_estado }}</span>
                 </div>
 
                 <!-- Barra + % + badges mini -->
@@ -96,8 +97,8 @@
         {% else %}
         <div class="empty-state">
             <div class="empty-icon">👥</div>
-            <h3>No hay aprendices en formación en esta ficha</h3>
-            <p>El llamado a lista solo incluye aprendices en formación. Carga o actualiza los aprendices antes de continuar.</p>
+            <h3>No hay aprendices para el llamado a lista</h3>
+            <p>El llamado a lista incluye aprendices en formación y condicionados. Carga o actualiza los aprendices antes de continuar.</p>
             <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-primary">Cargar Aprendices</a>
         </div>
         {% endif %}
@@ -195,6 +196,14 @@
 .aprendiz-doc {
     font-size: 11px;
     color: var(--text-muted);
+    white-space: nowrap;
+}
+.estado-mini {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    margin-top: 2px;
+    align-self: flex-start;
     white-space: nowrap;
 }
 
@@ -424,5 +433,29 @@ if (markAllButton) {
     });
 }
 updateAttendanceSummary();
+
+var searchInput = document.getElementById('asistencia-search');
+if (searchInput) {
+    searchInput.addEventListener('input', function() {
+        var query = this.value;
+        var toolbar = document.querySelector('.attendance-toolbar');
+        var terminos = window.FiltroVista ? window.FiltroVista.terminos(query) : query.toLowerCase().split(/\s+/).filter(Boolean);
+
+        var runFilter = function() {
+            document.querySelectorAll('.asistencia-row').forEach(function(row) {
+                var nameEl = row.querySelector('.aprendiz-name');
+                var text = nameEl ? nameEl.textContent : row.textContent;
+                var matches = window.FiltroVista ? window.FiltroVista.coincide(text, terminos) : text.toLowerCase().indexOf(query.toLowerCase()) !== -1;
+                row.style.display = matches ? '' : 'none';
+            });
+        };
+
+        if (window.FiltroVista && toolbar) {
+            window.FiltroVista.aplicar(toolbar, runFilter);
+        } else {
+            runFilter();
+        }
+    });
+}
 </script>
 {% endblock %}

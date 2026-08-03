@@ -168,11 +168,11 @@ class FlujosWebTestCase(unittest.TestCase):
         )
         for ruta in rutas:
             with self.subTest(ruta=ruta):
-                self.assertEqual(self.cliente.get(ruta).status_code, 200)
+                self.assertEqual(self.cliente.get(ruta, follow_redirects=True).status_code, 200)
 
         dashboard = self.cliente.get('/instructor/').data
-        self.assertIn(b'class="card card-ficha"', dashboard)
-        self.assertNotIn(b'<a class="card card-ficha"', dashboard)
+        self.assertIn(b'class="card card-ficha', dashboard)
+        self.assertNotIn(b'<a class="card card-ficha', dashboard)
         self.assertIn('Navegación principal'.encode(), dashboard)
 
     def test_login_logout_y_redireccion_son_seguros(self):

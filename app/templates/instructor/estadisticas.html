@@ -204,7 +204,7 @@
                 {% set comps_tipo = competencias_stats | selectattr('tipo', 'equalto', tipo_actual) | list %}
                 {% if comps_tipo %}
                 <h3 style="margin-top: {{ '0' if loop.first else '24px' }}; margin-bottom: 12px; font-size: 16px; color: var(--text-primary); border-bottom: 1px solid var(--border-divider); padding-bottom: 8px;">Competencias: {{ tipos_nombres[tipo_actual] }}</h3>
-                <div class="table-container">
+                <div class="table-container" data-filter-region="estadisticas-competencias-tabla">
                 <div class="table-responsive">
                     <table class="table table-sena table-striped">
                         <caption class="sr-only">Rendimiento por competencia - {{ tipos_nombres[tipo_actual] }}</caption>
@@ -254,7 +254,7 @@
         </header>
         <div class="card-body">
             {% if instructores_stats %}
-            <div class="table-container">
+            <div class="table-container" data-filter-region="estadisticas-instructores-tabla">
             <div class="table-responsive">
                 <table class="table table-sena table-striped">
                     <caption class="sr-only">Historial evaluativo por instructor</caption>
