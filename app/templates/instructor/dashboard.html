@@ -85,36 +85,69 @@
                         {% endif %}
 
                         {% if extra %}
-                        {% set expected_deliveries = extra.get('tareas_totales', 0) * extra.get('total_aprendices', 0) %}
-                        {% set cert_pct = ((extra.get('aprendices_certificados', 0) / extra.get('total_aprendices', 1)) * 100)|round|int if extra.get('total_aprendices', 0) > 0 else 0 %}
-                        <div class="ficha-metric-grid">
-                            <div class="ficha-metric {% if extra.pct_asistencia >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Asistencia promedio del grupo activo">
-                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Asistencia</span><strong class="ficha-metric-value">{{ extra.pct_asistencia }}%</strong></div>
-                                <div class="ficha-metric-track"><span style="--metric-value: {{ [extra.pct_asistencia, 100]|min }}%;"></span></div>
-                                <small>{{ extra.sesiones }} sesiones</small>
+                            {% set expected_deliveries = extra.get('tareas_totales', 0) * extra.get('total_aprendices', 0) %}
+                            {% set cert_pct = ((extra.get('aprendices_certificados', 0) / extra.get('total_aprendices', 1)) * 100)|round|int if extra.get('total_aprendices', 0) > 0 else 0 %}
+                            {% set pct_asistencia = extra.get('pct_asistencia', 100) %}
+                            {% set pct_entregas = extra.get('pct_entregas', 100) %}
+                            {% set pct_juicios = extra.get('pct_juicios', 100) %}
+                            {% set pct_tiempo = extra.get('pct_tiempo', 0) %}
+                            {% set notas_negativas = extra.get('notas_negativas', 0) %}
+                            {% set notas_positivas = extra.get('notas_positivas', 0) %}
+                            {% set notas_total = extra.get('notas_total', 0) %}
+
+                            <div class="ficha-time-progress" title="Tiempo transcurrido de la ficha">
+                                <span>⏱ Tiempo</span>
+                                <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_tiempo, 100]|min }}%;"></span></div>
+                                <strong>{{ pct_tiempo }}%</strong>
                             </div>
-                            <div class="ficha-metric {% if extra.pct_entregas >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Entregas recibidas frente a las esperadas">
-                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Entregas</span><strong class="ficha-metric-value">{{ extra.pct_entregas }}%</strong></div>
-                                <div class="ficha-metric-track"><span style="--metric-value: {{ [extra.pct_entregas, 100]|min }}%;"></span></div>
-                                <small>{% if expected_deliveries %}{{ extra.entregas_totales }} de {{ expected_deliveries }}{% else %}Sin tareas asignadas{% endif %}</small>
+
+                            <div class="ficha-metric-grid">
+                                <div class="ficha-metric {% if pct_asistencia >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Asistencia promedio del grupo activo">
+                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Asistencia</span><strong class="ficha-metric-value">{{ pct_asistencia }}%</strong></div>
+                                    <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_asistencia, 100]|min }}%;"></span></div>
+                                    <small>{{ extra.get('sesiones', 0) }} sesiones registradas</small>
+                                </div>
+                                <div class="ficha-metric {% if pct_entregas >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Evidencias y trabajos entregados frente a los esperados">
+                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Evidencias</span><strong class="ficha-metric-value">{{ pct_entregas }}%</strong></div>
+                                    <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_entregas, 100]|min }}%;"></span></div>
+                                    <small>{% if expected_deliveries %}{{ extra.get('entregas_totales', 0) }} de {{ expected_deliveries }} entregadas{% else %}Sin tareas asignadas{% endif %}</small>
+                                </div>
+                                <div class="ficha-metric {% if pct_juicios >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Juicios evaluativos aprobados sobre el total">
+                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Evaluación</span><strong class="ficha-metric-value">{{ pct_juicios }}%</strong></div>
+                                    <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_juicios, 100]|min }}%;"></span></div>
+                                    <small>{{ extra.get('juicios_aprobados', 0) }} de {{ extra.get('juicios_totales', 0) }} juicios aprobados</small>
+                                </div>
+                                <div class="ficha-metric {% if extra.get('alertas_activas', 0) > 0 %}is-danger{% elif extra.get('planes_pendientes', 0) > 0 %}is-warning{% else %}is-positive{% endif %}" title="Alertas activas y planes de mejoramiento pendientes">
+                                    <span class="ficha-metric-label">Alertas / Planes</span>
+                                    <strong class="ficha-metric-value">{{ extra.get('alertas_activas', 0) }} / {{ extra.get('planes_pendientes', 0) }}</strong>
+                                    <small>{% if extra.get('alertas_activas', 0) or extra.get('planes_pendientes', 0) %}Requieren revisión{% else %}Sin casos activos{% endif %}</small>
+                                </div>
+                                <div class="ficha-metric {% if cert_pct >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Aprendices con todos sus juicios aprobados, listos para certificar">
+                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Certificación</span><strong class="ficha-metric-value">{{ extra.get('aprendices_certificados', 0) }}/{{ extra.get('total_aprendices', 0) }}</strong></div>
+                                    <div class="ficha-metric-track"><span style="--metric-value: {{ cert_pct }}%;"></span></div>
+                                    <small>Listos para certificar</small>
+                                </div>
+                                <div class="ficha-metric {% if notas_negativas > 0 %}is-warning{% else %}is-positive{% endif %}" title="Notas del observador: formación integral del grupo">
+                                    <span class="ficha-metric-label">Formación integral</span>
+                                    <strong class="ficha-metric-value">{{ notas_total }}</strong>
+                                    <small>{% if notas_negativas %}{{ notas_negativas }} llamados · {{ notas_positivas }} reconocimientos{% elif notas_total %}{{ notas_positivas }} reconocimientos{% else %}Sin notas registradas{% endif %}</small>
+                                </div>
                             </div>
-                            <div class="ficha-metric {% if extra.pct_juicios >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Juicios evaluativos aprobados">
-                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Juicios</span><strong class="ficha-metric-value">{{ extra.pct_juicios }}%</strong></div>
-                                <div class="ficha-metric-track"><span style="--metric-value: {{ [extra.pct_juicios, 100]|min }}%;"></span></div>
-                                <small>{{ extra.juicios_aprobados }} de {{ extra.juicios_totales }} aprobados</small>
-                            </div>
-                            <div class="ficha-metric {% if extra.alertas_activas > 0 %}is-danger{% else %}is-positive{% endif %}" title="Alertas activas en la ficha">
-                                <span class="ficha-metric-label">Alertas</span>
-                                <strong class="ficha-metric-value">{{ extra.alertas_activas }}</strong>
-                                <small>{% if extra.alertas_activas %}Requieren revisión{% else %}Sin casos activos{% endif %}</small>
-                            </div>
-                            <div class="ficha-metric {% if cert_pct >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Aprendices con todos sus juicios aprobados">
-                                <div class="ficha-metric-heading"><span class="ficha-metric-label">Completos</span><strong class="ficha-metric-value">{{ extra.get('aprendices_certificados', 0) }}/{{ extra.get('total_aprendices', 0) }}</strong></div>
-                                <div class="ficha-metric-track"><span style="--metric-value: {{ cert_pct }}%;"></span></div>
-                                <small>Listos para certificar</small>
+
+                        {% if extra.top_competencias %}
+                        <div class="ficha-competency-alert">
+                            <span class="eyebrow">Competencias con menor aprobación</span>
+                            <div class="ficha-competency-alert-list">
+                                {% for comp_name, comp_data in extra.top_competencias %}
+                                {% set comp_pct = ((comp_data.aprobados / comp_data.total) * 100)|round|int if comp_data.total > 0 else 0 %}
+                                <div class="ficha-competency-alert-item {% if comp_pct >= 80 %}is-positive{% endif %}">
+                                    <span title="{{ comp_name }}">{{ comp_name[:80] }}</span>
+                                    <strong>{{ comp_pct }}%</strong>
+                                </div>
+                                {% endfor %}
                             </div>
                         </div>
-
+                        {% endif %}
 
                         {% endif %}
                     </aside>
@@ -122,39 +155,39 @@
 
                 <nav class="ficha-action-grid" aria-label="Acciones de la ficha {{ ficha.codigo }}">
                     <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
-                        <span class="module-icon" aria-hidden="true">✓</span>
+                        <span class="module-icon" aria-hidden="true">📋</span>
                         <span><strong>Llamado a lista</strong><small>Registrar asistencia</small></span>
                     </a>
                     <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">T</span>
+                        <span class="module-icon" aria-hidden="true">📝</span>
                         <span><strong>Tareas</strong><small>Asignaciones y entregas</small></span>
                     </a>
-                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">M</span>
-                        <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
+                        <span class="module-icon" aria-hidden="true">⚠️</span>
+                        <span><strong>Alertas</strong><small>{% set num_alertas = extra.get('alertas_activas', 0) if extra else 0 %}{% if num_alertas %}{{ num_alertas }} activa{{ 's' if num_alertas != 1 }}{% else %}Sin riesgos{% endif %}</small></span>
                     </a>
                     <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
                         <span class="module-icon" aria-hidden="true">📓</span>
                         <span><strong>Observador</strong><small>Formación integral</small></span>
                     </a>
-                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
-                        <span class="module-icon" aria-hidden="true">!</span>
-                        <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
-                    </a>
                     <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">S</span>
+                        <span class="module-icon" aria-hidden="true">🔍</span>
                         <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
                     </a>
                     <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
                         <span class="module-icon module-icon-chart" aria-hidden="true">📊</span>
-                        <span><strong>Estadísticas</strong><small>Evaluaciones</small></span>
+                        <span><strong>Estadísticas</strong><small>Evaluaciones y juicios</small></span>
+                    </a>
+                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">📂</span>
+                        <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
                     </a>
                     <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">#</span>
+                        <span class="module-icon" aria-hidden="true">🏆</span>
                         <span><strong>Ranking</strong><small>Participación del grupo</small></span>
                     </a>
                     <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">A</span>
+                        <span class="module-icon" aria-hidden="true">🧹</span>
                         <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
                     </a>
                 </nav>
@@ -254,39 +287,39 @@
 
                     <nav class="ficha-action-grid" aria-label="Acciones de la ficha {{ ficha.codigo }}">
                         <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
-                            <span class="module-icon" aria-hidden="true">✓</span>
+                            <span class="module-icon" aria-hidden="true">📋</span>
                             <span><strong>Llamado a lista</strong><small>Registrar asistencia</small></span>
                         </a>
                         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">T</span>
+                            <span class="module-icon" aria-hidden="true">📝</span>
                             <span><strong>Tareas</strong><small>Asignaciones y entregas</small></span>
                         </a>
-                        <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">M</span>
-                            <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                        <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
+                            <span class="module-icon" aria-hidden="true">⚠️</span>
+                            <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
                         </a>
                         <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
                             <span class="module-icon" aria-hidden="true">📓</span>
                             <span><strong>Observador</strong><small>Formación integral</small></span>
                         </a>
-                        <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
-                            <span class="module-icon" aria-hidden="true">!</span>
-                            <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
-                        </a>
                         <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">S</span>
+                            <span class="module-icon" aria-hidden="true">🔍</span>
                             <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
                         </a>
-                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">📊</span>
-                        <span><strong>Estadísticas</strong><small>Estados y Evaluaciones</small></span>
-                    </a>
-                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">#</span>
-                        <span><strong>Ranking</strong><small>Participación del grupo</small></span>
-                    </a>
+                        <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">📊</span>
+                            <span><strong>Estadísticas</strong><small>Evaluaciones y juicios</small></span>
+                        </a>
+                        <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">📂</span>
+                            <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                        </a>
+                        <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">🏆</span>
+                            <span><strong>Ranking</strong><small>Participación del grupo</small></span>
+                        </a>
                         <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">A</span>
+                            <span class="module-icon" aria-hidden="true">🧹</span>
                             <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
                         </a>
                     </nav>

@@ -58,4 +58,10 @@
 4. Verificar el gateway en `/health`, los puertos canónicos y el contexto de tareas representativas.
 5. Un fallo de validación bloquea el commit; un hook posterior solo actualiza índices y nunca sustituye la validación previa.
 
+## 8. Registro automático de proyectos (v8.7 Zero-Touch)
+
+- Todo proyecto nuevo alojado en `_projects/` o en la raíz de Aplicaciones debe ser registrado automáticamente en el ecosistema.
+- El registro se activa de forma transparente mediante el auto-descubrimiento en `Sync-DashboardProjects.ps1`, el arranque del ecosistema (`START-DEVBRAIN.ps1`) y el script `New-DevBrainProject.ps1`.
+- Al crear una nueva carpeta o proyecto bajo `_projects/`, el agente debe asegurar que el auto-registro complete la sincronización en `_core/config.yml`, `port-registry.json`, `devbrain-runtime-manifest.json` y PostgreSQL `master_db`.
+
 Este archivo es el estándar de desarrollo distribuido a los proyectos. No reemplaza las fuentes de autoridad operativa indicadas en la sección 1.

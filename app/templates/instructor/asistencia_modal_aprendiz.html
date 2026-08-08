@@ -634,19 +634,20 @@
     background: #7c3aed !important;
     color: #ffffff !important;
     border-color: #8b5cf6 !important;
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.4);
 }
 
 /* Celda Asistió */
 .cal-day-cell.is-asiste {
-    border-color: rgba(5, 150, 105, 0.5);
+    background: #059669 !important;
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 12px rgba(5, 150, 105, 0.4);
 }
-.cal-day-cell.is-asiste::after {
-    content: '';
-    width: 6px;
-    height: 6px;
-    background: #059669;
-    border-radius: 50%;
-    margin-top: 2px;
+
+/* Celda Día Actual (Hoy) */
+.cal-day-cell.is-today {
+    box-shadow: 0 0 0 2px var(--sena-orange, #f97316), 0 0 10px rgba(249, 115, 22, 0.4) !important;
 }
 
 .calendar-legend-bar {
@@ -894,21 +895,54 @@ const asistenciaMapData = {{ asistencia_map | tojson | safe }};
 let currentDate = new Date();
 currentDate.setHours(12,0,0,0);
 
+// Auto-navegar al mes más reciente con registros si el mes actual no los tiene
+const fechasConDatos = Object.keys(asistenciaMapData || {}).sort();
+if (fechasConDatos.length > 0) {
+    const mesActualStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    const tieneDatosMesActual = fechasConDatos.some(f => f.startsWith(mesActualStr));
+    if (!tieneDatosMesActual) {
+        const ultimaFecha = fechasConDatos[fechasConDatos.length - 1];
+        const partes = ultimaFecha.split('-');
+        if (partes.length === 3) {
+            currentDate = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, 1, 12, 0, 0);
+        }
+    }
+}
+
+function getClaseAsistencia(record) {
+    if (!record) return null;
+    let clase = record.clase || '';
+    if (!clase && record.estado) {
+        const st = String(record.estado).toUpperCase();
+        if (st === 'ASISTE' || st === 'ASISTIO') clase = 'asiste';
+        else if (st === 'FALTA' || st === 'FALTA_NJ' || st === 'INJUSTIFICADA') clase = 'falta-nj';
+        else if (st === 'FALTA_JUSTIFICADA' || st === 'EXCUSA_MEDICA' || st === 'FALTA_J') clase = 'falta-j';
+        else if (st === 'TARDANZA') clase = 'tardanza';
+    }
+    if (clase && clase.startsWith('is-')) {
+        clase = clase.substring(3);
+    }
+    return clase || null;
+}
+
 function renderCalendar() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
+    const titleEl = document.getElementById('calendar-month-year');
+    if (titleEl) {
+        titleEl.textContent = `${monthNames[month]} ${year}`;
+    }
     
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    let startDayIndex = firstDay.getDay() || 7; 
-    startDayIndex -= 1; // 0 for Mon, 6 for Sun
+    let startDayIndex = (firstDay.getDay() + 6) % 7; // 0 para Lunes, 6 para Domingo
     
     const numDays = lastDay.getDate();
     const grid = document.getElementById('calendar-grid');
+    if (!grid) return;
     
     grid.style.opacity = '0';
     setTimeout(() => {
@@ -937,26 +971,28 @@ function renderCalendar() {
             dayDiv.className = 'cal-day-cell';
             dayDiv.textContent = i;
             
-            const dStr = `${year}-${String(month+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-            const record = asistenciaMapData[dStr];
+            const monthStr = String(month + 1).padStart(2, '0');
+            const dayStr = String(i).padStart(2, '0');
+            const dStr = `${year}-${monthStr}-${dayStr}`;
+            const record = asistenciaMapData ? asistenciaMapData[dStr] : null;
 
-            if (isCurrentMonth && i === currentDay && !record) {
-                dayDiv.style.boxShadow = '0 0 0 2px #059669';
+            if (isCurrentMonth && i === currentDay) {
+                dayDiv.classList.add('is-today');
             }
             
             if (record) {
-                // La clase la resuelve el servidor junto con el detalle. Así
-                // el color no depende de una segunda interpretación distinta
-                // en JavaScript y se mantiene alineado con la tarjeta lateral.
-                if (record.clase) dayDiv.classList.add(`is-${record.clase}`);
+                const clase = getClaseAsistencia(record);
+                if (clase) {
+                    dayDiv.classList.add(`is-${clase}`);
+                }
                 const detalle = record.causal ? `: ${record.causal}` : '';
-                dayDiv.title = `${record.etiqueta || record.estado}${detalle} (${record.fecha_fmt})`;
+                dayDiv.title = `${record.etiqueta || record.estado}${detalle} (${record.fecha_fmt || dStr})`;
             }
             
             grid.appendChild(dayDiv);
         }
         grid.style.opacity = '1';
-    }, 100);
+    }, 50);
     grid.style.transition = 'opacity 0.15s ease';
 }
 

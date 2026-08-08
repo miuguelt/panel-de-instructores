@@ -205,6 +205,17 @@ def obtener_fichas():
 @instructor_bp.route('/')
 @login_required
 def dashboard():
+    try:
+        return _dashboard_inner()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Error cargando el dashboard del instructor.')
+        flash('Hubo un problema al cargar el panel. Intenta de nuevo.', 'error')
+        return render_template('dashboard.html', fichas=[], cronogramas={},
+                               estadisticas_fichas={}, estadisticas_extra={})
+
+
+def _dashboard_inner():
     fichas = obtener_fichas()
     cronogramas = {ficha.id: obtener_cronograma(ficha) for ficha in fichas}
 
@@ -352,6 +363,29 @@ def dashboard():
             )
             top_competencias[fid] = sorted_comps[:2]
 
+        # --- Notas del observador por ficha ---
+        notas_obs_data = db.session.query(
+            NotaObservador.ficha_id, NotaObservador.tipo, func.count(NotaObservador.id)
+        ).filter(
+            NotaObservador.ficha_id.in_(ficha_ids)
+        ).group_by(NotaObservador.ficha_id, NotaObservador.tipo).all()
+
+        notas_obs_por_ficha = {}
+        for fid, tipo, cnt in notas_obs_data:
+            if fid not in notas_obs_por_ficha:
+                notas_obs_por_ficha[fid] = {'positiva': 0, 'negativa': 0, 'neutra': 0}
+            notas_obs_por_ficha[fid][tipo] = cnt
+
+        # --- Planes de mejoramiento pendientes ---
+        planes_pendientes = dict(
+            db.session.query(
+                PlanMejoramiento.ficha_id, func.count(PlanMejoramiento.id)
+            ).filter(
+                PlanMejoramiento.ficha_id.in_(ficha_ids),
+                PlanMejoramiento.estado == 'pendiente'
+            ).group_by(PlanMejoramiento.ficha_id).all()
+        )
+
         # --- Consolidar por ficha ---
         for ficha in fichas:
             fid = ficha.id
@@ -378,6 +412,8 @@ def dashboard():
             else:
                 pct_tiempo = 0
 
+            notas_obs = notas_obs_por_ficha.get(fid, {'positiva': 0, 'negativa': 0, 'neutra': 0})
+
             estadisticas_extra[fid] = {
                 'total_aprendices': n_ap,
                 'total_aprendices_incl_inactivos': n_ap_total,
@@ -393,7 +429,12 @@ def dashboard():
                 'aprendices_certificados': certificados_por_ficha.get(fid, 0),
                 'alertas_activas': alertas_activas.get(fid, 0),
                 'pct_tiempo': pct_tiempo,
-                'top_competencias': top_competencias.get(fid, [])
+                'top_competencias': top_competencias.get(fid, []),
+                'notas_positivas': notas_obs['positiva'],
+                'notas_negativas': notas_obs['negativa'],
+                'notas_neutras': notas_obs['neutra'],
+                'notas_total': sum(notas_obs.values()),
+                'planes_pendientes': planes_pendientes.get(fid, 0),
             }
 
     def get_order(fase):
