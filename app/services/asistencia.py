@@ -1,6 +1,8 @@
 """Persistence and reporting helpers for attendance data."""
 
+import calendar
 import time
+from datetime import date
 
 from sqlalchemy.exc import IntegrityError, OperationalError
 
@@ -75,6 +77,77 @@ def mapa_asistencia_por_fecha(registros):
         evento.pop('_prioridad', None)
         evento.pop('_registro_id', None)
     return resultado
+
+
+CLASES_CALENDARIO_VALIDAS = frozenset(CLASE_ESTADO_ASISTENCIA.values())
+
+MESES_CALENDARIO = [
+    '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+
+def mes_inicial_calendario(asistencia_map, hoy=None):
+    """Pick the month the calendar should open on for one learner.
+
+    Prefers the current month when it already has records; otherwise falls back
+    to the most recent month with data so the modal never opens on a blank grid.
+    """
+    hoy = hoy or date.today()
+    prefijo = f'{hoy.year:04d}-{hoy.month:02d}'
+    if any(fecha.startswith(prefijo) for fecha in asistencia_map):
+        return hoy.year, hoy.month
+
+    fechas = sorted(asistencia_map)
+    if fechas:
+        try:
+            ultima = date.fromisoformat(fechas[-1])
+            return ultima.year, ultima.month
+        except ValueError:
+            pass
+    return hoy.year, hoy.month
+
+
+def construir_calendario_mes(asistencia_map, anio, mes):
+    """Build one month grid already resolved to visual classes.
+
+    Rendering server side keeps every cell bound to the learner that produced
+    the map, so a stale client-side state can no longer paint another learner's
+    colours, and the modal shows the right colours on first paint.
+    """
+    dias_mes = calendar.monthrange(anio, mes)[1]
+    offset = date(anio, mes, 1).weekday()  # 0 = lunes
+
+    celdas = [{'vacio': True} for _ in range(offset)]
+    for dia in range(1, dias_mes + 1):
+        iso = date(anio, mes, dia).isoformat()
+        evento = asistencia_map.get(iso) or {}
+        clase = (evento.get('clase') or '').strip().lower()
+        if clase not in CLASES_CALENDARIO_VALIDAS:
+            clase = ''
+
+        if evento:
+            etiqueta = evento.get('etiqueta') or evento.get('estado') or 'Sin registro'
+            causal = evento.get('causal') or ''
+            fecha_fmt = evento.get('fecha_fmt') or iso
+            titulo = f"{etiqueta}{': ' + causal if causal else ''} ({fecha_fmt})"
+        else:
+            titulo = f'Sin marcación registrada ({iso})'
+
+        celdas.append({
+            'vacio': False,
+            'dia': dia,
+            'iso': iso,
+            'clase': clase,
+            'titulo': titulo,
+        })
+
+    return {
+        'anio': anio,
+        'mes': mes,
+        'titulo': f'{MESES_CALENDARIO[mes]} {anio}',
+        'celdas': celdas,
+    }
 
 
 def sesiones_registradas_query(ficha_id):

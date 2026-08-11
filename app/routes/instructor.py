@@ -36,9 +36,11 @@ from app.services.alertas import (
 )
 from app.services.aseo import ajustar_turno_por_asistencia
 from app.services.asistencia import (
+    construir_calendario_mes,
     contar_sesiones_registradas,
     guardar_asistencia,
     mapa_asistencia_por_fecha,
+    mes_inicial_calendario,
 )
 from app.services.importacion_ficha import ErrorImportacion, importar_archivo, clasificar_competencia
 from app.services.permisos import puede_gestionar_ficha, puede_gestionar_tarea, tareas_visibles
@@ -1360,9 +1362,15 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
     total_faltas = total_faltas_nj + total_faltas_j
     pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones > 0 else 100.0
 
+    # El mes visible se arma en el servidor: la primera pintura ya sale con los
+    # colores de este aprendiz, sin esperar a JavaScript.
+    anio_inicial, mes_inicial = mes_inicial_calendario(asistencia_map)
+    calendario = construir_calendario_mes(asistencia_map, anio_inicial, mes_inicial)
+
     return render_template('instructor/asistencia_modal_aprendiz.html',
                            ficha=ficha, aprendiz=aprendiz,
                            asistencia_map=asistencia_map,
+                           calendario=calendario,
                            faltas=faltas,
                            faltas_detalladas=faltas_detalladas,
                            total_asistencias=total_asistencias,

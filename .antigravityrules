@@ -44,7 +44,8 @@
 ## 6. UI, legibilidad y Colombia
 
 - Interfaz en español de Colombia (`es-CO`), con fechas y números que declaren el locale.
-- Nunca truncar contenido con `text-overflow: ellipsis`; permitir salto con `overflow-wrap: break-word`. Solo se admite truncado en chrome compacto como badges o botones.
+- Nunca truncar contenido con `text-overflow: ellipsis` como primera opción: antes de perder texto hay que ajustar el tamaño de la letra al espacio disponible. Cuando la caja no puede crecer de alto (celdas, listas, chrome compacto), se encoge primero y solo se recortan los caracteres que aún no quepan. La reducción tiene un suelo absoluto de legibilidad (11 px); por debajo se recorta o se envuelve, nunca se sigue encogiendo.
+- Una palabra nunca se parte a la mitad: lo que cede es el tamaño de la letra. Prohibidos `word-break: break-word`, `word-break: break-all` y la clase `break-all` sobre texto en lenguaje natural, porque reducen `min-content` a un carácter y el contenedor se encoge por debajo de la palabra. Para texto que no cabe se usa ajuste tipográfico al contenedor (`FitText`/`useFitText` o `clamp()` con unidades `cqi`); el corte a la brava solo se autoriza explícitamente y en cadenas sin espacios (identificadores, hashes, URLs, correos).
 - Mobile-first desde 320 px y soporte hasta 2560 px. Usar `clamp()`, Grid con `minmax()` y breakpoints ascendentes.
 - Tablas y bloques de código: scroll horizontal seguro; bloques de código con `white-space: pre-wrap` y `word-break: break-word`.
 - Contraste suficiente, fondos sólidos para texto y estados legibles sin depender solo del color.
