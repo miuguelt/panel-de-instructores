@@ -4,16 +4,16 @@
 {% block head %}
 <style>
     .nota-card {
-        background: white;
+        background: var(--bg-card);
         border: 1px solid var(--border-divider);
-        border-left: 4px solid var(--gray-300);
+        border-left: 4px solid var(--border-divider);
         border-radius: var(--radius-sm);
         padding: 16px 20px;
         margin-bottom: 12px;
         box-shadow: var(--shadow);
     }
     .nota-positiva { border-left-color: var(--sena-green); }
-    .nota-negativa { border-left-color: var(--sena-red); }
+    .nota-negativa { border-left-color: var(--danger); }
     .nota-neutra { border-left-color: var(--info); }
     .nota-encabezado {
         display: flex;
@@ -22,9 +22,9 @@
         gap: 12px;
         flex-wrap: wrap;
     }
-    .nota-encabezado h3 { margin: 0; font-size: 16px; font-weight: 700; }
-    .nota-meta { font-size: 12px; color: var(--gray-500); }
-    .nota-texto { margin: 10px 0 0; color: var(--gray-700); white-space: pre-line; }
+    .nota-encabezado h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-strong); }
+    .nota-meta { font-size: 12px; color: var(--text-muted); }
+    .nota-texto { margin: 10px 0 0; color: var(--text-main); white-space: pre-line; }
     .nota-acciones { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
     .resumen-tabla { width: 100%; border-collapse: collapse; }
     .resumen-tabla th, .resumen-tabla td {
@@ -32,11 +32,12 @@
         text-align: left;
         border-bottom: 1px solid var(--border-divider);
         font-size: 14px;
+        color: var(--text-main);
     }
-    .resumen-tabla th { color: var(--gray-500); font-size: 12px; text-transform: uppercase; }
+    .resumen-tabla th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
     .contador { font-weight: 800; }
     .contador-positiva { color: var(--sena-green); }
-    .contador-negativa { color: var(--sena-red); }
+    .contador-negativa { color: var(--danger); }
     .contador-neutra { color: var(--info); }
     .filtros-observador {
         display: flex;
@@ -50,6 +51,14 @@
 {% endblock %}
 
 {% block content %}
+<nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+    <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">Observador del Aprendiz</span>
+</nav>
+
 <div class="page-header">
     <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
     <h1>Observador del aprendiz</h1>

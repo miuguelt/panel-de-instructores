@@ -2,6 +2,14 @@
 {% block title %}Juicios Evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
+<nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+    <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">Juicios Evaluativos</span>
+</nav>
+
 <style>
     /* ── Layout ── */
     .juicios-container { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -29,11 +37,11 @@
     .juicio-stat-val { font-size: 1.8rem; font-weight: 800; color: var(--text-strong); line-height: 1; }
 
     /* ── Badge helpers ── */
-    .badge-tech        { background:#4f46e5!important; color:#fff!important; font-weight:700!important; }
-    .badge-transversal { background:#059669!important; color:#fff!important; font-weight:700!important; }
-    .badge-ingles      { background:#0284c7!important; color:#fff!important; font-weight:700!important; }
-    .badge-solid-success { background:#059669!important; color:#fff!important; font-weight:700!important; }
-    .badge-solid-warning { background:#d97706!important; color:#fff!important; font-weight:700!important; }
+    .badge-tech        { background: var(--badge-tech-bg)!important; color: var(--badge-tech-text)!important; font-weight:700!important; }
+    .badge-transversal { background: var(--badge-transversal-bg)!important; color: var(--badge-transversal-text)!important; font-weight:700!important; }
+    .badge-ingles      { background: var(--badge-ingles-bg)!important; color: var(--badge-ingles-text)!important; font-weight:700!important; }
+    .badge-solid-success { background: var(--success)!important; color:#fff!important; font-weight:700!important; }
+    .badge-solid-warning { background: var(--warning)!important; color:#fff!important; font-weight:700!important; }
 
     /* ── Competencia grid ── */
     .comp-grid {
@@ -58,13 +66,13 @@
         top: 0; left: 0; right: 0;
         height: 3px;
         border-radius: 16px 16px 0 0;
-        background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, #059669));
+        background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, var(--success)));
         opacity: 0;
         transition: opacity .22s;
     }
     .comp-card:hover {
         border-color: var(--accent-primary);
-        box-shadow: 0 8px 32px rgba(57,169,0,.18);
+        box-shadow: var(--shadow-lg);
         transform: translateY(-3px);
     }
     .comp-card:hover::before { opacity: 1; }
@@ -79,22 +87,22 @@
 
     /* ── Competencias Seleccionadas Highlighting ── */
     .comp-card.is-selected-own {
-        border: 2px solid #10b981 !important;
-        background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, var(--bg-card) 100%) !important;
-        box-shadow: 0 0 20px rgba(16, 185, 129, 0.28) !important;
+        border: 2px solid var(--comp-selected-own-border) !important;
+        background: var(--comp-selected-own-bg) !important;
+        box-shadow: 0 0 20px var(--accent-glow) !important;
     }
     .comp-card.is-selected-own::before {
         opacity: 1 !important;
-        background: linear-gradient(90deg, #10b981, #059669) !important;
+        background: linear-gradient(90deg, var(--comp-selected-own-border), var(--accent-hover)) !important;
     }
     .comp-card.is-selected-other {
-        border: 2px solid #8b5cf6 !important;
-        background: linear-gradient(135deg, rgba(139, 92, 246, 0.09) 0%, var(--bg-card) 100%) !important;
-        box-shadow: 0 0 20px rgba(139, 92, 246, 0.25) !important;
+        border: 2px solid var(--comp-selected-other-border) !important;
+        background: var(--comp-selected-other-bg) !important;
+        box-shadow: 0 0 20px var(--accent-glow) !important;
     }
     .comp-card.is-selected-other::before {
         opacity: 1 !important;
-        background: linear-gradient(90deg, #8b5cf6, #6366f1) !important;
+        background: linear-gradient(90deg, var(--comp-selected-other-border), var(--accent-primary)) !important;
     }
     .comp-select-btn {
         background: rgba(255, 255, 255, 0.06);
@@ -258,20 +266,23 @@
         </div>
     </div>
 
-    <!-- Search bar -->
+    <!-- Search and Quick Pills Bar -->
     <div class="card" style="margin:0; padding:1.25rem;" data-filter-region="comp-search-bar">
-        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; justify-content:space-between;">
-            <h2 style="margin:0; color:var(--text-strong); font-size:1.2rem;">Competencias del Programa</h2>
-            <p style="margin:0; font-size:.83rem; color:var(--text-muted)">Haz clic en una competencia para ver el análisis detallado</p>
-            <div style="display:flex; gap:.75rem; flex-wrap:wrap;">
-                <input type="text" id="comp-search" placeholder="🔍 Buscar competencia…" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; min-width:240px; border-radius:8px;">
-                <select id="comp-type-filter" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; border-radius:8px;">
-                    <option value="">Todas las categorías</option>
-                    <option value="tecnica">Técnicas</option>
-                    <option value="transversal">Transversales</option>
-                    <option value="ingles">Inglés</option>
-                </select>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom: 0.75rem;">
+            <div>
+                <h2 style="margin:0; color:var(--text-strong); font-size:1.2rem;">Competencias del Programa</h2>
+                <p style="margin:0; font-size:.83rem; color:var(--text-muted)">Haz clic en una competencia para ver el análisis detallado</p>
             </div>
+            <div style="display:flex; gap:.75rem; flex-wrap:wrap; flex: 1; max-width: 400px;">
+                <input type="text" id="comp-search" placeholder="🔍 Buscar competencia…" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; width:100%; border-radius:8px;">
+            </div>
+        </div>
+        <div class="comp-filter-pills" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-primary comp-filter-pill is-active" data-filter="">Todas</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="mis-competencias">⭐ Mis Competencias</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="tecnica">💻 Técnicas</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="transversal">🌱 Transversales</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="ingles">🌐 Inglés</button>
         </div>
     </div>
 
@@ -511,12 +522,25 @@
 
     // ─── Filtering ──────────────────────────────────────────
     const searchInput   = document.getElementById('comp-search');
-    const typeSelect    = document.getElementById('comp-type-filter');
+    const filterPills   = document.querySelectorAll('.comp-filter-pill');
     const cards         = document.querySelectorAll('.comp-grid .comp-card');
+    let currentFilter   = '';
+
+    filterPills.forEach(pill => {
+        pill.addEventListener('click', function() {
+            filterPills.forEach(p => {
+                p.classList.remove('btn-primary', 'is-active');
+                p.classList.add('btn-outline');
+            });
+            this.classList.remove('btn-outline');
+            this.classList.add('btn-primary', 'is-active');
+            currentFilter = this.getAttribute('data-filter') || '';
+            filterCards();
+        });
+    });
 
     function filterCards() {
-        const q    = searchInput ? searchInput.value.trim() : '';
-        const tipo = typeSelect  ? typeSelect.value : '';
+        const q = searchInput ? searchInput.value.trim() : '';
         const searchCard = document.querySelector('[data-filter-region="comp-search-bar"]');
         const terminos = window.FiltroVista ? window.FiltroVista.terminos(q) : q.toLowerCase().split(/\s+/).filter(Boolean);
 
@@ -525,7 +549,14 @@
                 const nombre   = card.getAttribute('data-nombre') || '';
                 const cardTipo = card.getAttribute('data-tipo')   || '';
                 const matchQ   = window.FiltroVista ? window.FiltroVista.coincide(nombre, terminos) : (!q || nombre.toLowerCase().includes(q.toLowerCase()));
-                const matchT   = !tipo || cardTipo === tipo;
+                
+                let matchT = true;
+                if (currentFilter === 'mis-competencias') {
+                    matchT = card.classList.contains('is-selected-own');
+                } else if (currentFilter) {
+                    matchT = (cardTipo === currentFilter);
+                }
+
                 card.style.display = (matchQ && matchT) ? '' : 'none';
             });
             // Ocultar secciones sin tarjetas visibles
@@ -542,7 +573,6 @@
         }
     }
     if (searchInput) searchInput.addEventListener('input', filterCards);
-    if (typeSelect)  typeSelect.addEventListener('change', filterCards);
 
     // keyboard navigation on cards
     cards.forEach(card => {

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Mi Panel - {{ aprendiz.nombre }} - SENA Control{% endblock %}
+{% block body_class %}has-learner-bottom-nav{% endblock %}
 
 {# REGLA: No mostrar números de documento/cédula en esta vista #}
 {% block content %}
@@ -41,7 +42,7 @@
     {% endif %}
 
     {# ── Consolidated Progress Dashboard ── #}
-    <section class="section-container">
+    <section class="section-container" id="seccion-progreso">
         <div class="section-title-row">
             <h2 class="section-title">Mi Progreso</h2>
             <span class="badge badge-secondary">Panorama general</span>
@@ -213,7 +214,7 @@
         </div>
     </section>
 
-    <section class="metrics-grid">
+    <section class="metrics-grid" id="seccion-juicios">
         <div class="metric-card">
             <div class="metric-card-header">
                 <div>
@@ -395,7 +396,7 @@
         {% endif %}
     </section>
 
-    <section class="learner-cleaning-card {% if aseo.aviso_visible %}is-upcoming{% endif %}">
+    <section class="learner-cleaning-card {% if aseo.aviso_visible %}is-upcoming{% endif %}" id="seccion-aseo">
         <div class="learner-cleaning-heading">
             <div>
                 <span class="eyebrow">Responsabilidad compartida</span>
@@ -904,7 +905,7 @@
     {% endif %}
 
     {% if ranking %}
-    <section class="card my-ranking-card">
+    <section class="card my-ranking-card" id="seccion-ranking">
         <div class="my-ranking-top">
             <div>
                 <span class="eyebrow">Mi participación</span>
@@ -987,7 +988,7 @@
         <p class="ranking-disclaimer">Estos reconocimientos son motivacionales y no hacen parte de tu evaluación oficial.</p>
     </section>
 
-    <div class="tasks-section-header">
+    <div class="tasks-section-header" id="seccion-tareas">
         <div>
             <span class="eyebrow">Espacio de Evidencias</span>
             <h2 class="tasks-section-title">Mis Tareas Programadas</h2>
@@ -1523,5 +1524,28 @@
 })();
 </script>
 
-<!-- openJuicioTab defined in the metrics-grid inline script above -->
+    <!-- Barra de Navegación Inferior Móvil para Aprendices -->
+    <nav class="learner-bottom-nav" aria-label="Navegación rápida móvil">
+        <a href="#seccion-progreso" class="learner-bottom-link">
+            <span class="bottom-nav-icon" aria-hidden="true">📊</span>
+            <span>Progreso</span>
+        </a>
+        <a href="#seccion-juicios" class="learner-bottom-link">
+            <span class="bottom-nav-icon" aria-hidden="true">🎓</span>
+            <span>Juicios</span>
+        </a>
+        <a href="#seccion-tareas" class="learner-bottom-link">
+            <span class="bottom-nav-icon" aria-hidden="true">📝</span>
+            <span>Tareas</span>
+        </a>
+        <a href="#seccion-ranking" class="learner-bottom-link">
+            <span class="bottom-nav-icon" aria-hidden="true">🏆</span>
+            <span>Ranking</span>
+        </a>
+        <a href="#seccion-aseo" class="learner-bottom-link">
+            <span class="bottom-nav-icon" aria-hidden="true">🧹</span>
+            <span>Aseo</span>
+        </a>
+    </nav>
+</div>
 {% endblock %}

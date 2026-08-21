@@ -128,6 +128,14 @@
 {% block navbar %}{{ super() }}{% endblock %}
 
 {% block content %}
+<nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+    <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">Materiales de Apoyo</span>
+</nav>
+
 <div class="section-header" style="margin-top:0;">
   <div>
     <span class="eyebrow">Ficha {{ ficha.codigo }}</span>

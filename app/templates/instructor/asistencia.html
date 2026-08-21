@@ -2,6 +2,14 @@
 {% block title %}Llamado a Lista - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
+<nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+    <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">Llamado a Lista</span>
+</nav>
+
 <div class="page-header">
     <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
     <h1>Llamado a Lista</h1>
@@ -70,6 +78,9 @@
                           hx-get="{{ url_for('instructor.asistencia_aprendiz_modal', ficha_id=ficha.id, aprendiz_id=ap.id, corte_id=corte_actual.id if corte_actual else None) }}"
                           hx-target="#modal-container" hx-trigger="click">{{ ap.nombre }} {{ ap.apellidos }}</span>
                     <span class="badge badge-{{ ap.estado|tono_estado }} estado-mini">{{ ap.estado|etiqueta_estado }}</span>
+                    {% if stats.faltas_no_justificadas >= 3 %}
+                    <span class="racha-alerta" title="Atención: acumula {{ stats.faltas_no_justificadas }} faltas no justificadas">⚠️ {{ stats.faltas_no_justificadas }}F</span>
+                    {% endif %}
                 </div>
 
                 <!-- Barra + % + badges mini -->
@@ -119,6 +130,24 @@
             <span class="text-muted">La asistencia está disponible solo en modo consulta para este corte.</span>
             {% endif %}
         </div>
+
+        {% if puede_editar_corte %}
+        <!-- Barra Flotante Fija de Guardado (Sticky Save Bar) -->
+        <aside class="sticky-save-bar" id="sticky-save-bar" aria-label="Guardado rápido de asistencia">
+            <div class="sticky-save-bar-inner">
+                <div class="sticky-save-summary">
+                    <span class="sticky-stat-pill is-present"><strong id="sticky-count-asiste">0</strong> Asisten</span>
+                    <span class="sticky-stat-pill is-absent"><strong id="sticky-count-falta">0</strong> Faltas</span>
+                    <span class="sticky-stat-pill is-justified"><strong id="sticky-count-justificada">0</strong> Justificadas / Tardanzas</span>
+                </div>
+                <div class="sticky-save-actions">
+                    <button type="submit" class="btn btn-primary">
+                        💾 Guardar asistencia
+                    </button>
+                </div>
+            </div>
+        </aside>
+        {% endif %}
         {% else %}
         <div class="empty-state">
             <div class="empty-icon">👥</div>
@@ -435,8 +464,18 @@ document.querySelectorAll('.asistencia-row input[type="radio"]').forEach(functio
 function updateAttendanceSummary() {
     var total = document.querySelectorAll('.asistencia-row').length;
     var present = document.querySelectorAll('.asistencia-row input[value="ASISTE"]:checked').length;
+    var absent = document.querySelectorAll('.asistencia-row input[value="FALTA"]:checked').length;
+    var justified = document.querySelectorAll('.asistencia-row input[value="FALTA_JUSTIFICADA"]:checked, .asistencia-row input[value="EXCUSA_MEDICA"]:checked, .asistencia-row input[value="TARDANZA"]:checked').length;
+    
     var summary = document.getElementById('attendance-summary');
     if (summary) summary.textContent = present + ' de ' + total + ' marcados como asistentes';
+
+    var elAsiste = document.getElementById('sticky-count-asiste');
+    var elFalta = document.getElementById('sticky-count-falta');
+    var elJust = document.getElementById('sticky-count-justificada');
+    if (elAsiste) elAsiste.textContent = present;
+    if (elFalta) elFalta.textContent = absent;
+    if (elJust) elJust.textContent = justified;
 }
 
 var markAllButton = document.getElementById('mark-all-present');

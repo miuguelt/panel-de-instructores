@@ -75,30 +75,43 @@
                     <strong>{{ ficha.codigo }}</strong>
                 </div>
                 <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
-                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %}is-active{% endif %}">Aprendices</a>
+                    <!-- Día a Día -->
                     <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}">Asistencia</a>
+                       class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}" title="Llamado a lista y asistencia">📋 Asistencia</a>
                     <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}">Tareas</a>
-                    <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'instructor.observador' %}is-active{% endif %}">Observador</a>
-                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}">Alertas</a>
-                    <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.juicios',) %}is-active{% endif %}">Juicios</a>
-                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'planeacion.analisis' %}is-active{% endif %}">Planeación</a>
-                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.estadisticas',) %}is-active{% endif %}">Estadísticas</a>
-                    <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}">Seguimiento</a>
-                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}">Materiales</a>
-                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}">Ranking</a>
+                       class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}" title="Tareas y evidencias">📝 Tareas</a>
                     <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'aseo.turnos' %}is-active{% endif %}">Turnos de aseo</a>
+                       class="{% if request.endpoint == 'aseo.turnos' %}is-active{% endif %}" title="Turnos de aseo del ambiente">🧹 Aseo</a>
+
+                    <span class="ficha-nav-divider" aria-hidden="true"></span>
+
+                    <!-- Académico -->
+                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %}is-active{% endif %}" title="Directorio de aprendices">👥 Aprendices</a>
+                    <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.juicios',) %}is-active{% endif %}" title="Juicios evaluativos y RAPs">🎓 Juicios</a>
+                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'planeacion.analisis' %}is-active{% endif %}" title="Planeación pedagógica y línea de tiempo">🧭 Planeación</a>
+                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.estadisticas',) %}is-active{% endif %}" title="Estadísticas y reportes">📊 Estadísticas</a>
+
+                    <span class="ficha-nav-divider" aria-hidden="true"></span>
+
+                    <!-- Seguimiento y Convivencia -->
+                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}" title="Alertas tempranas de riesgo">⚠️ Alertas</a>
+                    <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'instructor.observador' %}is-active{% endif %}" title="Observador del aprendiz">📓 Observador</a>
+                    <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}" title="Casos de seguimiento">🔍 Seguimiento</a>
+
+                    <span class="ficha-nav-divider" aria-hidden="true"></span>
+
+                    <!-- Recursos y Gamificación -->
+                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}" title="Materiales de apoyo">📂 Materiales</a>
+                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
+                       class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}" title="Ranking de participación">🏆 Ranking</a>
                 </nav>
             </div>
         </div>
@@ -145,6 +158,12 @@
                     }
                 }, 4000 + (index * 500));
             });
+
+            // Mantener visible el módulo activo en la barra horizontal
+            const activeFichaLink = document.querySelector('.ficha-nav a.is-active');
+            if (activeFichaLink) {
+                activeFichaLink.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
         });
     </script>
     <script>

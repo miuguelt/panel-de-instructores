@@ -155,6 +155,19 @@
     --sena-yellow-light: #fffbeb;
     --sena-orange-light: #fff7ed;
 
+    --badge-tech-bg: #2d8500;
+    --badge-tech-text: #ffffff;
+    --badge-transversal-bg: #059669;
+    --badge-transversal-text: #ffffff;
+    --badge-ingles-bg: #0284c7;
+    --badge-ingles-text: #ffffff;
+    --comp-selected-own-border: #39A900;
+    --comp-selected-own-bg: linear-gradient(135deg, rgba(57, 169, 0, 0.09) 0%, var(--bg-card) 100%);
+    --comp-selected-other-border: #ff6a00;
+    --comp-selected-other-bg: linear-gradient(135deg, rgba(255, 106, 0, 0.09) 0%, var(--bg-card) 100%);
+    --sticky-bar-bg: rgba(255, 255, 255, 0.96);
+    --sticky-bar-border: rgba(57, 169, 0, 0.22);
+
     --focus-ring: 0 0 0 3px rgba(57, 169, 0, 0.25);
 
     --navbar-bg: linear-gradient(135deg, #1e5900, #39A900);
@@ -198,6 +211,19 @@
     --sena-red-light: rgba(239, 68, 68, 0.1);
     --sena-yellow-light: rgba(245, 158, 11, 0.1);
     --sena-orange-light: rgba(255, 106, 0, 0.1);
+
+    --badge-tech-bg: #6366f1;
+    --badge-tech-text: #ffffff;
+    --badge-transversal-bg: #10b981;
+    --badge-transversal-text: #ffffff;
+    --badge-ingles-bg: #38bdf8;
+    --badge-ingles-text: #082f49;
+    --comp-selected-own-border: #22d3ee;
+    --comp-selected-own-bg: linear-gradient(135deg, rgba(34, 211, 238, 0.14) 0%, var(--bg-card) 100%);
+    --comp-selected-other-border: #a855f7;
+    --comp-selected-other-bg: linear-gradient(135deg, rgba(168, 85, 247, 0.14) 0%, var(--bg-card) 100%);
+    --sticky-bar-bg: rgba(14, 26, 46, 0.95);
+    --sticky-bar-border: rgba(34, 211, 238, 0.25);
 
     --focus-ring: 0 0 0 3px rgba(6, 182, 212, 0.35);
 
@@ -5482,4 +5508,404 @@ summary:focus-visible {
 
 @media (max-width: 480px) {
     .estado-chip { width: 100%; justify-content: space-between; }
+}
+
+/* =========================================
+   COMPONENTES UI/UX V8.7: BREADCRUMBS, STICKY BAR, WHATSAPP
+   ========================================= */
+
+/* ── Migas de Pan (Breadcrumbs) ── */
+.breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.breadcrumb-nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.breadcrumb-nav a:hover {
+    color: var(--accent-primary);
+}
+.breadcrumb-separator {
+    color: var(--border-subtle);
+    font-size: 11px;
+    user-select: none;
+}
+.breadcrumb-current {
+    color: var(--text-strong);
+    font-weight: 600;
+}
+
+/* ── Barra Flotante de Guardado (Sticky Save Bar) ── */
+.sticky-save-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--sticky-bar-bg);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border-top: 1px solid var(--sticky-bar-border);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+    padding: 12px clamp(16px, 4vw, 32px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    animation: slideUpBar 0.25s ease-out;
+}
+@keyframes slideUpBar {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.sticky-save-bar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.sticky-save-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text-main);
+}
+.sticky-stat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 12px;
+}
+.sticky-stat-pill.is-present { background: var(--sena-green-light); color: var(--sena-green-dark); }
+.sticky-stat-pill.is-absent { background: var(--sena-red-light); color: var(--danger); }
+.sticky-stat-pill.is-justified { background: var(--sena-yellow-light); color: #b45309; }
+.sticky-save-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+    .sticky-save-bar {
+        padding: 10px 14px;
+    }
+    .sticky-save-bar-inner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .sticky-save-summary {
+        justify-content: space-around;
+        font-size: 12px;
+    }
+    .sticky-save-actions .btn {
+        width: 100%;
+    }
+}
+
+/* ── Botón Compartir por WhatsApp ── */
+.btn-whatsapp {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #25D366;
+    color: #ffffff !important;
+    font-weight: 700;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 9px 16px;
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(37, 211, 102, 0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.btn-whatsapp:hover, .btn-whatsapp:focus-visible {
+    background: #20ba59;
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+    transform: translateY(-1px);
+    color: #ffffff !important;
+}
+.btn-whatsapp:active {
+    transform: translateY(0);
+}
+.btn-whatsapp svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    flex-shrink: 0;
+}
+
+/* ── Badges Semánticos de Competencias y Tipos ── */
+.badge-tech {
+    background: var(--badge-tech-bg) !important;
+    color: var(--badge-tech-text) !important;
+    font-weight: 700 !important;
+}
+.badge-transversal {
+    background: var(--badge-transversal-bg) !important;
+    color: var(--badge-transversal-text) !important;
+    font-weight: 700 !important;
+}
+.badge-ingles {
+    background: var(--badge-ingles-bg) !important;
+    color: var(--badge-ingles-text) !important;
+    font-weight: 700 !important;
+}
+
+/* ── Indicador de Racha de Inasistencias ── */
+.racha-alerta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    background: var(--sena-red-light);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    animation: pulseAlert 2s infinite ease-in-out;
+}
+@keyframes pulseAlert {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(0.97); }
+}
+
+/* ── Ficha Nav Scroll Gradient Effect ── */
+.ficha-toolbar-inner {
+    position: relative;
+}
+.ficha-nav::-webkit-scrollbar {
+    height: 4px;
+}
+.ficha-nav::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 4px;
+}
+
+/* =========================================
+   DASHBOARD: BUSCADOR Y VISTAS (TARJETAS / COMPACTA)
+   ========================================= */
+.dashboard-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 18px 0 24px;
+    flex-wrap: wrap;
+}
+.dashboard-search-wrap {
+    flex: 1;
+    min-width: 260px;
+    max-width: 480px;
+    position: relative;
+}
+.dashboard-search-input {
+    width: 100%;
+    padding: 10px 16px 10px 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-divider);
+    background: var(--input-bg);
+    color: var(--text-strong);
+    font-size: 14px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dashboard-search-input:focus {
+    border-color: var(--accent-primary);
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+.dashboard-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+}
+.view-switcher {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 2px;
+}
+.view-switch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.view-switch-btn:hover {
+    color: var(--text-strong);
+}
+.view-switch-btn.is-active {
+    background: var(--bg-card);
+    color: var(--accent-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Vista Compacta (Lista) */
+.dashboard-compact-view {
+    display: none;
+    margin-bottom: 24px;
+}
+.dashboard-compact-view.is-visible {
+    display: block;
+}
+.dashboard-cards.is-hidden {
+    display: none;
+}
+.dashboard-compact-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+.dashboard-compact-table th {
+    background: var(--bg-surface);
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-divider);
+    text-align: left;
+}
+.dashboard-compact-table td {
+    padding: 14px;
+    border-bottom: 1px solid var(--border-divider);
+    font-size: 13px;
+    color: var(--text-main);
+    vertical-align: middle;
+}
+.dashboard-compact-table tr:last-child td {
+    border-bottom: none;
+}
+.dashboard-compact-table tr:hover td {
+    background: var(--bg-glass-hover);
+}
+.compact-ficha-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.compact-ficha-title strong {
+    color: var(--text-strong);
+    font-size: 14px;
+}
+.compact-ficha-title small {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+.compact-metric-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 13px;
+}
+.compact-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* ── Separador Semántico en Ficha Nav ── */
+.ficha-nav-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-divider);
+    margin: auto 4px;
+    flex-shrink: 0;
+}
+
+/* ── Barra Inferior Móvil para Aprendices (Bottom Navigation) ── */
+.learner-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .learner-bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: var(--sticky-bar-bg);
+        backdrop-filter: var(--blur-glass);
+        -webkit-backdrop-filter: var(--blur-glass);
+        border-top: 1px solid var(--border-divider);
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+    }
+    .learner-bottom-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 8px;
+        transition: color 0.15s ease;
+        flex: 1;
+        text-align: center;
+    }
+    .learner-bottom-link .bottom-nav-icon {
+        font-size: 18px;
+        line-height: 1;
+    }
+    .learner-bottom-link:hover,
+    .learner-bottom-link:focus-visible,
+    .learner-bottom-link.is-active {
+        color: var(--accent-primary);
+    }
+    body.has-learner-bottom-nav {
+        padding-bottom: 70px;
+    }
 }

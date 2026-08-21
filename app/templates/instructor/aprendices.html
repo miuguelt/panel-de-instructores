@@ -2,6 +2,14 @@
 {% block title %}Aprendices - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
+<nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+    <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{{ url_for('instructor.fichas') }}">Fichas</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">Ficha {{ ficha.codigo }} · Aprendices</span>
+</nav>
+
 <div class="page-header">
     <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
     <h1>{{ ficha.codigo }} - {{ ficha.nombre_programa }}</h1>

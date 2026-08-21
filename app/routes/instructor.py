@@ -68,6 +68,14 @@ from app.services.archivos import (
     resolver_archivo_subido,
 )
 from app.services.cronograma import obtener_cronograma
+from app.services.tareas import (
+    DatosTareaInvalidos,
+    agrupar_tareas_por_corte_e_instructor,
+    eliminar_tarea_con_archivos,
+    guardar_material_apoyo,
+    leer_datos_tarea,
+    obtener_tarea_gestionable,
+)
 from app.models.ficha_instructor import FichaInstructor
 from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor, FichaCompetenciaSeleccionada
 from app.models.material import MaterialFicha
@@ -1460,6 +1468,7 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
 
     total_sesiones = contar_sesiones_registradas(ficha_id, corte_id=corte_id)
     total_faltas = total_faltas_nj + total_faltas_j
+    total_faltas = total_faltas_nj + total_faltas_j
     pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones > 0 else 100.0
 
     # El mes visible se arma en el servidor: la primera pintura ya sale con los
@@ -1486,64 +1495,7 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
                            config_alertas=config_alertas)
 
 
-class _DatosTareaInvalidos(Exception):
-    """El formulario de la tarea no cumple las validaciones mínimas."""
 
-
-def _leer_datos_tarea(form):
-    """Normaliza el formulario que comparten la creación y la edición."""
-    titulo = form.get('titulo', '').strip()
-    if not titulo:
-        raise _DatosTareaInvalidos('El título es obligatorio.')
-
-    modalidad = form.get('modalidad', MODALIDAD_EVIDENCIA).strip()
-    if modalidad not in MODALIDADES_TAREA:
-        modalidad = MODALIDAD_EVIDENCIA
-
-    fecha_limite = None
-    fecha_limite_str = form.get('fecha_limite', '')
-    if fecha_limite_str:
-        try:
-            fecha_limite = datetime.strptime(fecha_limite_str, '%Y-%m-%dT%H:%M')
-        except ValueError:
-            raise _DatosTareaInvalidos('La fecha límite no tiene un formato válido.')
-
-    return {
-        'titulo': titulo,
-        'descripcion': form.get('descripcion', '').strip(),
-        'enlace_externo': form.get('enlace_externo', '').strip() or None,
-        'fecha_limite': fecha_limite,
-        'modalidad': modalidad,
-        # Una actividad de aula no admite subidas: forzar el indicador evita
-        # que el panel del aprendiz exija un archivo que nadie va a revisar.
-        'requiere_archivo': modalidad == MODALIDAD_EVIDENCIA and 'requiere_archivo' in form,
-    }
-
-
-def _guardar_material_apoyo(archivo, ficha_id):
-    """Guarda el material de apoyo de una tarea y devuelve su URL relativa."""
-    resultado = ArchivoService.guardar(
-        archivo=archivo,
-        carpeta=TiposCarpeta.MATERIALES_TAREA,
-        # Keep support material inside the same instructor scope
-        # as the task. This prevents files with the same logical
-        # task name from being mixed across shared fichas.
-        subcarpeta=f'ficha_{ficha_id}/instructor_{current_user.id}',
-        prefijo_extra=f'tarea_{current_user.id}',
-        check_magic=True,
-    )
-    return resultado.url
-
-
-def _tarea_gestionable(ficha_id, tarea_id):
-    """Devuelve la tarea si el usuario puede operarla dentro de esa ficha."""
-    ficha = db.session.get(Ficha, ficha_id)
-    if not puede_gestionar_ficha(ficha):
-        return None, None
-    tarea = db.session.get(Tarea, tarea_id)
-    if not tarea or tarea.ficha_id != ficha_id or not puede_gestionar_tarea(tarea):
-        return ficha, None
-    return ficha, tarea
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/tareas', methods=['GET', 'POST'])
@@ -1554,12 +1506,24 @@ def tareas(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
-    corte_id = request.values.get('corte_id', type=int)
-    corte = corte_actual(ficha_id, corte_id=corte_id)
-    if corte_id and not corte:
-        flash('El corte no existe o no está compartido contigo.', 'error')
-        return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
-    corte_id = corte.id if corte else None
+    corte_param = request.values.get('corte_id')
+    modo_todos = request.method == 'GET' and corte_param == 'todos'
+    if modo_todos:
+        # Vista agrupada: sin filtro de corte, el tablero separa por corte e instructor.
+        corte = None
+        corte_id = None
+    else:
+        corte_id = request.values.get('corte_id', type=int)
+        if corte_id == 0:
+            # «Sin corte» explícito: corte_actual(0) devolvería el corte activo.
+            corte = None
+            corte_id = None
+        else:
+            corte = corte_actual(ficha_id, corte_id=corte_id)
+            if corte_id and not corte:
+                flash('El corte no existe o no está compartido contigo.', 'error')
+                return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+            corte_id = corte.id if corte else None
 
     if request.method == 'POST':
         if corte and not puede_gestionar_corte(corte):
@@ -1569,8 +1533,8 @@ def tareas(ficha_id):
             )
             return redirect(url_for('instructor.tareas', ficha_id=ficha_id, corte_id=corte_id))
         try:
-            datos = _leer_datos_tarea(request.form)
-        except _DatosTareaInvalidos as exc:
+            datos = leer_datos_tarea(request.form)
+        except DatosTareaInvalidos as exc:
             flash(str(exc), 'error')
             return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
@@ -1578,7 +1542,7 @@ def tareas(ficha_id):
         archivo_material = request.files.get('material_apoyo')
         if archivo_material and archivo_material.filename:
             try:
-                material_url = _guardar_material_apoyo(archivo_material, ficha_id)
+                material_url = guardar_material_apoyo(archivo_material, ficha_id, current_user.id)
             except ErrorArchivo as exc:
                 flash(str(exc), 'error')
                 return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
@@ -1620,15 +1584,28 @@ def tareas(ficha_id):
         if fi.instructor and fi.instructor.id != ficha.instructor_id and fi.instructor not in instructores_ficha:
             instructores_ficha.append(fi.instructor)
 
+    cortes_lista = cortes_visibles(ficha_id).order_by(
+        Corte.fecha_inicio.desc(), Corte.id.desc()
+    ).all()
+
+    # Tablero agrupado: se activa en la vista de todos los cortes o al ver
+    # las tareas de todos los instructores; separa por corte y por responsable.
+    grupos = None
+    if modo_todos or ver_todas:
+        grupos = agrupar_tareas_por_corte_e_instructor(lista_tareas, cortes_lista)
+
+    cortes_editables = [c for c in cortes_lista if puede_gestionar_corte(c)] if modo_todos else []
+
     return render_template(
         'tareas.html',
         ficha=ficha,
         tareas=lista_tareas,
         now=datetime.utcnow(),
-        cortes=cortes_visibles(ficha_id).order_by(
-            Corte.fecha_inicio.desc(), Corte.id.desc()
-        ).all(),
+        cortes=cortes_lista,
         corte_actual=corte,
+        modo_todos=modo_todos,
+        cortes_editables=cortes_editables,
+        grupos=grupos,
         puede_editar_corte=(corte is None or puede_gestionar_corte(corte)),
         filtro_instructor=filtro_instructor,
         instructores_ficha=instructores_ficha,
@@ -1639,7 +1616,7 @@ def tareas(ficha_id):
 @login_required
 def editar_tarea(ficha_id, tarea_id):
     """Actualiza una tarea existente conservando entregas y evaluaciones."""
-    ficha, tarea = _tarea_gestionable(ficha_id, tarea_id)
+    ficha, tarea = obtener_tarea_gestionable(ficha_id, tarea_id)
     if not ficha:
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
@@ -1648,8 +1625,8 @@ def editar_tarea(ficha_id, tarea_id):
         return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
     try:
-        datos = _leer_datos_tarea(request.form)
-    except _DatosTareaInvalidos as exc:
+        datos = leer_datos_tarea(request.form)
+    except DatosTareaInvalidos as exc:
         flash(str(exc), 'error')
         return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
@@ -1672,7 +1649,7 @@ def editar_tarea(ficha_id, tarea_id):
     archivo_material = request.files.get('material_apoyo')
     if archivo_material and archivo_material.filename:
         try:
-            material_nuevo = _guardar_material_apoyo(archivo_material, ficha_id)
+            material_nuevo = guardar_material_apoyo(archivo_material, ficha_id, current_user.id)
         except ErrorArchivo as exc:
             flash(str(exc), 'error')
             return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
@@ -1703,7 +1680,7 @@ def editar_tarea(ficha_id, tarea_id):
 @login_required
 def eliminar_tarea(ficha_id, tarea_id):
     """Elimina la tarea con sus entregas y los archivos asociados en disco."""
-    ficha, tarea = _tarea_gestionable(ficha_id, tarea_id)
+    ficha, tarea = obtener_tarea_gestionable(ficha_id, tarea_id)
     if not ficha:
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
@@ -1711,23 +1688,7 @@ def eliminar_tarea(ficha_id, tarea_id):
         flash('No tienes permiso para eliminar esta tarea.', 'error')
         return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
-    titulo = tarea.titulo
-    # Las rutas se recogen antes del borrado: después del commit los objetos
-    # de entrega ya no están disponibles para consultar su archivo.
-    archivos = [
-        entrega.archivo_url
-        for entrega in tarea.entregas.all()
-        if entrega.archivo_url
-    ]
-    if tarea.material_apoyo_url:
-        archivos.append(tarea.material_apoyo_url)
-
-    db.session.delete(tarea)
-    db.session.commit()
-
-    for url in archivos:
-        ArchivoService.eliminar(url)
-
+    titulo = eliminar_tarea_con_archivos(tarea)
     actualizar_alertas_ficha(ficha_id)
     actualizar_participacion_ficha(ficha_id)
     flash(f'Tarea "{titulo}" eliminada junto con sus registros.', 'success')

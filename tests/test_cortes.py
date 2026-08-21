@@ -190,3 +190,80 @@ class CortesWebTestCase(FlujosWebTestCase):
         self.assertEqual(reactivar_archivado.status_code, 302)
         db.session.refresh(primer_corte)
         self.assertEqual(primer_corte.estado, Corte.ESTADO_ARCHIVADO)
+
+    def test_tablero_agrupado_separa_por_corte_e_instructor(self):
+        corte_principal = self._crear_corte('Corte principal')
+        self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas',
+            data={
+                'corte_id': corte_principal.id,
+                'titulo': 'Tarea del corte principal',
+            },
+        )
+
+        db.session.add(FichaInstructor(
+            ficha_id=self.ficha.id,
+            instructor_id=self.ajeno.id,
+        ))
+        db.session.commit()
+        self._autenticar(self.ajeno)
+        corte_ajeno = self._crear_corte('Corte del colaborador')
+        self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas',
+            data={
+                'corte_id': corte_ajeno.id,
+                'titulo': 'Tarea del corte del colaborador',
+            },
+        )
+
+        self._autenticar(self.instructor)
+        pagina = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/tareas?corte_id=todos&filtro_instructor=todas'
+        )
+        self.assertEqual(pagina.status_code, 200)
+        cuerpo = pagina.get_data(as_text=True)
+        self.assertIn('tablero-agrupado', cuerpo)
+        self.assertIn('Corte principal', cuerpo)
+        self.assertIn('Corte del colaborador', cuerpo)
+        self.assertIn('Tarea del corte principal', cuerpo)
+        self.assertIn('Tarea del corte del colaborador', cuerpo)
+        self.assertIn('Instructor Principal', cuerpo)
+        self.assertIn('Instructor Ajeno', cuerpo)
+
+    def test_tablero_agrupado_permite_crear_tarea_eligiendo_corte(self):
+        corte_principal = self._crear_corte('Corte principal')
+        pagina = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/tareas?corte_id=todos'
+        )
+        self.assertEqual(pagina.status_code, 200)
+        self.assertIn('Corte destino', pagina.get_data(as_text=True))
+
+        self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas',
+            data={
+                'corte_id': corte_principal.id,
+                'titulo': 'Tarea creada desde la vista agrupada',
+            },
+        )
+        self.assertEqual(
+            Tarea.query.filter_by(
+                corte_id=corte_principal.id,
+                titulo='Tarea creada desde la vista agrupada',
+            ).count(),
+            1,
+        )
+
+        self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/tareas',
+            data={
+                'corte_id': 0,
+                'titulo': 'Tarea sin corte asignado',
+            },
+        )
+        self.assertEqual(
+            Tarea.query.filter_by(
+                corte_id=None,
+                titulo='Tarea sin corte asignado',
+            ).count(),
+            1,
+        )

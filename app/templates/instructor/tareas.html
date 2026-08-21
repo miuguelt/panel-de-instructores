@@ -48,10 +48,60 @@
         font-size: 13px;
         color: var(--gray-500);
     }
+    /* Tablero agrupado por corte e instructor */
+    .tablero-agrupado { display: flex; flex-direction: column; gap: 14px; }
+    .corte-grupo {
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-md, 12px);
+        background: var(--bg-card);
+        overflow: hidden;
+    }
+    .corte-grupo > summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 16px;
+        cursor: pointer;
+        font-weight: 700;
+        list-style: none;
+        background: var(--bg-surface);
+    }
+    .corte-grupo > summary::-webkit-details-marker { display: none; }
+    .corte-grupo > summary::before {
+        content: "▾";
+        margin-right: 4px;
+        color: var(--gray-500);
+        transition: transform .2s ease;
+    }
+    .corte-grupo:not([open]) > summary::before { transform: rotate(-90deg); }
+    .corte-grupo-titulo { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .corte-grupo-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 18px; }
+    .instructor-grupo-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 15px;
+        margin: 0 0 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px dashed var(--border-divider);
+    }
+    .corte-grupo > summary:focus-visible,
+    .corte-grupo > summary:focus-visible::before { outline: 2px solid var(--sena-green); outline-offset: 2px; }
 </style>
 {% endblock %}
 
 {% block content %}
+<nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+    <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">Tareas y Evidencias</span>
+</nav>
+
 <div class="page-header">
     <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
     <h1>Tareas y Evidencias</h1>
@@ -61,6 +111,10 @@
         <div class="corte-selector" style="flex: 1; min-width: 240px;">
             <label for="corte-tareas"><strong>Corte de trabajo</strong></label>
             <select id="corte-tareas" onchange="window.location.href=this.value">
+                <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id='todos', filtro_instructor=filtro_instructor) }}"
+                        {% if modo_todos %}selected{% endif %}>
+                    📚 Todos los cortes (tablero agrupado)
+                </option>
                 {% for item in cortes %}
                 <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=item.id, filtro_instructor=filtro_instructor) }}"
                         {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
@@ -75,17 +129,18 @@
         <div class="instructor-selector" style="flex: 1; min-width: 240px;">
             <label for="filtro-docente"><strong>Filtrar por Instructor</strong></label>
             <select id="filtro-docente" onchange="window.location.href=this.value">
-                <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None, filtro_instructor='mias') }}"
+                {% set corte_sel = 'todos' if modo_todos else (corte_actual.id if corte_actual else None) %}
+                <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='mias') }}"
                         {% if filtro_instructor == 'mias' %}selected{% endif %}>
                     👤 Mis Tareas ({{ current_user.nombre }})
                 </option>
-                <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None, filtro_instructor='todas') }}"
+                <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='todas') }}"
                         {% if filtro_instructor == 'todas' %}selected{% endif %}>
                     👥 Todas las tareas de la ficha
                 </option>
                 {% for inst in instructores_ficha %}
                 {% if inst.id != current_user.id %}
-                <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None, filtro_instructor=inst.id) }}"
+                <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor=inst.id) }}"
                         {% if filtro_instructor == inst.id|string %}selected{% endif %}>
                     👨‍🏫 Tareas de {{ inst.nombre }}
                 </option>
@@ -96,7 +151,9 @@
         {% endif %}
     </div>
 
-    {% if corte_actual and not corte_actual.esta_activo %}
+    {% if modo_todos %}
+    <div class="alert alert-info" style="margin-top: 10px;">Vista agrupada: las tareas se separan por corte y, dentro de cada corte, por instructor responsable. Para crear una tarea nueva elige el corte destino en el formulario.</div>
+    {% elif corte_actual and not corte_actual.esta_activo %}
     <div class="alert alert-info" style="margin-top: 10px;">Este corte está {{ corte_actual.estado }} y se puede consultar, pero no modificar.</div>
     {% endif %}
 </div>
@@ -106,7 +163,18 @@
     <h2>Crear nueva tarea</h2>
     <form method="POST" enctype="multipart/form-data" data-form-tarea>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">{% endif %}
+        {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">
+        {% elif modo_todos %}
+        <div class="form-group">
+            <label for="corte-destino">Corte destino</label>
+            <select id="corte-destino" name="corte_id">
+                <option value="0">Sin corte (tablero general de la ficha)</option>
+                {% for c in cortes_editables %}
+                <option value="{{ c.id }}">{{ c.nombre }} · Activo</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
 
         <div class="form-group">
                 <label for="titulo">Título de la tarea</label>
@@ -166,123 +234,45 @@
 </div>
 {% endif %}
 
-{% if tareas %}
+{% if grupos %}
+<div class="tablero-agrupado">
+    {% for grupo in grupos %}
+    <details class="corte-grupo" open>
+        <summary>
+            <span class="corte-grupo-titulo">
+                {% if grupo.corte %}
+                📂 {{ grupo.corte.nombre }}
+                <span class="badge badge-{{ 'info' if grupo.corte.esta_activo else 'secondary' }}">{{ grupo.corte.estado }}</span>
+                {% if grupo.corte.compartido %}<span class="badge badge-secondary">Compartido</span>{% endif %}
+                {% else %}
+                📂 Sin corte asignado
+                {% endif %}
+            </span>
+            <span class="badge badge-secondary">{{ grupo.total }} tarea(s)</span>
+        </summary>
+        <div class="corte-grupo-body">
+            {% for sub in grupo.instructores %}
+            <section class="instructor-grupo">
+                <h3 class="instructor-grupo-head">
+                    👨‍🏫 {{ sub.instructor.nombre if sub.instructor else 'Instructor desconocido' }}
+                    {% if sub.instructor and sub.instructor.id == current_user.id %}<span class="badge badge-info">Tú</span>{% endif %}
+                    <span class="text-muted">{{ sub.tareas|length }} tarea(s)</span>
+                </h3>
+                <div class="tasks-list">
+                    {% for tarea in sub.tareas %}
+                    {% include 'instructor/_tarea_card.html' %}
+                    {% endfor %}
+                </div>
+            </section>
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+</div>
+{% elif tareas %}
 <div class="tasks-list">
     {% for tarea in tareas %}
-    <div class="card task-card">
-        <div class="task-header">
-            <h3>{{ tarea.titulo }}</h3>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                {% if tarea.es_actividad_clase %}
-                <span class="badge badge-info">Se revisa en clase</span>
-                {% else %}
-                <span class="badge badge-secondary">Con evidencia</span>
-                {% endif %}
-                {% if tarea.fecha_limite %}
-                <span class="badge badge-{{ 'danger' if tarea.fecha_limite < now else 'info' }}">
-                    Límite: {{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}
-                </span>
-                {% endif %}
-            </div>
-        </div>
-        {% if tarea.creador %}
-        <p class="text-muted">Instructor responsable: {{ tarea.creador.nombre }}{% if tarea.corte and tarea.corte.compartido %} · Información compartida{% endif %}</p>
-        {% endif %}
-        {% if tarea.descripcion %}
-        <p class="task-desc">{{ tarea.descripcion }}</p>
-        {% endif %}
-        {% if tarea.enlace_externo %}
-        <a href="{{ tarea.enlace_externo }}" target="_blank" class="link-external">Enlace externo &rarr;</a>
-        {% endif %}
-        {% if tarea.actualizada_en %}
-        <p class="text-muted" style="font-size: 12px;">Editada el {{ tarea.actualizada_en.strftime('%d/%m/%Y %H:%M') }}</p>
-        {% endif %}
-
-        <div class="task-card-footer">
-            <a href="{{ url_for('instructor.ver_entregas', tarea_id=tarea.id) }}" class="btn btn-sm btn-primary">
-                {% if tarea.es_actividad_clase %}Aprobar cumplimiento{% else %}Ver Entregas{% endif %}
-            </a>
-            {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}<form method="POST"
-                  action="{{ url_for('instructor.eliminar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
-                  onsubmit="return confirm('Se eliminará la tarea «{{ tarea.titulo|e }}» junto con todas sus entregas, calificaciones y archivos. Esta acción no se puede deshacer. ¿Continuar?');"
-                  style="display: inline;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">{% endif %}
-                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-            </form>{% endif %}
-        </div>
-
-        {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}<details class="task-edit-form" data-form-tarea>
-            <summary>✏️ Editar tarea</summary>
-            <form method="POST"
-                  action="{{ url_for('instructor.editar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
-                  enctype="multipart/form-data" class="task-edit-inner">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-                <div class="form-group">
-                    <label for="titulo-{{ tarea.id }}">Título</label>
-                    <input type="text" id="titulo-{{ tarea.id }}" name="titulo" value="{{ tarea.titulo }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="descripcion-{{ tarea.id }}">Descripción</label>
-                    <textarea id="descripcion-{{ tarea.id }}" name="descripcion" rows="3">{{ tarea.descripcion or '' }}</textarea>
-                </div>
-
-                <div class="form-group">
-                    <label>Modalidad</label>
-                    <div class="modalidad-opciones">
-                        <label class="modalidad-opcion">
-                            <input type="radio" name="modalidad" value="evidencia" data-modalidad
-                                   {% if not tarea.es_actividad_clase %}checked{% endif %}>
-                            <span><strong>Con evidencia</strong><small>El aprendiz sube archivo o enlace.</small></span>
-                        </label>
-                        <label class="modalidad-opcion">
-                            <input type="radio" name="modalidad" value="clase" data-modalidad
-                                   {% if tarea.es_actividad_clase %}checked{% endif %}>
-                            <span><strong>Se revisa en clase</strong><small>Apruebas el cumplimiento tú mismo.</small></span>
-                        </label>
-                    </div>
-                    <small class="text-muted">La modalidad solo puede cambiarse mientras la tarea no tenga registros.</small>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group flex-grow">
-                        <label for="enlace-{{ tarea.id }}">Enlace externo</label>
-                        <input type="url" id="enlace-{{ tarea.id }}" name="enlace_externo" value="{{ tarea.enlace_externo or '' }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="limite-{{ tarea.id }}">Fecha límite</label>
-                        <input type="datetime-local" id="limite-{{ tarea.id }}" name="fecha_limite"
-                               value="{{ tarea.fecha_limite.strftime('%Y-%m-%dT%H:%M') if tarea.fecha_limite else '' }}">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="material-{{ tarea.id }}">Reemplazar material de apoyo</label>
-                    <input type="file" id="material-{{ tarea.id }}" name="material_apoyo">
-                    {% if tarea.material_apoyo_url %}
-                    <div class="material-actual" style="margin-top: 8px;">
-                        <span>Material actual cargado.</span>
-                        <label class="checkbox-label">
-                            <input type="checkbox" name="quitar_material">
-                            Quitar el material actual
-                        </label>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <div class="form-group" data-solo-evidencia>
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="requiere_archivo" {% if tarea.requiere_archivo %}checked{% endif %}>
-                        Los aprendices deben subir archivo como evidencia
-                    </label>
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
-            </form>
-        </details>{% else %}<small class="text-muted">Solo lectura para instructores vinculados.</small>{% endif %}
-    </div>
+    {% include 'instructor/_tarea_card.html' %}
     {% endfor %}
 </div>
 {% else %}
