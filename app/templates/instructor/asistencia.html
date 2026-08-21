@@ -15,23 +15,39 @@
     <h1>Llamado a Lista</h1>
     <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
     {% if cortes %}
-    <div class="corte-selector" style="margin-top: 12px;">
-        <label for="corte-asistencia"><strong>Corte de trabajo</strong></label>
-        <select id="corte-asistencia" onchange="window.location.href=this.value">
-            {% for item in cortes %}
-            <option value="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=item.id) }}"
-                    {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
-                {{ item.nombre }}{% if item.creador %} · {{ item.creador.nombre }}{% endif %}{% if item.compartido %} · Compartido{% endif %}
-            </option>
-            {% endfor %}
-        </select>
-        <small class="text-muted">Las sesiones de este corte no se mezclan con las demás.</small>
-        {% if corte_actual and not corte_actual.esta_activo %}
-        <div class="alert alert-info" style="margin-top: 10px;">Este corte está {{ corte_actual.estado }} y se puede consultar, pero no modificar.</div>
-        {% elif corte_actual and not puede_editar_corte %}
-        <div class="alert alert-info" style="margin-top: 10px;">Este corte es compartido y está disponible en modo consulta.</div>
+    <div class="page-control-panel">
+        <div class="control-selectors-cluster">
+            <div class="control-item">
+                <label class="control-label" for="corte-asistencia">
+                    <span class="control-icon" aria-hidden="true">📂</span>
+                    <span>Corte de trabajo</span>
+                </label>
+                <div class="control-select-wrap">
+                    <select id="corte-asistencia" onchange="window.location.href=this.value" aria-label="Seleccionar corte de trabajo">
+                        {% for item in cortes %}
+                        <option value="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=item.id) }}"
+                                {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
+                            {{ item.nombre }}{% if item.creador %} · {{ item.creador.nombre }}{% endif %}{% if item.compartido %} · Compartido{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        {% if corte_actual %}
+        <div class="control-actions-cluster">
+            <span class="badge badge-{{ 'success' if corte_actual.esta_activo else 'secondary' }}">
+                Estado: {{ corte_actual.estado|capitalize }}
+            </span>
+            {% if corte_actual.compartido %}<span class="badge badge-info">Compartido</span>{% endif %}
+        </div>
         {% endif %}
     </div>
+    {% if corte_actual and not corte_actual.esta_activo %}
+    <div class="alert alert-info" style="margin-top: 10px;">Este corte está {{ corte_actual.estado }} y se puede consultar, pero no modificar.</div>
+    {% elif corte_actual and not puede_editar_corte %}
+    <div class="alert alert-info" style="margin-top: 10px;">Este corte es compartido y está disponible en modo consulta.</div>
+    {% endif %}
     {% endif %}
 </div>
 
@@ -49,8 +65,8 @@
 
         {% if aprendices %}
         <div class="attendance-toolbar" data-filter-region="asistencia-toolbar">
-            <button type="button" class="btn btn-sm btn-outline" id="mark-all-present">Marcar todos como “Asiste”</button>
-            <input type="search" id="asistencia-search" class="form-control" placeholder="🔍 Buscar aprendiz..." style="font-size:12px; padding:4px 10px; max-width:220px; border-radius:6px;" aria-label="Buscar aprendiz en la lista de asistencia">
+            <button type="button" class="btn btn-sm btn-outline" id="mark-all-present">✓ Marcar todos como “Asiste”</button>
+            <input type="search" id="asistencia-search" class="form-control" placeholder="🔍 Buscar aprendiz..." style="font-size: 13px; padding: 7px 12px; max-width: 240px;" aria-label="Buscar aprendiz en la lista de asistencia">
             <span id="attendance-summary" role="status" aria-live="polite"></span>
         </div>
         <div class="asistencia-list">
@@ -123,13 +139,11 @@
             {% endfor %}
         </div>
 
-        <div class="attendance-save-bar">
-            {% if puede_editar_corte %}
-            <button type="submit" class="btn btn-primary btn-full btn-lg">Guardar asistencia del {{ fecha_actual }}</button>
-            {% else %}
-            <span class="text-muted">La asistencia está disponible solo en modo consulta para este corte.</span>
-            {% endif %}
+        {% if not puede_editar_corte %}
+        <div class="text-muted text-center" style="margin-top: 16px;">
+            La asistencia está disponible solo en modo consulta para este corte.
         </div>
+        {% endif %}
 
         {% if puede_editar_corte %}
         <!-- Barra Flotante Fija de Guardado (Sticky Save Bar) -->
@@ -207,6 +221,7 @@
     flex-direction: column;
     gap: 4px;
     margin-top: 12px;
+    margin-bottom: 72px;
 }
 
 /* Una sola fila compacta por aprendiz */

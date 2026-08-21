@@ -744,7 +744,7 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertEqual(pantalla.status_code, 200)
         self.assertIn('Dejó de asistir a las asesorías acordadas.'.encode(), pantalla.data)
         # Sigue en el resumen y en el filtro, marcado con su estado.
-        self.assertIn(b'Retiro Voluntario', pantalla.data)
+        self.assertIn(b'retiro voluntario', pantalla.data.lower())
         self.assertIn(f'value="{self.otro_aprendiz.id}"'.encode(), pantalla.data)
 
         # Y su nota se puede seguir corrigiendo aunque ya no esté en formación.

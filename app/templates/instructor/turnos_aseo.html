@@ -44,9 +44,9 @@
 
 <div class="cleaning-controls">
     <section class="card form-card">
-        <span class="eyebrow">Cola justa</span>
-        <h2>Generar turnos automáticamente</h2>
-        <p class="text-muted">Solo se asignan fechas con una sesión de clase registrada. Los turnos existentes no se sobrescriben.</p>
+        <span class="eyebrow">Cola justa y equidad</span>
+        <h2>Calcular turnos de aseo</h2>
+        <p class="text-muted">Calcula y redistribuye los días faltantes equilibrando las cargas según los turnos cumplidos por cada aprendiz. Los turnos cumplidos se conservan intactos.</p>
         <form method="POST" action="{{ url_for('aseo.generar', ficha_id=ficha.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-row align-center">
@@ -58,7 +58,17 @@
                     <label for="fecha_fin">Hasta</label>
                     <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin_default.isoformat() }}" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Generar turnos</button>
+                <div class="form-group" style="display:flex; flex-direction:column; gap:4px;">
+                    <label class="checkbox-label cleaning-check" style="margin:0; font-size:0.85rem;">
+                        <input type="checkbox" name="recalcular" checked>
+                        Recalcular días pendientes
+                    </label>
+                    <label class="checkbox-label cleaning-check" style="margin:0; font-size:0.85rem;">
+                        <input type="checkbox" name="respetar_manuales" checked>
+                        Conservar asignaciones manuales
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">⚡ Calcular turnos</button>
             </div>
         </form>
     </section>

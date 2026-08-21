@@ -219,25 +219,30 @@
 </div>
 
 {% if cortes %}
-<div class="card" style="margin-top: 1rem;">
-    <div class="form-row align-center" style="justify-content: space-between;">
-        <div>
-            <strong>Corte seleccionado</strong>
-            <p class="text-muted" style="margin: 4px 0 0;">El ranking, las tareas y la asistencia se consultan dentro del corte seleccionado.</p>
+<div class="page-control-panel">
+    <div class="control-selectors-cluster">
+        <div class="control-item" style="max-width: 480px;">
+            <label class="control-label" for="corte-ranking">
+                <span class="control-icon" aria-hidden="true">📂</span>
+                <span>Corte de trabajo</span>
+            </label>
+            <div class="control-select-wrap">
+                <select id="corte-ranking" onchange="window.location.href=this.value" aria-label="Seleccionar corte">
+                    {% for item in cortes %}
+                    <option value="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo=periodo, corte_id=item.id) }}"
+                            {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
+                        {{ item.nombre }} · {{ item.creador.nombre if item.creador else 'Instructor' }} · {{ item.estado|capitalize }}{% if item.compartido %} · Compartido{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
-        <select onchange="window.location.href=this.value" aria-label="Seleccionar corte">
-            {% for item in cortes %}
-            <option value="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo=periodo, corte_id=item.id) }}"
-                    {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
-                {{ item.nombre }} · {{ item.creador.nombre if item.creador else 'Instructor' }} · {{ item.estado|capitalize }}{% if item.compartido %} · Compartido{% endif %}
-            </option>
-            {% endfor %}
-        </select>
     </div>
     {% if corte_actual %}
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+    <div class="control-actions-cluster">
         <span class="badge badge-{{ 'success' if corte_actual.esta_activo else 'secondary' }}">Estado: {{ corte_actual.estado|capitalize }}</span>
-        {% if corte_actual.fecha_fin %}<small class="text-muted">Finalizado el {{ corte_actual.fecha_fin.strftime('%d/%m/%Y %H:%M') }}</small>{% endif %}
+        {% if corte_actual.compartido %}<span class="badge badge-info">Compartido</span>{% endif %}
+        {% if corte_actual.fecha_fin %}<small class="text-muted">Finalizado {{ corte_actual.fecha_fin.strftime('%d/%m/%Y') }}</small>{% endif %}
         {% if puede_administrar_corte %}
             {% if corte_actual.estado == 'activo' %}
             <form method="POST" action="{{ url_for('ranking.cambiar_estado', ficha_id=ficha.id, corte_id=corte_actual.id) }}" style="display:inline;">

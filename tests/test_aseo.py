@@ -375,6 +375,157 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertFalse(turno.completado_1)
         self.assertEqual(contador_1.veces_aseo, 0)
 
+    def test_recalcular_dias_faltantes_equilibra_cargas_segun_pesos_y_cumplidos(self):
+        # Ana (0) y Bruno (1) ya cumplieron turno en el pasado
+        fecha_pasada = date.today() - timedelta(days=2)
+        self._crear_sesion(fecha_pasada)
+        turno_pasado = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_pasada,
+            aprendiz_1_id=self.aprendices[0].id, # Ana
+            aprendiz_2_id=self.aprendices[1].id, # Bruno
+            estado='cumplido',
+            completado_1=True,
+            completado_2=True,
+        )
+        db.session.add(turno_pasado)
+        db.session.commit()
+
+        # Creamos 2 fechas futuras (4 cupos)
+        fecha_futura_1 = date.today() + timedelta(days=1)
+        fecha_futura_2 = date.today() + timedelta(days=2)
+        self._crear_sesion(fecha_futura_1)
+        self._crear_sesion(fecha_futura_2)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_futura_1,
+            fecha_futura_2,
+            rng=random.Random(42),
+        )
+        db.session.commit()
+
+        self.assertEqual(len(resultado['creados']), 2)
+        asignados_futuros = set()
+        for turno in resultado['creados']:
+            asignados_futuros.add(turno.aprendiz_1_id)
+            asignados_futuros.add(turno.aprendiz_2_id)
+
+        # Los 4 aprendices restantes (Carmen, Diego, Elena, Felipe) deben recibir los 4 cupos
+        ids_restantes = {a.id for a in self.aprendices[2:]}
+        self.assertEqual(asignados_futuros, ids_restantes)
+        # Ana y Bruno NO deben haber sido asignados en estos 2 días
+        self.assertNotIn(self.aprendices[0].id, asignados_futuros)
+        self.assertNotIn(self.aprendices[1].id, asignados_futuros)
+
+    def test_recalcular_actualiza_turnos_programados_existentes(self):
+        fecha_futura = date.today() + timedelta(days=3)
+        self._crear_sesion(fecha_futura)
+        # Turno programado inicialmente con Ana y Bruno
+        turno_existente = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_futura,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_existente)
+
+        # Pero Ana y Bruno ya tienen 1 turno cumplido antes
+        fecha_pasada = date.today() - timedelta(days=1)
+        self._crear_sesion(fecha_pasada)
+        turno_cumplido = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_pasada,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='cumplido',
+            completado_1=True,
+            completado_2=True,
+        )
+        db.session.add(turno_cumplido)
+        db.session.commit()
+
+        # Recalcular debe actualizar el turno existente programado
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_futura,
+            fecha_futura,
+            recalcular_existentes=True,
+            rng=random.Random(15),
+        )
+        db.session.commit()
+
+        self.assertEqual(len(resultado['recalculados']), 1)
+        turno_actualizado = resultado['recalculados'][0]
+        self.assertEqual(turno_actualizado.id, turno_existente.id)
+        # Deben haber salido Ana y Bruno y entrado aprendices con carga 0
+        self.assertFalse(turno_actualizado.incluye(self.aprendices[0].id))
+        self.assertFalse(turno_actualizado.incluye(self.aprendices[1].id))
+
+    def test_turnos_cumplidos_no_se_modifican_al_recalcular(self):
+        fecha = date.today()
+        self._crear_sesion(fecha)
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='cumplido',
+            completado_1=True,
+            completado_2=True,
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha,
+            fecha,
+            recalcular_existentes=True,
+        )
+        db.session.commit()
+
+        self.assertEqual(len(resultado['creados']), 0)
+        self.assertEqual(len(resultado['recalculados']), 0)
+        self.assertEqual(resultado['cumplidos_conservados'], 1)
+        turno_bd = db.session.get(TurnoAseo, turno.id)
+        self.assertEqual(turno_bd.aprendiz_1_id, self.aprendices[0].id)
+        self.assertEqual(turno_bd.aprendiz_2_id, self.aprendices[1].id)
+        self.assertEqual(turno_bd.estado, 'cumplido')
+
+    def test_respetar_ajustes_manuales_al_recalcular(self):
+        fecha_futura = date.today() + timedelta(days=2)
+        self._crear_sesion(fecha_futura)
+        turno_manual = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_futura,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='instructor',
+        )
+        db.session.add(turno_manual)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_futura,
+            fecha_futura,
+            recalcular_existentes=True,
+            respetar_manuales=True,
+        )
+        db.session.commit()
+
+        self.assertEqual(len(resultado['creados']), 0)
+        self.assertEqual(len(resultado['recalculados']), 0)
+        self.assertEqual(resultado['omitidos_manuales'], 1)
+        turno_bd = db.session.get(TurnoAseo, turno_manual.id)
+        self.assertEqual(turno_bd.aprendiz_1_id, self.aprendices[0].id)
+        self.assertEqual(turno_bd.aprendiz_2_id, self.aprendices[1].id)
+
 
 if __name__ == '__main__':
     unittest.main()

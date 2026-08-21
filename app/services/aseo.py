@@ -179,13 +179,21 @@ def generar_turnos(
     fecha_fin,
     generado_por='sistema',
     rng=None,
+    recalcular_existentes=True,
+    respetar_manuales=True,
 ):
-    """Genera turnos para sesiones del rango. Crea sesiones si faltan."""
+    """Genera y recalcula turnos para sesiones del rango equilibrando cargas.
+
+    - Conserva siempre intactos los turnos cumplidos (históricos).
+    - Si recalcular_existentes=True, recalcula cronológicamente los turnos
+      pendientes/programados para equilibrar las cargas según los turnos cumplidos.
+    - Si respetar_manuales=True, conserva las asignaciones manuales del instructor.
+    """
     if fecha_fin < fecha_inicio:
         raise ValueError('La fecha final no puede ser anterior a la inicial.')
 
     config = obtener_configuracion(ficha_id)
-    contadores = asegurar_contadores(ficha_id)
+    contadores = recalcular_contadores(ficha_id)
     activos = aprendices_activos(ficha_id)
     sesiones = _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin)
 
@@ -198,25 +206,56 @@ def generar_turnos(
     }
     cargas_programadas = defaultdict(int)
     ultima_programada = {}
-    for turno in TurnoAseo.query.filter(
+
+    # Si hay turnos pendientes fuera del rango que se está calculando, sumamos sus cargas
+    turnos_pendientes_fuera = TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
         TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
-    ).all():
+        db.or_(TurnoAseo.fecha < fecha_inicio, TurnoAseo.fecha > fecha_fin),
+    ).all()
+    for turno in turnos_pendientes_fuera:
         for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
             cargas_programadas[aprendiz_id] += 1
             ultima_programada[aprendiz_id] = _ultima_fecha(
                 ultima_programada.get(aprendiz_id), turno.fecha
             )
 
+    # Si se respetan asignaciones manuales del instructor dentro del rango
+    if respetar_manuales:
+        for fecha, turno in existentes.items():
+            if turno.estado in ESTADOS_PENDIENTES and turno.generado_por == 'instructor':
+                for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
+                    cargas_programadas[aprendiz_id] += 1
+                    ultima_programada[aprendiz_id] = _ultima_fecha(
+                        ultima_programada.get(aprendiz_id), turno.fecha
+                    )
+
     aleatorio = rng or random.SystemRandom()
     creados = []
-    omitidos_existentes = 0
+    recalculados = []
+    cumplidos_conservados = 0
+    omitidos_manuales = 0
     sin_candidatos = []
 
     for sesion in sesiones:
-        if sesion.fecha in existentes:
-            omitidos_existentes += 1
-            continue
+        turno_existente = existentes.get(sesion.fecha)
+        if turno_existente:
+            if turno_existente.estado == 'cumplido':
+                cumplidos_conservados += 1
+                continue
+            if respetar_manuales and turno_existente.generado_por == 'instructor':
+                omitidos_manuales += 1
+                continue
+            if not recalcular_existentes:
+                cargas_programadas[turno_existente.aprendiz_1_id] += 1
+                cargas_programadas[turno_existente.aprendiz_2_id] += 1
+                ultima_programada[turno_existente.aprendiz_1_id] = _ultima_fecha(
+                    ultima_programada.get(turno_existente.aprendiz_1_id), sesion.fecha
+                )
+                ultima_programada[turno_existente.aprendiz_2_id] = _ultima_fecha(
+                    ultima_programada.get(turno_existente.aprendiz_2_id), sesion.fecha
+                )
+                continue
 
         presentes = _registros_presentes(sesion) if config.excluir_ausentes else None
         candidatos = []
@@ -283,24 +322,43 @@ def generar_turnos(
             cargas_programadas[elegido.id] += 1
             ultima_programada[elegido.id] = sesion.fecha
 
-        turno = TurnoAseo(
-            ficha_id=ficha_id,
-            fecha=sesion.fecha,
-            aprendiz_1_id=elegidos[0].id,
-            aprendiz_2_id=elegidos[1].id,
-            estado='programado',
-            generado_por=generado_por,
-            auditoria_1=razones[0],
-            auditoria_2=razones[1],
-        )
-        db.session.add(turno)
-        creados.append(turno)
+        if turno_existente:
+            turno_existente.aprendiz_1_id = elegidos[0].id
+            turno_existente.aprendiz_2_id = elegidos[1].id
+            turno_existente.estado = 'programado'
+            turno_existente.generado_por = generado_por
+            turno_existente.auditoria_1 = razones[0]
+            turno_existente.auditoria_2 = razones[1]
+            turno_existente.completado_1 = None
+            turno_existente.completado_2 = None
+            turno_existente.completado_en = None
+            for intercambio in turno_existente.intercambios:
+                if intercambio.estado == 'pendiente':
+                    intercambio.estado = 'rechazado'
+                    intercambio.respondido_en = datetime.utcnow()
+            recalculados.append(turno_existente)
+        else:
+            turno = TurnoAseo(
+                ficha_id=ficha_id,
+                fecha=sesion.fecha,
+                aprendiz_1_id=elegidos[0].id,
+                aprendiz_2_id=elegidos[1].id,
+                estado='programado',
+                generado_por=generado_por,
+                auditoria_1=razones[0],
+                auditoria_2=razones[1],
+            )
+            db.session.add(turno)
+            creados.append(turno)
 
     db.session.flush()
     return {
         'creados': creados,
+        'recalculados': recalculados,
         'sesiones': len(sesiones),
-        'omitidos_existentes': omitidos_existentes,
+        'omitidos_existentes': cumplidos_conservados + omitidos_manuales,
+        'cumplidos_conservados': cumplidos_conservados,
+        'omitidos_manuales': omitidos_manuales,
         'sin_candidatos': sin_candidatos,
     }
 

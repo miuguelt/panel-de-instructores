@@ -181,7 +181,15 @@ def generar(ficha_id):
     try:
         inicio = _fecha_formulario(request.form.get('fecha_inicio'), 'fecha inicial')
         fin = _fecha_formulario(request.form.get('fecha_fin'), 'fecha final')
-        resultado = generar_turnos(ficha_id, inicio, fin)
+        recalcular = request.form.get('recalcular', 'on') in ('on', 'true', '1')
+        respetar_manuales = request.form.get('respetar_manuales', 'on') in ('on', 'true', '1')
+        resultado = generar_turnos(
+            ficha_id,
+            inicio,
+            fin,
+            recalcular_existentes=recalcular,
+            respetar_manuales=respetar_manuales,
+        )
         db.session.commit()
     except ValueError as exc:
         db.session.rollback()
@@ -189,20 +197,31 @@ def generar(ficha_id):
         return redirect(url_for('aseo.turnos', ficha_id=ficha_id))
 
     creados = len(resultado['creados'])
-    mensaje = (
-        f'Se generaron {creados} turno(s) para '
-        f'{resultado["sesiones"]} sesión(es) registrada(s).'
-    )
-    if resultado['omitidos_existentes']:
-        mensaje += (
-            f' {resultado["omitidos_existentes"]} ya tenían asignación y se conservaron.'
-        )
+    recalculados = len(resultado.get('recalculados', []))
+    cumplidos = resultado.get('cumplidos_conservados', 0)
+    manuales = resultado.get('omitidos_manuales', 0)
+
+    partes = []
+    if creados:
+        partes.append(f'{creados} nuevo(s)')
+    if recalculados:
+        partes.append(f'{recalculados} pendiente(s) recalculado(s)')
+    if cumplidos:
+        partes.append(f'{cumplidos} cumplido(s) conservado(s)')
+    if manuales:
+        partes.append(f'{manuales} manual(es) conservado(s)')
+
+    if partes:
+        mensaje = f'Cálculo de turnos completado ({", ".join(partes)}) para {resultado["sesiones"]} sesión(es).'
+    else:
+        mensaje = f'No se requirieron cambios en las {resultado["sesiones"]} sesiones evaluadas.'
+
     if resultado['sin_candidatos']:
         mensaje += (
             f' {len(resultado["sin_candidatos"])} sesión(es) no tenían dos '
             'aprendices elegibles.'
         )
-    flash(mensaje, 'success' if creados else 'info')
+    flash(mensaje, 'success' if (creados or recalculados) else 'info')
     return redirect(
         url_for('aseo.turnos', ficha_id=ficha_id, mes=inicio.strftime('%Y-%m'))
     )

@@ -10,14 +10,12 @@
     <span class="breadcrumb-current">Estadísticas</span>
 </nav>
 
-<div class="module-header">
-    <a href="{{ url_for('instructor.dashboard') }}" class="back-link">
-        <span aria-hidden="true">←</span> Volver al inicio
+<div class="page-header">
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">
+        <span aria-hidden="true">&larr;</span> Volver al inicio
     </a>
-    <div class="header-content">
-        <h1>Estadísticas de la Ficha {{ ficha.codigo }}</h1>
-        <p class="subtitle">{{ ficha.nombre_programa }}</p>
-    </div>
+    <h1>Estadísticas de la Ficha {{ ficha.codigo }}</h1>
+    <p class="text-muted">{{ ficha.nombre_programa }}</p>
 </div>
 
 {% include '_cronograma.html' %}
