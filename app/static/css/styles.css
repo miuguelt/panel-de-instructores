@@ -5766,11 +5766,39 @@ select optgroup {
    COMPONENTES UI/UX V8.7: BREADCRUMBS, STICKY BAR, WHATSAPP
    ========================================= */
 
+/* ── Barra de Navegación Superior Unificada (Breadcrumbs + Volver) ── */
+.page-nav-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 14px;
+    width: 100%;
+}
+
+@media (min-width: 640px) {
+    .page-nav-bar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+    }
+}
+
+.page-nav-bar .breadcrumb-nav {
+    margin-bottom: 0;
+}
+
+.page-nav-bar .btn-back,
+.page-nav-bar .back-link {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
 /* ── Migas de Pan (Breadcrumbs) ── */
 .breadcrumb-nav {
     display: inline-flex;
     align-items: center;
-    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 14px;
     padding: 6px 14px;
@@ -5781,6 +5809,13 @@ select optgroup {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     width: fit-content;
     max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.breadcrumb-nav::-webkit-scrollbar {
+    display: none;
 }
 .breadcrumb-nav a {
     color: var(--text-muted);
@@ -6079,6 +6114,81 @@ select optgroup {
 }
 .dashboard-compact-table tr:last-child td {
     border-bottom: none;
+}
+.page-header,
+.module-header,
+.cleaning-page-header {
+    margin-bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .page-header,
+    .module-header,
+    .cleaning-page-header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+    }
+}
+
+.page-header-info,
+.page-header .header-content,
+.module-header .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.page-header-actions,
+.page-header .header-actions,
+.page-header .page-actions,
+.module-header .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+    .page-header-actions,
+    .page-header .header-actions,
+    .page-header .page-actions,
+    .module-header .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+.page-header h1,
+.module-header h1,
+.module-header .header-content h1,
+.page-header-info h1 {
+    font-size: clamp(22px, 5vw, 30px);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 2px 0 4px;
+    color: var(--text-strong);
+    line-height: 1.25;
+}
+.page-header p,
+.page-header .text-muted,
+.module-header .subtitle,
+.page-subtitle,
+.page-header-info p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+    line-height: 1.45;
 }
 .dashboard-compact-table tr:hover td {
     background: var(--bg-glass-hover);

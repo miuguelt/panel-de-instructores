@@ -65,18 +65,23 @@
 {% endblock %}
 
 {% block content %}
-<nav class="breadcrumb-nav" aria-label="Ruta de navegación">
-    <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
-    <span class="breadcrumb-separator">/</span>
-    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
-    <span class="breadcrumb-separator">/</span>
-    <span class="breadcrumb-current">Observador del Aprendiz</span>
-</nav>
+<div class="page-nav-bar">
+    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+        <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-current">Observador del Aprendiz</span>
+    </nav>
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
+</div>
 
 <div class="page-header">
-    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
-    <h1>Observador del Aprendiz</h1>
-    <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+    <div class="page-header-info">
+        <span class="eyebrow">Convivencia y Seguimiento</span>
+        <h1>📓 Observador del Aprendiz</h1>
+        <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+    </div>
 </div>
 
 <div class="card form-card" id="registrar">

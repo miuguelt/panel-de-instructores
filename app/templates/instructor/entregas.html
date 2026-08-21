@@ -214,15 +214,29 @@
     }
     .seleccion-entrega input { width: 18px; height: 18px; accent-color: var(--sena-green); }
     .entrega-card.is-seleccionada { box-shadow: 0 0 0 3px rgba(57, 169, 0, .2), var(--shadow-lg); }
-    @media (max-width: 700px) { .evaluacion-masiva-grid { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="page-nav-bar">
+    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+        <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}">Tareas</a>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-current">{% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}</span>
+    </nav>
+    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}" class="btn-back">&larr; Volver a Tareas</a>
+</div>
+
 <div class="page-header">
-    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}" class="btn-back">&larr; Volver</a>
-    <h1>{% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}: {{ tarea.titulo }}</h1>
-    <p class="text-muted">{{ ficha.codigo }}</p>
+    <div class="page-header-info">
+        <span class="eyebrow">Evaluación y Evidencias</span>
+        <h1>{% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}: {{ tarea.titulo }}</h1>
+        <p class="text-muted">{{ ficha.codigo }} · {{ ficha.nombre_programa }}</p>
+    </div>
 </div>
 
 {% if tarea.es_actividad_clase %}

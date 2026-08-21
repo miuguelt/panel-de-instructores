@@ -204,14 +204,24 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header ranking-heading">
+<div class="page-nav-bar">
+    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+        <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-current">Ranking</span>
+    </nav>
     <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
-    <div>
+</div>
+
+<div class="page-header ranking-heading">
+    <div class="page-header-info">
         <span class="eyebrow">Participación y constancia</span>
         <h1>Ranking de desempeño</h1>
         <p class="text-muted">{{ ficha.codigo }} · {{ ficha.nombre_programa }}</p>
     </div>
-    <div class="header-actions">
+    <div class="page-header-actions">
         <a href="{{ url_for('ranking.insignias', ficha_id=ficha.id) }}" class="btn btn-secondary">🏅 Insignias</a>
         <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='excel', corte_id=corte_actual.id if corte_actual else None) }}" class="btn btn-outline">↓ Excel</a>
         <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='pdf', corte_id=corte_actual.id if corte_actual else None) }}" class="btn btn-outline">↓ PDF</a>

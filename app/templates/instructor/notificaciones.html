@@ -2,14 +2,30 @@
 {% block title %}Notificaciones - SENA Control{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-nav-bar">
+    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+        <a href="{{ url_for('instructor.dashboard') if not aprendiz else url_for('aprendiz.panel', ficha_id=ficha.id) }}">Inicio</a>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-current">Notificaciones</span>
+    </nav>
     {% if aprendiz %}
     <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver a mi panel</a>
-    <h1>Mis notificaciones</h1><p class="text-muted">{{ ficha.codigo }} · {{ aprendiz.nombre_completo }}</p>
     {% else %}
-    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
-    <h1>Centro de notificaciones</h1><p class="text-muted">Avisos informativos para revisión del instructor.</p>
+    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver al Inicio</a>
     {% endif %}
+</div>
+
+<div class="page-header">
+    <div class="page-header-info">
+        <span class="eyebrow">Centro de Mensajes</span>
+        {% if aprendiz %}
+        <h1>🔔 Mis notificaciones</h1>
+        <p class="text-muted">{{ ficha.codigo }} · {{ aprendiz.nombre_completo }}</p>
+        {% else %}
+        <h1>🔔 Centro de notificaciones</h1>
+        <p class="text-muted">Avisos informativos para revisión del instructor.</p>
+        {% endif %}
+    </div>
 </div>
 
 <div class="notification-toolbar">

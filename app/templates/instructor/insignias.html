@@ -2,14 +2,26 @@
 {% block title %}Insignias - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
-<div class="page-header ranking-heading">
+<div class="page-nav-bar">
+    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
+        <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}">Ranking</a>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-current">Insignias</span>
+    </nav>
     <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver al ranking</a>
-    <div>
+</div>
+
+<div class="page-header ranking-heading">
+    <div class="page-header-info">
         <span class="eyebrow">Reconocimiento positivo</span>
         <h1>Insignias y logros</h1>
         <p class="text-muted"><a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">{{ ficha.codigo }} · {{ ficha.nombre_programa }}</a></p>
     </div>
-    <div class="header-actions">
+    <div class="page-header-actions">
         <a href="{{ url_for('ranking.exportar_insignias', ficha_id=ficha.id, formato='excel') }}" class="btn btn-outline">Excel</a>
         <a href="{{ url_for('ranking.exportar_insignias', ficha_id=ficha.id, formato='pdf') }}" class="btn btn-outline">PDF</a>
     </div>
