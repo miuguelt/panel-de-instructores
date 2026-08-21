@@ -67,7 +67,7 @@
             </div>
         </nav>
 
-        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento') %}
+        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion') %}
         <div class="ficha-toolbar">
             <div class="ficha-toolbar-inner">
                 <div class="ficha-context" title="{{ ficha.nombre_programa }}">
@@ -77,9 +77,9 @@
                 <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
                     <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %}is-active{% endif %}">Aprendices</a>
-                    <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}"
+                    <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
                        class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}">Asistencia</a>
-                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}"
+                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
                        class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}">Tareas</a>
                     <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint == 'instructor.observador' %}is-active{% endif %}">Observador</a>
@@ -87,13 +87,15 @@
                        class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}">Alertas</a>
                     <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint in ('instructor.juicios',) %}is-active{% endif %}">Juicios</a>
+                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'planeacion.analisis' %}is-active{% endif %}">Planeación</a>
                     <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint in ('instructor.estadisticas',) %}is-active{% endif %}">Estadísticas</a>
                     <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}">Seguimiento</a>
                     <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}">Materiales</a>
-                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}"
+                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
                        class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}">Ranking</a>
                     <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}"
                        class="{% if request.endpoint == 'aseo.turnos' %}is-active{% endif %}">Turnos de aseo</a>

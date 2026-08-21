@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.helpers import utc_now
 
 from app import db
 
@@ -23,7 +23,7 @@ class ConfiguracionRanking(db.Model):
     umbral_calificacion_alta = db.Column(db.Float, nullable=False, default=4.0)
     penalizacion_falla_injustificada = db.Column(db.Float, nullable=False, default=1.0)
     actualizada_en = db.Column(
-        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime, nullable=False, default=utc_now, onupdate=utc_now
     )
 
 
@@ -33,7 +33,8 @@ class PuntajeHistorico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
-    fecha_corte = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    corte_id = db.Column(db.Integer, db.ForeignKey('cortes.id'), nullable=True, index=True)
+    fecha_corte = db.Column(db.DateTime, nullable=False, default=utc_now, index=True)
     tipo_corte = db.Column(db.String(20), nullable=False, default='automatico')
     puntaje_total = db.Column(db.Float, nullable=False, default=0.0)
     puntaje_asistencia = db.Column(db.Float, nullable=False, default=0.0)
@@ -46,3 +47,4 @@ class PuntajeHistorico(db.Model):
         backref=db.backref('puntajes_historicos', cascade='all, delete-orphan'),
     )
     ficha = db.relationship('Ficha', back_populates='puntajes_historicos')
+    corte = db.relationship('Corte', backref=db.backref('puntajes_historicos', lazy='dynamic'))

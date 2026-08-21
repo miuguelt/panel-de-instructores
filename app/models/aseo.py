@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.helpers import utc_now
 
 from app import db
 
@@ -18,7 +18,7 @@ class ConfiguracionAseo(db.Model):
     excluir_ausentes = db.Column(db.Boolean, nullable=False, default=True)
     aviso_horas = db.Column(db.Integer, nullable=False, default=24)
     actualizada_en = db.Column(
-        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime, nullable=False, default=utc_now, onupdate=utc_now
     )
 
 
@@ -67,9 +67,9 @@ class TurnoAseo(db.Model):
     auditoria_1 = db.Column(db.Text, nullable=True)
     auditoria_2 = db.Column(db.Text, nullable=True)
     observacion = db.Column(db.Text, nullable=True)
-    creado_en = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    creado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
     actualizado_en = db.Column(
-        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime, nullable=False, default=utc_now, onupdate=utc_now
     )
     completado_en = db.Column(db.DateTime, nullable=True)
     completado_1 = db.Column(db.Boolean, nullable=True)
@@ -119,7 +119,7 @@ class IntercambioAseo(db.Model):
     estado = db.Column(db.String(20), nullable=False, default='pendiente')
     confirma_solicita = db.Column(db.Boolean, nullable=False, default=True)
     confirma_recibe = db.Column(db.Boolean, nullable=False, default=False)
-    creado_en = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    creado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
     respondido_en = db.Column(db.DateTime, nullable=True)
 
     turno = db.relationship(

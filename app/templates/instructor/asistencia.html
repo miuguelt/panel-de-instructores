@@ -6,16 +6,36 @@
     <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
     <h1>Llamado a Lista</h1>
     <p class="text-muted">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</p>
+    {% if cortes %}
+    <div class="corte-selector" style="margin-top: 12px;">
+        <label for="corte-asistencia"><strong>Corte de trabajo</strong></label>
+        <select id="corte-asistencia" onchange="window.location.href=this.value">
+            {% for item in cortes %}
+            <option value="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=item.id) }}"
+                    {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
+                {{ item.nombre }}{% if item.creador %} · {{ item.creador.nombre }}{% endif %}{% if item.compartido %} · Compartido{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        <small class="text-muted">Las sesiones de este corte no se mezclan con las demás.</small>
+        {% if corte_actual and not corte_actual.esta_activo %}
+        <div class="alert alert-info" style="margin-top: 10px;">Este corte está {{ corte_actual.estado }} y se puede consultar, pero no modificar.</div>
+        {% elif corte_actual and not puede_editar_corte %}
+        <div class="alert alert-info" style="margin-top: 10px;">Este corte es compartido y está disponible en modo consulta.</div>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <div class="card form-card">
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">{% endif %}
 
         <div class="form-row align-center">
             <div class="form-group">
                 <label for="fecha">Fecha de sesión</label>
-                <input type="date" id="fecha" name="fecha" value="{{ fecha_actual }}" required>
+                <input type="date" id="fecha" name="fecha" value="{{ fecha_actual }}" required {% if not puede_editar_corte %}disabled{% endif %}>
             </div>
         </div>
 
@@ -47,7 +67,7 @@
                 <!-- Nombre + estado -->  
                 <div class="col-nombre">
                     <span class="aprendiz-name" id="aprendiz-{{ ap.id }}"
-                          hx-get="{{ url_for('instructor.asistencia_aprendiz_modal', ficha_id=ficha.id, aprendiz_id=ap.id) }}"
+                          hx-get="{{ url_for('instructor.asistencia_aprendiz_modal', ficha_id=ficha.id, aprendiz_id=ap.id, corte_id=corte_actual.id if corte_actual else None) }}"
                           hx-target="#modal-container" hx-trigger="click">{{ ap.nombre }} {{ ap.apellidos }}</span>
                     <span class="badge badge-{{ ap.estado|tono_estado }} estado-mini">{{ ap.estado|etiqueta_estado }}</span>
                 </div>
@@ -73,13 +93,14 @@
                         <label class="attendance-btn {% if seleccionado %}active state-{{ valor|lower }}{% endif %}">
                             <input type="radio" name="asistencia_{{ ap.id }}" value="{{ valor }}"
                                    {% if seleccionado %}checked{% endif %}
+                                   {% if not puede_editar_corte %}disabled{% endif %}
                                    onchange="this.closest('.asistencia-row').querySelectorAll('.attendance-btn').forEach(b=>b.classList.remove('active','state-asiste','state-falta','state-falta_justificada','state-excusa_medica','state-tardanza'));this.closest('.attendance-btn').classList.add('active','state-{{ valor|lower }}')">
                             {{ etiqueta }}
                         </label>
                         {% endfor %}
                     </div>
                     <div class="causal-select" id="causal_{{ ap.id }}_wrap" style="display:{% if registro and registro.causal_justificacion %}flex{% else %}none{% endif %}">
-                        <select name="causal_{{ ap.id }}" aria-label="Causal">
+                        <select name="causal_{{ ap.id }}" aria-label="Causal" {% if not puede_editar_corte %}disabled{% endif %}>
                             <option value="">-- Causal --</option>
                             {% for val, et in causales_justificadas %}
                             <option value="{{ val }}" {% if registro and registro.causal_justificacion == val %}selected{% endif %}>{{ et }}</option>
@@ -92,7 +113,11 @@
         </div>
 
         <div class="attendance-save-bar">
+            {% if puede_editar_corte %}
             <button type="submit" class="btn btn-primary btn-full btn-lg">Guardar asistencia del {{ fecha_actual }}</button>
+            {% else %}
+            <span class="text-muted">La asistencia está disponible solo en modo consulta para este corte.</span>
+            {% endif %}
         </div>
         {% else %}
         <div class="empty-state">
@@ -110,7 +135,7 @@
     <h3>Sesiones recientes</h3>
     <div class="sesiones-list">
         {% for s in sesiones_recientes %}
-        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, fecha=s.fecha) }}" class="sesion-item">
+            <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, fecha=s.fecha, corte_id=corte_actual.id if corte_actual else None) }}" class="sesion-item">
             {{ s.fecha.strftime('%d/%m/%Y') }}
         </a>
         {% endfor %}
@@ -118,6 +143,7 @@
     <div class="mt-1" style="background: var(--gray-50); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);">
         <h4 style="margin-bottom: 8px; font-size: 14px;">Exportar Reporte</h4>
         <form method="GET" action="{{ url_for('instructor.reporte_asistencia', ficha_id=ficha.id) }}" class="form-row align-center">
+            {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">{% endif %}
             <div class="form-group">
                 <label for="fecha_inicio">Desde</label>
                 <input type="date" id="fecha_inicio" name="fecha_inicio">

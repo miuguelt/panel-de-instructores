@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.helpers import utc_now
 
 from app import db
 
@@ -43,8 +43,8 @@ class ConfiguracionAlertasComite(db.Model):
     )
 
     correo_habilitado = db.Column(db.Boolean, nullable=False, default=False)
-    actualizada_en = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
-                               onupdate=datetime.utcnow)
+    actualizada_en = db.Column(db.DateTime, nullable=False, default=utc_now,
+                               onupdate=utc_now)
 
 
 class Alerta(db.Model):
@@ -59,7 +59,7 @@ class Alerta(db.Model):
     titulo = db.Column(db.String(180), nullable=False)
     mensaje = db.Column(db.Text, nullable=False)
     detalle_json = db.Column(db.JSON, nullable=True)
-    fecha_generada = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    fecha_generada = db.Column(db.DateTime, nullable=False, default=utc_now, index=True)
     estado = db.Column(db.String(30), nullable=False, default='activa', index=True)
     observaciones = db.Column(db.Text, nullable=True)
     fecha_resuelta = db.Column(db.DateTime, nullable=True)
@@ -84,7 +84,7 @@ class Notificacion(db.Model):
     tipo = db.Column(db.String(40), nullable=False, default='general')
     url = db.Column(db.String(500), nullable=True)
     clave = db.Column(db.String(180), nullable=False)
-    fecha_creada = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    fecha_creada = db.Column(db.DateTime, nullable=False, default=utc_now, index=True)
     leida = db.Column(db.Boolean, nullable=False, default=False, index=True)
     leida_en = db.Column(db.DateTime, nullable=True)
 
@@ -103,7 +103,7 @@ class PlanMejoramiento(db.Model):
     aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
     alerta_id = db.Column(db.Integer, db.ForeignKey('alertas.id'), nullable=True)
-    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=utc_now)
     fecha_limite = db.Column(db.DateTime, nullable=True)
     fecha_cumplimiento = db.Column(db.DateTime, nullable=True)
     actividades = db.Column(db.Text, nullable=False)

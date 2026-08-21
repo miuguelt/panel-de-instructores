@@ -1,0 +1,164 @@
+{# Mapa de fases del proyecto formativo con diagrama de Gantt dual (Plan vs Real) sobre los trimestres. #}
+
+<section class="pl-card" id="seccion-gantt">
+    <div class="pl-card-head" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2>Cronograma de la ficha: plan vs. avance real (Gantt)</h2>
+            <p>Representación multicapa y proporcional al volumen horario. La <strong>barra superior</strong> muestra la ventana planeada en el proyecto formativo (GFPI-F-134) y la <strong>barra inferior</strong> muestra la ejecución real en SOFIA Plus con el porcentaje de aprendices aprobados.</p>
+        </div>
+        <div class="pl-gantt-filter-bar">
+            <button type="button" class="pl-filter-btn is-active" data-filter="all">Todas ({{ linea.competencias|length }})</button>
+            <button type="button" class="pl-filter-btn" data-filter="tecnicas">⚡ Técnicas ({{ linea.resumen.competencias_exigibles }})</button>
+            <button type="button" class="pl-filter-btn" data-filter="atrasadas">⚠️ Con Retraso ({{ linea.resumen.competencias_atrasadas }})</button>
+            <button type="button" class="pl-filter-btn" data-filter="flexibles">🌱 Transversales ({{ linea.resumen.competencias_sugeridas }})</button>
+        </div>
+    </div>
+
+    <div class="pl-gantt-wrap">
+        <div class="pl-gantt" style="--pl-cols: {{ calendario.bloques|length }}">
+            <div class="pl-gantt-scale">
+                <div class="pl-gantt-scale-title">
+                    <span>Estructura Curricular</span>
+                    <small>Horas & Tipo</small>
+                </div>
+                <div class="pl-gantt-scale-cols">
+                    {% for bloque in calendario.bloques %}
+                    <span class="pl-gantt-scale-col is-{{ bloque.estado }} {{ 'is-productiva' if bloque.etapa == 'productiva' }}">
+                        <strong>{{ bloque.etiqueta }}</strong>
+                        <small>{{ bloque.inicio.strftime('%m/%y') }}–{{ bloque.fin.strftime('%m/%y') }}</small>
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="pl-gantt-body">
+                <div class="pl-gantt-overlay" aria-hidden="true">
+                    <span></span>
+                    <span class="pl-gantt-overlay-track"><i class="pl-gantt-hoy" style="--pl-hoy: {{ calendario.posicion_hoy }}" title="Línea de tiempo actual (Hoy)"></i></span>
+                </div>
+
+                {% for fase in linea.fases %}
+                <div class="pl-gantt-fase" data-fase-tipo="{{ 'productiva' if 'productiva' in fase.nombre.lower() else 'lectiva' }}">
+                    <div class="pl-fase-title-row">
+                        <h3>📌 {{ fase.nombre }}</h3>
+                        <span class="pl-chip pl-tone-{{ fase.estado_tono }} is-tone">{{ fase.porcentaje_avance }}% aprobado</span>
+                    </div>
+                    <small>
+                        {{ fase.competencias|length }} competencias ·
+                        {{ fase.resultados_total }} RAPs ·
+                        {{ fase.horas|round|int }} horas lectivas ·
+                        {{ fase.etiqueta_trimestre }}
+                    </small>
+                </div>
+
+                {% for competencia in fase.competencias %}
+                {% set comp_tipo = 'tecnicas' if competencia.exigible else 'flexibles' %}
+                {% set comp_atraso = 'atrasadas' if competencia.estado_tiempo in ('atrasado', 'critico') else 'al_dia' %}
+                
+                <div class="pl-gantt-row pl-clickable pl-gantt-item" 
+                     data-type="{{ comp_tipo }}" 
+                     data-status="{{ comp_atraso }}"
+                     data-pedagogico-target="{{ competencia.nombre }}"
+                     tabindex="0" role="button"
+                     aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}"
+                     title="Haz clic para abrir la ficha pedagógica con criterios, saberes y estadísticas">
+                    
+                    <div class="pl-gantt-label">
+                        <div class="pl-gantt-name-row">
+                            <span class="pl-gantt-status-dot" style="background:var(--{{ 'danger' if competencia.estado_tono == 'danger' else ('warning' if competencia.estado_tono == 'warning' else ('success' if competencia.estado_tono == 'success' else 'text-muted')) }})"></span>
+                            <span class="pl-gantt-name"><strong>{{ competencia.nombre }}</strong></span>
+                            {% if competencia.es_camino_critico %}
+                            <span class="pl-badge-critico" title="Competencia técnica crítica para la certificación">⚡ Crítica</span>
+                            {% endif %}
+                        </div>
+                        
+                        <span class="pl-gantt-meta">
+                            <span class="pl-chip">{{ competencia.etiqueta_trimestre }}{{ '' if competencia.exigible else ' (sugerido)' }}</span>
+                            <span class="pl-chip pl-tone-{{ competencia.estado_tono }} is-tone">{{ competencia.estado_label }}</span>
+                            {% if competencia.dias_desfase is defined and competencia.dias_desfase > 0 %}
+                            <span class="pl-gantt-desfase-badge">⏱ {{ competencia.dias_desfase }}d retraso</span>
+                            {% endif %}
+                            <span class="pl-chip"><strong>{{ competencia.horas|round|int }} h</strong></span>
+                            <span class="pl-chip">{{ competencia.resultados_total }} RAPs</span>
+                            <button type="button" class="pl-btn-pedagogico" style="margin-left:auto;">📋 Ver datos</button>
+                        </span>
+                    </div>
+
+                    <div class="pl-gantt-track">
+                        {% for bloque in calendario.bloques %}
+                        <span class="pl-gantt-cell {{ 'is-productiva' if bloque.etapa == 'productiva' }}" aria-hidden="true"></span>
+                        {% endfor %}
+
+                        {# 1. Barra Superior: Planeación GFPI-F-134 #}
+                        <div class="pl-gantt-bar pl-gantt-bar-plan {{ 'is-sugerida' if not competencia.exigible else '' }}"
+                             style="left: {{ competencia.gantt_left_pct }}%; width: {{ competencia.gantt_width_pct }}%;"
+                             title="Planificado: {{ competencia.etiqueta_trimestre }} · {{ competencia.horas|round|int }} horas (~{{ competencia.duracion_semanas }} sem){% if competencia.fecha_plan_inicio and competencia.fecha_plan_fin %} · Desde {{ competencia.fecha_plan_inicio.strftime('%d/%m/%Y') if competencia.fecha_plan_inicio.strftime is defined else competencia.fecha_plan_inicio }} hasta {{ competencia.fecha_plan_fin.strftime('%d/%m/%Y') if competencia.fecha_plan_fin.strftime is defined else competencia.fecha_plan_fin }}{% endif %}">
+                            <span class="pl-bar-plan-label">Plan: {{ competencia.etiqueta_trimestre }} ({{ competencia.horas|round|int }}h · ~{{ competencia.duracion_semanas|round(1) }}sem)</span>
+                        </div>
+
+                        {# 2. Barra Inferior: Ejecución Real en SOFIA Plus #}
+                        <div class="pl-gantt-bar pl-gantt-bar-real pl-tone-{{ competencia.estado_tono }}"
+                             style="left: {{ competencia.gantt_left_pct }}%; width: {{ competencia.gantt_width_pct }}%; --pl-avance: {{ competencia.porcentaje_avance }};"
+                             title="Real SOFIA: {{ competencia.porcentaje_avance }}% aprobado ({{ competencia.estado_label }}){% if competencia.fecha_primera_aprobacion %} · Primera aprobación: {{ competencia.fecha_primera_aprobacion.strftime('%d/%m/%Y') if competencia.fecha_primera_aprobacion.strftime is defined else competencia.fecha_primera_aprobacion }}{% endif %}{% if competencia.fecha_cierre_real %} · Cerrado el {{ competencia.fecha_cierre_real.strftime('%d/%m/%Y') if competencia.fecha_cierre_real.strftime is defined else competencia.fecha_cierre_real }}{% endif %}{% if competencia.dias_desfase > 0 %} · {{ competencia.dias_desfase }} días de desfase{% endif %}">
+                            <span class="pl-gantt-fill" aria-hidden="true"></span>
+                            <span class="pl-gantt-value">{{ competencia.porcentaje_avance }}% real</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="pl-legend" style="margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border-subtle);">
+        <span class="pl-tone-info"><i style="background:var(--accent-primary)"></i> Barra superior: Ventana y Carga Horaria Planificada</span>
+        <span class="pl-tone-success"><i style="background:var(--success)"></i> Barra inferior: Avance Real Aprobado (SOFIA Plus)</span>
+        <span class="pl-tone-danger"><i></i> Retraso cronológico técnico</span>
+        <span class="pl-tone-warning"><i></i> En riesgo o retraso moderado</span>
+        <span class="pl-tone-neutral"><i style="border:1px dashed var(--text-muted)"></i> Transversal / Inglés (cronograma flexible)</span>
+    </div>
+    <p class="pl-note" style="margin-top:.6rem">
+        <strong>Ponderación y Realismo:</strong> Las macro-competencias de alto volumen horario como <em>Construcción de Software (1.008 h)</em> abarcan múltiples trimestres de desarrollo activo. La línea vertical roja marca la fecha actual. Los RAPs se consideran consolidados cuando al menos el 80% de los aprendices vigentes cuentan con juicio aprobado.
+    </p>
+</section>
+
+{% set criticas = linea.competencias|selectattr('estado_tiempo', 'in', ['critico', 'atrasado'])|sort(attribute='dias_desfase', reverse=True)|list %}
+<section class="pl-card" id="seccion-riesgos">
+    <div class="pl-card-head">
+        <h2>Atención prioritaria: competencias con retraso</h2>
+        <p>Competencias técnicas cuyo trimestre planeado ya finalizó sin alcanzar el umbral de cierre (80%), ordenadas por días de retraso real.</p>
+    </div>
+    {% if criticas %}
+    <div class="pl-risk-grid">
+        {% for competencia in criticas[:6] %}
+        <article class="pl-risk pl-tone-{{ competencia.estado_tono }} pl-clickable" data-pedagogico-target="{{ competencia.nombre }}" tabindex="0" role="button" aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}" title="Haz clic para ver criterios y contenidos de esta competencia">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem;">
+                <h3>{{ competencia.nombre }}</h3>
+                <span class="pl-btn-pedagogico">📋 Ver datos competencia</span>
+            </div>
+            <span class="pl-gantt-meta">
+                <span class="pl-chip">{{ competencia.fase }}</span>
+                <span class="pl-chip">Planeada {{ competencia.etiqueta_trimestre }}</span>
+                <span class="pl-chip pl-tone-{{ competencia.estado_tono }} is-tone">{{ competencia.estado_label }}</span>
+            </span>
+            <div class="pl-bar"><i style="width: {{ competencia.porcentaje_avance }}%"></i></div>
+            <div class="pl-risk-facts">
+                <span><b>{{ competencia.porcentaje_avance }}%</b> aprendices aprobados</span>
+                <span><b>{{ competencia.dias_desfase }}</b> días de retraso</span>
+                <span><b>{{ competencia.resultados_atrasados }}/{{ competencia.resultados_total }}</b> RAPs vencidos</span>
+            </div>
+            {% if competencia.instructores %}
+            <p class="pl-note">Docentes asignados: {{ competencia.instructores|join(', ') }}.</p>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% if criticas|length > 6 %}
+    <p class="pl-note" style="margin-top:.7rem">Se muestran las 6 principales; el detalle completo por fase se encuentra en la sección inferior ({{ criticas|length }} con desfase en total).</p>
+    {% endif %}
+    {% else %}
+    <p class="pl-note">Ninguna competencia técnica presenta retraso frente al trimestre planificado. El cronograma formativo avanza según lo previsto.</p>
+    {% endif %}
+</section>
+

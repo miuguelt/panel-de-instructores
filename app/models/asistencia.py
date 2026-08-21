@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from app.helpers import utc_now
 
 
 ESTADOS_ASISTENCIA = [
@@ -23,15 +23,17 @@ class SesionAsistencia(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
+    corte_id = db.Column(db.Integer, db.ForeignKey('cortes.id'), nullable=True, index=True)
     fecha = db.Column(db.Date, nullable=False)
     observaciones = db.Column(db.Text, nullable=True)
-    creada_en = db.Column(db.DateTime, default=datetime.utcnow)
+    creada_en = db.Column(db.DateTime, default=utc_now)
 
     registros = db.relationship('RegistroAsistencia', backref='sesion', lazy='dynamic',
                                 cascade='all, delete-orphan')
+    corte = db.relationship('Corte', back_populates='sesiones')
 
     __table_args__ = (
-        db.UniqueConstraint('ficha_id', 'fecha', name='uq_sesion_ficha_fecha'),
+        db.UniqueConstraint('corte_id', 'fecha', name='uq_sesion_corte_fecha'),
     )
 
     def __repr__(self):

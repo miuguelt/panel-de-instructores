@@ -1,4 +1,36 @@
+param([switch]$Stop)
+
 $ErrorActionPreference = "Stop"
+
+# Sin este bloque param el script no tenia forma de parar nada: el supervisor
+# lo invocaba como `start-windows.ps1 -Stop`, PowerShell ignoraba el argumento
+# suelto y el cuerpo arrancaba el servidor en primer plano. `db stop` se quedaba
+# colgado para siempre en el paso 1/7 y, de paso, ARRANCABA este proyecto en vez
+# de detenerlo (2026-08-16).
+function Get-ListeningPidsOnPort($TargetPort) {
+    if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
+        return @(Get-NetTCPConnection -LocalPort $TargetPort -State Listen -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty OwningProcess -Unique)
+    }
+    # pwsh 7 no trae el modulo NetTCPIP: sin este respaldo el puerto se lee
+    # siempre como libre y la parada seria un falso verde.
+    $matchesFound = @(netstat -ano -p tcp 2>$null | Select-String ":$TargetPort\s+\S+\s+LISTENING\s+(\d+)")
+    return @($matchesFound | ForEach-Object { [int]$_.Matches.Groups[1].Value } | Select-Object -Unique)
+}
+
+if ($Stop) {
+    Write-Host "Deteniendo SENA Control Academico (:8009)..." -ForegroundColor Yellow
+    $detenidos = 0
+    foreach ($ownerPid in (Get-ListeningPidsOnPort 8009)) {
+        if ($ownerPid -gt 4) {
+            try { Stop-Process -Id $ownerPid -Force -ErrorAction Stop; $detenidos++ } catch {
+                Write-Warning "No se pudo detener el proceso $ownerPid."
+            }
+        }
+    }
+    Write-Host "Detenido(s): $detenidos proceso(s) en el puerto 8009." -ForegroundColor Green
+    return
+}
 
 # El reloader de Werkzeug usa watchdog y excluye el entorno virtual,
 # uploads, logs y caches desde wsgi.py para evitar reinicios espurios.
@@ -59,12 +91,13 @@ Write-Host "=== SENA Control Academico - Inicio ===" -ForegroundColor Green
 $projectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectDir
 
-if (-not (Test-Path "venv")) {
-    Write-Host "Creando entorno virtual..." -ForegroundColor Yellow
-    python -m venv venv
+$venvDir = if (Test-Path "venv_win\Scripts\Activate.ps1") { "venv_win" } elseif (Test-Path "venv\Scripts\Activate.ps1") { "venv" } else { "venv" }
+if (-not (Test-Path "$venvDir\Scripts\Activate.ps1")) {
+    Write-Host "Creando entorno virtual ($venvDir)..." -ForegroundColor Yellow
+    python -m venv $venvDir
 }
 
-& ".\venv\Scripts\Activate.ps1"
+& ".\$venvDir\Scripts\Activate.ps1"
 
 Write-Host "Instalando dependencias..." -ForegroundColor Yellow
 pip install -r requirements.txt -q

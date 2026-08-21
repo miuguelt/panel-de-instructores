@@ -32,6 +32,30 @@
             <p>¿Eres instructor nuevo?</p>
             <a href="{{ url_for('auth.registro') }}" class="btn btn-outline btn-full">Registrarme</a>
         </div>
+
+        <div class="dev-quick-login" style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid rgba(0,0,0,0.08);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Accesos de prueba</span>
+                <span style="font-size: 0.65rem; padding: 2px 8px; border-radius: 9999px; background: #dcfce7; color: #166534; font-weight: 600;">1-Click Login</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <button type="button" onclick="quickLogin('admin@sena.edu.co', 'Admin123456!')" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.5rem; display: flex; flex-direction: column; align-items: center; gap: 2px; border-color: #cbd5e1; cursor: pointer;">
+                    <strong style="color: #0f172a;">Admin</strong>
+                    <span style="font-size: 0.65rem; color: #64748b;">Administrador</span>
+                </button>
+                <button type="button" onclick="quickLogin('instructor@sena.edu.co', 'Instructor123456!')" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.5rem; display: flex; flex-direction: column; align-items: center; gap: 2px; border-color: #cbd5e1; cursor: pointer;">
+                    <strong style="color: #0f172a;">Instructor</strong>
+                    <span style="font-size: 0.65rem; color: #64748b;">Colaborador</span>
+                </button>
+            </div>
+        </div>
+        <script>
+            function quickLogin(correo, pass) {
+                document.getElementById('correo').value = correo;
+                document.getElementById('password').value = pass;
+                document.querySelector('.auth-form').submit();
+            }
+        </script>
     </div>
 </div>
 {% endblock %}

@@ -4,6 +4,7 @@ from datetime import datetime, time, timedelta
 from app import db
 from app.models.aprendiz import Aprendiz
 from app.models.asistencia import RegistroAsistencia, SesionAsistencia
+from app.models.corte import Corte
 from app.models.insignia import Insignia, InsigniaOtorgada
 from app.models.juicio import JuicioEvaluativo
 from app.models.ranking import ConfiguracionRanking, PuntajeHistorico
@@ -176,19 +177,26 @@ def _alias_aprendiz(aprendiz):
     return f'Aprendiz {aprendiz.id:03d}'
 
 
-def calcular_ranking(ficha_id, periodo='general', ahora=None):
+def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
     ahora = ahora or datetime.utcnow()
     if periodo not in ('general', 'semanal', 'mensual'):
         periodo = 'general'
 
     config = obtener_configuracion(ficha_id, crear=True)
-    inicio = _inicio_periodo(config, periodo, ahora)
+    corte = db.session.get(Corte, corte_id) if corte_id is not None else None
+    if corte and corte.ficha_id != ficha_id:
+        corte = None
+    inicio = corte.fecha_inicio if corte else _inicio_periodo(config, periodo, ahora)
+    inicio_corte = corte.fecha_inicio if corte else config.inicio_corte
     aprendices = Aprendiz.query_en_formacion(ficha_id).all()
 
+    consulta_sesiones = SesionAsistencia.query.filter_by(ficha_id=ficha_id)
+    if corte:
+        consulta_sesiones = consulta_sesiones.filter(SesionAsistencia.corte_id == corte.id)
     sesiones = [
         sesion
-        for sesion in SesionAsistencia.query.filter_by(ficha_id=ficha_id).all()
-        if _en_periodo_sesion(sesion, inicio, ahora, config.inicio_corte)
+        for sesion in consulta_sesiones.all()
+        if _en_periodo_sesion(sesion, inicio, ahora, inicio_corte)
     ]
     sesiones_map = {sesion.id: sesion for sesion in sesiones}
     registros_por_aprendiz = defaultdict(list)
@@ -199,9 +207,12 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None):
         for registro in registros:
             registros_por_aprendiz[registro.aprendiz_id].append(registro)
 
+    consulta_tareas = Tarea.query.filter_by(ficha_id=ficha_id)
+    if corte:
+        consulta_tareas = consulta_tareas.filter(Tarea.corte_id == corte.id)
     tareas = [
         tarea
-        for tarea in Tarea.query.filter_by(ficha_id=ficha_id).all()
+        for tarea in consulta_tareas.all()
         if _en_periodo_fecha(tarea.creada_en, inicio, ahora)
     ]
     tareas_map = {tarea.id: tarea for tarea in tareas}
@@ -221,10 +232,15 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None):
         juicios_por_aprendiz[j.aprendiz_id].append(j)
 
     fecha_referencia = ahora - timedelta(days=7)
-    historicos = PuntajeHistorico.query.filter(
+    consulta_historicos = PuntajeHistorico.query.filter(
         PuntajeHistorico.ficha_id == ficha_id,
         PuntajeHistorico.fecha_corte <= fecha_referencia,
-    ).order_by(PuntajeHistorico.fecha_corte.desc()).all()
+    )
+    if corte_id is not None:
+        consulta_historicos = consulta_historicos.filter(
+            PuntajeHistorico.corte_id == corte_id
+        )
+    historicos = consulta_historicos.order_by(PuntajeHistorico.fecha_corte.desc()).all()
     anterior_por_aprendiz = {}
     for historico in historicos:
         anterior_por_aprendiz.setdefault(historico.aprendiz_id, historico)
@@ -370,18 +386,23 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None):
     return filas, config
 
 
-def guardar_snapshot(ficha_id, filas, ahora=None, tipo='automatico'):
+def guardar_snapshot(ficha_id, filas, ahora=None, tipo='automatico', corte_id=None):
     ahora = ahora or datetime.utcnow()
     inicio_dia = datetime.combine(ahora.date(), time.min)
     fin_dia = inicio_dia + timedelta(days=1)
     existentes = {}
     if tipo == 'automatico':
-        registros = PuntajeHistorico.query.filter(
+        consulta = PuntajeHistorico.query.filter(
             PuntajeHistorico.ficha_id == ficha_id,
             PuntajeHistorico.tipo_corte == tipo,
             PuntajeHistorico.fecha_corte >= inicio_dia,
             PuntajeHistorico.fecha_corte < fin_dia,
-        ).all()
+        )
+        if corte_id is None:
+            consulta = consulta.filter(PuntajeHistorico.corte_id.is_(None))
+        else:
+            consulta = consulta.filter(PuntajeHistorico.corte_id == corte_id)
+        registros = consulta.all()
         existentes = {registro.aprendiz_id: registro for registro in registros}
 
     for fila in filas:
@@ -391,6 +412,7 @@ def guardar_snapshot(ficha_id, filas, ahora=None, tipo='automatico'):
                 aprendiz_id=fila['aprendiz'].id,
                 ficha_id=ficha_id,
                 tipo_corte=tipo,
+                corte_id=corte_id,
             )
             db.session.add(historico)
         historico.fecha_corte = ahora
@@ -581,13 +603,18 @@ def evaluar_insignias(ficha_id, filas, ahora=None):
     return nuevas
 
 
-def actualizar_participacion_ficha(ficha_id, ahora=None):
+def actualizar_participacion_ficha(ficha_id, ahora=None, corte_id=None):
     ahora = ahora or datetime.utcnow()
     obtener_configuracion(ficha_id, crear=True)
     asegurar_catalogo_insignias(ficha_id)
-    filas, _ = calcular_ranking(ficha_id, periodo='general', ahora=ahora)
+    filas, _ = calcular_ranking(
+        ficha_id,
+        periodo='general',
+        ahora=ahora,
+        corte_id=corte_id,
+    )
     nuevas = evaluar_insignias(ficha_id, filas, ahora=ahora)
-    guardar_snapshot(ficha_id, filas, ahora=ahora)
+    guardar_snapshot(ficha_id, filas, ahora=ahora, corte_id=corte_id)
     # Los ids se leen antes del commit: al confirmar, SQLAlchemy expira los
     # objetos y quien recorra las filas despues recargaria un aprendiz por
     # consulta. Una sola lectura en bloque los repuebla.

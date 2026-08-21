@@ -1,9 +1,35 @@
 from app import db
+import re
+import unicodedata
 
 
 # Estados que cuentan como "en formacion": unicos habilitados para llamado a
 # lista, turnos de aseo y ranking.
 ESTADOS_EN_FORMACION = ('EN', 'EN_FORMACION')
+
+# Estados que deben conservarse en la lectura académica de la planeación.
+# Esta lista es deliberadamente explícita: si el reporte oficial incorpora un
+# estado nuevo, una prueba debe obligar a decidir si entra o no en el avance.
+ESTADOS_PLANEACION = (
+    'EN',
+    'EN_FORMACION',
+    'INDUCCION',
+    'CONDICIONADO',
+    'POR_CERTIFICAR',
+    'CERTIFICADO',
+    'APLAZADO',
+)
+
+# Estados que todavía pueden recibir o cerrar resultados en el seguimiento.
+# Certificado y Aplazado se conservan en el análisis histórico, pero no se
+# presentan como aprendices actualmente activos.
+ESTADOS_PLANEACION_ACTIVOS = (
+    'EN',
+    'EN_FORMACION',
+    'INDUCCION',
+    'CONDICIONADO',
+    'POR_CERTIFICAR',
+)
 
 # Los condicionados siguen asistiendo a clase: entran al llamado a lista,
 # aunque no cuentan como "en formacion" para ranking, aseo ni alertas.
@@ -13,6 +39,7 @@ ESTADOS_LLAMADO_LISTA = ESTADOS_EN_FORMACION + ('CONDICIONADO',)
 ETIQUETAS_ESTADO = {
     'EN': 'En formación',
     'EN_FORMACION': 'En formación',
+    'INDUCCION': 'Inducción',
     'CONDICIONADO': 'Condicionado',
     'POR_CERTIFICAR': 'Por certificar',
     'CERTIFICADO': 'Certificado',
@@ -27,6 +54,7 @@ ETIQUETAS_ESTADO = {
 TONOS_ESTADO = {
     'EN': 'success',
     'EN_FORMACION': 'success',
+    'INDUCCION': 'info',
     'CONDICIONADO': 'warning',
     'POR_CERTIFICAR': 'info',
     'CERTIFICADO': 'success',
@@ -38,16 +66,24 @@ TONOS_ESTADO = {
 }
 
 
+def normalizar_estado(estado):
+    """Normaliza estados del Excel y de registros antiguos para compararlos."""
+    texto = unicodedata.normalize('NFKD', str(estado or '').strip())
+    texto = ''.join(caracter for caracter in texto if not unicodedata.combining(caracter))
+    return re.sub(r'[^A-Z0-9]+', '_', texto.upper()).strip('_')
+
+
 def etiqueta_estado(estado):
     """Convierte el estado tecnico en un texto legible para la UI."""
     if not estado:
         return 'Sin estado'
-    return ETIQUETAS_ESTADO.get(estado, estado.replace('_', ' ').title())
+    normalizado = normalizar_estado(estado)
+    return ETIQUETAS_ESTADO.get(normalizado, normalizado.replace('_', ' ').title())
 
 
 def tono_estado(estado):
     """Devuelve la clase de badge adecuada para el estado del aprendiz."""
-    return TONOS_ESTADO.get(estado, 'secondary')
+    return TONOS_ESTADO.get(normalizar_estado(estado), 'secondary')
 
 
 class Aprendiz(db.Model):
@@ -91,6 +127,18 @@ class Aprendiz(db.Model):
     @property
     def en_formacion(self):
         return self.estado in ESTADOS_EN_FORMACION
+
+    @property
+    def estado_normalizado(self):
+        return normalizar_estado(self.estado)
+
+    @property
+    def incluido_en_planeacion(self):
+        return self.estado_normalizado in ESTADOS_PLANEACION
+
+    @property
+    def activo_en_planeacion(self):
+        return self.estado_normalizado in ESTADOS_PLANEACION_ACTIVOS
 
     @property
     def nombre_completo(self):

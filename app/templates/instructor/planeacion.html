@@ -1,0 +1,1562 @@
+{% extends "base.html" %}
+{% block title %}Línea de tiempo de la ficha {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="pl-page">
+    <div class="pl-header">
+        <div>
+            <a href="{{ url_for('instructor.fichas') }}" class="btn-back">&larr; Volver a Fichas</a>
+            <h1>Línea de tiempo de la ficha</h1>
+            <p><strong>{{ ficha.codigo }}</strong> · {{ ficha.nombre_programa }}</p>
+        </div>
+        <div class="pl-actions">
+            <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-secondary">Juicios por aprendiz</a>
+            <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="btn btn-outline">Estadísticas</a>
+            <button type="button" class="btn btn-outline" onclick="window.print()" title="Imprimir o guardar vista gráfica como PDF">
+                🖨️ Informe
+            </button>
+            {% set total_descargables = (1 if version_planeacion else 0) + (1 if version_reporte else 0) + (1 if version_programa else 0) %}
+            {% if total_descargables %}
+            <div class="pl-actions-group" role="group" aria-label="Descargar archivos fuente">
+                <span class="pl-actions-group-label">Fuentes:</span>
+                {% if version_planeacion %}
+                <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_planeacion.id) }}" class="btn btn-xs btn-outline" title="Descargar Planeación Pedagógica GFPI-F-134 (v{{ version_planeacion.version }})">
+                    📊 Planeación
+                </a>
+                {% endif %}
+                {% if version_reporte %}
+                <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_reporte.id) }}" class="btn btn-xs btn-outline" title="Descargar Reporte de Juicios SOFIA Plus (v{{ version_reporte.version }})">
+                    📋 Juicios
+                </a>
+                {% endif %}
+                {% if version_programa %}
+                <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}" class="btn btn-xs btn-outline" title="Descargar Programa de Formación Oficial en PDF (v{{ version_programa.version }})">
+                    📑 Programa
+                </a>
+                {% endif %}
+                {% if total_descargables > 1 %}
+                <a href="{{ url_for('planeacion.descargar_todos', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Descargar todos los archivos fuente en formato .zip">
+                    📦 .zip
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if importacion_id %}
+    <div class="pl-verdict pl-tone-info" data-importacion-id="{{ importacion_id }}">
+        <span class="pl-verdict-icon" aria-hidden="true">⏳</span>
+        <div>
+            <strong>Reporte en procesamiento</strong>
+            <p>La vista se actualizará cuando termine la importación. Puedes permanecer aquí; el sistema revisa el estado automáticamente.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if error_planeacion %}
+    <div class="pl-verdict pl-tone-danger">
+        <span class="pl-verdict-icon" aria-hidden="true">⚠️</span>
+        <div>
+            <strong>La planeación no está disponible</strong>
+            <p>{{ error_planeacion }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Centro de Carga y Análisis de los Tres Documentos #}
+    {% include 'instructor/_planeacion_carga_unificada.html' %}
+
+    {% if analisis %}
+    <nav class="pl-subnav" aria-label="Secciones de esta página">
+        <a href="#seccion-resumen" class="pl-subnav-link is-active">Resumen</a>
+        {% if curva_svg %}<a href="#seccion-curva-s" class="pl-subnav-link">Curva S</a>{% endif %}
+        <a href="#seccion-gantt" class="pl-subnav-link">Cronograma</a>
+        <a href="#seccion-riesgos" class="pl-subnav-link">Riesgos</a>
+        {% if fases_progreso %}<a href="#seccion-pipeline" class="pl-subnav-link">Fases</a>{% endif %}
+        {% if proyeccion and proyeccion.cfd %}<a href="#seccion-cfd" class="pl-subnav-link">Flujo RAPs</a>{% endif %}
+        {% if radar and radar.ejes %}<a href="#seccion-radar" class="pl-subnav-link">Radar</a>{% endif %}
+        {% if heatmap_docente and heatmap_docente.filas %}<a href="#heatmap-docente-section" class="pl-subnav-link">Carga docente</a>{% endif %}
+        {% if contraste and contraste.disponible %}<a href="#seccion-contraste" class="pl-subnav-link">Contraste</a>{% endif %}
+        {% if diagnostico %}<a href="#seccion-diagnostico" class="pl-subnav-link">Diagnóstico</a>{% endif %}
+        <a href="#seccion-detalle" class="pl-subnav-link">Detalle por fase</a>
+        <a href="#documentos" class="pl-subnav-link">Archivos</a>
+        <div class="pl-subnav-tools">
+            <button type="button" id="pl-expandir-todo" class="pl-subnav-tool" title="Expandir todas las secciones plegables">▾ Expandir todo</button>
+            <button type="button" id="pl-colapsar-todo" class="pl-subnav-tool" title="Contraer todas las secciones plegables">▸ Colapsar todo</button>
+        </div>
+    </nav>
+    {% endif %}
+
+    {% if not analisis %}
+    <div class="pl-empty">
+        <div class="empty-icon">🧭</div>
+        <h2>Arma la línea de tiempo de la ficha</h2>
+        <p>Utiliza el panel superior para cargar los tres documentos clave: la <strong>Planeación Pedagógica GFPI-F-134</strong>, el <strong>Reporte de Juicios Evaluativos</strong> de SOFIA Plus y el <strong>Programa de Formación (PDF)</strong>. Al hacer clic en <em>Ejecutar Análisis Completo</em>, el sistema cruzará las fuentes, calculará el avance real, identificará atrasos y habilitará el catálogo pedagógico detallado con conocimientos de proceso, saber y criterios de evaluación.</p>
+    </div>
+    {% else %}
+        {% if not analisis.alineacion.alineado %}
+        <div class="pl-verdict pl-tone-danger">
+            <span class="pl-verdict-icon" aria-hidden="true">🚫</span>
+            <div>
+                <strong>Los archivos no corresponden al mismo programa</strong>
+                <p>La línea de tiempo se conserva, pero no debe leerse como avance de esta ficha: {{ analisis.alineacion.motivos|join(' ') }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% include 'instructor/_planeacion_panorama.html' %}
+        {% include 'instructor/_planeacion_mapa.html' %}
+        {% include 'instructor/_planeacion_programa.html' %}
+        {% include 'instructor/_planeacion_detalle.html' %}
+    {% endif %}
+
+    {% include 'instructor/_planeacion_documentos.html' %}
+
+    <!-- Modal Pedagógico de Competencia / RAP -->
+    <div id="modal-pedagogico" class="pl-modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="pl-modal-title">
+        <div class="pl-modal">
+            <div class="pl-modal-header">
+                <div>
+                    <div class="pl-modal-badge-row">
+                        <span id="pl-modal-badge" class="pl-chip is-tone">Competencia</span>
+                        <span id="pl-modal-code-badge" class="pl-chip pl-tone-neutral">Código: </span>
+                        <span id="pl-modal-phase-badge" class="pl-chip pl-tone-info" style="display:none;"></span>
+                        {% if version_programa %}
+                        <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}" class="pl-chip pl-tone-info is-tone pl-btn-modal-pdf" target="_blank" title="Descargar Programa de Formación Oficial">
+                            📑 Descargar PDF Oficial (v{{ version_programa.version }})
+                        </a>
+                        {% endif %}
+                    </div>
+                    <h3 id="pl-modal-title">Detalle Pedagógico de la Competencia</h3>
+                    <p id="pl-modal-sub">Código de Norma y denominación oficial</p>
+                </div>
+                <button type="button" class="pl-modal-close" id="pl-modal-close-btn" aria-label="Cerrar ventana">&times;</button>
+            </div>
+
+            <div class="pl-modal-status-bar" id="modal-status-bar"></div>
+
+            <div class="pl-pedagogico-metrics" id="modal-metrics-bar"></div>
+
+            <div class="pl-modal-toolbar">
+                <div class="pl-modal-search-wrap">
+                    <span class="pl-modal-search-icon">🔍</span>
+                    <input type="text" id="modal-search-input" class="pl-modal-search-input" placeholder="Filtrar saberes, criterios, perfil docente o palabras clave..." autocomplete="off">
+                    <span id="modal-search-count" class="pl-modal-search-count"></span>
+                </div>
+                <div class="pl-modal-actions">
+                    <button type="button" id="btn-copiar-ficha" class="pl-btn-modal-action" title="Copiar todo el contenido pedagógico de esta competencia al portapapeles">
+                        📋 Copiar datos
+                    </button>
+                    <button type="button" id="btn-imprimir-ficha" class="pl-btn-modal-action" title="Imprimir ficha de la competencia">
+                        🖨️ Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="pl-modal-tabs" role="tablist">
+                <button type="button" class="pl-modal-tab is-active" data-pane="pane-todo" role="tab" aria-selected="true">
+                    👁️ Vista Integral (Todo)
+                </button>
+                <button type="button" class="pl-modal-tab" data-pane="pane-proceso" role="tab" aria-selected="false">
+                    ⚙️ Conocimientos de Proceso <span class="pl-tab-badge" id="tab-cnt-proceso"></span>
+                </button>
+                <button type="button" class="pl-modal-tab" data-pane="pane-saber" role="tab" aria-selected="false">
+                    📚 Conocimientos del Saber <span class="pl-tab-badge" id="tab-cnt-saber"></span>
+                </button>
+                <button type="button" class="pl-modal-tab" data-pane="pane-criterios" role="tab" aria-selected="false">
+                    🎯 Criterios de Evaluación <span class="pl-tab-badge" id="tab-cnt-criterios"></span>
+                </button>
+                <button type="button" class="pl-modal-tab" data-pane="pane-perfil" role="tab" aria-selected="false">
+                    👨‍🏫 Perfil del Instructor
+                </button>
+                <button type="button" class="pl-modal-tab" data-pane="pane-resultados" role="tab" aria-selected="false">
+                    📝 Resultados y Juicios <span class="pl-tab-badge" id="tab-cnt-resultados"></span>
+                </button>
+            </div>
+
+            <div class="pl-modal-body">
+                <div id="pane-todo" class="pl-modal-pane is-active" role="tabpanel">
+                    <div id="todo-content"></div>
+                </div>
+                <div id="pane-proceso" class="pl-modal-pane" role="tabpanel">
+                    <div id="proceso-content"></div>
+                </div>
+                <div id="pane-saber" class="pl-modal-pane" role="tabpanel">
+                    <div id="saber-content"></div>
+                </div>
+                <div id="pane-criterios" class="pl-modal-pane" role="tabpanel">
+                    <div id="criterios-content"></div>
+                </div>
+                <div id="pane-perfil" class="pl-modal-pane" role="tabpanel">
+                    <div id="perfil-content"></div>
+                </div>
+                <div id="pane-resultados" class="pl-modal-pane" role="tabpanel">
+                    <div id="resultados-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script id="pl-catalogo-json" type="application/json">
+    {{ catalogo_pedagogico|tojson|safe if catalogo_pedagogico else '{}' }}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    // 1. Estado de importación asíncrona
+    const pendiente = document.querySelector('[data-importacion-id]');
+    if (pendiente) {
+        const url = {{ url_for('instructor.estado_importacion', ficha_id=ficha.id, job_id=0)|replace('/0', '/')|tojson }} + pendiente.dataset.importacionId;
+        const revisar = function () {
+            fetch(url, {headers: {'Accept': 'application/json'}})
+                .then(function (respuesta) { return respuesta.ok ? respuesta.json() : null; })
+                .then(function (datos) {
+                    if (!datos) return;
+                    if (datos.estado === 'completado' || datos.estado === 'error') window.location.reload();
+                    else window.setTimeout(revisar, 2500);
+                })
+                .catch(function () { window.setTimeout(revisar, 5000); });
+        };
+        window.setTimeout(revisar, 1200);
+    }
+
+    // 2. Drag & Drop e interactividad en el Centro de Carga Unificada
+    const formCarga = document.getElementById('form-carga-unificada');
+    const dropzones = document.querySelectorAll('.pl-dropzone');
+    const btnAnalizar = document.getElementById('btn-ejecutar-analisis');
+    const feedbackMsg = document.getElementById('pl-carga-feedback');
+    const progressWrap = document.getElementById('pl-carga-progress-wrap');
+    const progressBar = document.getElementById('pl-carga-progress-bar');
+
+    dropzones.forEach(function (dz) {
+        const inputId = dz.getAttribute('data-input-target');
+        const input = document.getElementById(inputId);
+        const preview = dz.querySelector('.pl-file-preview');
+        const textSpan = dz.querySelector('.pl-dropzone-text');
+
+        const bannerSeleccionados = document.getElementById('pl-banner-seleccionados');
+        const bannerCount = document.getElementById('pl-banner-seleccionados-count');
+        const btnTexto = document.getElementById('btn-ejecutar-texto');
+
+        function refrescarEstadoArchivos() {
+            let totalSeleccionados = 0;
+            const fileInputs = formCarga ? formCarga.querySelectorAll('input[type="file"]') : [];
+            fileInputs.forEach(inp => {
+                if (inp.files && inp.files.length > 0) totalSeleccionados += inp.files.length;
+            });
+            if (bannerSeleccionados && bannerCount) {
+                if (totalSeleccionados > 0) {
+                    bannerSeleccionados.style.display = 'flex';
+                    bannerCount.textContent = totalSeleccionados + (totalSeleccionados === 1 ? ' archivo listo' : ' archivos listos');
+                    if (btnTexto) {
+                        btnTexto.textContent = `Ejecutar Análisis Completo (${totalSeleccionados} ${totalSeleccionados === 1 ? 'archivo listo' : 'archivos listos'})`;
+                    }
+                    if (btnAnalizar) btnAnalizar.classList.add('is-pulse');
+                } else {
+                    bannerSeleccionados.style.display = 'none';
+                    if (btnTexto) btnTexto.textContent = 'Ejecutar Análisis Completo';
+                    if (btnAnalizar) btnAnalizar.classList.remove('is-pulse');
+                }
+            }
+        }
+
+        function actualizarNombre(file) {
+            if (file) {
+                dz.classList.add('has-file');
+                if (preview) {
+                    preview.style.display = 'block';
+                    preview.innerHTML = `<strong>✓ Seleccionado:</strong> ${file.name} <small>(${Math.round(file.size / 1024)} KB)</small>`;
+                }
+                if (textSpan) textSpan.style.display = 'none';
+                refrescarEstadoArchivos();
+            }
+        }
+
+        dz.addEventListener('click', function (e) {
+            if (e.target !== input) input.click();
+        });
+
+        input.addEventListener('change', function () {
+            if (this.files && this.files[0]) {
+                actualizarNombre(this.files[0]);
+            } else {
+                refrescarEstadoArchivos();
+            }
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dz.addEventListener(eventName, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dz.classList.add('is-dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dz.addEventListener(eventName, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dz.classList.remove('is-dragover');
+            });
+        });
+
+        dz.addEventListener('drop', function (e) {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                input.files = e.dataTransfer.files;
+                actualizarNombre(input.files[0]);
+            }
+        });
+    });
+
+    if (formCarga) {
+        formCarga.addEventListener('submit', function (e) {
+            const fileInputs = formCarga.querySelectorAll('input[type="file"]');
+            let hayArchivos = false;
+            fileInputs.forEach(i => { if (i.files && i.files.length > 0) hayArchivos = true; });
+
+            if (!hayArchivos) {
+                e.preventDefault();
+                if (feedbackMsg) {
+                    feedbackMsg.style.display = 'inline-block';
+                    feedbackMsg.className = 'pl-carga-msg pl-tone-warning';
+                    feedbackMsg.textContent = 'Selecciona o arrastra al menos un archivo antes de ejecutar el análisis.';
+                }
+                return;
+            }
+
+            // AJAX submit con progreso
+            e.preventDefault();
+            const formData = new FormData(formCarga);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', formCarga.action, true);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+            if (btnAnalizar) {
+                btnAnalizar.disabled = true;
+                btnAnalizar.innerHTML = '<span class="pl-spinner"></span> Procesando análisis...';
+            }
+            if (progressWrap) progressWrap.style.display = 'block';
+            if (progressBar) progressBar.style.width = '20%';
+            if (feedbackMsg) {
+                feedbackMsg.style.display = 'inline-block';
+                feedbackMsg.className = 'pl-carga-msg pl-tone-info';
+                feedbackMsg.textContent = 'Subiendo y analizando documentos...';
+            }
+
+            xhr.upload.onprogress = function (ev) {
+                if (ev.lengthComputable && progressBar) {
+                    const percent = Math.min(Math.round((ev.loaded / ev.total) * 70), 70);
+                    progressBar.style.width = percent + '%';
+                }
+            };
+
+            xhr.onload = function () {
+                if (progressBar) progressBar.style.width = '100%';
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const resp = JSON.parse(xhr.responseText);
+                        if (resp.ok) {
+                            if (feedbackMsg) {
+                                feedbackMsg.className = 'pl-carga-msg pl-tone-success';
+                                feedbackMsg.textContent = resp.message || 'Análisis completado. Actualizando...';
+                            }
+                            window.setTimeout(function () {
+                                if (resp.redirect) window.location.href = resp.redirect;
+                                else window.location.reload();
+                            }, 600);
+                            return;
+                        }
+                    } catch (err) {}
+                    window.location.reload();
+                } else {
+                    let errMsg = 'Error al procesar la solicitud.';
+                    try {
+                        const errResp = JSON.parse(xhr.responseText);
+                        if (errResp.message) errMsg = errResp.message;
+                    } catch (err) {}
+                    if (feedbackMsg) {
+                        feedbackMsg.className = 'pl-carga-msg pl-tone-danger';
+                        feedbackMsg.textContent = errMsg;
+                    }
+                    if (btnAnalizar) {
+                        btnAnalizar.disabled = false;
+                        btnAnalizar.innerHTML = '<span class="pl-btn-icon">⚡</span> Reintentar Análisis';
+                    }
+                }
+            };
+
+            xhr.onerror = function () {
+                if (feedbackMsg) {
+                    feedbackMsg.className = 'pl-carga-msg pl-tone-danger';
+                    feedbackMsg.textContent = 'Error de conexión con el servidor.';
+                }
+                if (btnAnalizar) {
+                    btnAnalizar.disabled = false;
+                    btnAnalizar.innerHTML = '<span class="pl-btn-icon">⚡</span> Reintentar Análisis';
+                }
+            };
+
+            xhr.send(formData);
+        });
+    }
+
+    // 3. Catálogo y Modal Pedagógico
+    const modal = document.getElementById('modal-pedagogico');
+    let catalogo = {};
+    try {
+        const raw = document.getElementById('pl-catalogo-json');
+        if (raw && raw.textContent) {
+            catalogo = JSON.parse(raw.textContent);
+        }
+    } catch (e) {
+        console.error('Error al cargar catálogo pedagógico', e);
+    }
+
+    // Filtros interactivos del Gantt
+    const filterBtns = document.querySelectorAll('.pl-filter-btn');
+    const ganttItems = document.querySelectorAll('.pl-gantt-item');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            filterBtns.forEach(b => b.classList.remove('is-active'));
+            this.classList.add('is-active');
+            const f = this.getAttribute('data-filter');
+            ganttItems.forEach(item => {
+                const type = item.getAttribute('data-type');
+                const status = item.getAttribute('data-status');
+                if (f === 'all') {
+                    item.style.display = '';
+                } else if (f === 'tecnicas') {
+                    item.style.display = (type === 'tecnicas') ? '' : 'none';
+                } else if (f === 'atrasadas') {
+                    item.style.display = (status === 'atrasadas') ? '' : 'none';
+                } else if (f === 'flexibles') {
+                    item.style.display = (type === 'flexibles') ? '' : 'none';
+                }
+            });
+        });
+    });
+
+    function normalizarClave(texto) {
+        return (texto || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+    }
+
+    function tokenSimilarity(t1, t2) {
+        if (!t1 || !t2) return 0;
+        const stop = new Set(['de', 'la', 'del', 'las', 'los', 'el', 'en', 'para', 'y', 'a', 'con', 'por', 'al', 'segun']);
+        const s1 = new Set(normalizarClave(t1).split(' ').filter(w => !stop.has(w) && w.length > 2));
+        const s2 = new Set(normalizarClave(t2).split(' ').filter(w => !stop.has(w) && w.length > 2));
+        if (s1.size === 0 || s2.size === 0) return 0;
+        let inter = 0;
+        s1.forEach(w => { if (s2.has(w)) inter++; });
+        return inter / Math.min(s1.size, s2.size);
+    }
+
+    function buscarEnCatalogo(target) {
+        if (!target) return null;
+        if (catalogo[target]) return catalogo[target];
+        const normalizado = normalizarClave(target);
+        if (catalogo[normalizado]) return catalogo[normalizado];
+
+        // Match exacto o inclusión por clave / norma / código
+        for (const [k, v] of Object.entries(catalogo)) {
+            if (k && (normalizado.includes(k) || k.includes(normalizado))) return v;
+            if (v && v.norma && (normalizarClave(v.norma).includes(normalizado) || normalizado.includes(normalizarClave(v.norma)))) return v;
+            if (v && v.codigo_norma && (v.codigo_norma === target || target.includes(v.codigo_norma))) return v;
+        }
+
+        // Búsqueda por código de norma numérico de 7 a 10 dígitos extraído del nombre
+        const codMatch = target.match(/\b(\d{7,10})\b/);
+        if (codMatch && catalogo[codMatch[1]]) return catalogo[codMatch[1]];
+
+        // Match por similitud de tokens
+        let mejorMatch = null;
+        let mejorScore = 0;
+        for (const [k, v] of Object.entries(catalogo)) {
+            const scoreNom = tokenSimilarity(target, v.nombre || k);
+            const scoreNor = tokenSimilarity(target, v.norma || '');
+            const score = Math.max(scoreNom, scoreNor);
+            if (score > 0.35 && score > mejorScore) {
+                mejorScore = score;
+                mejorMatch = v;
+            }
+        }
+        return mejorMatch;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function highlightText(text, query) {
+        if (!text) return '';
+        const safeText = escapeHtml(text);
+        if (!query || query.trim().length < 2) return safeText;
+        const qClean = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${qClean})`, 'gi');
+        return safeText.replace(regex, '<mark class="pl-highlight">$1</mark>');
+    }
+
+    let currentModalDato = null;
+
+    function renderStructuredList(items, emptyMsg, sectionRef, query) {
+        if (!items || !items.length) {
+            return `
+                <div class="pl-pedagogico-empty">
+                    <p class="pl-note">${emptyMsg}</p>
+                    <div class="pl-pedagogico-tip">
+                        💡 <strong>Sugerencia:</strong> Carga el <em>Programa de Formación (.pdf)</em> en el panel superior y haz clic en <em>Ejecutar Análisis Completo</em> para activar la extracción oficial de saberes y criterios.
+                    </div>
+                </div>
+            `;
+        }
+
+        let html = '';
+        if (sectionRef) {
+            html += `<p class="pl-section-ref">Declarado en el Programa de Formación (<strong>${sectionRef}</strong>):</p>`;
+        }
+
+        html += '<div class="pl-pedagogico-structured-list">';
+        let inSubgroup = false;
+
+        items.forEach(function (item) {
+            const trimmed = item.trim();
+            if (trimmed.endsWith(':') || (!trimmed.startsWith('*') && trimmed.toUpperCase() === trimmed && trimmed.length < 90 && !trimmed.includes('.'))) {
+                if (inSubgroup) {
+                    html += '</ul></div>';
+                }
+                html += `
+                    <div class="pl-pedagogico-group">
+                        <h4 class="pl-pedagogico-subhead">📌 ${highlightText(trimmed, query)}</h4>
+                        <ul class="pl-pedagogico-list">
+                `;
+                inSubgroup = true;
+            } else {
+                if (!inSubgroup) {
+                    html += '<div class="pl-pedagogico-group"><ul class="pl-pedagogico-list">';
+                    inSubgroup = true;
+                }
+                html += `<li><span class="pl-item-dot">✦</span> <span>${highlightText(trimmed, query)}</span></li>`;
+            }
+        });
+
+        if (inSubgroup) {
+            html += '</ul></div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function renderPerfilInstructor(perf, query) {
+        perf = perf || {};
+        const tieneAcad = !!perf.requisitos_academicos;
+        const tieneExp = !!perf.experiencia;
+        const tieneComp = perf.competencias && perf.competencias.length > 0;
+
+        if (!tieneAcad && !tieneExp && !tieneComp) {
+            return `
+                <div class="pl-pedagogico-empty">
+                    <p class="pl-note">No hay requisitos de perfil docente especificados en el documento cargado.</p>
+                    <div class="pl-pedagogico-tip">
+                        💡 <strong>Sugerencia:</strong> Carga el <em>Programa de Formación (.pdf)</em> oficial para ver los requisitos académicos, años de experiencia laboral/docente y competencias requeridas.
+                    </div>
+                </div>
+            `;
+        }
+
+        let html = '<p class="pl-section-ref">Perfil docente requerido por el diseño curricular oficial (<strong>Sección 4.8</strong>):</p>';
+        html += '<div class="pl-perfil-grid">';
+
+        if (tieneAcad) {
+            html += `
+                <div class="pl-perfil-card is-academico">
+                    <div class="pl-perfil-head">🎓 4.8.1 Requisitos Académicos</div>
+                    <div class="pl-perfil-body">${highlightText(perf.requisitos_academicos, query)}</div>
+                </div>
+            `;
+        }
+
+        if (tieneExp) {
+            html += `
+                <div class="pl-perfil-card is-experiencia">
+                    <div class="pl-perfil-head">⏱️ 4.8.2 Experiencia Laboral y Docente</div>
+                    <div class="pl-perfil-body">${highlightText(perf.experiencia, query)}</div>
+                </div>
+            `;
+        }
+
+        if (tieneComp) {
+            html += `
+                <div class="pl-perfil-card is-competencias">
+                    <div class="pl-perfil-head">⭐ 4.8.3 Competencias Docentes Exigidas</div>
+                    <ul class="pl-pedagogico-list">
+                        ${perf.competencias.map(c => `<li><span class="pl-item-dot">✦</span> <span>${highlightText(c, query)}</span></li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    function renderResultadosJuicios(dato, query) {
+        let htmlRes = '';
+        if (dato.resultados_planeados && dato.resultados_planeados.length) {
+            htmlRes += '<p class="pl-section-ref">Resultados de aprendizaje articulados en la planeación pedagógica y contrastados con SOFIA Plus:</p>';
+            htmlRes += '<div class="pl-gap-list">';
+            dato.resultados_planeados.forEach(r => {
+                const avRap = r.porcentaje_avance || 0;
+                const hDir = r.horas_directas || 0;
+                const hInd = r.horas_independientes || 0;
+                const hTot = r.horas_total || (hDir + hInd) || 0;
+
+                htmlRes += `
+                    <div class="pl-pedagogico-card">
+                        <div class="pl-rap-head">
+                            <strong>${highlightText(r.rap || 'Sin denominación', query)}</strong>
+                            ${r.rap_codigo ? `<span class="pl-chip pl-tone-neutral">RAP: ${highlightText(r.rap_codigo, query)}</span>` : ''}
+                        </div>
+                        <div class="pl-pedagogico-meta" style="margin-top:.5rem; margin-bottom:.3rem;">
+                            <span class="pl-chip">${hTot} h (${hDir} directas + ${hInd} autónomas)</span>
+                            <span class="pl-chip pl-tone-${r.estado_tono || 'neutral'} is-tone">${avRap}% aprobado (${r.aprendices_aprobados || 0} aprendices)</span>
+                            ${r.actividad ? `<span class="pl-chip">${highlightText(r.actividad, query)}</span>` : ''}
+                        </div>
+                        
+                        <div class="pl-rap-progress-section" style="margin: 0.5rem 0;">
+                            <div class="pl-rap-progress-label">
+                                <span>Aprobación en SOFIA Plus: <strong>${avRap}%</strong></span>
+                                <small>${r.aprendices_aprobados || 0} aprendices con juicio evaluativo aprobado</small>
+                            </div>
+                            <div class="pl-progress-mini-wrap">
+                                <div class="pl-progress-mini-bar pl-tone-${r.estado_tono || 'info'}" style="width:${avRap}%;"></div>
+                            </div>
+                        </div>
+
+                        ${r.instructores && r.instructores.length ? `<div class="pl-note" style="margin-top:.4rem;">👨‍🏫 <strong>Planeado para:</strong> ${highlightText(r.instructores.join(', '), query)}</div>` : ''}
+                        ${r.evaluadores && r.evaluadores.length ? `<div class="pl-note">✍️ <strong>Evaluado en SOFIA por:</strong> ${highlightText(r.evaluadores.join(', '), query)}</div>` : ''}
+                    </div>
+                `;
+            });
+            htmlRes += '</div>';
+        } else if (dato.resultados_programa && dato.resultados_programa.length) {
+            htmlRes += '<p class="pl-section-ref">Resultados de aprendizaje oficiales del Programa de Formación (Sección 4.5):</p><ul class="pl-pedagogico-list">';
+            dato.resultados_programa.forEach(r => {
+                htmlRes += `<li><strong>${r.numero}</strong> — <span>${highlightText(r.nombre, query)}</span></li>`;
+            });
+            htmlRes += '</ul>';
+        } else {
+            htmlRes = '<p class="pl-note">No hay resultados de aprendizaje registrados para esta competencia.</p>';
+        }
+        return htmlRes;
+    }
+
+    function renderVistaIntegral(dato, query) {
+        const nProc = (dato.conocimientos_proceso || []).length;
+        const nSab = (dato.conocimientos_saber || []).length;
+        const nCrit = (dato.criterios_evaluacion || []).length;
+        const rapsList = dato.resultados_planeados || dato.resultados_programa || [];
+        const avance = dato.porcentaje_avance !== undefined ? dato.porcentaje_avance : 0;
+        const desfase = dato.dias_desfase || 0;
+        const estadoLabel = dato.estado_label || (avance >= 80 ? 'Al día' : 'En progreso');
+        const tono = dato.estado_tono || 'neutral';
+
+        let rapsAprobados = 0;
+        if (dato.resultados_planeados) {
+            rapsAprobados = dato.resultados_planeados.filter(r => (r.porcentaje_avance || 0) >= 80).length;
+        }
+
+        // Calcular tono de clase CSS para el resumen
+        const tonoClase = tono === 'danger' ? 'is-danger' : (tono === 'warning' ? 'is-warning' : (tono === 'success' ? 'is-success' : ''));
+
+        return `
+            <div class="pl-modal-all-wrap">
+                <!-- 0. Resumen de la Competencia -->
+                <div class="pl-competencia-summary">
+                    <div class="pl-summary-item">
+                        <span class="pl-summary-label">Estado</span>
+                        <span class="pl-summary-value ${tonoClase}">${escapeHtml(estadoLabel)}${desfase > 0 ? ` (${desfase} días)` : ''}</span>
+                    </div>
+                    <div class="pl-summary-item">
+                        <span class="pl-summary-label">RAPs cerrados</span>
+                        <span class="pl-summary-value">${rapsAprobados} / ${rapsList.length}</span>
+                    </div>
+                    <div class="pl-summary-item">
+                        <span class="pl-summary-label">Primera aprobación</span>
+                        <span class="pl-summary-value">${dato.fecha_primera_aprobacion || '—'}</span>
+                    </div>
+                    <div class="pl-summary-item">
+                        <span class="pl-summary-label">Cierre</span>
+                        <span class="pl-summary-value">${dato.fecha_cierre_real || 'Sin cerrar'}</span>
+                    </div>
+                    ${dato.instructores && dato.instructores.length ? `
+                    <div class="pl-summary-item" style="grid-column: 1 / -1;">
+                        <span class="pl-summary-label">Instructores asignados</span>
+                        <span class="pl-summary-value" style="font-weight:600; font-size:0.78rem;">${escapeHtml(dato.instructores.join(', '))}</span>
+                    </div>` : ''}
+                </div>
+
+                <!-- 1. Criterios de Evaluación (siempre visible — lo más importante) -->
+                <section class="pl-modal-section-card">
+                    <div class="pl-modal-section-head">
+                        <h4>🎯 4.7 Criterios de Evaluación</h4>
+                        <span class="pl-chip pl-tone-success is-tone">${nCrit} criterios</span>
+                    </div>
+                    ${renderStructuredList(
+                        dato.criterios_evaluacion,
+                        'No hay criterios de evaluación registrados para esta competencia en los documentos cargados.',
+                        '',
+                        query
+                    )}
+                </section>
+
+                <!-- 2. Resultados de Aprendizaje & Avance SOFIA (siempre visible) -->
+                <section class="pl-modal-section-card">
+                    <div class="pl-modal-section-head">
+                        <h4>📝 4.5 Resultados de Aprendizaje y Juicios Evaluativos</h4>
+                        <span class="pl-chip pl-tone-info is-tone">${rapsList.length} RAPs</span>
+                    </div>
+                    ${renderResultadosJuicios(dato, query)}
+                </section>
+
+                <!-- 3. Conocimientos de Proceso (colapsado por defecto) -->
+                <details class="pl-collapsible-section">
+                    <summary>
+                        <span>⚙️ 4.6.1 Conocimientos de Proceso</span>
+                        <span class="pl-chip pl-tone-info is-tone">${nProc} ítems</span>
+                    </summary>
+                    <div class="pl-collapsible-body">
+                        ${renderStructuredList(
+                            dato.conocimientos_proceso,
+                            'No hay conocimientos de proceso registrados en el documento cargado.',
+                            '',
+                            query
+                        )}
+                    </div>
+                </details>
+
+                <!-- 4. Conocimientos del Saber (colapsado por defecto) -->
+                <details class="pl-collapsible-section">
+                    <summary>
+                        <span>📚 4.6.2 Conocimientos del Saber (Conceptos y Principios)</span>
+                        <span class="pl-chip pl-tone-info is-tone">${nSab} conceptos</span>
+                    </summary>
+                    <div class="pl-collapsible-body">
+                        ${renderStructuredList(
+                            dato.conocimientos_saber,
+                            'No hay conceptos o saberes registrados en el documento cargado.',
+                            '',
+                            query
+                        )}
+                    </div>
+                </details>
+
+                <!-- 5. Perfil del Instructor (colapsado por defecto) -->
+                <details class="pl-collapsible-section">
+                    <summary>
+                        <span>👨‍🏫 4.8 Perfil del Instructor Exigido</span>
+                        <span class="pl-chip pl-tone-neutral">Requisitos Curriculares</span>
+                    </summary>
+                    <div class="pl-collapsible-body">
+                        ${renderPerfilInstructor(dato.perfil_instructor, query)}
+                    </div>
+                </details>
+            </div>
+        `;
+    }
+
+    function renderModalPanels(dato, query) {
+        if (!dato) return;
+
+        // 1. Vista Integral
+        const todoContent = document.getElementById('todo-content');
+        if (todoContent) {
+            todoContent.innerHTML = renderVistaIntegral(dato, query);
+        }
+
+        // 2. Conocimientos de Proceso
+        const procContent = document.getElementById('proceso-content');
+        if (procContent) {
+            procContent.innerHTML = renderStructuredList(
+                dato.conocimientos_proceso,
+                'No hay conocimientos de proceso registrados en el documento cargado.',
+                'Sección 4.6.1 Conocimientos de Proceso',
+                query
+            );
+        }
+
+        // 3. Conocimientos del Saber
+        const saberContent = document.getElementById('saber-content');
+        if (saberContent) {
+            saberContent.innerHTML = renderStructuredList(
+                dato.conocimientos_saber,
+                'No hay conceptos o conocimientos del saber registrados en el documento cargado.',
+                'Sección 4.6.2 Conocimientos del Saber',
+                query
+            );
+        }
+
+        // 4. Criterios de Evaluación
+        const critContent = document.getElementById('criterios-content');
+        if (critContent) {
+            critContent.innerHTML = renderStructuredList(
+                dato.criterios_evaluacion,
+                'No hay criterios de evaluación registrados para esta competencia en los documentos cargados.',
+                'Sección 4.7 Criterios de Evaluación',
+                query
+            );
+        }
+
+        // 5. Perfil del Instructor
+        const perfilContent = document.getElementById('perfil-content');
+        if (perfilContent) {
+            perfilContent.innerHTML = renderPerfilInstructor(dato.perfil_instructor, query);
+        }
+
+        // 6. Resultados y Juicios
+        const resContent = document.getElementById('resultados-content');
+        if (resContent) {
+            resContent.innerHTML = renderResultadosJuicios(dato, query);
+        }
+
+        // Contar coincidencias si hay búsqueda
+        const searchCountEl = document.getElementById('modal-search-count');
+        if (searchCountEl) {
+            if (query && query.trim().length >= 2) {
+                const marks = document.querySelectorAll('#modal-pedagogico mark.pl-highlight');
+                searchCountEl.textContent = marks.length ? `${marks.length} encontrados` : 'Sin coincidencias';
+                searchCountEl.style.display = 'inline-block';
+            } else {
+                searchCountEl.textContent = '';
+                searchCountEl.style.display = 'none';
+            }
+        }
+    }
+
+    function abrirModal(targetNombre) {
+        if (!modal) return;
+        let dato = buscarEnCatalogo(targetNombre);
+        
+        // Fallback garantizado: si no está en el catálogo, construir objeto sintetizado
+        if (!dato) {
+            dato = {
+                nombre: targetNombre,
+                norma: targetNombre,
+                codigo_norma: '',
+                tipo: 'tecnica',
+                horas_programa: 0,
+                horas_planeadas: 0,
+                horas_directas: 0,
+                horas_independientes: 0,
+                porcentaje_avance: 0,
+                conocimientos_proceso: [],
+                conocimientos_saber: [],
+                criterios_evaluacion: [],
+                perfil_instructor: {},
+                resultados_programa: [],
+                resultados_planeados: []
+            };
+        }
+
+        currentModalDato = dato;
+
+        const titleEl = document.getElementById('pl-modal-title');
+        const subEl = document.getElementById('pl-modal-sub');
+        const badgeEl = document.getElementById('pl-modal-badge');
+        const codeBadge = document.getElementById('pl-modal-code-badge');
+        const phaseBadge = document.getElementById('pl-modal-phase-badge');
+        const metricsBar = document.getElementById('modal-metrics-bar');
+        const searchInput = document.getElementById('modal-search-input');
+
+        if (searchInput) searchInput.value = '';
+
+        titleEl.textContent = dato.nombre || targetNombre;
+        subEl.textContent = dato.norma ? `Norma: ${dato.norma}` : 'Diseño curricular oficial';
+
+        const cod = dato.codigo_norma || '';
+        if (codeBadge) {
+            if (cod) {
+                codeBadge.style.display = 'inline-block';
+                codeBadge.textContent = `Código Norma: ${cod}`;
+            } else {
+                codeBadge.style.display = 'none';
+            }
+        }
+
+        if (phaseBadge) {
+            if (dato.etiqueta_trimestre) {
+                phaseBadge.style.display = 'inline-block';
+                phaseBadge.textContent = `Planeada: ${dato.etiqueta_trimestre}`;
+            } else {
+                phaseBadge.style.display = 'none';
+            }
+        }
+
+        const tipoTexto = dato.tipo === 'tecnica' ? '⚡ Competencia Técnica (Exigible)' : (dato.tipo === 'ingles' ? '🌐 Inglés (Flexible)' : (dato.tipo === 'productiva' ? '🏢 Etapa Productiva' : '🌱 Competencia Transversal'));
+        badgeEl.textContent = tipoTexto;
+        badgeEl.className = 'pl-chip is-tone ' + (dato.tipo === 'tecnica' ? 'pl-tone-info' : (dato.tipo === 'productiva' ? 'pl-tone-success' : 'pl-tone-neutral'));
+
+        // Barra de estado contextual
+        const statusBar = document.getElementById('modal-status-bar');
+        if (statusBar) {
+            const tono = dato.estado_tono || 'neutral';
+            const tonoMap = { success: 'is-success', warning: 'is-warning', danger: 'is-danger', info: 'is-info' };
+            const dotClass = tonoMap[tono] || 'is-neutral';
+            const estadoLabel = dato.estado_label || (dato.porcentaje_avance >= 80 ? 'Al día' : 'En progreso');
+            const desfase = dato.dias_desfase || 0;
+
+            let parts = [];
+            parts.push(`<span class="pl-status-dot ${dotClass}"></span>`);
+            parts.push(`<span class="pl-status-label">${escapeHtml(estadoLabel)}</span>`);
+
+            if (desfase > 0) {
+                parts.push(`<span class="pl-status-sep">·</span>`);
+                parts.push(`<span class="pl-status-detail" style="color:var(--danger); font-weight:700;">${desfase} días de retraso</span>`);
+            }
+
+            if (dato.fecha_primera_aprobacion || dato.fecha_cierre_real) {
+                parts.push(`<span class="pl-status-sep">·</span>`);
+                const fechaInicio = dato.fecha_primera_aprobacion ? `<strong>${dato.fecha_primera_aprobacion}</strong>` : '—';
+                const fechaCierre = dato.fecha_cierre_real ? `<strong>${dato.fecha_cierre_real}</strong>` : 'sin cerrar';
+                parts.push(`<span class="pl-status-detail">📅 ${fechaInicio} → ${fechaCierre}</span>`);
+            }
+
+            if (dato.instructores && dato.instructores.length) {
+                parts.push(`<span class="pl-status-sep">·</span>`);
+                parts.push(`<span class="pl-status-detail">👨‍🏫 ${escapeHtml(dato.instructores.join(', '))}</span>`);
+            }
+
+            statusBar.innerHTML = parts.join('');
+            statusBar.style.display = 'flex';
+        }
+
+        // Métricas resumidas gráficas (3 columnas)
+        const horasOficiales = dato.horas_programa || dato.horas_planeadas || 0;
+        const horasPlan = dato.horas_planeadas || 0;
+        const horasDir = dato.horas_directas || 0;
+        const horasInd = dato.horas_independientes || 0;
+        const avance = dato.porcentaje_avance !== undefined ? dato.porcentaje_avance : 0;
+        const rapsList = dato.resultados_planeados || dato.resultados_programa || [];
+        const totalRaps = rapsList.length;
+        let rapsAprobados = 0;
+        if (dato.resultados_planeados) {
+            rapsAprobados = dato.resultados_planeados.filter(r => (r.porcentaje_avance || 0) >= 80).length;
+        }
+
+        const pctCobHoras = horasOficiales > 0 ? Math.round((horasPlan / horasOficiales) * 100) : 100;
+        const pctRapsOk = totalRaps > 0 ? Math.round((rapsAprobados / totalRaps) * 100) : 0;
+
+        const nCrit = (dato.criterios_evaluacion || []).length;
+        const nProc = (dato.conocimientos_proceso || []).length;
+        const nSab = (dato.conocimientos_saber || []).length;
+
+        if (metricsBar) {
+            metricsBar.innerHTML = `
+                <div class="pl-metric-box">
+                    <span class="pl-metric-val">${horasPlan} / ${horasOficiales} h</span>
+                    <span class="pl-metric-lbl">Cobertura Horas (${pctCobHoras}%)</span>
+                    <div class="pl-progress-mini-wrap" title="Cobertura de horas: ${pctCobHoras}%">
+                        <div class="pl-progress-mini-bar pl-tone-${pctCobHoras >= 100 ? 'success' : 'warning'}" style="width:${Math.min(pctCobHoras, 100)}%;"></div>
+                    </div>
+                </div>
+                <div class="pl-metric-box">
+                    <span class="pl-metric-val ${avance >= 80 ? 'pl-tone-success' : ''}">${avance}%</span>
+                    <span class="pl-metric-lbl">Avance en Ficha</span>
+                    <div class="pl-progress-mini-wrap" title="Avance en ficha: ${avance}%">
+                        <div class="pl-progress-mini-bar pl-tone-${dato.estado_tono || (avance >= 80 ? 'success' : 'info')}" style="width:${avance}%;"></div>
+                    </div>
+                </div>
+                <div class="pl-metric-box">
+                    <span class="pl-metric-val">${rapsAprobados} / ${totalRaps} RAPs</span>
+                    <span class="pl-metric-lbl">Cierre RAPs (${pctRapsOk}%)</span>
+                    <div class="pl-progress-mini-wrap" title="RAPs cerrados: ${pctRapsOk}%">
+                        <div class="pl-progress-mini-bar pl-tone-${pctRapsOk === 100 ? 'success' : 'info'}" style="width:${pctRapsOk}%;"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Conteo en badges de pestañas
+        document.getElementById('tab-cnt-proceso').textContent = nProc ? `(${nProc})` : '';
+        document.getElementById('tab-cnt-saber').textContent = nSab ? `(${nSab})` : '';
+        document.getElementById('tab-cnt-criterios').textContent = nCrit ? `(${nCrit})` : '';
+        document.getElementById('tab-cnt-resultados').textContent = totalRaps ? `(${totalRaps})` : '';
+
+        // Renderizar contenidos
+        renderModalPanels(dato, '');
+
+        // Reset tabs a Vista Integral (Todo)
+        document.querySelectorAll('.pl-modal-tab').forEach((t, i) => {
+            t.classList.toggle('is-active', i === 0);
+            t.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+        });
+
+        const paneIdDefault = 'pane-todo';
+        document.querySelectorAll('.pl-modal-pane').forEach(p => {
+            p.classList.toggle('is-active', p.id === paneIdDefault);
+        });
+
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function cerrarModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        currentModalDato = null;
+    }
+
+    // Buscador en tiempo real dentro del modal
+    const searchInput = document.getElementById('modal-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            if (currentModalDato) {
+                renderModalPanels(currentModalDato, this.value);
+            }
+        });
+    }
+
+    // Botón Copiar Datos de la Competencia
+    const btnCopiar = document.getElementById('btn-copiar-ficha');
+    if (btnCopiar) {
+        btnCopiar.addEventListener('click', function () {
+            if (!currentModalDato) return;
+            const d = currentModalDato;
+            const perf = d.perfil_instructor || {};
+            
+            let texto = `COMPETENCIA: ${d.nombre}\n`;
+            if (d.norma) texto += `NORMA: ${d.norma}\n`;
+            if (d.codigo_norma) texto += `CÓDIGO DE NORMA: ${d.codigo_norma}\n`;
+            texto += `HORAS: ${d.horas_programa || d.horas_planeadas || 0} h | AVANCE: ${d.porcentaje_avance || 0}%\n\n`;
+
+            texto += `=========================================\n`;
+            texto += `1. CONOCIMIENTOS DE PROCESO (4.6.1)\n`;
+            texto += `=========================================\n`;
+            if (d.conocimientos_proceso && d.conocimientos_proceso.length) {
+                d.conocimientos_proceso.forEach(item => { texto += `• ${item}\n`; });
+            } else {
+                texto += `(No registrados en el documento)\n`;
+            }
+            texto += `\n`;
+
+            texto += `=========================================\n`;
+            texto += `2. CONOCIMIENTOS DEL SABER (4.6.2)\n`;
+            texto += `=========================================\n`;
+            if (d.conocimientos_saber && d.conocimientos_saber.length) {
+                d.conocimientos_saber.forEach(item => { texto += `• ${item}\n`; });
+            } else {
+                texto += `(No registrados en el documento)\n`;
+            }
+            texto += `\n`;
+
+            texto += `=========================================\n`;
+            texto += `3. CRITERIOS DE EVALUACIÓN (4.7)\n`;
+            texto += `=========================================\n`;
+            if (d.criterios_evaluacion && d.criterios_evaluacion.length) {
+                d.criterios_evaluacion.forEach(item => { texto += `• ${item}\n`; });
+            } else {
+                texto += `(No registrados en el documento)\n`;
+            }
+            texto += `\n`;
+
+            texto += `=========================================\n`;
+            texto += `4. PERFIL DEL INSTRUCTOR (4.8)\n`;
+            texto += `=========================================\n`;
+            if (perf.requisitos_academicos) texto += `Requisitos Académicos:\n${perf.requisitos_academicos}\n\n`;
+            if (perf.experiencia) texto += `Experiencia:\n${perf.experiencia}\n\n`;
+            if (perf.competencias && perf.competencias.length) {
+                texto += `Competencias Docentes:\n`;
+                perf.competencias.forEach(c => { texto += `• ${c}\n`; });
+            }
+            texto += `\n`;
+
+            texto += `=========================================\n`;
+            texto += `5. RESULTADOS DE APRENDIZAJE (4.5)\n`;
+            texto += `=========================================\n`;
+            const raps = d.resultados_planeados || d.resultados_programa || [];
+            if (raps.length) {
+                raps.forEach(r => {
+                    texto += `• RAP: ${r.rap || r.nombre || ''} (${r.porcentaje_avance || 0}% aprobado)\n`;
+                });
+            }
+
+            navigator.clipboard.writeText(texto).then(() => {
+                const originalText = btnCopiar.innerHTML;
+                btnCopiar.innerHTML = '✅ ¡Copiado!';
+                setTimeout(() => { btnCopiar.innerHTML = originalText; }, 2000);
+            }).catch(err => {
+                console.error('Error al copiar al portapapeles', err);
+            });
+        });
+    }
+
+    // Botón Imprimir Ficha
+    const btnImprimir = document.getElementById('btn-imprimir-ficha');
+    if (btnImprimir) {
+        btnImprimir.addEventListener('click', function () {
+            // Asegurar que la pestaña "Vista Integral" esté activa para imprimir todo
+            const tabTodo = document.querySelector('.pl-modal-tab[data-pane="pane-todo"]');
+            if (tabTodo) tabTodo.click();
+            window.print();
+        });
+    }
+
+    // Disparadores de apertura del modal
+    document.addEventListener('click', function (e) {
+        const targetBtn = e.target.closest('[data-pedagogico-target]');
+        if (targetBtn) {
+            e.preventDefault();
+            const nom = targetBtn.getAttribute('data-pedagogico-target');
+            if (nom) abrirModal(nom);
+        }
+    });
+
+    // Cerrar modal
+    const closeBtn = document.getElementById('pl-modal-close-btn');
+    if (closeBtn) closeBtn.addEventListener('click', cerrarModal);
+
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) cerrarModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+            cerrarModal();
+        }
+    });
+
+    // Pestañas del modal
+    document.querySelectorAll('.pl-modal-tab').forEach(tab => {
+        tab.addEventListener('click', function () {
+            const paneId = this.getAttribute('data-pane');
+            document.querySelectorAll('.pl-modal-tab').forEach(t => {
+                t.classList.toggle('is-active', t === tab);
+                t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+            });
+            document.querySelectorAll('.pl-modal-pane').forEach(p => {
+                p.classList.toggle('is-active', p.id === paneId);
+            });
+        });
+    });
+
+    // 4. Interactividad de la Curva S y Tooltips Flotantes
+    const tooltip = document.getElementById('pl-chart-tooltip');
+
+    function showTooltip(html, x, y, container) {
+        if (!tooltip) return;
+        tooltip.innerHTML = html;
+        tooltip.style.display = 'block';
+        tooltip.setAttribute('aria-hidden', 'false');
+
+        const rect = (container || document.body).getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        
+        let posX = x - rect.left + 12;
+        let posY = y - rect.top - tooltipRect.height - 10;
+
+        if (posX + tooltipRect.width > rect.width - 10) {
+            posX = x - rect.left - tooltipRect.width - 12;
+        }
+        if (posY < 10) {
+            posY = y - rect.top + 18;
+        }
+
+        tooltip.style.left = Math.max(posX, 8) + 'px';
+        tooltip.style.top = Math.max(posY, 8) + 'px';
+    }
+
+    function hideTooltip() {
+        if (!tooltip) return;
+        tooltip.style.display = 'none';
+        tooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    // Tooltips en Puntos de la Curva S
+    document.querySelectorAll('.pl-curve-dot').forEach(dot => {
+        dot.addEventListener('mouseenter', function (e) {
+            const tri = this.getAttribute('data-trimestre') || '';
+            const nom = this.getAttribute('data-nombre') || '';
+            const rango = this.getAttribute('data-rango') || '';
+            const estadoLbl = this.getAttribute('data-estado-lbl') || '';
+            const dias = this.getAttribute('data-dias') || '';
+            const planPct = this.getAttribute('data-plan-pct') || '0';
+            const planH = this.getAttribute('data-plan-h') || '0';
+            const planInc = this.getAttribute('data-plan-inc') || '0';
+            const realPct = this.getAttribute('data-real-pct');
+            const realH = this.getAttribute('data-real-h');
+            const realInc = this.getAttribute('data-real-inc');
+            const svH = this.getAttribute('data-sv-h');
+
+            let html = `
+                <div class="pl-tooltip-title"><strong>${tri}</strong> · ${nom} ${estadoLbl ? '<span class="pl-chip" style="font-size:0.65rem; margin-left:0.3rem;">' + estadoLbl + '</span>' : ''}</div>
+                <div class="pl-tooltip-body">
+            `;
+
+            if (rango) {
+                html += `
+                    <div class="pl-tooltip-row" style="color:var(--accent-primary); font-size:0.72rem; margin-bottom:0.3rem;">
+                        <span>📅 Período:</span>
+                        <strong>${rango} ${dias ? '(' + dias + ' días)' : ''}</strong>
+                    </div>
+                `;
+            }
+
+            html += `
+                    <div class="pl-tooltip-row">
+                        <span>Planeado acumulado:</span>
+                        <strong>${planPct}% (${planH} h)</strong>
+                    </div>
+            `;
+
+            if (realPct !== null && realPct !== '') {
+                html += `
+                    <div class="pl-tooltip-row">
+                        <span>Aprobado real:</span>
+                        <strong>${realPct}% (${realH} h)</strong>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="pl-tooltip-row pl-tone-neutral">
+                        <span>Aprobado real:</span>
+                        <em>Aún no ejecutado</em>
+                    </div>
+                `;
+            }
+
+            if (svH !== null && svH !== '') {
+                const svVal = parseFloat(svH);
+                const tono = svVal >= 0 ? 'var(--success)' : 'var(--danger)';
+                const sign = svVal > 0 ? '+' : '';
+                html += `
+                    <div class="pl-tooltip-row">
+                        <span>Diferencia frente al plan:</span>
+                        <strong style="color:${tono}">${sign}${svH} h</strong>
+                    </div>
+                `;
+            }
+
+            html += `
+                    <div class="pl-tooltip-sub" style="margin-top:0.35rem; padding-top:0.35rem; border-top:1px dashed rgba(255,255,255,0.15); font-size:0.68rem; opacity:0.85;">
+                        En este bloque: <span>+${planInc}h planeadas</span> · <span>${realInc !== null && realInc !== '' ? '+' + realInc + 'h aprobadas' : '—'}</span>
+                    </div>
+                </div>
+            `;
+
+            const wrap = dot.closest('.pl-curve-wrap');
+            showTooltip(html, e.clientX, e.clientY, wrap);
+        });
+
+        dot.addEventListener('mousemove', function (e) {
+            const wrap = dot.closest('.pl-curve-wrap');
+            showTooltip(tooltip.innerHTML, e.clientX, e.clientY, wrap);
+        });
+
+        dot.addEventListener('mouseleave', hideTooltip);
+    });
+
+    // Tooltips en Círculos de Proyección P10, P50, P90
+    document.querySelectorAll('.pl-proj-circle').forEach(circle => {
+        circle.addEventListener('mouseenter', function (e) {
+            const tipo = this.getAttribute('data-prob-tipo') || 'Proyección';
+            const fecha = this.getAttribute('data-prob-fecha') || '';
+            const diasVsFin = this.getAttribute('data-prob-dias');
+
+            let difTexto = '';
+            if (diasVsFin !== null && diasVsFin !== '') {
+                const d = parseInt(diasVsFin, 10);
+                if (d > 0) {
+                    difTexto = `<span style="color:var(--warning)">+${d} días después del fin lectivo</span>`;
+                } else if (d < 0) {
+                    difTexto = `<span style="color:var(--success)">${-d} días antes del fin lectivo</span>`;
+                } else {
+                    difTexto = `<span style="color:var(--success)">Exactamente en la fecha de fin lectivo</span>`;
+                }
+            }
+
+            let desc = '';
+            if (tipo.includes('P10')) {
+                desc = 'Ritmo acelerado (+25% sobre la velocidad reciente de juicios).';
+            } else if (tipo.includes('P50')) {
+                desc = 'Ritmo esperado (mediana al ritmo de aprobaciones actual).';
+            } else if (tipo.includes('P90')) {
+                desc = 'Ritmo conservador (-30% sobre la velocidad reciente de juicios).';
+            }
+
+            let html = `
+                <div class="pl-tooltip-title"><strong>🔮 Escenario ${tipo}</strong></div>
+                <div class="pl-tooltip-body">
+                    <div class="pl-tooltip-row">
+                        <span>Fecha estimada de culminación:</span>
+                        <strong style="color:var(--accent-primary); font-size:0.85rem;">${fecha}</strong>
+                    </div>
+                    ${difTexto ? `<div class="pl-tooltip-row"><span>Margen vs fin lectivo:</span><strong>${difTexto}</strong></div>` : ''}
+                    <div class="pl-tooltip-sub" style="margin-top:0.35rem; padding-top:0.35rem; border-top:1px dashed rgba(255,255,255,0.15); font-size:0.68rem; opacity:0.85;">
+                        ${desc}
+                    </div>
+                </div>
+            `;
+
+            const wrap = circle.closest('.pl-curve-wrap');
+            showTooltip(html, e.clientX, e.clientY, wrap);
+        });
+
+        circle.addEventListener('mousemove', function (e) {
+            const wrap = circle.closest('.pl-curve-wrap');
+            showTooltip(tooltip.innerHTML, e.clientX, e.clientY, wrap);
+        });
+
+        circle.addEventListener('mouseleave', hideTooltip);
+    });
+
+    // Tooltips en Columnas CFD
+    document.querySelectorAll('.pl-interactive-cfd').forEach(col => {
+        col.addEventListener('mouseenter', function (e) {
+            const lbl = this.getAttribute('data-cfd-lbl');
+            const aprob = this.getAttribute('data-cfd-aprob');
+            const aprobPct = this.getAttribute('data-cfd-aprob-pct');
+            const evalC = this.getAttribute('data-cfd-eval');
+            const evalPct = this.getAttribute('data-cfd-eval-pct');
+            const form = this.getAttribute('data-cfd-form');
+            const formPct = this.getAttribute('data-cfd-form-pct');
+            const noin = this.getAttribute('data-cfd-noin');
+            const noinPct = this.getAttribute('data-cfd-noin-pct');
+            const tot = this.getAttribute('data-cfd-tot');
+
+            let html = `
+                <div class="pl-tooltip-title"><strong>Flujo de RAPs en ${lbl}</strong> (Total: ${tot})</div>
+                <div class="pl-tooltip-body">
+                    <div class="pl-tooltip-row" style="color:var(--success)">
+                        <span>✓ Aprobados (≥80%):</span>
+                        <strong>${aprob} (${aprobPct}%)</strong>
+                    </div>
+                    <div class="pl-tooltip-row" style="color:var(--accent-primary)">
+                        <span>📝 En Evaluación SOFIA:</span>
+                        <strong>${evalC} (${evalPct}%)</strong>
+                    </div>
+                    <div class="pl-tooltip-row" style="color:var(--warning)">
+                        <span>⏳ En Formación Activa:</span>
+                        <strong>${form} (${formPct}%)</strong>
+                    </div>
+                    <div class="pl-tooltip-row" style="color:var(--text-muted)">
+                        <span>⚪ No Iniciados:</span>
+                        <strong>${noin} (${noinPct}%)</strong>
+                    </div>
+                </div>
+            `;
+
+            showTooltip(html, e.clientX, e.clientY, document.body);
+        });
+
+        col.addEventListener('mousemove', function (e) {
+            showTooltip(tooltip.innerHTML, e.clientX, e.clientY, document.body);
+        });
+
+        col.addEventListener('mouseleave', hideTooltip);
+    });
+
+    // Tooltips en Radar Dots
+    document.querySelectorAll('.pl-radar-dot').forEach(dot => {
+        dot.addEventListener('mouseenter', function (e) {
+            const nom = this.getAttribute('data-radar-nom');
+            const hprog = this.getAttribute('data-radar-hprog');
+            const hplan = this.getAttribute('data-radar-hplan');
+            const av = this.getAttribute('data-radar-av');
+            const tipo = this.getAttribute('data-radar-tipo');
+
+            let html = `
+                <div class="pl-tooltip-title"><strong>${nom}</strong> (${tipo})</div>
+                <div class="pl-tooltip-body">
+                    <div class="pl-tooltip-row">
+                        <span>Avance Real Aprobado:</span>
+                        <strong style="color:var(--success)">${av}%</strong>
+                    </div>
+                    <div class="pl-tooltip-row">
+                        <span>Horas Planificadas:</span>
+                        <strong>${hplan} h</strong>
+                    </div>
+                    <div class="pl-tooltip-row">
+                        <span>Horas Oficiales (Programa):</span>
+                        <strong>${hprog} h</strong>
+                    </div>
+                    <div class="pl-tooltip-sub" style="margin-top:0.3rem; font-size:0.68rem; color:var(--accent-primary);">
+                        👆 Haz clic para abrir la ficha pedagógica
+                    </div>
+                </div>
+            `;
+            showTooltip(html, e.clientX, e.clientY, document.body);
+        });
+
+        dot.addEventListener('mouseleave', hideTooltip);
+    });
+
+    // 5. Selector de Modos de Visualización de la Curva S (% / Horas / Velocidad)
+    const modeBtns = document.querySelectorAll('[data-curve-mode]');
+    const axisPct = document.querySelectorAll('.pl-axis-pct');
+    const axisHoras = document.querySelectorAll('.pl-axis-horas');
+    const valPct = document.querySelectorAll('.pl-val-pct');
+    const valHoras = document.querySelectorAll('.pl-val-horas');
+    const valInc = document.querySelectorAll('.pl-val-inc');
+
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            modeBtns.forEach(b => b.classList.remove('is-active'));
+            this.classList.add('is-active');
+            const mode = this.getAttribute('data-curve-mode');
+
+            if (mode === 'horas') {
+                axisPct.forEach(el => el.style.display = 'none');
+                axisHoras.forEach(el => el.style.display = '');
+                valPct.forEach(el => el.style.display = 'none');
+                valHoras.forEach(el => el.style.display = '');
+                valInc.forEach(el => el.style.display = 'none');
+            } else if (mode === 'velocidad') {
+                axisPct.forEach(el => el.style.display = '');
+                axisHoras.forEach(el => el.style.display = 'none');
+                valPct.forEach(el => el.style.display = 'none');
+                valHoras.forEach(el => el.style.display = 'none');
+                valInc.forEach(el => el.style.display = '');
+            } else {
+                // pct
+                axisPct.forEach(el => el.style.display = '');
+                axisHoras.forEach(el => el.style.display = 'none');
+                valPct.forEach(el => el.style.display = '');
+                valHoras.forEach(el => el.style.display = 'none');
+                valInc.forEach(el => el.style.display = 'none');
+            }
+        });
+    });
+
+    // 6. Navegación interna (scroll-spy) de la barra de secciones
+    const subnavLinks = document.querySelectorAll('.pl-subnav-link');
+    if (subnavLinks.length && 'IntersectionObserver' in window) {
+        const linkPorId = {};
+        subnavLinks.forEach(l => { linkPorId[l.getAttribute('href').slice(1)] = l; });
+        const observer = new IntersectionObserver(function (entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && linkPorId[entry.target.id]) {
+                    subnavLinks.forEach(l => l.classList.remove('is-active'));
+                    linkPorId[entry.target.id].classList.add('is-active');
+                }
+            });
+        }, { rootMargin: '-20% 0px -70% 0px' });
+        Object.keys(linkPorId).forEach(id => {
+            const seccion = document.getElementById(id);
+            if (seccion) observer.observe(seccion);
+        });
+    }
+
+    // 7. Activación por teclado de elementos clicables (Gantt, tablas, tarjetas)
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const targetBtn = e.target.closest('[data-pedagogico-target]');
+        if (targetBtn && targetBtn.tagName !== 'BUTTON' && targetBtn.tagName !== 'A') {
+            e.preventDefault();
+            const nom = targetBtn.getAttribute('data-pedagogico-target');
+            if (nom) abrirModal(nom);
+            return;
+        }
+        const celdaHeat = e.target.closest('.pl-heatmap-cell');
+        if (celdaHeat && typeof mostrarDetalleRap === 'function') {
+            e.preventDefault();
+            mostrarDetalleRap(celdaHeat);
+        }
+    });
+    // 8. Secciones plegables con memoria por ficha (localStorage)
+    const seccionesPlegables = document.querySelectorAll('.pl-page section.pl-card[id]:not(.pl-carga-card)');
+    const claveSeccion = id => 'pl-collapse:f{{ ficha.id }}:' + id;
+
+    function fijarEstadoSeccion(sec, colapsada) {
+        const toggle = sec.querySelector(':scope > .pl-card-head .pl-card-toggle');
+        sec.classList.toggle('is-collapsed', colapsada);
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', colapsada ? 'false' : 'true');
+            toggle.title = colapsada ? 'Expandir sección' : 'Contraer sección';
+        }
+    }
+
+    function guardarEstadoSeccion(sec, colapsada) {
+        try { localStorage.setItem(claveSeccion(sec.id), colapsada ? '1' : '0'); } catch (e) {}
+    }
+
+    seccionesPlegables.forEach(sec => {
+        const head = sec.querySelector(':scope > .pl-card-head');
+        if (!head) return;
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'pl-card-toggle';
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-controls', sec.id);
+        toggle.title = 'Contraer sección';
+        toggle.innerHTML = '<span class="pl-card-toggle-icon" aria-hidden="true"></span>';
+
+        // Encabezados flex (con controles a la derecha) reciben el botón en flujo;
+        // los demás lo llevan en la esquina superior derecha.
+        if (window.getComputedStyle(head).display === 'flex') {
+            toggle.classList.add('is-inline');
+        } else {
+            head.classList.add('has-toggle');
+        }
+        head.appendChild(toggle);
+
+        let colapsada = sec.dataset.collapseDefault === 'cerrado';
+        try {
+            const guardado = localStorage.getItem(claveSeccion(sec.id));
+            if (guardado !== null) colapsada = guardado === '1';
+        } catch (e) {}
+        fijarEstadoSeccion(sec, colapsada);
+
+        toggle.addEventListener('click', function () {
+            const nuevo = !sec.classList.contains('is-collapsed');
+            fijarEstadoSeccion(sec, nuevo);
+            guardarEstadoSeccion(sec, nuevo);
+        });
+    });
+
+    function plegarTodo(colapsada) {
+        seccionesPlegables.forEach(sec => {
+            if (!sec.querySelector(':scope > .pl-card-head .pl-card-toggle')) return;
+            fijarEstadoSeccion(sec, colapsada);
+            guardarEstadoSeccion(sec, colapsada);
+        });
+    }
+    const btnExpandirTodo = document.getElementById('pl-expandir-todo');
+    const btnColapsarTodo = document.getElementById('pl-colapsar-todo');
+    if (btnExpandirTodo) btnExpandirTodo.addEventListener('click', function () { plegarTodo(false); });
+    if (btnColapsarTodo) btnColapsarTodo.addEventListener('click', function () { plegarTodo(true); });
+
+    // Al saltar desde la subnav a una sección plegada, se expande sola
+    subnavLinks.forEach(enlace => {
+        enlace.addEventListener('click', function () {
+            const sec = document.getElementById(this.getAttribute('href').slice(1));
+            if (sec && sec.classList.contains('is-collapsed')) {
+                fijarEstadoSeccion(sec, false);
+                guardarEstadoSeccion(sec, false);
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

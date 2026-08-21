@@ -9,6 +9,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 from app import db
 from app.models.aprendiz import Aprendiz
+from app.models.corte import Corte
 from app.models.ficha import Ficha
 from app.models.insignia import Insignia, InsigniaOtorgada
 from app.models.ranking import PuntajeHistorico
@@ -19,7 +20,14 @@ from app.services.ranking import (
     guardar_snapshot,
     obtener_configuracion,
 )
-from app.services.permisos import puede_gestionar_ficha
+from app.services.permisos import puede_administrar_corte, puede_gestionar_ficha
+from app.services.cortes import (
+    cambiar_estado_corte,
+    corte_actual,
+    corte_visible,
+    cortes_visibles,
+    siguiente_nombre_corte,
+)
 
 
 ranking_bp = Blueprint('ranking', __name__, template_folder='../templates/instructor')
@@ -39,10 +47,11 @@ def _periodo():
     return periodo if periodo in ('general', 'semanal', 'mensual') else 'general'
 
 
-def _evolucion(ficha_id, filas):
-    historicos = PuntajeHistorico.query.filter_by(ficha_id=ficha_id).order_by(
-        PuntajeHistorico.fecha_corte.asc()
-    ).all()
+def _evolucion(ficha_id, filas, corte_id=None):
+    consulta = PuntajeHistorico.query.filter_by(ficha_id=ficha_id)
+    if corte_id is not None:
+        consulta = consulta.filter(PuntajeHistorico.corte_id == corte_id)
+    historicos = consulta.order_by(PuntajeHistorico.fecha_corte.asc()).all()
     puntos = defaultdict(dict)
     for item in historicos:
         etiqueta = item.fecha_corte.strftime('%d/%m/%Y')
@@ -70,19 +79,35 @@ def ranking(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
-    filas_generales, _ = actualizar_participacion_ficha(ficha_id)
+    corte_id = request.args.get('corte_id', type=int)
+    corte = corte_actual(ficha_id, corte_id=corte_id)
+    if corte_id and not corte:
+        flash('El corte no existe o no está compartido contigo.', 'error')
+        return redirect(url_for('ranking.ranking', ficha_id=ficha_id))
+    corte_id = corte.id if corte else None
+
+    filas_generales, _ = actualizar_participacion_ficha(
+        ficha_id, corte_id=corte_id
+    )
     if _periodo() == 'general':
         filas = filas_generales
         config = obtener_configuracion(ficha_id)
     else:
-        filas, config = calcular_ranking(ficha_id, periodo=_periodo())
+        filas, config = calcular_ranking(
+            ficha_id, periodo=_periodo(), corte_id=corte_id
+        )
     return render_template(
         'ranking.html',
         ficha=ficha,
         filas=filas,
         config=config,
         periodo=_periodo(),
-        evolucion=_evolucion(ficha_id, filas),
+        evolucion=_evolucion(ficha_id, filas, corte_id=corte_id),
+        cortes=cortes_visibles(ficha_id).order_by(
+            Corte.fecha_inicio.desc(), Corte.id.desc()
+        ).all(),
+        corte_actual=corte,
+        puede_administrar_corte=bool(corte and puede_administrar_corte(corte)),
     )
 
 
@@ -92,7 +117,13 @@ def ranking_lista(ficha_id):
     ficha = _ficha_autorizada(ficha_id)
     if not ficha:
         return '<div class="alert alert-error">Ficha no encontrada.</div>', 404
-    filas, _ = calcular_ranking(ficha_id, periodo=_periodo())
+    corte_id = request.args.get('corte_id', type=int)
+    corte = corte_actual(ficha_id, corte_id=corte_id)
+    if corte_id and not corte:
+        return '<div class="alert alert-error">Corte no encontrado.</div>', 404
+    filas, _ = calcular_ranking(
+        ficha_id, periodo=_periodo(), corte_id=corte.id if corte else None
+    )
     resp = make_response(render_template('instructor/_ranking_lista.html', ficha=ficha, filas=filas))
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -162,6 +193,27 @@ def configurar_ranking(ficha_id):
     return redirect(url_for('ranking.ranking', ficha_id=ficha_id))
 
 
+@ranking_bp.route('/fichas/<int:ficha_id>/ranking/cortes/<int:corte_id>/estado', methods=['POST'])
+@login_required
+def cambiar_estado(ficha_id, corte_id):
+    ficha = _ficha_autorizada(ficha_id)
+    corte = corte_visible(ficha_id, corte_id) if ficha else None
+    if not ficha:
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+    if not corte or not puede_administrar_corte(corte):
+        flash('No tienes permiso para administrar este corte.', 'error')
+        return redirect(url_for('ranking.ranking', ficha_id=ficha_id))
+
+    estado = request.form.get('estado', '')
+    if not cambiar_estado_corte(corte, estado):
+        flash('La transición solicitada no está permitida para este corte.', 'error')
+    else:
+        db.session.commit()
+        flash(f'El corte quedó {estado}.', 'success')
+    return redirect(url_for('ranking.ranking', ficha_id=ficha_id, corte_id=corte.id))
+
+
 @ranking_bp.route('/fichas/<int:ficha_id>/ranking/nuevo-corte', methods=['POST'])
 @login_required
 def nuevo_corte(ficha_id):
@@ -171,15 +223,50 @@ def nuevo_corte(ficha_id):
         return redirect(url_for('instructor.fichas'))
 
     ahora = datetime.utcnow()
-    filas, config = calcular_ranking(ficha_id, periodo='general', ahora=ahora)
-    guardar_snapshot(ficha_id, filas, ahora=ahora, tipo='corte')
+    corte_anterior = corte_actual(
+        ficha_id, corte_id=request.form.get('corte_id', type=int)
+    )
+    corte_anterior_id = corte_anterior.id if corte_anterior else None
+    filas, config = calcular_ranking(
+        ficha_id,
+        periodo='general',
+        ahora=ahora,
+        corte_id=corte_anterior_id,
+    )
+    guardar_snapshot(
+        ficha_id,
+        filas,
+        ahora=ahora,
+        tipo='corte',
+        corte_id=corte_anterior_id,
+    )
+    cortes_activos = Corte.query.filter_by(
+        ficha_id=ficha_id,
+        instructor_id=current_user.id,
+        estado=Corte.ESTADO_ACTIVO,
+    ).all()
+    for corte_activo in cortes_activos:
+        cambiar_estado_corte(corte_activo, Corte.ESTADO_CERRADO, ahora=ahora)
+
+    nombre = request.form.get('nombre_corte', '').strip()[:120]
+    if not nombre:
+        nombre = siguiente_nombre_corte(ficha_id, current_user.id)
+    nuevo = Corte(
+        ficha_id=ficha_id,
+        instructor_id=current_user.id,
+        nombre=nombre,
+        fecha_inicio=ahora,
+        compartido=bool(request.form.get('compartido')),
+    )
+    db.session.add(nuevo)
     config.inicio_corte = ahora
     db.session.commit()
     flash(
-        'Nuevo corte iniciado. El resultado anterior quedó guardado en el histórico.',
+        f'Nuevo corte "{nombre}" iniciado. Tareas y asistencia quedan separadas; '
+        'el resultado anterior quedó guardado en el histórico.',
         'success',
     )
-    return redirect(url_for('ranking.ranking', ficha_id=ficha_id))
+    return redirect(url_for('ranking.ranking', ficha_id=ficha_id, corte_id=nuevo.id))
 
 
 @ranking_bp.route('/fichas/<int:ficha_id>/ranking/exportar')
@@ -191,7 +278,16 @@ def exportar_ranking(ficha_id):
         return redirect(url_for('instructor.fichas'))
 
     periodo = _periodo()
-    filas, _ = calcular_ranking(ficha_id, periodo=periodo)
+    corte_id = request.args.get('corte_id', type=int)
+    corte = corte_actual(ficha_id, corte_id=corte_id)
+    if corte_id and not corte:
+        flash('El corte no existe o no está compartido contigo.', 'error')
+        return redirect(url_for('ranking.ranking', ficha_id=ficha_id))
+    filas, _ = calcular_ranking(
+        ficha_id,
+        periodo=periodo,
+        corte_id=corte.id if corte else None,
+    )
     if request.args.get('formato') == 'pdf':
         return _ranking_pdf(ficha, filas, periodo)
     return _ranking_excel(ficha, filas, periodo)

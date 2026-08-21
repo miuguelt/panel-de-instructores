@@ -150,25 +150,27 @@ def construir_calendario_mes(asistencia_map, anio, mes):
     }
 
 
-def sesiones_registradas_query(ficha_id):
+def sesiones_registradas_query(ficha_id, corte_id=None):
     """Return attendance sessions that contain at least one saved record."""
-    return (
+    consulta = (
         SesionAsistencia.query
         .join(
             RegistroAsistencia,
             RegistroAsistencia.sesion_id == SesionAsistencia.id,
         )
         .filter(SesionAsistencia.ficha_id == ficha_id)
-        .distinct()
     )
+    if corte_id is not None:
+        consulta = consulta.filter(SesionAsistencia.corte_id == corte_id)
+    return consulta.distinct()
 
 
-def contar_sesiones_registradas(ficha_id):
+def contar_sesiones_registradas(ficha_id, corte_id=None):
     """Count real attendance sessions, excluding calendar placeholders."""
-    return sesiones_registradas_query(ficha_id).count()
+    return sesiones_registradas_query(ficha_id, corte_id=corte_id).count()
 
 
-def guardar_asistencia(ficha_id, fecha, registros, max_intentos=2):
+def guardar_asistencia(ficha_id, fecha, registros, corte_id=None, max_intentos=2):
     """Upsert one complete attendance call and commit it independently.
 
     ``registros`` maps learner ids to ``(estado, causal_justificacion)``.
@@ -177,14 +179,21 @@ def guardar_asistencia(ficha_id, fecha, registros, max_intentos=2):
     """
     for intento in range(max_intentos):
         try:
-            sesion = (
+            consulta = (
                 SesionAsistencia.query
                 .filter_by(ficha_id=ficha_id, fecha=fecha)
-                .with_for_update()
-                .first()
             )
+            if corte_id is None:
+                consulta = consulta.filter(SesionAsistencia.corte_id.is_(None))
+            else:
+                consulta = consulta.filter(SesionAsistencia.corte_id == corte_id)
+            sesion = consulta.with_for_update().first()
             if not sesion:
-                sesion = SesionAsistencia(ficha_id=ficha_id, fecha=fecha)
+                sesion = SesionAsistencia(
+                    ficha_id=ficha_id,
+                    fecha=fecha,
+                    corte_id=corte_id,
+                )
                 db.session.add(sesion)
                 db.session.flush()
 

@@ -185,3 +185,12 @@ cython_debug/
 #  Shared config (settings.json, agents/, skills/, commands/) stays tracked.
 .claude/worktrees/
 .claude/settings.local.json
+
+# --- DevBrain repo hygiene (managed block) ---
+*.pem
+scratch/
+debug_*
+venv_win/
+logs/
+test-results/
+# --- end DevBrain repo hygiene ---

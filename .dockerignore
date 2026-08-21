@@ -45,3 +45,9 @@ tests/
 *.ps1
 
 .DS_Store
+
+# --- DevBrain repo hygiene (managed block) ---
+venv_win/
+logs/
+test-results/
+# --- end DevBrain repo hygiene ---

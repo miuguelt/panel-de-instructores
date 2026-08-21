@@ -213,10 +213,55 @@
     </div>
     <div class="header-actions">
         <a href="{{ url_for('ranking.insignias', ficha_id=ficha.id) }}" class="btn btn-secondary">🏅 Insignias</a>
-        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='excel') }}" class="btn btn-outline">↓ Excel</a>
-        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='pdf') }}" class="btn btn-outline">↓ PDF</a>
+        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='excel', corte_id=corte_actual.id if corte_actual else None) }}" class="btn btn-outline">↓ Excel</a>
+        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='pdf', corte_id=corte_actual.id if corte_actual else None) }}" class="btn btn-outline">↓ PDF</a>
     </div>
 </div>
+
+{% if cortes %}
+<div class="card" style="margin-top: 1rem;">
+    <div class="form-row align-center" style="justify-content: space-between;">
+        <div>
+            <strong>Corte seleccionado</strong>
+            <p class="text-muted" style="margin: 4px 0 0;">El ranking, las tareas y la asistencia se consultan dentro del corte seleccionado.</p>
+        </div>
+        <select onchange="window.location.href=this.value" aria-label="Seleccionar corte">
+            {% for item in cortes %}
+            <option value="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo=periodo, corte_id=item.id) }}"
+                    {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
+                {{ item.nombre }} · {{ item.creador.nombre if item.creador else 'Instructor' }} · {{ item.estado|capitalize }}{% if item.compartido %} · Compartido{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    {% if corte_actual %}
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+        <span class="badge badge-{{ 'success' if corte_actual.esta_activo else 'secondary' }}">Estado: {{ corte_actual.estado|capitalize }}</span>
+        {% if corte_actual.fecha_fin %}<small class="text-muted">Finalizado el {{ corte_actual.fecha_fin.strftime('%d/%m/%Y %H:%M') }}</small>{% endif %}
+        {% if puede_administrar_corte %}
+            {% if corte_actual.estado == 'activo' %}
+            <form method="POST" action="{{ url_for('ranking.cambiar_estado', ficha_id=ficha.id, corte_id=corte_actual.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="estado" value="cerrado">
+                <button type="submit" class="btn btn-sm btn-outline">Cerrar corte</button>
+            </form>
+            {% elif corte_actual.estado == 'cerrado' %}
+            <form method="POST" action="{{ url_for('ranking.cambiar_estado', ficha_id=ficha.id, corte_id=corte_actual.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="estado" value="activo">
+                <button type="submit" class="btn btn-sm btn-primary">Reactivar corte</button>
+            </form>
+            <form method="POST" action="{{ url_for('ranking.cambiar_estado', ficha_id=ficha.id, corte_id=corte_actual.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="estado" value="archivado">
+                <button type="submit" class="btn btn-sm btn-outline">Archivar</button>
+            </form>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
 
 <div class="ranking-layout">
     <div class="ranking-main">
@@ -265,11 +310,11 @@
 
         <div class="ranking-card-container">
             <nav class="period-tabs" aria-label="Periodo del ranking" data-filter-region="ranking-period-tabs">
-                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='general') }}"
+                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='general', corte_id=corte_actual.id if corte_actual else None) }}"
                    class="{% if periodo == 'general' %}active{% endif %}">General</a>
-                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='semanal') }}"
+                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='semanal', corte_id=corte_actual.id if corte_actual else None) }}"
                    class="{% if periodo == 'semanal' %}active{% endif %}">Esta semana</a>
-                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='mensual') }}"
+                <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='mensual', corte_id=corte_actual.id if corte_actual else None) }}"
                    class="{% if periodo == 'mensual' %}active{% endif %}">Este mes</a>
             </nav>
 
@@ -437,6 +482,17 @@
             <form method="POST" action="{{ url_for('ranking.nuevo_corte', ficha_id=ficha.id) }}"
                   onsubmit="return confirm('¿Iniciar un nuevo corte? El resultado actual se guardará en el histórico.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">{% endif %}
+                <div class="form-row" style="margin: 12px 0;">
+                    <div class="form-group flex-grow">
+                        <label for="nombre_corte">Nombre del nuevo corte</label>
+                        <input type="text" id="nombre_corte" name="nombre_corte" maxlength="120" placeholder="Ej: Corte de marzo">
+                    </div>
+                    <label class="privacy-checkbox" style="align-self: end; padding-bottom: 10px;">
+                        <input type="checkbox" name="compartido" checked>
+                        Compartir con instructores vinculados
+                    </label>
+                </div>
                 <button type="submit" class="btn btn-warning">Iniciar nuevo corte</button>
             </form>
         </section>

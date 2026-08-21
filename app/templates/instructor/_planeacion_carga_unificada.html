@@ -1,0 +1,192 @@
+{# Centro de Carga Unificada y Análisis de los Tres Documentos #}
+
+<section class="pl-card pl-carga-card" id="centro-carga">
+    {% set total_docs = (1 if version_planeacion else 0) + (1 if version_reporte else 0) + (1 if version_programa else 0) %}
+    {% set pct_sinc = ((total_docs / 3) * 100)|round|int %}
+    {% set fuentes_sincronizadas = total_docs == 3 and analisis %}
+
+    {% if fuentes_sincronizadas %}
+    {# Las tres fuentes ya alimentan el análisis: resumen compacto, el formulario queda plegado #}
+    <div class="pl-carga-resumen">
+        <div class="pl-carga-resumen-info">
+            <strong>✅ Fuentes sincronizadas (3 de 3)</strong>
+            <div class="pl-carga-resumen-chips">
+                <span class="pl-chip pl-tone-success is-tone">📊 Planeación v{{ version_planeacion.version }}</span>
+                <span class="pl-chip pl-tone-success is-tone">📋 Juicios v{{ version_reporte.version }}</span>
+                <span class="pl-chip pl-tone-success is-tone">📑 Programa v{{ version_programa.version }}</span>
+            </div>
+        </div>
+        <a href="{{ url_for('planeacion.descargar_todos', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Descargar los 3 archivos fuente en un paquete .zip">
+            📦 Fuentes (.zip)
+        </a>
+    </div>
+    <details class="pl-details pl-carga-actualizar">
+        <summary>
+            <span>Actualizar archivos fuente</span>
+            <span class="pl-chip">Carga una nueva versión</span>
+        </summary>
+        <div class="pl-details-body">
+            <p class="pl-note">Cada carga crea una versión nueva sin sobrescribir la anterior. El historial completo está en la sección «Archivos», al final de esta página.</p>
+    {% else %}
+    <div class="pl-card-head pl-carga-head">
+        <div>
+            <h2>🚀 Centro de Carga y Análisis de Documentos</h2>
+            <p>Sincroniza los tres archivos fuente de la ficha para contrastar la planeación pedagógica GFPI-F-134, el avance real en SOFIA Plus y el diseño curricular oficial (PDF).</p>
+        </div>
+        <div class="pl-sync-meter-container" style="display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem;">
+            <div class="pl-sync-meter">
+                <div class="pl-sync-meter-head">
+                    <span class="pl-sync-label">Sincronización de Fuentes:</span>
+                    <span class="pl-chip pl-tone-{{ 'success' if pct_sinc == 100 else ('warning' if pct_sinc >= 33 else 'neutral') }} is-tone">
+                        {{ total_docs }} de 3 archivos ({{ pct_sinc }}%)
+                    </span>
+                </div>
+                <div class="pl-sync-progress-bar">
+                    <div class="pl-sync-progress-fill pl-tone-{{ 'success' if pct_sinc == 100 else ('warning' if pct_sinc >= 33 else 'neutral') }}" style="width: {{ pct_sinc }}%;"></div>
+                </div>
+            </div>
+            {% if total_docs > 0 %}
+            <a href="{{ url_for('planeacion.descargar_todos', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline pl-btn-download-all" title="Descargar los {{ total_docs }} archivo(s) fuente cargado(s) en un paquete .zip">
+                📦 Descargar Fuentes (.zip)
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form id="form-carga-unificada" method="POST" action="{{ url_for('planeacion.cargar_todo', ficha_id=ficha.id) }}" enctype="multipart/form-data" class="pl-carga-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="pl-carga-grid">
+            <!-- 1. Planeación Pedagógica -->
+            {% set doc_planeacion = carga_planeacion or version_planeacion %}
+            <div class="pl-carga-slot {{ 'is-listo' if version_planeacion else 'is-pendiente' }}" data-slot="planeacion">
+                <div class="pl-carga-slot-header">
+                    <span class="pl-carga-slot-icon">📊</span>
+                    <div>
+                        <h3>1. Planeación Pedagógica</h3>
+                        <span class="pl-chip pl-tone-{{ 'success' if version_planeacion else 'warning' }} is-tone">
+                            {{ 'v' ~ version_planeacion.version ~ ' · Cargada' if version_planeacion else ('v' ~ doc_planeacion.version ~ ' · ' ~ doc_planeacion.estado|capitalize if doc_planeacion else 'Pendiente') }}
+                        </span>
+                    </div>
+                </div>
+                <p class="pl-note">Formato GFPI-F-134 (.xlsx). Aporta fases del proyecto, competencias, RAPs y horas planeadas.</p>
+                {% if doc_planeacion %}
+                <div class="pl-doc-meta-badge">
+                    <div class="pl-doc-meta-info" title="{{ doc_planeacion.nombre_archivo }}">
+                        <strong class="pl-doc-meta-title">📗 {{ doc_planeacion.nombre_archivo }}</strong>
+                        <small class="pl-doc-meta-sub">
+                            v{{ doc_planeacion.version }} · {{ (doc_planeacion.tamano_bytes / 1024)|round(1) }} KB · {{ doc_planeacion.creado_en.strftime('%d/%m/%Y') }}
+                            {%- if doc_planeacion.estado != 'procesado' %} · Estado: {{ doc_planeacion.estado }}{% endif %}
+                        </small>
+                    </div>
+                    <a class="btn btn-xs btn-primary pl-btn-download" href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=doc_planeacion.id) }}" download="{{ doc_planeacion.nombre_archivo }}" title="Descargar archivo de planeación (v{{ doc_planeacion.version }})">
+                        ⬇️ Descargar
+                    </a>
+                </div>
+                {% endif %}
+                <div class="pl-dropzone" data-input-target="input-planeacion">
+                    <span class="pl-dropzone-icon">📁</span>
+                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo .xlsx o haz clic' if version_planeacion else 'Arrastra tu archivo .xlsx o haz clic' }}</span>
+                    <input type="file" id="input-planeacion" name="archivo_planeacion" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
+                    <div class="pl-file-preview" style="display:none;"></div>
+                </div>
+            </div>
+
+            <!-- 2. Reporte de Juicios Evaluativos -->
+            {% set doc_reporte = carga_reporte or version_reporte %}
+            <div class="pl-carga-slot {{ 'is-listo' if version_reporte else 'is-pendiente' }}" data-slot="juicios">
+                <div class="pl-carga-slot-header">
+                    <span class="pl-carga-slot-icon">📋</span>
+                    <div>
+                        <h3>2. Reporte de Juicios</h3>
+                        <span class="pl-chip pl-tone-{{ 'success' if version_reporte else 'warning' }} is-tone">
+                            {{ 'v' ~ version_reporte.version ~ ' · Cargado' if version_reporte else ('v' ~ doc_reporte.version ~ ' · ' ~ doc_reporte.estado|capitalize if doc_reporte else 'Pendiente') }}
+                        </span>
+                    </div>
+                </div>
+                <p class="pl-note">Reporte SOFIA Plus (.xls o .xlsx). Aporta las fechas reales de evaluación y juicios por aprendiz.</p>
+                {% if doc_reporte %}
+                <div class="pl-doc-meta-badge">
+                    <div class="pl-doc-meta-info" title="{{ doc_reporte.nombre_archivo }}">
+                        <strong class="pl-doc-meta-title">📊 {{ doc_reporte.nombre_archivo }}</strong>
+                        <small class="pl-doc-meta-sub">
+                            v{{ doc_reporte.version }} · {{ (doc_reporte.tamano_bytes / 1024)|round(1) }} KB · {{ doc_reporte.creado_en.strftime('%d/%m/%Y') }}
+                            {%- if doc_reporte.estado != 'procesado' %} · Estado: {{ doc_reporte.estado }}{% endif %}
+                        </small>
+                    </div>
+                    <a class="btn btn-xs btn-primary pl-btn-download" href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=doc_reporte.id) }}" download="{{ doc_reporte.nombre_archivo }}" title="Descargar reporte de juicios (v{{ doc_reporte.version }})">
+                        ⬇️ Descargar
+                    </a>
+                </div>
+                {% endif %}
+                <div class="pl-dropzone" data-input-target="input-juicios">
+                    <span class="pl-dropzone-icon">📁</span>
+                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo reporte o haz clic' if version_reporte else 'Arrastra tu archivo .xls/.xlsx o haz clic' }}</span>
+                    <input type="file" id="input-juicios" name="archivo_juicios" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
+                    <div class="pl-file-preview" style="display:none;"></div>
+                </div>
+            </div>
+
+            <!-- 3. Programa de Formación -->
+            {% set doc_programa = carga_programa or version_programa %}
+            <div class="pl-carga-slot {{ 'is-listo' if version_programa else 'is-pendiente' }}" data-slot="programa">
+                <div class="pl-carga-slot-header">
+                    <span class="pl-carga-slot-icon">📑</span>
+                    <div>
+                        <h3>3. Programa de Formación</h3>
+                        <span class="pl-chip pl-tone-{{ 'success' if version_programa else 'info' }} is-tone">
+                            {{ 'v' ~ version_programa.version ~ ' · Cargado' if version_programa else ('v' ~ doc_programa.version ~ ' · ' ~ doc_programa.estado|capitalize if doc_programa else 'Recomendado') }}
+                        </span>
+                    </div>
+                </div>
+                <p class="pl-note">Diseño Curricular (.pdf). Aporta horas oficiales, criterios de evaluación, conocimientos y perfil docente.</p>
+                {% if doc_programa %}
+                <div class="pl-doc-meta-badge">
+                    <div class="pl-doc-meta-info" title="{{ doc_programa.nombre_archivo }}">
+                        <strong class="pl-doc-meta-title">📕 {{ doc_programa.nombre_archivo }}</strong>
+                        <small class="pl-doc-meta-sub">
+                            v{{ doc_programa.version }} · {{ (doc_programa.tamano_bytes / 1024)|round(1) }} KB · {{ doc_programa.creado_en.strftime('%d/%m/%Y') }}
+                            {%- if doc_programa.estado != 'procesado' %} · Estado: {{ doc_programa.estado }}{% endif %}
+                        </small>
+                    </div>
+                    <a class="btn btn-xs btn-primary pl-btn-download" href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=doc_programa.id) }}" download="{{ doc_programa.nombre_archivo }}" title="Descargar Programa de Formación PDF (v{{ doc_programa.version }})">
+                        ⬇️ Descargar PDF
+                    </a>
+                </div>
+                {% endif %}
+                <div class="pl-dropzone" data-input-target="input-programa">
+                    <span class="pl-dropzone-icon">📁</span>
+                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo .pdf o haz clic' if version_programa else 'Arrastra tu diseño curricular .pdf o haz clic' }}</span>
+                    <input type="file" id="input-programa" name="archivo_programa" accept=".pdf,application/pdf" class="pl-file-input">
+                    <div class="pl-file-preview" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="pl-banner-seleccionados" class="pl-banner-seleccionados" style="display:none;">
+            <div class="pl-banner-seleccionados-info">
+                <span class="pl-banner-seleccionados-icon">⚡</span>
+                <div>
+                    <strong id="pl-banner-seleccionados-titulo">Archivos listos para procesar</strong>
+                    <p>Haz clic en «Ejecutar Análisis Completo» para procesar las fuentes y sincronizar toda la información de la ficha.</p>
+                </div>
+            </div>
+            <span id="pl-banner-seleccionados-count" class="pl-chip pl-tone-info is-tone">0 archivos</span>
+        </div>
+
+        <div class="pl-carga-actions">
+            <button type="submit" id="btn-ejecutar-analisis" class="btn btn-primary btn-lg pl-btn-analizar">
+                <span class="pl-btn-icon">⚡</span> <span id="btn-ejecutar-texto">Ejecutar Análisis Completo</span>
+            </button>
+            <span id="pl-carga-feedback" class="pl-carga-msg" style="display:none;"></span>
+            <div id="pl-carga-progress-wrap" class="pl-progress-wrap" style="display:none;">
+                <div class="pl-progress-bar" id="pl-carga-progress-bar" style="width:0%;"></div>
+            </div>
+        </div>
+    </form>
+    {% if fuentes_sincronizadas %}
+        </div>
+    </details>
+    {% endif %}
+</section>

@@ -24,7 +24,7 @@
         .then(job => {
             if (job.estado === 'completado') {
                 const r = job.resultado || {};
-                message.textContent = `Importación completada: ${r.nuevos || 0} aprendices y ${r.juicios_nuevos || 0} juicios nuevos. Actualizando los datos…`;
+                message.textContent = `Importación completada: ${r.nuevos || 0} aprendices, ${r.juicios_nuevos || 0} juicios nuevos y ${r.juicios_actualizados || 0} juicios actualizados. Actualizando los datos…`;
                 box.setAttribute('aria-busy', 'false');
                 setTimeout(() => window.location.reload(), 700);
                 return;

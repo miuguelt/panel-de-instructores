@@ -18,7 +18,11 @@ from app.models import (
     JuicioEvaluativo,
     JuicioEvaluativoInstructor,
 )
-from app.services.importacion_ficha import ErrorImportacion, importar_archivo
+from app.services.importacion_ficha import (
+    ErrorImportacion,
+    importar_archivo,
+    validar_reporte_ficha,
+)
 
 
 class ImportacionFichaTestCase(unittest.TestCase):
@@ -39,7 +43,12 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.b.set_password('x')
         db.session.add_all([self.a, self.b])
         db.session.flush()
-        self.ficha = Ficha(codigo='2672089', nombre_programa='Programa', instructor_id=self.a.id)
+        self.ficha = Ficha(
+            codigo='2672089',
+            codigo_programa='228117',
+            nombre_programa='Programa',
+            instructor_id=self.a.id,
+        )
         db.session.add(self.ficha)
         db.session.commit()
 
@@ -63,6 +72,28 @@ class ImportacionFichaTestCase(unittest.TestCase):
                 'APROBADO', '14/03/2023', 'Instructor anterior']
         hoja.append(fila)
         hoja.append(fila)
+        salida = BytesIO()
+        libro.save(salida)
+        salida.seek(0)
+        return FileStorage(stream=salida, filename='reporte.xlsx')
+
+    def _archivo_con_estado(self, juicio, fecha='14/03/2023', funcionario='Instructor anterior'):
+        libro = openpyxl.Workbook()
+        hoja = libro.active
+        hoja.append(['Ficha de Caracterización:', '', 2672089])
+        hoja.append(['Cógigo:', '', '228117'])
+        hoja.append(['Denominación:', '', 'Programa'])
+        for _ in range(10):
+            hoja.append([])
+        hoja.append([
+            'Tipo de Documento', 'Número de Documento', 'Nombre', 'Apellidos', 'Estado',
+            'Competencia', 'Resultado de Aprendizaje', 'Juicio de Evaluación',
+            'Fecha y Hora del Juicio Evaluativo', 'Funcionario que registro el juicio evaluativo',
+        ])
+        hoja.append([
+            'CC', '1001', 'Ana', 'Pérez', 'EN_FORMACION', 'Competencia 1', 'Resultado 1',
+            juicio, fecha, funcionario,
+        ])
         salida = BytesIO()
         libro.save(salida)
         salida.seek(0)
@@ -129,6 +160,32 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.assertEqual(FichaInstructor.query.count(), 2)
         self.assertEqual(JuicioEvaluativoInstructor.query.count(), 2)
 
+    def test_cambio_de_estado_actualiza_el_juicio_sin_crear_duplicado(self):
+        importar_archivo(
+            self._archivo_con_estado('POR EVALUAR'),
+            self.ficha,
+            self.a.id,
+        )
+        db.session.commit()
+
+        resultado = importar_archivo(
+            self._archivo_con_estado(
+                'APROBADO',
+                fecha='20/03/2023',
+                funcionario='Instructor actualizado',
+            ),
+            self.ficha,
+            self.a.id,
+        )
+        db.session.commit()
+
+        juicio = JuicioEvaluativo.query.one()
+        self.assertEqual(resultado['juicios_nuevos'], 0)
+        self.assertEqual(resultado['juicios_actualizados'], 1)
+        self.assertEqual(JuicioEvaluativo.query.count(), 1)
+        self.assertEqual(juicio.juicio, 'APROBADO')
+        self.assertEqual(juicio.funcionario_registro, 'Instructor actualizado')
+
     def test_crea_ficha_completa_desde_reporte(self):
         resultado = importar_archivo(
             self._reporte_para_crear(),
@@ -155,6 +212,7 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.assertEqual(ConfiguracionAlertas.query.filter_by(ficha_id=ficha.id).count(), 1)
         self.assertEqual(ConfiguracionRanking.query.filter_by(ficha_id=ficha.id).count(), 1)
         self.assertEqual(ConfiguracionAseo.query.filter_by(ficha_id=ficha.id).count(), 1)
+        self.assertEqual(resultado['metadata']['fecha_reporte'], date(2026, 6, 24))
 
     def test_ruta_crea_ficha_y_redirige_a_aprendices(self):
         cliente = self.app.test_client()
@@ -194,6 +252,35 @@ class ImportacionFichaTestCase(unittest.TestCase):
                 crear_ficha=True,
             )
         self.assertEqual(Ficha.query.count(), 1)
+
+    def test_bloquea_reporte_de_la_misma_ficha_con_otro_programa(self):
+        ficha = Ficha(
+            codigo='2672089',
+            codigo_ficha='2672089',
+            codigo_programa='228118',
+            nombre_programa='Programa',
+            instructor_id=self.a.id,
+        )
+
+        with self.assertRaisesRegex(ErrorImportacion, 'misma ficha y programa'):
+            validar_reporte_ficha(
+                ficha,
+                {
+                    'codigo_ficha': '2672089',
+                    'codigo_programa': '133100',
+                    'nombre_programa': 'Programa',
+                },
+            )
+
+    def test_bloquea_reporte_sin_codigo_de_programa(self):
+        with self.assertRaisesRegex(ErrorImportacion, 'no contiene el código del programa'):
+            validar_reporte_ficha(
+                self.ficha,
+                {
+                    'codigo_ficha': '2672089',
+                    'nombre_programa': 'Programa',
+                },
+            )
 
 
 if __name__ == '__main__':

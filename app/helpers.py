@@ -1,4 +1,15 @@
 import re
+from datetime import datetime, timezone
+
+
+def utc_now():
+    """Return the current UTC time as a naive datetime (compatible with existing columns).
+
+    Replaces the deprecated ``datetime.utcnow()`` while keeping the return type
+    identical (naive ``datetime``) so existing ``db.Column(db.DateTime, ...)``
+    defaults keep working without a schema migration.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 from app.services.archivos import ArchivoService
 

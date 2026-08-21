@@ -1,7 +1,7 @@
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
-from datetime import datetime
+from app.helpers import utc_now
 
 
 class Instructor(UserMixin, db.Model):
@@ -13,7 +13,7 @@ class Instructor(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     rol = db.Column(db.String(20), nullable=False, default='colaborador')
     activo = db.Column(db.Boolean, default=True)
-    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+    creado_en = db.Column(db.DateTime, default=utc_now)
 
     fichas = db.relationship('Ficha', backref='instructor', lazy='dynamic')
     fichas_asociadas = db.relationship('FichaInstructor', back_populates='instructor',

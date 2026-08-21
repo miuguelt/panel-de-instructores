@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.helpers import utc_now
 
 from app import db
 
@@ -15,7 +15,7 @@ class Insignia(db.Model):
     tipo = db.Column(db.String(20), nullable=False, default='manual')
     condicion_json = db.Column(db.JSON, nullable=True)
     activa = db.Column(db.Boolean, nullable=False, default=True)
-    creada_en = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    creada_en = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     otorgamientos = db.relationship(
         'InsigniaOtorgada',
@@ -35,7 +35,7 @@ class InsigniaOtorgada(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
     insignia_id = db.Column(db.Integer, db.ForeignKey('insignias.id'), nullable=False, index=True)
-    fecha_obtencion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_obtencion = db.Column(db.DateTime, nullable=False, default=utc_now)
     otorgada_por = db.Column(db.String(30), nullable=False, default='sistema')
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=True)
     notificada = db.Column(db.Boolean, nullable=False, default=False)

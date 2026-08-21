@@ -12,7 +12,7 @@ from redis import Redis
 from redis.exceptions import RedisError
 from werkzeug.datastructures import FileStorage
 
-from app.models import ImportacionJob, Ficha
+from app.models import ArchivoFichaVersion, ImportacionJob, Ficha
 from app.services.alertas import actualizar_alertas_ficha
 from app.services.importacion_ficha import importar_archivo
 from app.services.ranking import actualizar_participacion_ficha
@@ -54,7 +54,7 @@ def _resultado_resumido(resultado):
         clave: resultado.get(clave, 0)
         for clave in (
             'nuevos', 'actualizados', 'juicios_nuevos',
-            'juicios_repetidos', 'sesiones_creadas',
+            'juicios_actualizados', 'juicios_repetidos', 'sesiones_creadas',
         )
     } | {'errores': len(resultado.get('errores', []))}
 
@@ -116,6 +116,11 @@ def _procesar(job_id):
 
             job.estado = 'completado'
             job.resultado = json.dumps(_resultado_resumido(resultado), ensure_ascii=False)
+            if job.archivo_version_id:
+                version = db.session.get(ArchivoFichaVersion, job.archivo_version_id)
+                if version:
+                    version.estado = 'procesado'
+                    version.detalle = job.resultado
             job.terminado_en = datetime.utcnow()
             db.session.commit()
             log.info('Importación #%s completada: %s', job.id, job.resultado)
@@ -125,6 +130,11 @@ def _procesar(job_id):
             if job:
                 job.estado = 'error'
                 job.error = f'{type(exc).__name__}: {exc}'
+                if job.archivo_version_id:
+                    version = db.session.get(ArchivoFichaVersion, job.archivo_version_id)
+                    if version:
+                        version.estado = 'error'
+                        version.detalle = job.error
                 job.terminado_en = datetime.utcnow()
                 db.session.commit()
             log.exception('Falló la importación #%s', job_id)

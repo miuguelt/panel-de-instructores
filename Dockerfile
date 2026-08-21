@@ -38,8 +38,11 @@ RUN chmod +x /app/docker-entrypoint.sh && \
 
 # Defaults del runtime. Antes vivían en el `environment:` del compose; ahora que
 # ese bloque es pass-through puro, la imagen aporta los valores por omisión.
+# Las migraciones se ejecutan en el entrypoint, cuando Coolify ya inyectó
+# DATABASE_URL. No deben ejecutarse durante `docker build`.
 ENV FLASK_APP=wsgi.py \
     FLASK_ENV=production \
+    RUN_MIGRATIONS=true \
     REDIS_URL=memory:// \
     IMPORTACIONES_ASINCRONAS=true \
     IMPORT_QUEUE_NAME=adso:importaciones \

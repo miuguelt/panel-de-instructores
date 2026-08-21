@@ -220,7 +220,7 @@
 
 {% block content %}
 <div class="page-header">
-    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver</a>
+    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}" class="btn-back">&larr; Volver</a>
     <h1>{% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}: {{ tarea.titulo }}</h1>
     <p class="text-muted">{{ ficha.codigo }}</p>
 </div>
@@ -242,6 +242,7 @@
 </div>
 
 {% if aprendices %}
+{% if puede_editar_tarea %}
 <form method="POST" action="{{ url_for('instructor.registrar_actividad_clase', tarea_id=tarea.id) }}"
       class="card" style="margin-top: 24px; padding: 24px;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -298,6 +299,11 @@
 
     <button type="submit" class="btn btn-primary" style="margin-top: 24px;">Guardar cumplimiento</button>
 </form>
+{% else %}
+<div class="card" style="margin-top: 24px; padding: 18px;">
+    <p class="text-muted" style="margin: 0;">Este corte es compartido. Puedes consultar el cumplimiento, pero solo el instructor responsable puede modificarlo.</p>
+</div>
+{% endif %}
 
 <script>
     (function () {
@@ -396,7 +402,7 @@
     </div>
 </div>
 
-<form id="evaluacion-masiva" method="POST"
+{% if puede_editar_tarea %}<form id="evaluacion-masiva" method="POST"
       action="{{ url_for('instructor.evaluar_entregas_en_bloque', tarea_id=tarea.id) }}"
       class="evaluacion-masiva">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -422,7 +428,7 @@
         <small id="entregas-seleccionadas" class="text-muted">0 entregas seleccionadas</small>
         <button type="submit" id="guardar-evaluacion-masiva" class="btn btn-primary" disabled>Evaluar seleccionadas</button>
     </div>
-</form>
+</form>{% endif %}
 
 <div class="entregas-grid">
     {% for ap in aprendices %}
@@ -517,7 +523,7 @@
                     </div>
                 </div>
                 
-                <details class="calificar-details" {% if not entrega.calificada %}open{% endif %}>
+                {% if puede_editar_tarea %}<details class="calificar-details" {% if not entrega.calificada %}open{% endif %}>
                     <summary style="cursor: pointer; font-weight: 600; color: var(--sena-green); margin-bottom: 12px;">
                         {% if entrega.calificada %}Modificar evaluación{% else %}Evaluar ahora{% endif %}
                     </summary>
@@ -538,7 +544,7 @@
                             Guardar Evaluación
                         </button>
                     </form>
-                </details>
+                </details>{% endif %}
             {% else %}
                 <div style="text-align: center; padding: 24px 0 8px;">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2" style="margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>

@@ -38,6 +38,10 @@ class ErrorArchivo(Exception):
     """Error controlado en operaciones con archivos."""
 
 
+class ArchivoDuplicado(ErrorArchivo):
+    """El mismo contenido ya fue cargado en el contexto solicitado."""
+
+
 class ErrorExtension(ErrorArchivo):
     """Extensión de archivo no permitida."""
 

@@ -1,0 +1,883 @@
+{# Veredicto temporal, indicadores EVM, Curva S con incertidumbre, Diagrama de Flujo Acumulado y Radar Curricular. #}
+
+<section class="pl-verdict pl-tone-{{ veredicto.tono }}" id="seccion-resumen">
+    <span class="pl-verdict-icon" aria-hidden="true">{{ veredicto.icono }}</span>
+    <div>
+        <strong>{{ veredicto.titulo }}</strong>
+        <p>{{ veredicto.detalle }}</p>
+    </div>
+</section>
+
+<div class="pl-kpis">
+    {% set desfase = linea.resumen.trimestres_desfase %}
+
+    {# 1. Momento de la Ficha #}
+    <div class="pl-kpi pl-tone-info">
+        <span>Momento de la ficha</span>
+        <strong>{{ calendario.bloque_actual.etiqueta if calendario.bloque_actual else '—' }} · {{ calendario.porcentaje_lectiva }}%</strong>
+        <div class="pl-bar pl-tone-info" title="Avance lectivo global: {{ calendario.porcentaje_lectiva }}%">
+            <i style="width: {{ calendario.porcentaje_lectiva }}%"></i>
+        </div>
+        <small>
+            {% if calendario.bloque_actual %}
+            {{ calendario.bloque_actual.nombre }} de {{ calendario.trimestres_lectivos }} ({{ calendario.bloque_actual.porcentaje_transcurrido }}% transcurrido)
+            {% else %}
+            Fuera del rango lectivo de la ficha
+            {% endif %}
+        </small>
+    </div>
+
+    {# 2. Índice EVM SPI (Schedule Performance Index) #}
+    {% set evm = proyeccion.evm if proyeccion and proyeccion.evm else None %}
+    {% set tono_spi = evm.tono if evm else 'neutral' %}
+    <div class="pl-kpi pl-tone-{{ tono_spi }}">
+        <span>Ritmo frente al plan (Velocidad)</span>
+        <strong>{{ evm.spi if evm else '1.0' }} <small style="font-size:0.75rem; font-weight:600;">(SPI)</small></strong>
+        <div class="pl-bar pl-tone-{{ tono_spi }}" title="SPI: {{ evm.spi if evm else 0 }}">
+            <i style="width: {{ [((evm.spi or 1.0) * 100)|round|int, 100]|min }}%"></i>
+        </div>
+        <small>
+            {% if evm %}
+            {{ evm.label }} · {{ '+' if evm.sv_horas > 0 else '' }}{{ evm.sv_horas }} h frente al plan. 1.0 = ritmo exacto.
+            {% else %}
+            Sin datos calculables
+            {% endif %}
+        </small>
+    </div>
+
+    {# 3. Horas aprobadas vs horas que el plan ya debería tener #}
+    <div class="pl-kpi pl-tone-info">
+        <span>Horas aprobadas vs planeadas</span>
+        <strong>{{ evm.ev_horas|round|int if evm and evm.ev_horas is not none else 0 }} / {{ evm.pv_horas|round|int if evm else 0 }} h</strong>
+        <div class="pl-bar pl-tone-info" title="Horas aprobadas en SOFIA Plus vs horas planeadas a la fecha">
+            {% set pct_ev = ((evm.ev_horas / evm.total_horas) * 100)|round|int if evm and evm.total_horas else 0 %}
+            <i style="width: {{ pct_ev }}%"></i>
+        </div>
+        <small>
+            {{ pct_ev }}% del total técnico de la ficha ({{ evm.total_horas|round|int if evm else 0 }} h lectivas)
+        </small>
+    </div>
+
+    {# 4. Técnicas al Día vs Retrasadas #}
+    {% set total_exigibles = linea.resumen.competencias_exigibles %}
+    {% set atrasadas_cnt = linea.resumen.competencias_atrasadas %}
+    {% set al_dia_cnt = total_exigibles - atrasadas_cnt %}
+    {% set pct_al_dia = (al_dia_cnt / total_exigibles * 100)|round|int if total_exigibles else 100 %}
+    {% set tono_tecnicas = 'pl-tone-danger' if linea.resumen.competencias_criticas else ('pl-tone-warning' if atrasadas_cnt else 'pl-tone-success') %}
+    <div class="pl-kpi {{ tono_tecnicas }}">
+        <span>Competencias técnicas al día</span>
+        <strong>{{ al_dia_cnt }} de {{ total_exigibles }} ({{ pct_al_dia }}%)</strong>
+        <div class="pl-bar {{ tono_tecnicas }}" title="Cumplimiento técnico: {{ pct_al_dia }}%">
+            <i style="width: {{ pct_al_dia }}%"></i>
+        </div>
+        <small>
+            {% if atrasadas_cnt %}
+            {{ atrasadas_cnt }} con retraso · Máx. {{ desfase|round(1) }} trim. de atraso
+            {% else %}
+            100% de técnicas al día según el plan
+            {% endif %}
+        </small>
+    </div>
+
+    {# 5. Transversales e Inglés #}
+    <div class="pl-kpi pl-tone-neutral">
+        <span>Transversales e inglés</span>
+        <strong>{{ proyeccion.transversales.porcentaje_avance }}%</strong>
+        <div class="pl-bar pl-tone-neutral" title="Avance transversales: {{ proyeccion.transversales.porcentaje_avance }}%">
+            <i style="width: {{ proyeccion.transversales.porcentaje_avance }}%"></i>
+        </div>
+        <small>
+            {{ linea.resumen.competencias_sugeridas }} competencias · {{ proyeccion.transversales.horas }} h · Flexibles
+        </small>
+    </div>
+
+    {# 6. Ritmo Real vs Requerido #}
+    {% set tono_ritmo = 'pl-tone-danger' if proyeccion.estado == 'en_riesgo' else ('pl-tone-warning' if proyeccion.estado == 'ajustado' else 'pl-tone-success') %}
+    <div class="pl-kpi {{ tono_ritmo }}">
+        <span>Ritmo de evaluación</span>
+        <strong>{{ proyeccion.ritmo_mensual|round(1) }} / mes</strong>
+        <div class="pl-bar {{ tono_ritmo }}" title="Aprobaciones acumuladas: {{ proyeccion.porcentaje_pares }}%">
+            <i style="width: {{ proyeccion.porcentaje_pares }}%"></i>
+        </div>
+        <small>
+            {{ proyeccion.porcentaje_pares }}% evaluado · Req: {{ proyeccion.ritmo_requerido|round(1) }}/mes ({{ proyeccion.pares_pendientes }} pend.)
+        </small>
+    </div>
+
+    {# 7. Cierre Lectivo Proyectado #}
+    {% set tono_cierre = 'pl-tone-danger' if proyeccion.estado == 'en_riesgo' else ('pl-tone-warning' if proyeccion.estado == 'ajustado' else 'pl-tone-success') %}
+    <div class="pl-kpi {{ tono_cierre }}">
+        <span>Fecha estimada de cierre</span>
+        <strong>{{ proyeccion.fecha_proyectada.strftime('%d/%m/%Y') if proyeccion.fecha_proyectada else '—' }}</strong>
+        <div class="pl-bar {{ tono_cierre }}" title="Proyección de cierre al ritmo actual">
+            <i style="width: {{ 100 if proyeccion.estado in ('completado', 'holgado', 'ajustado') else 35 }}%"></i>
+        </div>
+        <small>
+            {% if proyeccion.dias_vs_fin_lectiva is none %}
+            Falta ritmo medible
+            {% elif proyeccion.dias_vs_fin_lectiva > 0 %}
+            +{{ proyeccion.dias_vs_fin_lectiva }} días vs fin lectivo ({{ calendario.fin_lectiva.strftime('%d/%m/%Y') }})
+            {% else %}
+            {{ -proyeccion.dias_vs_fin_lectiva }} días de margen antes del fin lectivo
+            {% endif %}
+        </small>
+    </div>
+
+    {# 8. Saberes y Criterios Oficiales Conquistados #}
+    {% if desempeno_ficha and desempeno_ficha.total_saberes %}
+    <div class="pl-kpi pl-tone-success">
+        <span>Saberes curriculares cubiertos</span>
+        <strong>{{ desempeno_ficha.saberes_cubiertos }} / {{ desempeno_ficha.total_saberes }} ({{ desempeno_ficha.pct_saberes_cubiertos }}%)</strong>
+        <div class="pl-bar pl-tone-success" title="Dominio de saberes: {{ desempeno_ficha.pct_saberes_cubiertos }}%">
+            <i style="width: {{ desempeno_ficha.pct_saberes_cubiertos }}%"></i>
+        </div>
+        <small>
+            {{ desempeno_ficha.criterios_cubiertos }}/{{ desempeno_ficha.total_criterios }} criterios de evaluación consolidados
+        </small>
+    </div>
+    {% endif %}
+</div>
+
+{# 1. Curva S de Avance con Pronóstico y Abanico de Incertidumbre #}
+{% if proyeccion.curva and curva_svg %}
+<section class="pl-card" id="seccion-curva-s">
+    <div class="pl-card-head">
+        <h2>Curva S: avance planeado vs. avance real aprobado</h2>
+        <p>Monitoreo cronológico del avance de la ficha: la <strong>línea gris punteada</strong> representa las horas exigidas por la planeación curricular oficial (GFPI-F-134); la <strong>línea azul sólida</strong> muestra las horas efectivamente calificadas y aprobadas en SOFIA Plus.</p>
+    </div>
+
+    {# Hitos Cronológicos Clave de la Ficha con Fechas #}
+    <div class="pl-fechas-timeline" role="region" aria-label="Línea de hitos cronológicos de la ficha">
+        <div class="pl-fecha-node is-inicio">
+            <span class="pl-fecha-icon" aria-hidden="true">🚩</span>
+            <div class="pl-fecha-info">
+                <small>Inicio de Formación</small>
+                <strong>{{ calendario.inicio.strftime('%d/%m/%Y') if calendario.inicio else '—' }}</strong>
+            </div>
+        </div>
+        <div class="pl-fecha-arrow" aria-hidden="true">&rarr;</div>
+        <div class="pl-fecha-node is-hoy">
+            <span class="pl-fecha-icon" aria-hidden="true">📍</span>
+            <div class="pl-fecha-info">
+                <small>Hoy ({{ calendario.bloque_actual.etiqueta if calendario.bloque_actual else 'Trimestre actual' }} en curso)</small>
+                <strong>{{ curva_svg.hoy_str or hoy.strftime('%d/%m/%Y') }}</strong>
+            </div>
+        </div>
+        <div class="pl-fecha-arrow" aria-hidden="true">&rarr;</div>
+        <div class="pl-fecha-node is-fin-lectiva">
+            <span class="pl-fecha-icon" aria-hidden="true">🎯</span>
+            <div class="pl-fecha-info">
+                <small>Fin Etapa Lectiva (Oficial)</small>
+                <strong>{{ calendario.fin_lectiva.strftime('%d/%m/%Y') if calendario.fin_lectiva else '—' }}</strong>
+            </div>
+        </div>
+        <div class="pl-fecha-arrow" aria-hidden="true">&rarr;</div>
+        <div class="pl-fecha-node is-fin-ficha">
+            <span class="pl-fecha-icon" aria-hidden="true">🏁</span>
+            <div class="pl-fecha-info">
+                <small>Cierre Total (Productiva)</small>
+                <strong>{{ calendario.fin.strftime('%d/%m/%Y') if calendario.fin else '—' }}</strong>
+            </div>
+        </div>
+    </div>
+
+    {# Lectura ejecutiva clara y entendible en lenguaje natural con fechas #}
+    {% set puntos_reales = curva_svg.puntos_datos | selectattr('es_pasado_o_actual') | list %}
+    {% set ultimo_real = puntos_reales | last if puntos_reales else none %}
+    {% if ultimo_real %}
+    <div class="pl-curva-lectura-box pl-tone-{{ 'success' if (ultimo_real.sv_horas or 0) >= 0 else 'danger' }}" role="status">
+        <div class="pl-lectura-header">
+            <span class="pl-lectura-icon" aria-hidden="true">{{ '✅' if (ultimo_real.sv_horas or 0) >= 0 else '⏱️' }}</span>
+            <div class="pl-lectura-texto">
+                <strong class="pl-lectura-titulo">
+                    {% if ultimo_real.sv_horas is not none and ultimo_real.sv_horas > 0 %}
+                    La ficha marcha con {{ ultimo_real.sv_horas|round|int }} horas de adelanto frente a la planeación curricular
+                    {% elif ultimo_real.sv_horas is not none and ultimo_real.sv_horas < 0 %}
+                    La ficha presenta {{ (-ultimo_real.sv_horas)|round|int }} horas de retraso frente a la planeación curricular
+                    {% else %}
+                    La ficha marcha exactamente al día con la planeación curricular
+                    {% endif %}
+                </strong>
+                <p class="pl-lectura-parrafo">
+                    A la fecha (<strong>{{ curva_svg.hoy_str or hoy.strftime('%d/%m/%Y') }}</strong>, en <strong>{{ calendario.bloque_actual.nombre if calendario.bloque_actual else 'Trimestre actual' }}</strong>), el plan oficial exigía <strong>{{ ultimo_real.planeado_pct }}%</strong> ({{ ultimo_real.pv_horas|round|int }} h) y los aprendices registran <strong>{{ ultimo_real.real_pct }}%</strong> ({{ ultimo_real.ev_horas|round|int }} h aprobadas en SOFIA Plus).
+                </p>
+            </div>
+        </div>
+
+        <div class="pl-lectura-grid">
+            <div class="pl-lectura-item">
+                <span class="pl-lectura-lbl">📊 Avance de Competencias</span>
+                <strong>{{ ultimo_real.real_pct }}% aprobado</strong>
+                <small>{{ ultimo_real.ev_horas|round|int }} / {{ proyeccion.evm.total_horas|round|int }} h técnicas</small>
+            </div>
+            <div class="pl-lectura-item">
+                <span class="pl-lectura-lbl">⚡ Ritmo de Evaluación</span>
+                <strong>{{ proyeccion.ritmo_mensual|round(1) }} aprob./mes</strong>
+                <small>Requerido: {{ proyeccion.ritmo_requerido|round(1) }}/mes para cierre</small>
+            </div>
+            <div class="pl-lectura-item">
+                <span class="pl-lectura-lbl">🎯 Fin Etapa Lectiva</span>
+                <strong>{{ calendario.fin_lectiva.strftime('%d/%m/%Y') if calendario.fin_lectiva else '—' }}</strong>
+                <small>{{ calendario.trimestres_lectivos }} trimestres lectivos reglamentarios</small>
+            </div>
+            <div class="pl-lectura-item">
+                <span class="pl-lectura-lbl">🔮 Fecha Estimada de Cierre</span>
+                <strong>{{ proyeccion.fecha_proyectada.strftime('%d/%m/%Y') if proyeccion.fecha_proyectada else '—' }}</strong>
+                <small>
+                    {% if proyeccion.dias_vs_fin_lectiva is none %}
+                    Sin proyección suficiente
+                    {% elif proyeccion.dias_vs_fin_lectiva > 0 %}
+                    +{{ proyeccion.dias_vs_fin_lectiva }} días vs fecha oficial
+                    {% elif proyeccion.dias_vs_fin_lectiva < 0 %}
+                    {{ -proyeccion.dias_vs_fin_lectiva }} días de margen a favor
+                    {% else %}
+                    Exacto en la fecha oficial
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Pronóstico comprensible de finalización (3 Escenarios Humanos) #}
+    {% if proyeccion.proyeccion_probabilistica and curva_svg.proyeccion %}
+    <div class="pl-escenarios-panel">
+        <div class="pl-escenarios-header">
+            <span class="pl-escenarios-title">🔮 Pronóstico de Finalización de la Etapa Lectiva</span>
+            <span class="pl-escenarios-sub">Estimación según la velocidad histórica de evaluación y registro de juicios en SOFIA Plus:</span>
+        </div>
+        <div class="pl-escenarios-grid">
+            <div class="pl-escenario-card is-optimista">
+                <div class="pl-escenario-top">
+                    <span class="pl-escenario-icon">🚀</span>
+                    <div>
+                        <span class="pl-escenario-tag">Escenario Optimista</span>
+                        <strong>{{ proyeccion.proyeccion_probabilistica.p10.fecha.strftime('%d/%m/%Y') }}</strong>
+                    </div>
+                </div>
+                <div class="pl-escenario-meta">
+                    <span>En <strong>{{ proyeccion.proyeccion_probabilistica.p10.meses }} meses</strong></span>
+                    <small>Si el equipo docente acelera el ritmo de evaluación (+25%).</small>
+                </div>
+            </div>
+
+            <div class="pl-escenario-card is-probable is-destacado">
+                <div class="pl-escenario-top">
+                    <span class="pl-escenario-icon">🎯</span>
+                    <div>
+                        <span class="pl-escenario-tag">Escenario Más Probable</span>
+                        <strong>{{ proyeccion.proyeccion_probabilistica.p50.fecha.strftime('%d/%m/%Y') }}</strong>
+                    </div>
+                </div>
+                <div class="pl-escenario-meta">
+                    <span>En <strong>{{ proyeccion.proyeccion_probabilistica.p50.meses }} meses</strong>
+                        {% if proyeccion.dias_vs_fin_lectiva is not none %}
+                            {% if proyeccion.dias_vs_fin_lectiva > 0 %}
+                            · <span class="pl-tone-warning">(+{{ proyeccion.dias_vs_fin_lectiva }}d vs oficial)</span>
+                            {% elif proyeccion.dias_vs_fin_lectiva < 0 %}
+                            · <span class="pl-tone-success">({{ -proyeccion.dias_vs_fin_lectiva }}d antes)</span>
+                            {% endif %}
+                        {% endif %}
+                    </span>
+                    <small>Manteniendo el ritmo actual de {{ proyeccion.ritmo_mensual|round(1) }} aprobaciones/mes.</small>
+                </div>
+            </div>
+
+            <div class="pl-escenario-card is-conservador">
+                <div class="pl-escenario-top">
+                    <span class="pl-escenario-icon">⏳</span>
+                    <div>
+                        <span class="pl-escenario-tag">Escenario Conservador</span>
+                        <strong>{{ proyeccion.proyeccion_probabilistica.p90.fecha.strftime('%d/%m/%Y') }}</strong>
+                    </div>
+                </div>
+                <div class="pl-escenario-meta">
+                    <span>En <strong>{{ proyeccion.proyeccion_probabilistica.p90.meses }} meses</strong></span>
+                    <small>Si disminuye el ritmo de evaluación o surgen retrasos (-30%).</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="pl-curve-wrap" style="position:relative;">
+        <svg class="pl-curve" id="svg-curva-s" viewBox="0 0 800 305" role="img" aria-label="Curva S de Avance y Pronóstico Probabilístico">
+            <defs>
+                <linearGradient id="pl-fan-grad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="var(--accent-primary)" stop-opacity="0.22" />
+                    <stop offset="50%" stop-color="var(--accent-primary)" stop-opacity="0.12" />
+                    <stop offset="100%" stop-color="var(--warning)" stop-opacity="0.06" />
+                </linearGradient>
+                <linearGradient id="pl-area-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--accent-primary)" stop-opacity="0.30" />
+                    <stop offset="100%" stop-color="var(--accent-primary)" stop-opacity="0.03" />
+                </linearGradient>
+            </defs>
+
+            {# Franja de Etapa Productiva #}
+            {% if curva_svg.rect_productiva %}
+            <rect class="pl-curve-productiva" x="{{ curva_svg.rect_productiva.x }}" y="20" width="{{ curva_svg.rect_productiva.width }}" height="190" rx="6"></rect>
+            {% endif %}
+
+            {# Destacar columna del trimestre actual #}
+            {% for pt in curva_svg.puntos_datos %}
+                {% if pt.es_actual %}
+                {% set col_w = ((curva_svg.x_end - curva_svg.x_start) / [curva_svg.puntos_datos|length - 1, 1]|max) * 0.9 %}
+                <rect class="pl-curve-col-active" x="{{ pt.x - col_w / 2 }}" y="20" width="{{ col_w }}" height="268" rx="6"></rect>
+                {% endif %}
+            {% endfor %}
+            
+            {# Rejilla Horizontal de Porcentajes / Horas #}
+            {% for marca in [0, 25, 50, 75, 100] %}
+            {% set y_line = 210 - marca * 1.8 %}
+            <line class="pl-curve-grid" x1="{{ curva_svg.x_start }}" x2="{{ curva_svg.x_end }}" y1="{{ y_line }}" y2="{{ y_line }}"></line>
+            <text class="pl-curve-axis pl-axis-pct" x="{{ curva_svg.x_start - 8 }}" y="{{ y_line + 4 }}" text-anchor="end">{{ marca }}%</text>
+            <text class="pl-curve-axis pl-axis-horas" x="{{ curva_svg.x_start - 8 }}" y="{{ y_line + 4 }}" text-anchor="end" style="display:none;">{{ ((marca / 100) * (proyeccion.evm.total_horas or 3120))|round|int }}h</text>
+            {% endfor %}
+
+            {# Abanico de Incertidumbre Probabilística P10 - P90 #}
+            {% if curva_svg.proyeccion %}
+            <polygon class="pl-curve-fan" points="{{ curva_svg.proyeccion.poligono_abanico }}" fill="url(#pl-fan-grad)"></polygon>
+            
+            {# Líneas de Proyección #}
+            <polyline class="pl-curve-proj pl-curve-p10" points="{{ curva_svg.proyeccion.linea_p10 }}" stroke="var(--success)" stroke-width="2.5" stroke-dasharray="4 3" opacity="0.9"></polyline>
+            <polyline class="pl-curve-proj pl-curve-p50" points="{{ curva_svg.proyeccion.linea_p50 }}" stroke="var(--accent-primary)" stroke-width="3" stroke-dasharray="5 3"></polyline>
+            <polyline class="pl-curve-proj pl-curve-p90" points="{{ curva_svg.proyeccion.linea_p90 }}" stroke="var(--warning)" stroke-width="2.5" stroke-dasharray="4 3" opacity="0.9"></polyline>
+            
+            {# Hitos de Llegada al 100% #}
+            <circle cx="{{ curva_svg.proyeccion.x_p10 }}" cy="{{ curva_svg.proyeccion.y_meta }}" r="5" fill="var(--success)" stroke="#fff" stroke-width="1.5" class="pl-clickable pl-proj-circle" data-prob-tipo="P10 (Optimista)" data-prob-fecha="{{ curva_svg.proyeccion.fecha_p10_str }}" data-prob-dias="{{ curva_svg.proyeccion.dias_vs_fin_p10 }}"></circle>
+            <circle cx="{{ curva_svg.proyeccion.x_p50 }}" cy="{{ curva_svg.proyeccion.y_meta }}" r="6" fill="var(--accent-primary)" stroke="#fff" stroke-width="2" class="pl-clickable pl-proj-circle" data-prob-tipo="P50 (Más Probable)" data-prob-fecha="{{ curva_svg.proyeccion.fecha_p50_str }}" data-prob-dias="{{ curva_svg.proyeccion.dias_vs_fin_p50 }}"></circle>
+            <circle cx="{{ curva_svg.proyeccion.x_p90 }}" cy="{{ curva_svg.proyeccion.y_meta }}" r="5" fill="var(--warning)" stroke="#fff" stroke-width="1.5" class="pl-clickable pl-proj-circle" data-prob-tipo="P90 (Conservador)" data-prob-fecha="{{ curva_svg.proyeccion.fecha_p90_str }}" data-prob-dias="{{ curva_svg.proyeccion.dias_vs_fin_p90 }}"></circle>
+            {% endif %}
+
+            {# Área y Línea Real (EV) #}
+            {% if curva_svg.poligono_real %}
+            <polygon class="pl-curve-area" points="{{ curva_svg.poligono_real }}" fill="url(#pl-area-grad)"></polygon>
+            <polyline class="pl-curve-real" points="{{ curva_svg.linea_real }}"></polyline>
+            {% endif %}
+
+            {# Línea Planeada (PV) #}
+            <polyline class="pl-curve-plan" points="{{ curva_svg.linea_plan }}"></polyline>
+
+            {# Marcador Vertical de Hoy #}
+            <line class="pl-curve-hoy" x1="{{ curva_svg.x_hoy }}" x2="{{ curva_svg.x_hoy }}" y1="24" y2="214"></line>
+            <g class="pl-curve-hoy-badge" transform="translate({{ curva_svg.x_hoy }}, 12)">
+                <rect class="pl-curve-hoy-pill" x="-25" y="-9" width="50" height="18" rx="9"></rect>
+                <text class="pl-curve-hoy-label" x="0" y="3.5" text-anchor="middle">Hoy</text>
+            </g>
+
+            {# Puntos Interactivos (Dots) #}
+            {% for pt in curva_svg.puntos_datos %}
+            <g class="pl-curve-point-group" data-pt-idx="{{ pt.index }}">
+                {# Punto Plan (PV) #}
+                <circle class="pl-curve-dot pl-dot-plan" cx="{{ pt.x }}" cy="{{ pt.y_plan }}" r="4.5" 
+                        data-trimestre="{{ pt.etiqueta }}" data-nombre="{{ pt.nombre }}"
+                        data-rango="{{ pt.rango_fechas }}" data-rango-corto="{{ pt.rango_corto }}"
+                        data-estado-lbl="{{ pt.estado_label }}" data-dias="{{ pt.dias_duracion }}"
+                        data-ini="{{ pt.fecha_inicio_str }}" data-fin="{{ pt.fecha_fin_str }}"
+                        data-plan-pct="{{ pt.planeado_pct }}" data-plan-h="{{ pt.pv_horas }}" data-plan-inc="{{ pt.pv_inc_horas }}"
+                        data-real-pct="{{ pt.real_pct if pt.real_pct is not none else '' }}" 
+                        data-real-h="{{ pt.ev_horas if pt.ev_horas is not none else '' }}" 
+                        data-real-inc="{{ pt.ev_inc_horas if pt.ev_inc_horas is not none else '' }}"
+                        data-sv-h="{{ pt.sv_horas if pt.sv_horas is not none else '' }}"></circle>
+                
+                {# Punto Real (EV) si existe #}
+                {% if pt.y_real is not none %}
+                <circle class="pl-curve-dot pl-dot-real" cx="{{ pt.x }}" cy="{{ pt.y_real }}" r="5.5"
+                        data-trimestre="{{ pt.etiqueta }}" data-nombre="{{ pt.nombre }}"
+                        data-rango="{{ pt.rango_fechas }}" data-rango-corto="{{ pt.rango_corto }}"
+                        data-estado-lbl="{{ pt.estado_label }}" data-dias="{{ pt.dias_duracion }}"
+                        data-ini="{{ pt.fecha_inicio_str }}" data-fin="{{ pt.fecha_fin_str }}"
+                        data-plan-pct="{{ pt.planeado_pct }}" data-plan-h="{{ pt.pv_horas }}" data-plan-inc="{{ pt.pv_inc_horas }}"
+                        data-real-pct="{{ pt.real_pct }}" data-real-h="{{ pt.ev_horas }}" data-real-inc="{{ pt.ev_inc_horas }}"
+                        data-sv-h="{{ pt.sv_horas }}"></circle>
+                {% endif %}
+            </g>
+            {% endfor %}
+
+            {# Etiquetas de Eje X (Trimestres con Rangos de Fechas y Valores — SIN tags HTML) #}
+            {% for pt in curva_svg.puntos_datos %}
+            {# Fila 1: Título de Trimestre (T1, T2...) #}
+            <text class="pl-curve-label {% if pt.es_actual %}is-actual{% elif pt.es_pasado_o_actual %}is-cumplido{% endif %}" x="{{ pt.x }}" y="232" text-anchor="middle">{{ pt.etiqueta }}{% if pt.es_actual %} (Hoy){% endif %}</text>
+            
+            {# Fila 2: Rango de Fechas del Trimestre (ej. Jul–Oct 25) #}
+            <text class="pl-curve-date" x="{{ pt.x }}" y="250" text-anchor="middle">{{ pt.rango_corto }}</text>
+            
+            {# Fila 3: Valor según el Modo Activo (% / Horas / Incremento) #}
+            <text class="pl-curve-axis pl-val-pct" x="{{ pt.x }}" y="272" text-anchor="middle" font-weight="700">{% if pt.real_pct is none %}—{% else %}{{ pt.real_pct }}%{% endif %}</text>
+            <text class="pl-curve-axis pl-val-horas" x="{{ pt.x }}" y="272" text-anchor="middle" font-weight="700" style="display:none;">{% if pt.ev_horas is none %}—{% else %}{{ pt.ev_horas|round|int }}h{% endif %}</text>
+            <text class="pl-curve-axis pl-val-inc" x="{{ pt.x }}" y="272" text-anchor="middle" font-weight="700" style="display:none;">{% if pt.ev_inc_horas is none %}—{% else %}+{{ pt.ev_inc_horas|round|int }}h{% endif %}</text>
+            {% endfor %}
+        </svg>
+
+        {# Tooltip Flotante Dinámico #}
+        <div id="pl-chart-tooltip" class="pl-chart-tooltip" aria-hidden="true"></div>
+    </div>
+    
+    <div class="pl-legend">
+        <span class="pl-tone-neutral"><i style="border: 1px dashed var(--text-muted)"></i> Planeado (GFPI-F-134)</span>
+        <span class="pl-tone-info"><i style="background:var(--accent-primary)"></i> Aprobado real (SOFIA Plus)</span>
+        {% if curva_svg.proyeccion %}
+        <span class="pl-tone-info"><i style="background:linear-gradient(90deg, var(--success), var(--warning))"></i> Rango estimado (Optimista–Conservador)</span>
+        {% endif %}
+        <span class="pl-tone-warning"><i></i> Etapa Productiva</span>
+        <span class="pl-tone-danger"><i style="border-left:2px dashed var(--danger)"></i> Hoy</span>
+    </div>
+
+    {# Detalle técnico plegable: EVM, fórmulas y modos de visualización #}
+    <details class="pl-detalle-tecnico">
+        <summary>🔧 Ver detalle técnico (EVM, fórmulas de proyección y modos de visualización)</summary>
+
+        {% if proyeccion.proyeccion_probabilistica %}
+        <div class="pl-prob-pills" style="margin-top:0.75rem;">
+            <span class="pl-chip pl-tone-success" title="Escenario optimista (+25% velocidad)">Optimista (P10): {{ proyeccion.proyeccion_probabilistica.p10.fecha.strftime('%d/%m/%Y') }} ({{ proyeccion.proyeccion_probabilistica.p10.meses }} meses)</span>
+            <span class="pl-chip pl-tone-info" title="Escenario esperado (mediana al ritmo actual)">Más Probable (P50): {{ proyeccion.proyeccion_probabilistica.p50.fecha.strftime('%d/%m/%Y') }} ({{ proyeccion.proyeccion_probabilistica.p50.meses }} meses)</span>
+            <span class="pl-chip pl-tone-warning" title="Escenario conservador (-30% velocidad)">Conservador (P90): {{ proyeccion.proyeccion_probabilistica.p90.fecha.strftime('%d/%m/%Y') }} ({{ proyeccion.proyeccion_probabilistica.p90.meses }} meses)</span>
+        </div>
+        {% endif %}
+
+        {% if proyeccion.evm %}
+        <div class="pl-evm-quick-bar">
+            <div class="pl-evm-mini-kpi">
+                <span class="pl-evm-lbl">SPI (Índice de Cronograma)</span>
+                <strong class="pl-tone-{{ proyeccion.evm.tono }}">{{ proyeccion.evm.spi }}</strong>
+                <small>{{ proyeccion.evm.label }}</small>
+            </div>
+            <div class="pl-evm-mini-kpi">
+                <span class="pl-evm-lbl">Desfase Neto (SV)</span>
+                <strong class="{{ 'pl-tone-danger' if proyeccion.evm.sv_horas < 0 else 'pl-tone-success' }}">{{ '+' if proyeccion.evm.sv_horas > 0 else '' }}{{ proyeccion.evm.sv_horas }} h</strong>
+                <small>Frente al plan a la fecha</small>
+            </div>
+            <div class="pl-evm-mini-kpi">
+                <span class="pl-evm-lbl">Horas Ganadas (EV)</span>
+                <strong>{{ proyeccion.evm.ev_horas|round|int }} / {{ proyeccion.evm.total_horas|round|int }} h</strong>
+                <small>{{ ((proyeccion.evm.ev_horas / [proyeccion.evm.total_horas, 1]|max) * 100)|round|int }}% del total técnico</small>
+            </div>
+            <div class="pl-evm-mini-kpi">
+                <span class="pl-evm-lbl">Cierre Esperado</span>
+                <strong>{{ proyeccion.fecha_proyectada.strftime('%d/%m/%Y') if proyeccion.fecha_proyectada else '—' }}</strong>
+                <small>{{ proyeccion.ritmo_mensual|round(1) }} aprob./mes (req: {{ proyeccion.ritmo_requerido|round(1) }})</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Selector de Modo de Visualización #}
+        <div class="pl-mode-switch" role="group" aria-label="Modo de visualización de la Curva S" style="margin-top:0.75rem;">
+            <button type="button" class="pl-mode-btn is-active" data-curve-mode="pct" title="Mostrar avance en porcentaje (0% - 100%)">📊 % Acumulado</button>
+            <button type="button" class="pl-mode-btn" data-curve-mode="horas" title="Mostrar avance en horas acumuladas">⏱️ Horas (h)</button>
+            <button type="button" class="pl-mode-btn" data-curve-mode="velocidad" title="Mostrar ritmo e incremento de horas por trimestre">📈 Velocidad Trimestral</button>
+        </div>
+    </details>
+</section>
+{% endif %}
+
+{# 2. Pipeline de Avance por Fases del Proyecto Formativo #}
+{% if fases_progreso %}
+<section class="pl-card" id="seccion-pipeline" data-collapse-default="cerrado" style="margin-top: 1rem;">
+    <div class="pl-card-head">
+        <h2>Progreso por Fases del Proyecto Formativo</h2>
+        <p>Monitoreo secuencial del avance pedagógico en cada etapa del diseño curricular (GFPI-F-134).</p>
+    </div>
+
+    <div class="pl-fases-pipeline">
+        {% for fase in fases_progreso %}
+        <div class="pl-fase-node pl-tone-{{ fase.estado_tono }}">
+            <div class="pl-fase-node-head">
+                <span class="pl-fase-node-icon">{{ fase.icono }}</span>
+                <div class="pl-fase-node-title">
+                    <strong>{{ fase.nombre }}</strong>
+                    <small>{{ fase.etiqueta_trimestre }} · {{ fase.horas|round|int }} horas</small>
+                </div>
+                <span class="pl-chip pl-tone-{{ fase.estado_tono }} is-tone" style="margin-left:auto;">{{ fase.porcentaje_avance }}%</span>
+            </div>
+
+            <div class="pl-bar pl-tone-{{ fase.estado_tono }}" style="margin: 0.5rem 0 0.35rem; height:6px;">
+                <i style="width: {{ fase.porcentaje_avance }}%;"></i>
+            </div>
+
+            <div class="pl-fase-node-meta">
+                <span><strong>{{ fase.resultados_total }}</strong> RAPs</span>
+                <span><strong>{{ fase.competencias_tecnicas }}</strong> Técnicas</span>
+                {% if fase.dias_desfase > 0 %}
+                <span class="pl-tone-danger"><strong>+{{ fase.dias_desfase }}d</strong> retraso</span>
+                {% else %}
+                <span class="pl-tone-success">Al día</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{# 3. Diagrama de Flujo Acumulado (CFD) y Radar de Cobertura Curricular #}
+<div class="pl-grid-2col">
+    
+    {# A. Diagrama de Flujo Acumulado (CFD) #}
+    {% if proyeccion.cfd %}
+    <section class="pl-card" id="seccion-cfd" data-collapse-default="cerrado">
+        <div class="pl-card-head">
+            <h2>Flujo acumulado de RAPs (CFD)</h2>
+            <p>Evolución del estado de los resultados de aprendizaje por trimestre: detecta si los RAPs están estancados en desarrollo pedagógico o pendientes de registro en SOFIA.</p>
+        </div>
+        
+        <div class="pl-cfd-wrap">
+            <div class="pl-cfd-grid">
+                {% for bloque in proyeccion.cfd %}
+                {% set total_c = [bloque.total, 1]|max %}
+                {% set pct_aprob = (bloque.aprobados / total_c * 100)|round|int %}
+                {% set pct_eval = (bloque.en_evaluacion / total_c * 100)|round|int %}
+                {% set pct_form = (bloque.en_formacion / total_c * 100)|round|int %}
+                {% set pct_noin = (bloque.no_iniciados / total_c * 100)|round|int %}
+                
+                <div class="pl-cfd-col pl-interactive-cfd" 
+                     data-cfd-lbl="{{ bloque.etiqueta }}"
+                     data-cfd-aprob="{{ bloque.aprobados }}" data-cfd-aprob-pct="{{ pct_aprob }}"
+                     data-cfd-eval="{{ bloque.en_evaluacion }}" data-cfd-eval-pct="{{ pct_eval }}"
+                     data-cfd-form="{{ bloque.en_formacion }}" data-cfd-form-pct="{{ pct_form }}"
+                     data-cfd-noin="{{ bloque.no_iniciados }}" data-cfd-noin-pct="{{ pct_noin }}"
+                     data-cfd-tot="{{ bloque.total }}">
+                    
+                    <div class="pl-cfd-stack">
+                        <div class="pl-cfd-bar is-aprobado" style="height: {{ pct_aprob }}%;" title="Aprobados: {{ bloque.aprobados }} ({{ pct_aprob }}%)"></div>
+                        <div class="pl-cfd-bar is-evaluacion" style="height: {{ pct_eval }}%;" title="En Evaluación: {{ bloque.en_evaluacion }} ({{ pct_eval }}%)"></div>
+                        <div class="pl-cfd-bar is-formacion" style="height: {{ pct_form }}%;" title="En Formación: {{ bloque.en_formacion }} ({{ pct_form }}%)"></div>
+                        <div class="pl-cfd-bar is-noiniciado" style="height: {{ pct_noin }}%;" title="No Iniciados: {{ bloque.no_iniciados }} ({{ pct_noin }}%)"></div>
+                    </div>
+                    <span class="pl-cfd-lbl"><strong>{{ bloque.etiqueta }}</strong></span>
+                    <small class="pl-note">{{ bloque.aprobados }}/{{ bloque.total }} ok</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="pl-legend" style="margin-top: 0.8rem;">
+            <span><i style="background:var(--success)"></i> Aprobados (≥80%)</span>
+            <span><i style="background:var(--accent-primary)"></i> En Evaluación SOFIA</span>
+            <span><i style="background:var(--warning)"></i> En Formación Activa</span>
+            <span><i style="background:var(--border-divider)"></i> No Iniciados</span>
+        </div>
+    </section>
+    {% endif %}
+
+    {# B. Radar de Cobertura y Equilibrio Curricular #}
+    {% if radar and radar.ejes %}
+    <section class="pl-card" id="seccion-radar" data-collapse-default="cerrado">
+        <div class="pl-card-head" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+                <h2>Cobertura curricular por competencia (radar)</h2>
+                <p>Contraste multidimensional entre el peso horario del Programa Oficial, las horas planeadas y el avance real logrado en cada competencia.</p>
+            </div>
+        </div>
+
+        <div class="pl-radar-container">
+            <svg class="pl-radar-svg" viewBox="0 0 360 300" role="img" aria-label="Radar Curricular">
+                {% set radio_max = 105 %}
+                {% set cx = 180 %}
+                {% set cy = 145 %}
+
+                {# Círculos concéntricos de escala (25%, 50%, 75%, 100%) #}
+                {% for lvl in [25, 50, 75, 100] %}
+                {% set r = radio_max * (lvl / 100) %}
+                <circle cx="{{ cx }}" cy="{{ cy }}" r="{{ r }}" class="pl-radar-grid-circle"></circle>
+                <text x="{{ cx + 4 }}" y="{{ cy - r + 10 }}" class="pl-radar-grid-text">{{ lvl }}%</text>
+                {% endfor %}
+
+                {# Ejes radiales y etiquetas externas precalculadas en Python #}
+                {% for eje in radar.ejes %}
+                <line x1="{{ cx }}" y1="{{ cy }}" x2="{{ eje.ex }}" y2="{{ eje.ey }}" class="pl-radar-axis-line"></line>
+                <text x="{{ eje.lx }}" y="{{ eje.ly }}" class="pl-radar-axis-label pl-clickable" text-anchor="{{ eje.anchor }}" data-pedagogico-target="{{ eje.nombre }}" title="Clic para ver ficha de {{ eje.nombre }}">{{ eje.nombre_corto }}</text>
+                {% endfor %}
+
+                {# Polígono Planificado #}
+                {% if radar.puntos_plan_svg %}
+                <polygon points="{{ radar.puntos_plan_svg }}" class="pl-radar-poly-plan"></polygon>
+                {% endif %}
+
+                {# Polígono Real #}
+                {% if radar.puntos_real_svg %}
+                <polygon points="{{ radar.puntos_real_svg }}" class="pl-radar-poly-real"></polygon>
+                {% endif %}
+
+                {# Vértices Clicables en Radar Real #}
+                {% for eje in radar.ejes %}
+                <circle cx="{{ eje.px_real }}" cy="{{ eje.py_real }}" r="4" class="pl-radar-dot pl-clickable" 
+                        data-pedagogico-target="{{ eje.nombre }}"
+                        data-radar-nom="{{ eje.nombre }}"
+                        data-radar-hprog="{{ eje.horas_programa }}"
+                        data-radar-hplan="{{ eje.horas_planeadas }}"
+                        data-radar-av="{{ eje.avance_real_pct }}"
+                        data-radar-tipo="{{ 'Técnica' if eje.tipo == 'tecnica' else 'Transversal' }}"
+                        title="{{ eje.nombre }}: {{ eje.avance_real_pct }}% avance real ({{ eje.horas_planeadas }}h planeadas / {{ eje.horas_programa }}h oficiales)"></circle>
+                {% endfor %}
+            </svg>
+        </div>
+
+        <div class="pl-legend">
+            <span><i style="background:rgba(99, 102, 241, 0.4); border:1px solid #6366f1"></i> Cobertura Planificada (100%)</span>
+            <span><i style="background:rgba(16, 185, 129, 0.5); border:1px solid #10b981"></i> Avance Real Aprobado</span>
+        </div>
+    </section>
+    {% endif %}
+
+</div>
+
+{# 3. Mapa de Calor de Intensidad y Carga Docente #}
+{% if heatmap_docente and heatmap_docente.filas %}
+<section class="pl-card" id="heatmap-docente-section" data-collapse-default="cerrado">
+    <div class="pl-card-head" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+        <div>
+            <h2>Carga docente por trimestre (mapa de calor)</h2>
+            <p>Distribución de horas formativas asignadas por instructor en cada bloque lectivo (intensidad semanal calculada sobre horas de acompañamiento directo frente a grupo).</p>
+        </div>
+        <div class="pl-mode-switch" id="heat-mode-switch">
+            <button type="button" class="pl-mode-btn is-active" data-heat-mode="directas" onclick="cambiarModoHeatmap('directas')">Horas Directas (Clase)</button>
+            <button type="button" class="pl-mode-btn" data-heat-mode="totales" onclick="cambiarModoHeatmap('totales')">Horas Totales (Plan)</button>
+        </div>
+    </div>
+
+    <!-- Tarjetas de diagnóstico rápido de carga -->
+    <div class="pl-heat-stat-grid">
+        <div class="pl-heat-stat-card">
+            <span>Horas Directas Totales</span>
+            <strong>{{ heatmap_docente.resumen.total_horas_directas }} h</strong>
+        </div>
+        <div class="pl-heat-stat-card">
+            <span>Horas Totales del Plan</span>
+            <strong>{{ heatmap_docente.resumen.total_horas_totales }} h</strong>
+        </div>
+        <div class="pl-heat-stat-card">
+            <span>Pico Máx. Docente</span>
+            <strong style="color: {% if heatmap_docente.resumen.max_intensidad_semanal > 32 %}var(--danger){% elif heatmap_docente.resumen.max_intensidad_semanal >= 28 %}var(--warning){% else %}var(--accent-primary){% endif %};">
+                {{ heatmap_docente.resumen.max_intensidad_semanal }} h/sem
+            </strong>
+        </div>
+        <div class="pl-heat-stat-card">
+            <span>Perfiles Asignados</span>
+            <strong>{{ heatmap_docente.resumen.docentes_count }} perfiles</strong>
+        </div>
+    </div>
+
+    <div class="pl-table-wrap">
+        <table class="pl-table pl-heatmap-table">
+            <thead>
+                <tr>
+                    <th scope="col" style="min-width: 15rem;">Docente / Instructor</th>
+                    <th scope="col" style="width: 7rem; text-align: center;">Total Horas</th>
+                    {% for t_lbl in heatmap_docente.trimestres %}
+                    <th scope="col" style="text-align: center;">{{ t_lbl }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in heatmap_docente.filas %}
+                <tr>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <span>{{ fila.componente.icono }}</span>
+                            <strong>{{ fila.instructor }}</strong>
+                            <span class="pl-chip pl-tone-{{ fila.componente.tono }}" style="font-size:0.65rem; padding:0.1rem 0.4rem;">{{ fila.componente.badge }}</span>
+                        </div>
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="pl-chip">
+                            <strong class="heat-total-val" data-dir="{{ fila.total_horas_directas }}" data-tot="{{ fila.total_horas_totales }}">
+                                {{ fila.total_horas_directas }} h
+                            </strong>
+                        </span>
+                    </td>
+                    {% for celda in fila.celdas %}
+                    <td class="pl-heatmap-cell is-{{ celda.nivel }}"
+                        {% if celda.num_raps > 0 %}tabindex="0" role="button"{% endif %}
+                        data-has-raps="{% if celda.num_raps > 0 %}true{% else %}false{% endif %}"
+                        data-doc="{{ fila.instructor }}"
+                        data-trim="{{ celda.etiqueta }}"
+                        data-horas-dir="{{ celda.horas_directas }}"
+                        data-horas-tot="{{ celda.horas_totales }}"
+                        data-sem="{{ celda.semanas }}"
+                        data-int-dir="{{ celda.intensidad_semanal }}"
+                        data-int-tot="{{ celda.intensidad_semanal_tot }}"
+                        data-raps='{{ celda.raps|tojson|safe }}'
+                        onclick="mostrarDetalleRap(this)"
+                        title="{{ fila.instructor }} en {{ celda.etiqueta }}: {{ celda.horas_directas }}h directas (~{{ celda.intensidad_semanal }} h/sem) [{{ celda.num_raps }} RAPs]">
+                        <div class="pl-heat-val heat-val-display">{{ celda.horas_directas|round|int }}h</div>
+                        <div class="pl-heat-sub heat-sub-display">{{ celda.intensidad_semanal }} h/sem</div>
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if heatmap_docente.totales_ficha %}
+            <tfoot class="pl-heatmap-tfoot">
+                <tr>
+                    <td>
+                        <strong>📊 Carga Formativa Total de la Ficha</strong>
+                        <div style="font-size:0.68rem; color:var(--text-muted); font-weight:normal;">Suma de horas que cursa el grupo de aprendices</div>
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="pl-chip pl-tone-primary">
+                            <strong class="heat-total-val" data-dir="{{ heatmap_docente.resumen.total_horas_directas }}" data-tot="{{ heatmap_docente.resumen.total_horas_totales }}">
+                                {{ heatmap_docente.resumen.total_horas_directas }} h
+                            </strong>
+                        </span>
+                    </td>
+                    {% for t_f in heatmap_docente.totales_ficha %}
+                    <td style="text-align: center; background: color-mix(in srgb, var(--accent-primary) 6%, transparent);">
+                        <div class="pl-heat-val heat-val-ficha" data-dir="{{ t_f.horas_directas }}" data-tot="{{ t_f.horas_totales }}">
+                            {{ t_f.horas_directas|round|int }}h
+                        </div>
+                        <div class="pl-heat-sub heat-sub-ficha" data-dir="{{ t_f.intensidad_semanal }}" data-tot="{{ (t_f.horas_totales / t_f.semanas)|round(1) if t_f.semanas > 0 else 0 }}">
+                            {{ t_f.intensidad_semanal }} h/sem
+                        </div>
+                    </td>
+                    {% endfor %}
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+
+    <div class="pl-legend" style="margin-top: 0.9rem; display:flex; flex-wrap:wrap; gap:0.8rem; align-items:center;">
+        <span style="font-size:0.75rem; font-weight:700; color:var(--text-muted);">Normativa SENA (Res. 642/2004):</span>
+        <span class="pl-tone-danger"><i style="background:rgba(239, 68, 68, 0.35); border:1px solid var(--danger);"></i> Sobrecarga (&gt;32 h/sem)</span>
+        <span class="pl-tone-warning"><i style="background:rgba(245, 158, 11, 0.35); border:1px solid var(--warning);"></i> Jornada Plena (28–32 h/sem)</span>
+        <span class="pl-tone-primary"><i style="background:rgba(59, 130, 246, 0.25); border:1px solid var(--accent-primary);"></i> Carga Regular (10–28 h/sem)</span>
+        <span class="pl-tone-neutral"><i style="background:rgba(148, 163, 184, 0.15); border:1px solid var(--border-divider);"></i> Carga Ligera (&lt;10 h/sem)</span>
+    </div>
+</section>
+
+<!-- Modal / Drawer de Desglose de RAPs por Celda -->
+<div id="modal-detalle-raps" class="pl-modal-raps" role="dialog" aria-modal="true" aria-labelledby="modal-raps-titulo" style="display:none;">
+    <div class="pl-modal-raps-box">
+        <div class="pl-modal-raps-head">
+            <div>
+                <h3 id="modal-raps-titulo">Desglose de Resultados de Aprendizaje</h3>
+                <div id="modal-raps-subtitulo" class="pl-modal-raps-sub"></div>
+            </div>
+            <button type="button" class="pl-modal-raps-close" onclick="cerrarDetalleRap()" aria-label="Cerrar ventana">&times;</button>
+        </div>
+        <div id="modal-raps-cuerpo" class="pl-modal-raps-body">
+            <!-- Contenido dinámico inyectado por JS -->
+        </div>
+        <div class="pl-modal-raps-foot">
+            <button type="button" class="btn btn-secondary" onclick="cerrarDetalleRap()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let modoHeatmapActual = 'directas';
+
+function cambiarModoHeatmap(modo) {
+    modoHeatmapActual = modo;
+    document.querySelectorAll('#heat-mode-switch .pl-mode-btn').forEach(btn => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-heat-mode') === modo);
+    });
+
+    // Actualizar celdas de instructores
+    document.querySelectorAll('.pl-heatmap-cell').forEach(td => {
+        const hDir = parseFloat(td.getAttribute('data-horas-dir') || 0);
+        const hTot = parseFloat(td.getAttribute('data-horas-tot') || 0);
+        const intDir = parseFloat(td.getAttribute('data-int-dir') || 0);
+        const intTot = parseFloat(td.getAttribute('data-int-tot') || 0);
+        
+        const valDiv = td.querySelector('.heat-val-display');
+        const subDiv = td.querySelector('.heat-sub-display');
+        
+        if (modo === 'directas') {
+            if (valDiv) valDiv.textContent = Math.round(hDir) + 'h';
+            if (subDiv) subDiv.textContent = intDir + ' h/sem';
+        } else {
+            if (valDiv) valDiv.textContent = Math.round(hTot) + 'h';
+            if (subDiv) subDiv.textContent = intTot + ' h/sem';
+        }
+    });
+
+    // Actualizar totales de fila
+    document.querySelectorAll('.heat-total-val').forEach(el => {
+        const val = modo === 'directas' ? el.getAttribute('data-dir') : el.getAttribute('data-tot');
+        el.textContent = val + ' h';
+    });
+
+    // Actualizar totales de pie de tabla (ficha)
+    document.querySelectorAll('.heat-val-ficha').forEach(el => {
+        const val = modo === 'directas' ? el.getAttribute('data-dir') : el.getAttribute('data-tot');
+        el.textContent = Math.round(parseFloat(val || 0)) + 'h';
+    });
+    document.querySelectorAll('.heat-sub-ficha').forEach(el => {
+        const val = modo === 'directas' ? el.getAttribute('data-dir') : el.getAttribute('data-tot');
+        el.textContent = val + ' h/sem';
+    });
+}
+
+let ultimoFocoRaps = null;
+
+function mostrarDetalleRap(td) {
+    const rawRaps = td.getAttribute('data-raps');
+    if (!rawRaps) return;
+    let raps = [];
+    try {
+        raps = JSON.parse(rawRaps);
+    } catch(e) {
+        return;
+    }
+    if (!raps || raps.length === 0) return;
+
+    const doc = td.getAttribute('data-doc');
+    const trim = td.getAttribute('data-trim');
+    const hDir = td.getAttribute('data-horas-dir');
+    const hTot = td.getAttribute('data-horas-tot');
+    const intDir = td.getAttribute('data-int-dir');
+
+    document.getElementById('modal-raps-titulo').textContent = doc;
+    document.getElementById('modal-raps-subtitulo').textContent = `${trim} • ${hDir}h directas (${intDir} h/semana) • ${hTot}h totales`;
+
+    const cuerpo = document.getElementById('modal-raps-cuerpo');
+    cuerpo.innerHTML = '';
+
+    raps.forEach((r) => {
+        const item = document.createElement('div');
+        item.className = 'pl-rap-item';
+        item.innerHTML = `
+            <div class="pl-rap-item-head">
+                <strong>${r.competencia}</strong>
+                <span class="pl-chip pl-tone-primary">${r.horas_directas}h directas</span>
+            </div>
+            <div class="pl-rap-item-body">${r.rap}</div>
+            ${r.fase ? `<div class="pl-rap-item-fase">Fase: ${r.fase}</div>` : ''}
+        `;
+        cuerpo.appendChild(item);
+    });
+
+    const modal = document.getElementById('modal-detalle-raps');
+    ultimoFocoRaps = document.activeElement;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const btnCierre = modal.querySelector('.pl-modal-raps-close');
+    if (btnCierre) btnCierre.focus();
+}
+
+function cerrarDetalleRap() {
+    const modal = document.getElementById('modal-detalle-raps');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+    if (ultimoFocoRaps && ultimoFocoRaps.focus) ultimoFocoRaps.focus();
+    ultimoFocoRaps = null;
+}
+
+window.addEventListener('click', function(e) {
+    const modal = document.getElementById('modal-detalle-raps');
+    if (modal && e.target === modal) {
+        cerrarDetalleRap();
+    }
+});
+
+window.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    const modal = document.getElementById('modal-detalle-raps');
+    if (modal && modal.style.display !== 'none') {
+        cerrarDetalleRap();
+    }
+});
+</script>
+{% endif %}

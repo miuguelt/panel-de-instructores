@@ -10,6 +10,7 @@ lugar de impresiones.
 
 from datetime import date, datetime
 
+from app.helpers import utc_now
 from app import db
 
 
@@ -53,7 +54,7 @@ class NotaObservador(db.Model):
     # Fecha del hecho, no la del registro: una nota puede escribirse al día
     # siguiente y debe ordenarse por cuándo ocurrió.
     fecha = db.Column(db.Date, nullable=False, default=date.today, index=True)
-    creada_en = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    creada_en = db.Column(db.DateTime, nullable=False, default=utc_now)
     actualizada_en = db.Column(db.DateTime, nullable=True)
 
     aprendiz = db.relationship(

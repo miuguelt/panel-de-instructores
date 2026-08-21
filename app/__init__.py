@@ -331,6 +331,7 @@ def create_app(test_config=None):
     _register('app.routes.auth', 'auth_bp')
     _register('app.routes.api', 'api_bp', url_prefix='/api')
     _register('app.routes.instructor', 'instructor_bp', url_prefix='/instructor')
+    _register('app.routes.planeacion', 'planeacion_bp', url_prefix='/instructor')
     _register('app.routes.ranking', 'ranking_bp', url_prefix='/instructor')
     _register('app.routes.aseo', 'aseo_bp', url_prefix='/instructor')
     _register('app.routes.seguimiento', 'seguimiento_bp', url_prefix='/instructor')
@@ -479,5 +480,29 @@ def create_app(test_config=None):
             titulo='El archivo es demasiado grande',
             mensaje=f'El tamaño máximo permitido es de {limite_mb} MB.',
         ), 413
+
+    @app.errorhandler(500)
+    @app.errorhandler(Exception)
+    def error_interno_servidor(error):
+        """Maneja excepciones no capturadas, asegura rollback y renderiza vista amigable."""
+        from werkzeug.exceptions import HTTPException
+        if isinstance(error, HTTPException):
+            return error
+
+        db.session.rollback()
+        log.exception('Error interno no controlado en %s: %s', request.path, error)
+        if request.is_json or request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from flask import jsonify
+            return jsonify({
+                'error': 'Error interno del servidor.',
+                'detalle': str(error) if app.debug else None,
+            }), 500
+
+        return render_template(
+            'errors/error.html',
+            codigo=500,
+            titulo='Error interno del servidor',
+            mensaje='Ocurrió un problema inesperado al procesar la solicitud.',
+        ), 500
 
     return app

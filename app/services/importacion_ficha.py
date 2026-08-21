@@ -1,6 +1,7 @@
 """Importación de plantillas de aprendices y reportes oficiales de juicios SENA."""
 
 from datetime import datetime, date, timedelta
+from difflib import SequenceMatcher
 import hashlib
 import io
 import re
@@ -66,6 +67,23 @@ def _clave(valor):
     return ''.join(c for c in texto if not unicodedata.combining(c)).lower()
 
 
+def _codigo_programa(valor):
+    """Normaliza códigos con versión, por ejemplo ``228118 v 1.0``."""
+    texto = _texto(valor)
+    coincidencia = re.match(r'(\d+)', texto)
+    return coincidencia.group(1) if coincidencia else _clave(texto)
+
+
+def _nombres_programa_compatibles(nombre_a, nombre_b):
+    primero = _clave(nombre_a)
+    segundo = _clave(nombre_b)
+    if not primero or not segundo:
+        return True
+    if primero in segundo or segundo in primero:
+        return True
+    return SequenceMatcher(None, primero, segundo).ratio() >= 0.55
+
+
 def clasificar_competencia(nombre_competencia):
     if not nombre_competencia:
         return 'tecnica'
@@ -112,6 +130,9 @@ def _metadata_fila(label, value, metadata):
     elif 'denominacion' in clave:
         metadata['nombre_programa'] = _texto(value)
         return True
+    elif 'fecha del reporte' in clave:
+        metadata['fecha_reporte'] = _fecha(value).date() if _fecha(value) else None
+        return True
     elif 'fecha inicio' in clave:
         metadata['fecha_inicio'] = _fecha(value).date() if _fecha(value) else None
         return True
@@ -133,6 +154,7 @@ def _extraer_metadata(filas):
                 clave == 'ficha de caracterizacion'
                 or clave in ('codigo', 'codigo programa', 'cogigo')
                 or 'denominacion' in clave
+                or 'fecha del reporte' in clave
                 or 'fecha inicio' in clave
                 or 'fecha fin' in clave
             ):
@@ -150,6 +172,43 @@ def _extraer_metadata(filas):
 def _estado_aprendiz(valor):
     estado = _clave(valor).upper().replace(' ', '_').replace('-', '_')
     return estado or 'EN_FORMACION'
+
+
+def _clave_juicio(ficha_id, aprendiz_id, competencia, resultado_aprendizaje):
+    """Identidad estable de un resultado, independiente de su estado."""
+    return (
+        ficha_id,
+        aprendiz_id,
+        _texto(competencia),
+        _texto(resultado_aprendizaje),
+    )
+
+
+def _huella_juicio(clave):
+    """Genera la huella idempotente usada por los juicios nuevos."""
+    return hashlib.sha256(
+        '|'.join(_texto(parte) for parte in clave).encode('utf-8')
+    ).hexdigest()
+
+
+def _actualizar_datos_juicio(juicio, registro, nombre_archivo):
+    """Actualiza los datos variables sin cambiar la identidad del resultado."""
+    valores = {
+        'tipo_competencia': clasificar_competencia(registro['competencia']),
+        'juicio': registro['juicio'],
+        'fecha_juicio': registro['fecha_juicio'],
+        'fecha_fuente_texto': registro['fecha_fuente_texto'],
+        'funcionario_registro': registro['funcionario_registro'],
+        'fuente_archivo': _texto(nombre_archivo)[:255],
+    }
+    cambios = False
+    for campo, valor in valores.items():
+        if getattr(juicio, campo) != valor:
+            setattr(juicio, campo, valor)
+            cambios = True
+    if cambios:
+        juicio.importado_en = datetime.utcnow()
+    return cambios
 
 
 def _parse_rows(rows):
@@ -247,6 +306,68 @@ def _leer_archivo(archivo):
     return metadata, _parse_rows(filas)
 
 
+def leer_metadata_archivo(archivo):
+    """Lee solo los metadatos oficiales y deja el archivo en su posición original."""
+    stream = archivo.stream
+    posicion = stream.tell()
+    try:
+        metadata, _registros = _leer_archivo(archivo)
+        return metadata
+    finally:
+        stream.seek(posicion)
+
+
+def validar_reporte_ficha(ficha, metadata):
+    """Evita mezclar un reporte con otra ficha o programa de formación."""
+    motivos = []
+    codigo_reporte = _texto(metadata.get('codigo_ficha'))
+    codigos_ficha = {
+        _texto(ficha.codigo),
+        _texto(ficha.codigo_ficha),
+    }
+    codigos_ficha.discard('')
+    if not codigo_reporte:
+        motivos.append('El reporte no contiene la Ficha de Caracterización.')
+    elif codigos_ficha and codigo_reporte not in codigos_ficha:
+        motivos.append(
+            f'El archivo corresponde a la ficha {codigo_reporte}, '
+            f'pero la pantalla está ubicada en la ficha {ficha.codigo}.'
+        )
+
+    codigo_reporte_programa = _codigo_programa(metadata.get('codigo_programa'))
+    codigo_ficha_programa = _codigo_programa(ficha.codigo_programa)
+    if not codigo_reporte_programa:
+        motivos.append('El reporte no contiene el código del programa.')
+    if not codigo_ficha_programa:
+        motivos.append(
+            'La ficha no tiene registrado el código del programa; completa ese dato antes de cargar el reporte.'
+        )
+    if codigo_reporte_programa and codigo_ficha_programa and (
+        codigo_reporte_programa != codigo_ficha_programa
+    ):
+        motivos.append(
+            'El código del programa no coincide: '
+            f'reporte {codigo_reporte_programa} y ficha {codigo_ficha_programa}.'
+        )
+
+    if not metadata.get('nombre_programa'):
+        motivos.append('El reporte no contiene la denominación del programa.')
+    elif not _nombres_programa_compatibles(
+        metadata.get('nombre_programa'), ficha.nombre_programa
+    ):
+        motivos.append('La denominación del programa no coincide con la ficha.')
+
+    if motivos:
+        raise ErrorImportacion(
+            'Carga bloqueada para proteger los datos. '
+            'Debes subir el Reporte de Juicios Evaluativos y la planeación '
+            'de la misma ficha y programa. '
+            + ' '.join(motivos)
+        )
+
+    return metadata
+
+
 def _buscar_ficha(ficha_actual, metadata):
     codigo_ficha = metadata.get('codigo_ficha')
     codigo_programa = metadata.get('codigo_programa')
@@ -282,16 +403,7 @@ def _resolver_ficha(ficha_actual, metadata, instructor_id, crear_ficha):
     codigo_reporte = metadata.get('codigo_ficha')
 
     if ficha_actual is not None:
-        codigos_actuales = {
-            _texto(ficha_actual.codigo),
-            _texto(ficha_actual.codigo_ficha),
-        }
-        codigos_actuales.discard('')
-        if codigo_reporte and codigo_reporte not in codigos_actuales:
-            raise ErrorImportacion(
-                f'El reporte corresponde a la ficha {codigo_reporte}, '
-                f'no a la ficha {ficha_actual.codigo}.'
-            )
+        validar_reporte_ficha(ficha_actual, metadata)
         _asegurar_configuraciones(ficha_actual)
         return ficha_actual, False
 
@@ -306,6 +418,7 @@ def _resolver_ficha(ficha_actual, metadata, instructor_id, crear_ficha):
 
     ficha = _buscar_ficha(None, metadata)
     if ficha:
+        validar_reporte_ficha(ficha, metadata)
         _asegurar_configuraciones(ficha)
         return ficha, False
 
@@ -346,7 +459,8 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
     if not asociacion:
         db.session.add(FichaInstructor(ficha_id=ficha.id, instructor_id=instructor_id))
 
-    nuevos = actualizados = juicios_nuevos = juicios_repetidos = 0
+    nuevos = actualizados = 0
+    juicios_nuevos = juicios_actualizados = juicios_repetidos = 0
     errores = []
 
     # Precarga en memoria para que cada fila se resuelva con O(1) lookups.
@@ -355,34 +469,6 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
     aprendices_db = {
         a.documento: a
         for a in Aprendiz.query.filter_by(ficha_id=ficha.id).all()
-    }
-
-    # Precalcular las huellas y consultar solo los juicios presentes en este
-    # archivo. Se deduplican los parámetros del IN porque el reporte puede
-    # repetir la misma evaluación.
-    huellas_excel = []
-    for registro in registros:
-        if registro['competencia'] or registro['resultado_aprendizaje'] or registro['juicio']:
-            partes = [
-                str(ficha.id), registro['documento'], registro['competencia'],
-                registro['resultado_aprendizaje'], registro['juicio'],
-                (registro['fecha_juicio'].isoformat() if registro['fecha_juicio']
-                 else registro['fecha_fuente_texto']), registro['funcionario_registro'],
-            ]
-            registro['huella_calc'] = hashlib.sha256(
-                '|'.join(_texto(p) for p in partes).encode('utf-8')
-            ).hexdigest()
-            huellas_excel.append(registro['huella_calc'])
-
-    huellas_excel = list(dict.fromkeys(huellas_excel))
-    juicios_db = {
-        j.huella: j
-        for j in (
-            JuicioEvaluativo.query
-            .filter(JuicioEvaluativo.huella.in_(huellas_excel))
-            .all()
-            if huellas_excel else []
-        )
     }
 
     # Primera pasada: preparar aprendices nuevos y actualizar los existentes.
@@ -442,16 +528,76 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
             ).all()
         })
 
+    # La huella anterior incluía el juicio, la fecha y el funcionario. Todos
+    # son datos que pueden cambiar en el siguiente reporte, así que ese diseño
+    # convertía una actualización de estado en un registro nuevo. La consulta
+    # por aprendiz permite encontrar también registros creados con la huella
+    # anterior y migrarlos de forma transparente al nuevo comportamiento.
+    claves_excel = set()
+    aprendices_con_juicios = set()
+    for registro, documento in registros_validos:
+        if not (
+            registro['competencia']
+            or registro['resultado_aprendizaje']
+            or registro['juicio']
+        ):
+            continue
+        aprendiz = aprendices_db[documento]
+        clave = _clave_juicio(
+            ficha.id,
+            aprendiz.id,
+            registro['competencia'],
+            registro['resultado_aprendizaje'],
+        )
+        registro['clave_juicio'] = clave
+        registro['huella_calc'] = _huella_juicio(clave)
+        claves_excel.add(clave)
+        aprendices_con_juicios.add(aprendiz.id)
+
+    juicios_db = {}
+    if aprendices_con_juicios:
+        juicios_existentes = (
+            JuicioEvaluativo.query
+            .filter(
+                JuicioEvaluativo.ficha_id == ficha.id,
+                JuicioEvaluativo.aprendiz_id.in_(aprendices_con_juicios),
+            )
+            .order_by(JuicioEvaluativo.id)
+            .all()
+        )
+        for juicio in juicios_existentes:
+            clave = _clave_juicio(
+                juicio.ficha_id,
+                juicio.aprendiz_id,
+                juicio.competencia,
+                juicio.resultado_aprendizaje,
+            )
+            if clave in claves_excel and clave not in juicios_db:
+                juicios_db[clave] = juicio
+
     # Segunda pasada: preparar todos los juicios para una inserción masiva.
     # Los duplicados dentro del mismo archivo se resuelven en memoria.
     juicios_pendientes = {}
     for registro, documento in registros_validos:
-        if 'huella_calc' not in registro:
+        if 'clave_juicio' not in registro:
             continue
-        huella = registro['huella_calc']
-        if huella not in juicios_db and huella not in juicios_pendientes:
+        clave = registro['clave_juicio']
+        if clave in juicios_pendientes:
+            # Si el reporte trae el mismo resultado más de una vez, conserva
+            # la última versión en memoria y no crea otra fila.
+            pendiente = juicios_pendientes[clave]
+            pendiente.update({
+                'tipo_competencia': clasificar_competencia(registro['competencia']),
+                'juicio': registro['juicio'],
+                'fecha_juicio': registro['fecha_juicio'],
+                'fecha_fuente_texto': registro['fecha_fuente_texto'],
+                'funcionario_registro': registro['funcionario_registro'],
+                'fuente_archivo': _texto(archivo.filename)[:255],
+            })
+            juicios_repetidos += 1
+        elif clave not in juicios_db:
             aprendiz = aprendices_db[documento]
-            juicios_pendientes[huella] = {
+            juicios_pendientes[clave] = {
                 'ficha_id': ficha.id,
                 'aprendiz_id': aprendiz.id,
                 'competencia': registro['competencia'],
@@ -462,12 +608,19 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
                 'fecha_fuente_texto': registro['fecha_fuente_texto'],
                 'funcionario_registro': registro['funcionario_registro'],
                 'fuente_archivo': _texto(archivo.filename)[:255],
-                'huella': huella,
+                'huella': registro['huella_calc'],
                 'importado_en': datetime.utcnow(),
             }
             juicios_nuevos += 1
         else:
-            juicios_repetidos += 1
+            if _actualizar_datos_juicio(
+                juicios_db[clave],
+                registro,
+                archivo.filename,
+            ):
+                juicios_actualizados += 1
+            else:
+                juicios_repetidos += 1
 
     if juicios_pendientes:
         db.session.bulk_insert_mappings(
@@ -477,13 +630,21 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
         db.session.flush()
         # Recuperar una sola vez los IDs de los juicios nuevos y conservar la
         # misma forma de lookup para los ya existentes.
-        huellas_consulta = list(juicios_pendientes) + list(juicios_db)
-        juicios_db = {
-            juicio.huella: juicio
-            for juicio in JuicioEvaluativo.query.filter(
-                JuicioEvaluativo.huella.in_(huellas_consulta)
-            ).all()
-        }
+        huellas_consulta = [
+            datos['huella'] for datos in juicios_pendientes.values()
+        ]
+        juicios_nuevos_db = JuicioEvaluativo.query.filter(
+            JuicioEvaluativo.huella.in_(huellas_consulta)
+        ).all()
+        juicios_db.update({
+            _clave_juicio(
+                juicio.ficha_id,
+                juicio.aprendiz_id,
+                juicio.competencia,
+                juicio.resultado_aprendizaje,
+            ): juicio
+            for juicio in juicios_nuevos_db
+        })
 
     # Consultar únicamente los vínculos relevantes. Antes se cargaba todo el
     # historial de juicios del instructor en cada importación.
@@ -558,6 +719,7 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
         'ficha': ficha, 'ficha_creada': ficha_creada,
         'metadata': metadata, 'nuevos': nuevos,
         'actualizados': actualizados, 'juicios_nuevos': juicios_nuevos,
+        'juicios_actualizados': juicios_actualizados,
         'juicios_repetidos': juicios_repetidos, 'errores': errores,
         'sesiones_creadas': sesiones_creadas,
     }

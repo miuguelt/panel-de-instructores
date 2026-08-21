@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from app.helpers import utc_now
 
 
 # Modalidades de trabajo de una tarea.
@@ -16,6 +16,7 @@ class Tarea(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
+    corte_id = db.Column(db.Integer, db.ForeignKey('cortes.id'), nullable=True, index=True)
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
     titulo = db.Column(db.String(200), nullable=False)
     descripcion = db.Column(db.Text, nullable=True)
@@ -26,11 +27,12 @@ class Tarea(db.Model):
     modalidad = db.Column(
         db.String(20), nullable=False, default=MODALIDAD_EVIDENCIA, server_default=MODALIDAD_EVIDENCIA
     )
-    creada_en = db.Column(db.DateTime, default=datetime.utcnow)
+    creada_en = db.Column(db.DateTime, default=utc_now)
     actualizada_en = db.Column(db.DateTime, nullable=True)
 
     entregas = db.relationship('Entrega', backref='tarea', lazy='dynamic',
                                cascade='all, delete-orphan')
+    corte = db.relationship('Corte', back_populates='tareas')
     creador = db.relationship(
         'Instructor',
         foreign_keys=[instructor_id],
@@ -54,7 +56,7 @@ class Entrega(db.Model):
     aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
     archivo_url = db.Column(db.String(500), nullable=True)
     enlace_repositorio = db.Column(db.String(500), nullable=True)
-    fecha_entrega = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_entrega = db.Column(db.DateTime, default=utc_now)
     calificada = db.Column(db.Boolean, default=False)
     calificacion = db.Column(db.String(10), nullable=True)
     feedback = db.Column(db.Text, nullable=True)

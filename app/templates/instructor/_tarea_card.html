@@ -1,0 +1,115 @@
+{# Tarjeta de una tarea/evidencia del tablero. Espera la variable `tarea` en contexto. #}
+<div class="card task-card">
+    <div class="task-header">
+        <h3>{{ tarea.titulo }}</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            {% if tarea.es_actividad_clase %}
+            <span class="badge badge-info">Se revisa en clase</span>
+            {% else %}
+            <span class="badge badge-secondary">Con evidencia</span>
+            {% endif %}
+            {% if tarea.fecha_limite %}
+            <span class="badge badge-{{ 'danger' if tarea.fecha_limite < now else 'info' }}">
+                Límite: {{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    {% if tarea.creador %}
+    <p class="text-muted">Instructor responsable: {{ tarea.creador.nombre }}{% if tarea.corte and tarea.corte.compartido %} · Información compartida{% endif %}</p>
+    {% endif %}
+    {% if tarea.descripcion %}
+    <p class="task-desc">{{ tarea.descripcion }}</p>
+    {% endif %}
+    {% if tarea.enlace_externo %}
+    <a href="{{ tarea.enlace_externo }}" target="_blank" class="link-external">Enlace externo &rarr;</a>
+    {% endif %}
+    {% if tarea.actualizada_en %}
+    <p class="text-muted" style="font-size: 12px;">Editada el {{ tarea.actualizada_en.strftime('%d/%m/%Y %H:%M') }}</p>
+    {% endif %}
+
+    <div class="task-card-footer">
+        <a href="{{ url_for('instructor.ver_entregas', tarea_id=tarea.id) }}" class="btn btn-sm btn-primary">
+            {% if tarea.es_actividad_clase %}Aprobar cumplimiento{% else %}Ver Entregas{% endif %}
+        </a>
+        {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}<form method="POST"
+              action="{{ url_for('instructor.eliminar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
+              onsubmit="return confirm('Se eliminará la tarea «{{ tarea.titulo|e }}» junto con todas sus entregas, calificaciones y archivos. Esta acción no se puede deshacer. ¿Continuar?');"
+              style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if tarea.corte_id %}<input type="hidden" name="corte_id" value="{{ tarea.corte_id }}">{% endif %}
+            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+        </form>{% endif %}
+    </div>
+
+    {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}<details class="task-edit-form" data-form-tarea>
+        <summary>✏️ Editar tarea</summary>
+        <form method="POST"
+              action="{{ url_for('instructor.editar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
+              enctype="multipart/form-data" class="task-edit-inner">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="titulo-{{ tarea.id }}">Título</label>
+                <input type="text" id="titulo-{{ tarea.id }}" name="titulo" value="{{ tarea.titulo }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="descripcion-{{ tarea.id }}">Descripción</label>
+                <textarea id="descripcion-{{ tarea.id }}" name="descripcion" rows="3">{{ tarea.descripcion or '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Modalidad</label>
+                <div class="modalidad-opciones">
+                    <label class="modalidad-opcion">
+                        <input type="radio" name="modalidad" value="evidencia" data-modalidad
+                               {% if not tarea.es_actividad_clase %}checked{% endif %}>
+                        <span><strong>Con evidencia</strong><small>El aprendiz sube archivo o enlace.</small></span>
+                    </label>
+                    <label class="modalidad-opcion">
+                        <input type="radio" name="modalidad" value="clase" data-modalidad
+                               {% if tarea.es_actividad_clase %}checked{% endif %}>
+                        <span><strong>Se revisa en clase</strong><small>Apruebas el cumplimiento tú mismo.</small></span>
+                    </label>
+                </div>
+                <small class="text-muted">La modalidad solo puede cambiarse mientras la tarea no tenga registros.</small>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group flex-grow">
+                    <label for="enlace-{{ tarea.id }}">Enlace externo</label>
+                    <input type="url" id="enlace-{{ tarea.id }}" name="enlace_externo" value="{{ tarea.enlace_externo or '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="limite-{{ tarea.id }}">Fecha límite</label>
+                    <input type="datetime-local" id="limite-{{ tarea.id }}" name="fecha_limite"
+                           value="{{ tarea.fecha_limite.strftime('%Y-%m-%dT%H:%M') if tarea.fecha_limite else '' }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="material-{{ tarea.id }}">Reemplazar material de apoyo</label>
+                <input type="file" id="material-{{ tarea.id }}" name="material_apoyo">
+                {% if tarea.material_apoyo_url %}
+                <div class="material-actual" style="margin-top: 8px;">
+                    <span>Material actual cargado.</span>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="quitar_material">
+                        Quitar el material actual
+                    </label>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="form-group" data-solo-evidencia>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="requiere_archivo" {% if tarea.requiere_archivo %}checked{% endif %}>
+                    Los aprendices deben subir archivo como evidencia
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
+        </form>
+    </details>{% else %}<small class="text-muted">Solo lectura para instructores vinculados.</small>{% endif %}
+</div>

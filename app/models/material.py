@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from app.helpers import utc_now
 
 class MaterialFicha(db.Model):
     __tablename__ = 'materiales_ficha'
@@ -10,7 +10,7 @@ class MaterialFicha(db.Model):
     nombre_archivo = db.Column(db.String(255), nullable=False)
     url_archivo = db.Column(db.String(500), nullable=False)
     descripcion = db.Column(db.Text, nullable=True)
-    subido_en = db.Column(db.DateTime, default=datetime.utcnow)
+    subido_en = db.Column(db.DateTime, default=utc_now)
 
     # Relación con el instructor que lo subió
     subido_por = db.relationship('Instructor', backref=db.backref('materiales_subidos', lazy='dynamic'))

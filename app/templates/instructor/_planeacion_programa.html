@@ -1,0 +1,180 @@
+{# Contraste de la planeación contra el diseño curricular oficial del programa. #}
+
+{% if not contraste.disponible %}
+<section class="pl-card">
+    <div class="pl-card-head">
+        <h2>Carga el Programa de Formación para validar la planeación</h2>
+        <p>Es el PDF oficial del diseño curricular. Con él, esta vista puede verificar lo que ni la planeación ni el reporte de juicios saben por sí solos.</p>
+    </div>
+    <ul class="pl-benefits">
+        <li><strong>Horas oficiales por competencia.</strong> Se compara la duración máxima estimada del programa contra lo que la planeación repartió, competencia por competencia.</li>
+        <li><strong>Cobertura del diseño curricular.</strong> Detecta competencias y resultados de aprendizaje del programa que la planeación dejó por fuera.</li>
+        <li><strong>Intensidad horaria exigida.</strong> Divide las horas lectivas entre los meses reales de la ficha para saber si el calendario es viable.</li>
+        <li><strong>Código de norma de cada competencia.</strong> Da una llave estable para cruzar planeación, juicios y programa sin depender del texto.</li>
+    </ul>
+    <p class="pl-note">Súbelo en el Centro de Carga superior. Se lee automáticamente y queda versionado y descargable.</p>
+</section>
+{% else %}
+{% set horas = contraste.horas %}
+{% set pct_cobertura_horas = ((horas.planeacion / horas.programa_lectiva) * 100)|round|int if horas.programa_lectiva else 100 %}
+{% set pct_tecnicas = ((horas.tecnicas / horas.programa_lectiva) * 100)|round|int if horas.programa_lectiva else 0 %}
+
+<section class="pl-card" id="seccion-contraste" data-collapse-default="cerrado">
+    <div class="pl-card-head" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+        <div>
+            <h2>Contraste con el Programa de Formación</h2>
+            <p>Lo que exige el diseño curricular oficial frente a lo que reparte la planeación pedagógica cargada.</p>
+        </div>
+        {% if version_programa %}
+        <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}" class="btn btn-outline btn-sm pl-btn-download-main" title="Descargar archivo PDF oficial del Programa">
+            📑 Descargar PDF Oficial (v{{ version_programa.version }})
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="pl-kpis">
+        <div class="pl-kpi pl-tone-neutral">
+            <span>Horas del programa</span>
+            <strong>{{ horas.programa_lectiva }} h</strong>
+            <div class="pl-bar pl-tone-neutral" title="Horas lectivas oficiales">
+                <i style="width: 100%"></i>
+            </div>
+            <small>Lectivas · {{ horas.programa_productiva }} h productivas · {{ horas.programa_total }} h en total</small>
+        </div>
+        <div class="pl-kpi {{ 'pl-tone-success' if horas.estado == 'coincide' else 'pl-tone-warning' }}">
+            <span>Horas de la planeación</span>
+            <strong>{{ horas.planeacion }} h ({{ pct_cobertura_horas }}%)</strong>
+            <div class="pl-bar {{ 'pl-tone-success' if horas.estado == 'coincide' else 'pl-tone-warning' }}" title="Cobertura horaria: {{ pct_cobertura_horas }}%">
+                <i style="width: {{ [pct_cobertura_horas, 100]|min }}%"></i>
+            </div>
+            <small>
+                {% if horas.estado == 'coincide' %}Coincide con el programa (100%)
+                {% elif horas.diferencia > 0 %}{{ horas.diferencia }} h por encima del programa
+                {% else %}{{ -horas.diferencia }} h por debajo del programa{% endif %}
+            </small>
+        </div>
+        <div class="pl-kpi pl-tone-info">
+            <span>Peso de lo exigible</span>
+            <strong>{{ horas.tecnicas }} h ({{ pct_tecnicas }}%)</strong>
+            <div class="pl-bar pl-tone-info" title="Horas técnicas: {{ pct_tecnicas }}%">
+                <i style="width: {{ pct_tecnicas }}%"></i>
+            </div>
+            <small>Técnicas · {{ horas.transversales }} h transversales · {{ horas.ingles }} h inglés</small>
+        </div>
+        {% if contraste.intensidad %}
+        <div class="pl-kpi {{ 'pl-tone-warning' if contraste.intensidad.horas_semana > 40 else 'pl-tone-success' }}">
+            <span>Intensidad horaria requerida</span>
+            <strong>{{ contraste.intensidad.horas_semana }} h/semana</strong>
+            <div class="pl-bar {{ 'pl-tone-warning' if contraste.intensidad.horas_semana > 40 else 'pl-tone-success' }}" title="Intensidad: {{ contraste.intensidad.horas_semana }} h/semana">
+                <i style="width: {{ [contraste.intensidad.horas_semana * 2.5, 100]|min }}%"></i>
+            </div>
+            <small>{{ contraste.intensidad.horas_lectivas }} h en {{ contraste.intensidad.meses }} meses · {{ contraste.intensidad.horas_mes }} h por mes</small>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if contraste.competencias_sin_planear %}
+    <div class="pl-gap pl-tone-danger" style="margin-top:1rem">
+        <strong>Competencias del programa que la planeación no incluye</strong>
+        <p>
+            {% for faltante in contraste.competencias_sin_planear %}
+            {{ faltante.nombre }} ({{ faltante.horas|round|int }} h){% if not loop.last %} · {% endif %}
+            {% endfor %}
+        </p>
+    </div>
+    {% endif %}
+
+    <details class="pl-details" style="margin-top:1rem" open>
+        <summary>
+            <span>Horas por competencia: programa contra planeación</span>
+            <span class="pl-gantt-meta">
+                {% set desviadas = contraste.competencias|rejectattr('estado', 'equalto', 'coincide')|list %}
+                <span class="pl-chip pl-tone-{{ 'warning' if desviadas else 'success' }} is-tone">{{ desviadas|length }} con diferencia</span>
+                <span class="pl-chip">{{ contraste.competencias|length }} comparadas</span>
+            </span>
+        </summary>
+        <div class="pl-details-body">
+            <div class="pl-table-wrap">
+                <table class="pl-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Competencia</th>
+                            <th scope="col">Norma</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Horas (Plan vs Prog)</th>
+                            <th scope="col">Diferencia</th>
+                            <th scope="col">Cobertura RAPs</th>
+                            <th scope="col">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fila in contraste.competencias %}
+                        {% set pct_h_fila = ((fila.horas_planeacion / fila.horas_programa) * 100)|round|int if fila.horas_programa else 100 %}
+                        {% set pct_r_fila = ((fila.resultados_planeacion / fila.resultados_programa) * 100)|round|int if fila.resultados_programa else 100 %}
+                        <tr class="pl-clickable" data-pedagogico-target="{{ fila.nombre }}" tabindex="0" role="button" aria-label="Abrir ficha pedagógica de {{ fila.nombre }}">
+                            <td class="pl-rap"><strong>{{ fila.nombre }}</strong></td>
+                            <td>{{ fila.codigo_norma or '—' }}</td>
+                            <td>{{ 'Técnica' if fila.tipo == 'tecnica' else ('Inglés' if fila.tipo == 'ingles' else 'Transversal') }}</td>
+                            <td>
+                                <strong>{{ fila.horas_planeacion }} / {{ fila.horas_programa }} h</strong>
+                                <div class="pl-progress-mini-wrap" title="Cobertura horaria: {{ pct_h_fila }}%">
+                                    <div class="pl-progress-mini-bar pl-tone-{{ 'success' if fila.estado == 'coincide' else 'warning' }}" style="width:{{ [pct_h_fila, 100]|min }}%;"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="pl-chip pl-tone-{{ 'success' if fila.estado == 'coincide' else 'warning' }} is-tone">
+                                    {% if fila.diferencia > 0 %}+{% endif %}{{ fila.diferencia|round|int }} h
+                                </span>
+                            </td>
+                            <td>
+                                <span>{{ fila.resultados_planeacion }} de {{ fila.resultados_programa }} ({{ pct_r_fila }}%)</span>
+                                <div class="pl-progress-mini-wrap" title="Cobertura de RAPs: {{ pct_r_fila }}%">
+                                    <div class="pl-progress-mini-bar pl-tone-{{ 'success' if pct_r_fila == 100 else 'warning' }}" style="width:{{ pct_r_fila }}%;"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ fila.nombre }}">
+                                    📋 Ver datos competencia
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </details>
+
+    {% if contraste.resultados_sin_planear %}
+    <details class="pl-details" style="margin-top:.6rem">
+        <summary>
+            <span>Resultados de aprendizaje del programa sin planear</span>
+            <span class="pl-chip pl-tone-warning is-tone">{{ contraste.resultados_sin_planear|length }} sin planear</span>
+        </summary>
+        <div class="pl-details-body">
+            <p class="pl-note">Están en el diseño curricular oficial pero no tienen una unidad equivalente en la planeación cargada, así que nunca aparecerán en la línea de tiempo ni en el reporte de juicios.</p>
+            <div class="pl-table-wrap">
+                <table class="pl-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Competencia</th>
+                            <th scope="col">N.º</th>
+                            <th scope="col">Resultado de aprendizaje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for faltante in contraste.resultados_sin_planear %}
+                        <tr>
+                            <td>{{ faltante.competencia }}</td>
+                            <td>{{ faltante.numero }}</td>
+                            <td class="pl-rap">{{ faltante.nombre }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </details>
+    {% endif %}
+</section>
+{% endif %}

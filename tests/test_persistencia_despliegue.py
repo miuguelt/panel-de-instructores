@@ -110,6 +110,7 @@ class PersistenciaDespliegueTestCase(unittest.TestCase):
         self.assertIn('- RUN_MIGRATIONS=true', self.servicios['app'])
         self.assertIn('- RUN_MIGRATIONS=false', self.servicios['worker'])
         self.assertIn('FLASK_APP=wsgi.py', dockerfile)
+        self.assertIn('RUN_MIGRATIONS=true', dockerfile)
         self.assertIn('COPY --chown=adso:adso . .', dockerfile)
 
 

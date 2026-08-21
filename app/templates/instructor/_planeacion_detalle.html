@@ -1,0 +1,148 @@
+{# Vacíos de datos, detalle por fase y archivos versionados. #}
+
+{% if diagnostico %}
+<section class="pl-card" id="seccion-diagnostico">
+    <div class="pl-card-head">
+        <h2>Qué falta para que la línea de tiempo sea exacta</h2>
+        <p>Vacíos detectados en los archivos cargados. Mientras existan, la ubicación de algunos resultados es una estimación y no un dato del documento.</p>
+    </div>
+    <div class="pl-gap-list">
+        {% for hallazgo in diagnostico %}
+        <div class="pl-gap pl-tone-{{ hallazgo.tono }}">
+            <strong>{{ hallazgo.titulo }}</strong>
+            <p>{{ hallazgo.detalle }}</p>
+            <em>{{ hallazgo.accion }}</em>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section class="pl-card" id="seccion-detalle" data-collapse-default="cerrado">
+    <div class="pl-card-head">
+        <h2>Detalle por fase del proyecto formativo</h2>
+        <p>Se despliega solo la fase que necesites. Cada resultado muestra su ventana planeada, la fecha real en que se cerró y quién quedó pendiente.</p>
+    </div>
+    {% for fase in linea.fases %}
+    <details class="pl-details">
+        <summary>
+            <span>{{ fase.nombre }} · {{ fase.etiqueta_trimestre }}</span>
+            <span class="pl-gantt-meta">
+                <span class="pl-chip pl-tone-{{ fase.estado_tono }} is-tone">{{ fase.estado_label }}</span>
+                <span class="pl-chip">{{ fase.porcentaje_avance }}% aprobado</span>
+                <span class="pl-chip">{{ fase.resultados_total }} resultados</span>
+            </span>
+        </summary>
+        <div class="pl-details-body">
+            <div class="pl-fase-progress-box">
+                <div class="pl-fase-progress-label">
+                    <span>Avance de la fase <strong>{{ fase.nombre }}</strong>:</span>
+                    <strong>{{ fase.porcentaje_avance }}%</strong>
+                </div>
+                <div class="pl-progress-wrap" style="margin-top:0.3rem;">
+                    <div class="pl-progress-bar pl-tone-{{ fase.estado_tono }}" style="width: {{ fase.porcentaje_avance }}%;"></div>
+                </div>
+            </div>
+
+            {% for competencia in fase.competencias %}
+            <div style="display:flex; justify-content:space-between; align-items:center; margin:1rem 0 .4rem; flex-wrap:wrap; gap:.5rem;">
+                <h4 style="margin:0; color:var(--text-strong); font-size:.84rem; line-height:1.4">
+                    {{ competencia.nombre }}
+                    {% if competencia.codigo_norma %}<span class="pl-note" style="display:inline; margin-left:.4rem;">(Norma: {{ competencia.codigo_norma }})</span>{% endif %}
+                </h4>
+                <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ competencia.nombre }}">
+                    📋 Ver datos competencia
+                </button>
+            </div>
+            <div class="pl-table-wrap">
+                <table class="pl-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Resultado de aprendizaje</th>
+                            <th scope="col">Actividad</th>
+                            <th scope="col">Ventana planeada</th>
+                            <th scope="col">Horas</th>
+                            <th scope="col">Aprobación (% y Aprendices)</th>
+                            <th scope="col">Cierre real</th>
+                            <th scope="col">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in competencia.resultados %}
+                        <tr class="pl-clickable" data-pedagogico-target="{{ competencia.nombre }}" tabindex="0" role="button" aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}" title="Clic para ver criterios de evaluación y saberes">
+                            <td class="pl-rap">
+                                <strong>{{ item.rap }}</strong>
+                                {% if item.rap_codigo %}<div class="pl-note">Código RAP {{ item.rap_codigo }}</div>{% endif %}
+                            </td>
+                            <td>{{ item.actividad }}</td>
+                            <td>
+                                {{ item.etiqueta_trimestre }}
+                                <div class="pl-note">{{ item.fecha_plan_inicio.strftime('%d/%m/%Y') }} al {{ item.fecha_plan_fin.strftime('%d/%m/%Y') }}</div>
+                                {% if not item.trimestre_declarado %}<div class="pl-note"><em>Trimestre estimado, no declarado</em></div>{% endif %}
+                            </td>
+                            <td>{{ item.horas_total|round|int }} h<div class="pl-note">{{ item.horas_directas|round|int }} directas</div></td>
+                            <td>
+                                <strong>{{ item.porcentaje_avance }}%</strong>
+                                <div class="pl-progress-mini-wrap">
+                                    <div class="pl-progress-mini-bar pl-tone-{{ item.estado_tono }}" style="width:{{ item.porcentaje_avance }}%;"></div>
+                                </div>
+                                <div class="pl-note">{{ item.aprendices_aprobados }} de {{ analisis.resumen.aprendices_analizados }} aprendices</div>
+                            </td>
+                            <td>
+                                {% if item.fecha_cierre_real %}
+                                    {{ item.fecha_cierre_real.strftime('%d/%m/%Y') }}
+                                    <div class="pl-note">{{ item.dias_desfase }} días frente al plan</div>
+                                {% elif item.fecha_primera_aprobacion %}
+                                    <span class="pl-note">Abierto desde el {{ item.fecha_primera_aprobacion.strftime('%d/%m/%Y') }}</span>
+                                {% else %}
+                                    <span class="pl-note">Sin aprobaciones fechadas</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="pl-chip pl-tone-{{ item.estado_tono }} is-tone">{{ item.estado_label }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+
+    {% endfor %}
+</section>
+
+{% if analisis.juicios_sin_planeacion_detalle %}
+<details class="pl-details">
+    <summary>
+        <span>Resultados del reporte sin correspondencia en la planeación</span>
+        <span class="pl-chip pl-tone-warning is-tone">{{ analisis.resumen.resultados_sin_planeacion }} sin ubicar</span>
+    </summary>
+    <div class="pl-details-body">
+        <p class="pl-note">Estos resultados aparecen en el Reporte de Juicios Evaluativos pero no existen en la planeación cargada, así que su tiempo no entra en la línea.</p>
+        <div class="pl-table-wrap">
+            <table class="pl-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Resultado reportado</th>
+                        <th scope="col">Competencia</th>
+                        <th scope="col">Funcionario</th>
+                        <th scope="col">Juicio</th>
+                        <th scope="col">Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detalle in analisis.juicios_sin_planeacion_detalle %}
+                    <tr>
+                        <td class="pl-rap">{{ detalle.resultado }}</td>
+                        <td>{{ detalle.competencia or '—' }}</td>
+                        <td>{{ detalle.funcionario }}</td>
+                        <td>{{ detalle.juicio }}</td>
+                        <td>{{ detalle.fecha.strftime('%d/%m/%Y') if detalle.fecha else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</details>
+{% endif %}

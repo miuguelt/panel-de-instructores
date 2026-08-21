@@ -37,9 +37,9 @@ if __name__ == '__main__':
             print("No se pudo conectar a la BD. La app inicia igual.")
 
     debug = os.environ.get('FLASK_DEBUG', '1').lower() in ('1', 'true', 'yes')
-    # Watchdog debe observar el código y las plantillas del proyecto, no el
-    # entorno virtual ni sus caches del entorno. Esto evita reinicios por cambios internos
-    # de site-packages durante instalaciones, pruebas o herramientas IA.
+    # Usar el reloader 'stat' para evitar que en Windows watchdog reaccione ante
+    # accesos o lecturas dentro de site-packages (venv, venv_win, uv, pycache),
+    # eliminando reinicios espurios y bucles infinitos de recarga.
     reloader_excludes = (
         '*venv*',
         '*venv_win*',
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         port=8009,
         debug=debug,
         use_reloader=debug,
-        reloader_type='watchdog',
+        reloader_type='stat',
         reloader_interval=1,
         exclude_patterns=reloader_excludes,
     )

@@ -138,6 +138,16 @@
     form.appendChild(aviso);
   }
 
+  function cuerpoJson(xhr) {
+    var tipo = xhr.getResponseHeader('Content-Type') || '';
+    if (tipo.toLowerCase().indexOf('application/json') === -1) return null;
+    try {
+      return JSON.parse(xhr.responseText || '{}');
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function enviar(form, evento) {
     var seleccion = archivosDe(form);
     if (!seleccion.length) return;  // Sin archivo: envío normal del navegador.
@@ -178,6 +188,17 @@
     });
 
     xhr.addEventListener('load', function () {
+      var cuerpo = cuerpoJson(xhr);
+      if (cuerpo) {
+        if (xhr.status >= 200 && xhr.status < 400 && cuerpo.ok) {
+          window.location.href = cuerpo.redirect || xhr.responseURL || window.location.href;
+          return;
+        }
+        bloquear(form, false);
+        ui.panel.remove();
+        mostrarError(form, cuerpo.message || 'El servidor no pudo procesar la subida.');
+        return;
+      }
       if (xhr.status >= 200 && xhr.status < 400) {
         // El servidor responde con redirección; XHR ya la siguió, así que
         // basta con navegar a la URL final para ver los mensajes flash.

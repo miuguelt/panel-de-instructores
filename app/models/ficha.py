@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from app.helpers import utc_now
 
 
 class Ficha(db.Model):
@@ -14,7 +14,7 @@ class Ficha(db.Model):
     fecha_inicio = db.Column(db.Date, nullable=True)
     fecha_fin = db.Column(db.Date, nullable=True)
     duracion_productiva_meses = db.Column(db.Integer, nullable=False, default=6)
-    creada_en = db.Column(db.DateTime, default=datetime.utcnow)
+    creada_en = db.Column(db.DateTime, default=utc_now)
 
     __table_args__ = (
         db.Index('uq_ficha_codigo_ficha', 'codigo_ficha', unique=True,
@@ -47,6 +47,10 @@ class Ficha(db.Model):
                                           lazy='dynamic', cascade='all, delete-orphan')
     materiales = db.relationship('MaterialFicha', backref='ficha', lazy='dynamic',
                                  cascade='all, delete-orphan')
+    cortes = db.relationship('Corte', back_populates='ficha', lazy='dynamic',
+                             cascade='all, delete-orphan')
+    archivos_versionados = db.relationship('ArchivoFichaVersion', back_populates='ficha',
+                                           lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Ficha {self.codigo} - {self.nombre_programa}>'

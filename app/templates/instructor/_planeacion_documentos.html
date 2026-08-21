@@ -1,0 +1,111 @@
+{# Estado de los archivos fuente de la ficha e historial de versiones. #}
+{# La carga se hace una sola vez: en el Centro de Carga Unificada al inicio de la página. #}
+
+<section class="pl-card" id="documentos" data-collapse-default="cerrado">
+    <div class="pl-card-head pl-docs-head">
+        <div>
+            <h2>Archivos fuente e historial</h2>
+            <p>Estado de los tres archivos que alimentan esta vista. Cada carga crea una versión nueva sin sobrescribir la anterior, así que el historial completo queda descargable.</p>
+        </div>
+        <a href="#centro-carga" class="btn btn-sm btn-outline" title="Ir al Centro de Carga para subir una nueva versión">⬆️ Actualizar archivos</a>
+    </div>
+
+    <div class="pl-docs">
+        <article class="pl-doc {{ 'is-listo' if version_planeacion else 'is-falta' }}">
+            <header>
+                <h3>Planeación pedagógica</h3>
+                <span class="pl-chip pl-tone-{{ 'success' if version_planeacion else 'warning' }} is-tone">
+                    {{ 'v' ~ version_planeacion.version if version_planeacion else 'Sin cargar' }}
+                </span>
+            </header>
+            <p class="pl-note">Formato GFPI-F-134 en Excel. Aporta las fases del proyecto, las competencias, las horas por resultado y el trimestre planeado.</p>
+            {% if version_planeacion %}
+            <p class="pl-doc-meta">
+                {{ version_planeacion.nombre_archivo }} ·
+                {{ version_planeacion.creado_en.strftime('%d/%m/%Y') }}
+            </p>
+            <a class="btn btn-sm btn-outline" href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_planeacion.id) }}">Descargar versión vigente</a>
+            {% else %}
+            <a class="btn btn-sm btn-primary" href="#centro-carga">Cargar planeación</a>
+            {% endif %}
+        </article>
+
+        <article class="pl-doc {{ 'is-listo' if version_reporte else 'is-falta' }}">
+            <header>
+                <h3>Reporte de Juicios Evaluativos</h3>
+                <span class="pl-chip pl-tone-{{ 'success' if version_reporte else 'warning' }} is-tone">
+                    {{ 'v' ~ version_reporte.version if version_reporte else 'Sin cargar' }}
+                </span>
+            </header>
+            <p class="pl-note">Excel de SOFIA Plus. Es la única fuente con fechas reales: solo las aprobaciones traen fecha y de ahí sale el avance y el ritmo.</p>
+            {% if version_reporte %}
+            <p class="pl-doc-meta">
+                {{ version_reporte.nombre_archivo }} ·
+                {{ version_reporte.creado_en.strftime('%d/%m/%Y') }}
+            </p>
+            <a class="btn btn-sm btn-outline" href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_reporte.id) }}">Descargar versión vigente</a>
+            {% else %}
+            <a class="btn btn-sm btn-primary" href="#centro-carga">Cargar reporte</a>
+            {% endif %}
+        </article>
+
+        <article class="pl-doc {{ 'is-listo' if version_programa else 'is-falta' }}">
+            <header>
+                <h3>Programa de Formación</h3>
+                <span class="pl-chip pl-tone-{{ 'success' if version_programa else 'info' }} is-tone">
+                    {{ 'v' ~ version_programa.version if version_programa else 'Recomendado' }}
+                </span>
+            </header>
+            <p class="pl-note">PDF del diseño curricular oficial. Aporta las horas máximas por competencia, el código de norma y la lista completa de resultados de aprendizaje.</p>
+            {% if version_programa %}
+            <p class="pl-doc-meta">
+                {{ version_programa.nombre_archivo }} ·
+                {{ version_programa.creado_en.strftime('%d/%m/%Y') }}
+                {% if programa %}· {{ programa.resumen.competencias }} competencias · {{ programa.resumen.horas_lectivas_declaradas }} h lectivas{% endif %}
+            </p>
+            <a class="btn btn-sm btn-outline" href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}">Descargar versión vigente</a>
+            {% else %}
+            <a class="btn btn-sm btn-primary" href="#centro-carga">Cargar programa</a>
+            {% endif %}
+        </article>
+    </div>
+
+    <details class="pl-details" style="margin-top:1rem">
+        <summary>
+            <span>Historial completo de versiones</span>
+            <span class="pl-chip">{{ versiones|length }} archivos</span>
+        </summary>
+        <div class="pl-details-body">
+            {% if versiones %}
+            <div class="pl-table-wrap">
+                <table class="pl-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Documento</th>
+                            <th scope="col">Versión</th>
+                            <th scope="col">Archivo</th>
+                            <th scope="col">Estado</th>
+                            <th scope="col">Cargado</th>
+                            <th scope="col">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for version in versiones %}
+                        <tr>
+                            <td>{{ etiquetas_tipo.get(version.tipo, version.tipo) }}</td>
+                            <td><strong>v{{ version.version }}</strong></td>
+                            <td>{{ version.nombre_archivo }}<div class="pl-note">{{ (version.tamano_bytes / 1024)|round(1) }} KB</div></td>
+                            <td>{{ version.estado|capitalize }}</td>
+                            <td>{{ version.creado_en.strftime('%d/%m/%Y %I:%M') }} {{ 'a. m.' if version.creado_en.hour < 12 else 'p. m.' }}</td>
+                            <td><a class="btn btn-sm btn-outline" href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version.id) }}">Descargar</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="pl-note">Todavía no hay archivos versionados para esta ficha.</p>
+            {% endif %}
+        </div>
+    </details>
+</section>

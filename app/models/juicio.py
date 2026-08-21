@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.helpers import utc_now
 
 from app import db
 
@@ -18,7 +18,7 @@ class JuicioEvaluativo(db.Model):
     funcionario_registro = db.Column(db.String(200), nullable=True)
     fuente_archivo = db.Column(db.String(255), nullable=True)
     huella = db.Column(db.String(64), nullable=False, unique=True, index=True)
-    importado_en = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    importado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     ficha = db.relationship('Ficha', back_populates='juicios_evaluativos')
     aprendiz = db.relationship('Aprendiz', backref=db.backref('juicios_evaluativos', lazy='dynamic'))
@@ -32,7 +32,7 @@ class JuicioEvaluativoInstructor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     juicio_id = db.Column(db.Integer, db.ForeignKey('juicios_evaluativos.id'), nullable=False, index=True)
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
-    fecha_importacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_importacion = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     juicio = db.relationship('JuicioEvaluativo', back_populates='instructores')
     instructor = db.relationship('Instructor', backref=db.backref('juicios_importados', lazy='dynamic'))
@@ -49,7 +49,7 @@ class FichaCompetenciaSeleccionada(db.Model):
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
     competencia = db.Column(db.String(300), nullable=False)
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
-    fecha_seleccion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_seleccion = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     ficha = db.relationship('Ficha', backref=db.backref('competencias_seleccionadas', lazy='dynamic', cascade='all, delete-orphan'))
     instructor = db.relationship('Instructor', backref=db.backref('competencias_seleccionadas', lazy='dynamic'))

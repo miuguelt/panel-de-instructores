@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.helpers import utc_now
 
 from app import db
 
@@ -11,7 +11,7 @@ class FichaInstructor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
-    fecha_asignacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_asignacion = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     ficha = db.relationship('Ficha', back_populates='instructores_asociados')
     instructor = db.relationship('Instructor', back_populates='fichas_asociadas')

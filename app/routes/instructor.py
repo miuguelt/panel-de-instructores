@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import joinedload
 from app import db
 from app.models.ficha import Ficha
+from app.models.corte import Corte
 from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz, etiqueta_estado
 from app.models.asistencia import SesionAsistencia, RegistroAsistencia, ESTADOS_ASISTENCIA, CAUSALES_JUSTIFICADAS
 from app.models.tarea import (
@@ -42,10 +43,24 @@ from app.services.asistencia import (
     mapa_asistencia_por_fecha,
     mes_inicial_calendario,
 )
-from app.services.importacion_ficha import ErrorImportacion, importar_archivo, clasificar_competencia
-from app.services.permisos import puede_gestionar_ficha, puede_gestionar_tarea, tareas_visibles
+from app.services.importacion_ficha import (
+    ErrorImportacion,
+    importar_archivo,
+    clasificar_competencia,
+    leer_metadata_archivo,
+    validar_reporte_ficha,
+)
+from app.services.permisos import (
+    puede_gestionar_ficha,
+    puede_gestionar_corte,
+    puede_gestionar_tarea,
+    puede_ver_tarea,
+    tareas_visibles,
+)
+from app.services.cortes import corte_actual, corte_visible, cortes_visibles
 from app.services.archivos import (
     ArchivoService,
+    ArchivoDuplicado,
     ErrorArchivo,
     ErrorExtension,
     TiposCarpeta,
@@ -57,7 +72,9 @@ from app.models.ficha_instructor import FichaInstructor
 from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor, FichaCompetenciaSeleccionada
 from app.models.material import MaterialFicha
 from app.models.importacion import ImportacionJob
+from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_REPORTE_JUICIOS
 from app.services.importacion_jobs import encolar_importacion, ColaImportacionesNoDisponible
+from app.services.versiones_archivos import actualizar_estado, crear_version
 from datetime import datetime, date
 import json
 import os
@@ -102,14 +119,14 @@ def _actualizar_resumenes_despues_de_evaluar(ficha_id):
     return errores
 
 
-def _faltas_por_aprendiz(ficha_id):
+def _faltas_por_aprendiz(ficha_id, corte_id=None):
     """Cuenta faltas por aprendiz y estado en una sola consulta agregada.
 
     Devuelve ``{aprendiz_id: {estado: cantidad}}``. Antes cada aprendiz costaba
     dos COUNT independientes, asi que una ficha de 30 aprendices emitia 60
     consultas solo para pintar el semaforo.
     """
-    filas = (
+    consulta = (
         db.session.query(
             RegistroAsistencia.aprendiz_id,
             RegistroAsistencia.estado,
@@ -120,9 +137,10 @@ def _faltas_por_aprendiz(ficha_id):
             SesionAsistencia.ficha_id == ficha_id,
             RegistroAsistencia.estado.in_(ESTADOS_FALTA),
         )
-        .group_by(RegistroAsistencia.aprendiz_id, RegistroAsistencia.estado)
-        .all()
     )
+    if corte_id is not None:
+        consulta = consulta.filter(SesionAsistencia.corte_id == corte_id)
+    filas = consulta.group_by(RegistroAsistencia.aprendiz_id, RegistroAsistencia.estado).all()
     conteo = {}
     for aprendiz_id, estado, cantidad in filas:
         conteo.setdefault(aprendiz_id, {})[estado] = cantidad
@@ -146,7 +164,7 @@ def _ultima_entrega_por_aprendiz(tareas):
     return ultimas
 
 
-def calcular_semaforo(ficha_id, aprendices, config, ahora=None):
+def calcular_semaforo(ficha_id, aprendices, config, ahora=None, corte_id=None):
     """Nivel de riesgo, faltas y tareas pendientes de cada aprendiz de la ficha.
 
     Las vistas de asistencia y de alertas mostraban el mismo semaforo
@@ -154,9 +172,9 @@ def calcular_semaforo(ficha_id, aprendices, config, ahora=None):
     Aqui se resuelve con tres consultas para toda la ficha.
     """
     ahora = ahora or datetime.utcnow()
-    total_sesiones = contar_sesiones_registradas(ficha_id)
-    faltas = _faltas_por_aprendiz(ficha_id)
-    tareas_ficha = tareas_visibles(ficha_id).all()
+    total_sesiones = contar_sesiones_registradas(ficha_id, corte_id=corte_id)
+    faltas = _faltas_por_aprendiz(ficha_id, corte_id=corte_id)
+    tareas_ficha = tareas_visibles(ficha_id, corte_id=corte_id).all()
     ultimas_entregas = _ultima_entrega_por_aprendiz(tareas_ficha)
 
     stats_map = {}
@@ -532,6 +550,9 @@ def _resumen_importacion(resultado):
         f"{resultado['actualizados']} actualizados y "
         f"{resultado['juicios_nuevos']} juicios evaluativos incorporados."
     )
+    juicios_actualizados = resultado.get('juicios_actualizados', 0)
+    if juicios_actualizados:
+        mensaje += f" {juicios_actualizados} juicios evaluativos actualizados."
     if resultado['juicios_repetidos']:
         mensaje += (
             f" {resultado['juicios_repetidos']} juicios ya estaban en el historial."
@@ -559,6 +580,23 @@ def importar_reporte_ficha():
         )
         ficha = resultado['ficha']
         db.session.commit()
+        try:
+            archivo.stream.seek(0)
+            version = crear_version(
+                archivo,
+                ficha.id,
+                current_user.id,
+                TIPO_REPORTE_JUICIOS,
+                metadata=resultado.get('metadata'),
+            )
+            actualizar_estado(version, 'procesado', detalle=_resumen_importacion(resultado))
+            db.session.commit()
+        except ArchivoDuplicado as exc:
+            db.session.rollback()
+            flash(str(exc), 'warning')
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('La ficha se importó, pero no se pudo guardar la versión del reporte.')
         actualizar_alertas_ficha(ficha.id)
         actualizar_participacion_ficha(ficha.id)
 
@@ -999,8 +1037,22 @@ def cargar_excel(ficha_id):
         return redirect(url_for('instructor.aprendices', ficha_id=ficha_id))
 
     importacion_job_id = None
+    version = None
+    version_path = None
+    volver_planeacion = request.form.get('retorno') == 'planeacion'
     try:
+        metadata_reporte = leer_metadata_archivo(archivo)
+        validar_reporte_ficha(ficha, metadata_reporte)
+        version = crear_version(
+            archivo,
+            ficha.id,
+            current_user.id,
+            TIPO_REPORTE_JUICIOS,
+            metadata=metadata_reporte,
+        )
+        version_path = version.ruta_archivo
         if current_app.config.get('IMPORTACIONES_ASINCRONAS'):
+            archivo.stream.seek(0)
             nombre_archivo = secure_filename(archivo.filename) or 'reporte.xls'
             # Dentro de UPLOAD_FOLDER porque el worker corre en otro contenedor
             # y solo comparte con el web el volumen `uploads`.
@@ -1013,6 +1065,7 @@ def cargar_excel(ficha_id):
             job = ImportacionJob(
                 ficha_id=ficha.id,
                 instructor_id=current_user.id,
+                archivo_version_id=version.id,
                 archivo_path=ruta,
                 nombre_archivo=nombre_archivo,
                 estado='encolado',
@@ -1033,8 +1086,13 @@ def cargar_excel(ficha_id):
                     job.estado = 'error'
                     job.error = 'No fue posible conectar con la cola de procesamiento.'
                     job.terminado_en = datetime.utcnow()
+                    version = db.session.get(ArchivoFichaVersion, version.id)
+                    if version:
+                        actualizar_estado(version, 'error', detalle=job.error)
                     db.session.commit()
                 importacion_job_id = None
+                # Conserva la versión permanente para descarga y diagnóstico.
+                version_path = None
                 raise RuntimeError(
                     'No fue posible poner la importación en cola. '
                     'Revisa REDIS_URL y que el worker esté activo.'
@@ -1049,6 +1107,7 @@ def cargar_excel(ficha_id):
         else:
             resultado = importar_archivo(archivo, ficha, current_user.id)
             ficha = resultado['ficha']
+            actualizar_estado(version, 'procesado', detalle=_resumen_importacion(resultado))
             db.session.commit()
             actualizar_alertas_ficha(ficha.id)
             actualizar_participacion_ficha(ficha.id)
@@ -1063,15 +1122,21 @@ def cargar_excel(ficha_id):
 
     except (ErrorArchivo, ErrorImportacion, RuntimeError) as exc:
         db.session.rollback()
+        if version_path:
+            ArchivoService.eliminar(version_path)
         flash(str(exc), 'error')
     except Exception:
         db.session.rollback()
+        if version_path:
+            ArchivoService.eliminar(version_path)
         current_app.logger.exception('Error inesperado al importar aprendices')
         flash('No fue posible procesar el archivo. Verifica el Excel e inténtalo de nuevo.', 'error')
 
     parametros = {'ficha_id': ficha.id}
     if importacion_job_id:
         parametros['importacion_id'] = importacion_job_id
+    if volver_planeacion:
+        return redirect(url_for('planeacion.analisis', **parametros))
     return redirect(url_for('instructor.aprendices', **parametros))
 
 
@@ -1127,17 +1192,28 @@ def asistencia(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
+    corte_id = request.values.get('corte_id', type=int)
+    corte = corte_actual(ficha_id, corte_id=corte_id)
+    if corte_id and not corte:
+        flash('El corte no existe o no está compartido contigo.', 'error')
+        return redirect(url_for('instructor.asistencia', ficha_id=ficha_id))
+    corte_id = corte.id if corte else None
+    parametros_corte = {'corte_id': corte_id} if corte_id else {}
+
     if request.method == 'POST':
+        if corte and not puede_gestionar_corte(corte):
+            flash('Puedes consultar este corte compartido, pero solo su instructor responsable puede modificar la asistencia.', 'error')
+            return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, **parametros_corte))
         fecha_str = request.form.get('fecha', '')
         if not fecha_str:
             flash('Debes indicar la fecha de la sesión.', 'error')
-            return redirect(url_for('instructor.asistencia', ficha_id=ficha_id))
+            return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, **parametros_corte))
 
         try:
             fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
             flash('La fecha de la sesión no tiene un formato válido.', 'error')
-            return redirect(url_for('instructor.asistencia', ficha_id=ficha_id))
+            return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, **parametros_corte))
 
         aprendices = Aprendiz.query_llamado_lista(ficha_id).order_by(Aprendiz.apellidos).all()
         estados_validos = {valor for valor, _etiqueta in ESTADOS_ASISTENCIA}
@@ -1147,10 +1223,10 @@ def asistencia(ficha_id):
             causal = request.form.get(f'causal_{aprendiz.id}', '')
             if estado not in estados_validos:
                 flash(f'Selecciona la asistencia de {aprendiz.nombre} {aprendiz.apellidos}.', 'error')
-                return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, fecha=fecha.isoformat()))
+                return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, fecha=fecha.isoformat(), **parametros_corte))
             if estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA') and causal not in causales_validas:
                 flash(f'Selecciona una causal válida para {aprendiz.nombre} {aprendiz.apellidos}.', 'error')
-                return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, fecha=fecha.isoformat()))
+                return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, fecha=fecha.isoformat(), **parametros_corte))
 
         registros = {
             aprendiz.id: (
@@ -1161,7 +1237,7 @@ def asistencia(ficha_id):
         }
 
         try:
-            guardar_asistencia(ficha_id, fecha, registros)
+            guardar_asistencia(ficha_id, fecha, registros, corte_id=corte_id)
         except OperationalError as e:
             db.session.rollback()
             current_app.logger.error("Error de conexión con la base de datos al guardar asistencia: %s", str(e))
@@ -1179,7 +1255,11 @@ def asistencia(ficha_id):
             tareas_secundarias_fallidas = []
 
             try:
-                turno_aseo = ajustar_turno_por_asistencia(ficha_id, fecha)
+                # Los turnos de aseo pertenecen al histórico general de la
+                # ficha; un corte nuevo no debe modificar ni reutilizar ese
+                # calendario secundario.
+                if corte_id is None:
+                    turno_aseo = ajustar_turno_por_asistencia(ficha_id, fecha)
                 db.session.commit()
             except Exception:
                 db.session.rollback()
@@ -1200,7 +1280,7 @@ def asistencia(ficha_id):
                 )
 
             try:
-                actualizar_participacion_ficha(ficha_id)
+                actualizar_participacion_ficha(ficha_id, corte_id=corte_id)
             except Exception:
                 db.session.rollback()
                 tareas_secundarias_fallidas.append('ranking')
@@ -1222,25 +1302,29 @@ def asistencia(ficha_id):
                 )
             flash(mensaje, 'success')
 
-        return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, fecha=fecha.isoformat()))
+        return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, fecha=fecha.isoformat(), **parametros_corte))
 
     fecha_param = request.args.get('fecha', date.today().isoformat())
-    sesion = SesionAsistencia.query.filter_by(ficha_id=ficha_id, fecha=fecha_param).first()
+    consulta_sesion = SesionAsistencia.query.filter_by(ficha_id=ficha_id, fecha=fecha_param)
+    if corte_id is not None:
+        consulta_sesion = consulta_sesion.filter(SesionAsistencia.corte_id == corte_id)
+    sesion = consulta_sesion.first()
 
     registros_map = {}
     if sesion:
         for r in sesion.registros:
             registros_map[r.aprendiz_id] = r
 
-    sesiones_recientes = (
+    consulta_sesiones = (
         SesionAsistencia.query
         .join(RegistroAsistencia)
         .filter(SesionAsistencia.ficha_id == ficha_id)
-        .distinct()
-        .order_by(SesionAsistencia.fecha.desc())
-        .limit(10)
-        .all()
     )
+    if corte_id is not None:
+        consulta_sesiones = consulta_sesiones.filter(SesionAsistencia.corte_id == corte_id)
+    sesiones_recientes = consulta_sesiones.distinct().order_by(
+        SesionAsistencia.fecha.desc()
+    ).limit(10).all()
 
     config = ConfiguracionAlertas.query.filter_by(ficha_id=ficha_id).first()
     if not config:
@@ -1253,7 +1337,9 @@ def asistencia(ficha_id):
     # recargaria cada fila una por una. Incluye condicionados.
     aprendices = Aprendiz.query_llamado_lista(ficha_id).order_by(Aprendiz.apellidos).all()
 
-    stats_map, total_sesiones = calcular_semaforo(ficha_id, aprendices, config)
+    stats_map, total_sesiones = calcular_semaforo(
+        ficha_id, aprendices, config, corte_id=corte_id
+    )
 
     return render_template('asistencia.html',
                            ficha=ficha,
@@ -1266,7 +1352,12 @@ def asistencia(ficha_id):
                            causales_justificadas=CAUSALES_JUSTIFICADAS,
                            config=config,
                            sesion=sesion,
-                           total_sesiones=total_sesiones)
+                           total_sesiones=total_sesiones,
+                           cortes=cortes_visibles(ficha_id).order_by(
+                               Corte.fecha_inicio.desc(), Corte.id.desc()
+                           ).all(),
+                           corte_actual=corte,
+                           puede_editar_corte=(corte is None or puede_gestionar_corte(corte)))
 
 @instructor_bp.route('/fichas/<int:ficha_id>/asistencia/aprendiz/<int:aprendiz_id>/modal')
 @login_required
@@ -1276,10 +1367,19 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
     if not puede_gestionar_ficha(ficha) or not aprendiz or aprendiz.ficha_id != ficha_id:
         return 'Aprendiz no encontrado', 404
 
-    registros = RegistroAsistencia.query.join(SesionAsistencia).filter(
+    corte_id = request.args.get('corte_id', type=int)
+    corte = corte_actual(ficha_id, corte_id=corte_id)
+    if corte_id and not corte:
+        return 'Corte no encontrado', 404
+    corte_id = corte.id if corte else None
+
+    consulta_registros = RegistroAsistencia.query.join(SesionAsistencia).filter(
         SesionAsistencia.ficha_id == ficha_id,
         RegistroAsistencia.aprendiz_id == aprendiz.id
-    ).order_by(SesionAsistencia.fecha.asc()).all()
+    )
+    if corte_id is not None:
+        consulta_registros = consulta_registros.filter(SesionAsistencia.corte_id == corte_id)
+    registros = consulta_registros.order_by(SesionAsistencia.fecha.asc()).all()
 
     config_alertas = ConfiguracionAlertas.query.filter_by(ficha_id=ficha_id).first()
 
@@ -1358,7 +1458,7 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
             max_faltas_dia = cnt
             dia_mas_inasistencias = dia
 
-    total_sesiones = contar_sesiones_registradas(ficha_id)
+    total_sesiones = contar_sesiones_registradas(ficha_id, corte_id=corte_id)
     total_faltas = total_faltas_nj + total_faltas_j
     pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones > 0 else 100.0
 
@@ -1454,7 +1554,20 @@ def tareas(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
+    corte_id = request.values.get('corte_id', type=int)
+    corte = corte_actual(ficha_id, corte_id=corte_id)
+    if corte_id and not corte:
+        flash('El corte no existe o no está compartido contigo.', 'error')
+        return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+    corte_id = corte.id if corte else None
+
     if request.method == 'POST':
+        if corte and not puede_gestionar_corte(corte):
+            flash(
+                'Este corte es de solo lectura: está cerrado, archivado o pertenece a otro instructor.',
+                'error',
+            )
+            return redirect(url_for('instructor.tareas', ficha_id=ficha_id, corte_id=corte_id))
         try:
             datos = _leer_datos_tarea(request.form)
         except _DatosTareaInvalidos as exc:
@@ -1473,18 +1586,53 @@ def tareas(ficha_id):
         tarea = Tarea(
             ficha_id=ficha_id,
             instructor_id=current_user.id,
+            corte_id=corte_id,
             material_apoyo_url=material_url,
             **datos,
         )
         db.session.add(tarea)
         db.session.commit()
         actualizar_alertas_ficha(ficha_id)
-        actualizar_participacion_ficha(ficha_id)
+        actualizar_participacion_ficha(ficha_id, corte_id=corte_id)
         flash(f'Tarea "{datos["titulo"]}" creada correctamente.', 'success')
         return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
-    lista_tareas = tareas_visibles(ficha_id).order_by(Tarea.creada_en.desc()).all()
-    return render_template('tareas.html', ficha=ficha, tareas=lista_tareas, now=datetime.utcnow())
+    filtro_instructor = request.args.get('filtro_instructor', 'mias')
+    instructor_filtro_id = None
+    ver_todas = (filtro_instructor == 'todas')
+    if filtro_instructor not in ('mias', 'todas'):
+        try:
+            instructor_filtro_id = int(filtro_instructor)
+        except ValueError:
+            pass
+
+    lista_tareas = tareas_visibles(
+        ficha_id,
+        corte_id=corte_id,
+        ver_todas=ver_todas,
+        instructor_id=instructor_filtro_id,
+    ).order_by(
+        Tarea.creada_en.desc()
+    ).all()
+
+    instructores_ficha = [ficha.instructor]
+    for fi in ficha.instructores_asociados.all():
+        if fi.instructor and fi.instructor.id != ficha.instructor_id and fi.instructor not in instructores_ficha:
+            instructores_ficha.append(fi.instructor)
+
+    return render_template(
+        'tareas.html',
+        ficha=ficha,
+        tareas=lista_tareas,
+        now=datetime.utcnow(),
+        cortes=cortes_visibles(ficha_id).order_by(
+            Corte.fecha_inicio.desc(), Corte.id.desc()
+        ).all(),
+        corte_actual=corte,
+        puede_editar_corte=(corte is None or puede_gestionar_corte(corte)),
+        filtro_instructor=filtro_instructor,
+        instructores_ficha=instructores_ficha,
+    )
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/tareas/<int:tarea_id>/editar', methods=['POST'])
@@ -1688,7 +1836,7 @@ def ver_entregas(tarea_id):
         return redirect(url_for('instructor.fichas'))
 
     ficha = tarea.ficha
-    if not puede_gestionar_ficha(ficha) or not puede_gestionar_tarea(tarea):
+    if not puede_gestionar_ficha(ficha) or not puede_ver_tarea(tarea):
         flash('No tienes permiso para ver esta tarea.', 'error')
         return redirect(url_for('instructor.fichas'))
 
@@ -1723,7 +1871,9 @@ def ver_entregas(tarea_id):
 
     return render_template('entregas.html', tarea=tarea, ficha=ficha,
                            aprendices=aprendices, entregas_map=entregas_map,
-                           insignias_map=insignias_map)
+                           insignias_map=insignias_map,
+                           corte_actual=tarea.corte,
+                           puede_editar_tarea=puede_gestionar_tarea(tarea))
 
 
 @instructor_bp.route('/entregas/<int:entrega_id>/archivo')
@@ -1738,7 +1888,7 @@ def descargar_archivo_entrega(entrega_id):
         or not entrega.aprendiz
         or entrega.aprendiz.ficha_id != entrega.tarea.ficha_id
         or not puede_gestionar_ficha(entrega.tarea.ficha)
-        or not puede_gestionar_tarea(entrega.tarea)
+        or not puede_ver_tarea(entrega.tarea)
     ):
         abort(404)
 
@@ -1999,6 +2149,13 @@ def reporte_asistencia(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
 
+    corte_id = request.args.get('corte_id', type=int)
+    corte = corte_actual(ficha_id, corte_id=corte_id)
+    if corte_id and not corte:
+        flash('El corte no existe o no está compartido contigo.', 'error')
+        return redirect(url_for('instructor.asistencia', ficha_id=ficha_id))
+    corte_id = corte.id if corte else None
+
     formato = request.args.get('formato', 'excel')
     fecha_inicio_str = request.args.get('fecha_inicio')
     fecha_fin_str = request.args.get('fecha_fin')
@@ -2011,6 +2168,8 @@ def reporte_asistencia(ficha_id):
         .filter(SesionAsistencia.ficha_id == ficha_id)
         .distinct()
     )
+    if corte_id is not None:
+        query_sesiones = query_sesiones.filter(SesionAsistencia.corte_id == corte_id)
     
     if fecha_inicio_str:
         try:
