@@ -19,6 +19,7 @@ from app.services.aseo import (
     datos_transparencia,
     generar_turnos,
     obtener_configuracion,
+    recalcular_contadores,
     reemplazar_aprendices,
 )
 from app.services.permisos import puede_gestionar_ficha
@@ -98,10 +99,7 @@ def turnos(ficha_id):
     }
 
     config = obtener_configuracion(ficha_id)
-    asegurar_contadores(ficha_id)
-    # Se confirma antes de leer lo que va a la plantilla: al hacerlo al final,
-    # el commit expiraba aprendices y contadores y el render los recargaba de
-    # uno en uno.
+    recalcular_contadores(ficha_id)
     db.session.commit()
     contadores = {
         contador.aprendiz_id: contador

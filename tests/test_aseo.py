@@ -526,6 +526,188 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertEqual(turno_bd.aprendiz_1_id, self.aprendices[0].id)
         self.assertEqual(turno_bd.aprendiz_2_id, self.aprendices[1].id)
 
+    def test_recalcular_contadores_preserva_turnos_con_completado_nulo(self):
+        # Simula turnos históricos donde completado_1 y completado_2 son None
+        fecha_pasada = date.today() - timedelta(days=5)
+        self._crear_sesion(fecha_pasada)
+        turno_historico = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_pasada,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='cumplido',
+            completado_1=None,
+            completado_2=None,
+        )
+        db.session.add(turno_historico)
+        db.session.commit()
+
+        from app.services.aseo import recalcular_contadores
+        contadores = recalcular_contadores(self.ficha.id)
+        db.session.commit()
+
+        self.assertEqual(contadores[self.aprendices[0].id].veces_aseo, 1)
+        self.assertEqual(contadores[self.aprendices[1].id].veces_aseo, 1)
+        self.assertEqual(contadores[self.aprendices[0].id].ultima_vez_aseo, fecha_pasada)
+        self.assertEqual(contadores[self.aprendices[1].id].ultima_vez_aseo, fecha_pasada)
+
+    def test_evita_repeticion_consecutiva(self):
+        # 3 días seguidos con 6 aprendices
+        fechas = [date.today() + timedelta(days=i) for i in range(1, 4)]
+        for f in fechas:
+            self._crear_sesion(f)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fechas[0],
+            fechas[-1],
+            rng=random.Random(42),
+        )
+        db.session.commit()
+
+        turnos = TurnoAseo.query.filter(
+            TurnoAseo.ficha_id == self.ficha.id,
+            TurnoAseo.fecha.between(fechas[0], fechas[-1]),
+        ).order_by(TurnoAseo.fecha).all()
+
+        for i in range(len(turnos) - 1):
+            t1 = turnos[i]
+            t2 = turnos[i + 1]
+            interseccion = {t1.aprendiz_1_id, t1.aprendiz_2_id}.intersection(
+                {t2.aprendiz_1_id, t2.aprendiz_2_id}
+            )
+            self.assertEqual(
+                len(interseccion),
+                0,
+                f"El aprendiz {interseccion} repitió en días consecutivos: {t1.fecha} y {t2.fecha}"
+            )
+
+    def test_diversidad_parejas_evita_repetir_mismo_companero(self):
+        # 6 sesiones = 2 ciclos completos para 6 aprendices
+        fechas = [date.today() + timedelta(days=i) for i in range(1, 7)]
+        for f in fechas:
+            self._crear_sesion(f)
+        db.session.commit()
+
+        generar_turnos(
+            self.ficha.id,
+            fechas[0],
+            fechas[-1],
+            rng=random.Random(42),
+        )
+        db.session.commit()
+
+        turnos = TurnoAseo.query.filter(
+            TurnoAseo.ficha_id == self.ficha.id,
+            TurnoAseo.fecha.between(fechas[0], fechas[-1]),
+        ).order_by(TurnoAseo.fecha).all()
+
+        parejas = set()
+        for t in turnos:
+            p = tuple(sorted((t.aprendiz_1_id, t.aprendiz_2_id)))
+            parejas.add(p)
+
+        # En 6 sesiones (2 rotaciones de 3 turnos), las 6 parejas deben ser todas distintas (máxima diversidad)
+        self.assertEqual(len(parejas), 6, "No se diversificaron las parejas en los dos ciclos de rotación")
+
+    def test_proteger_fechas_pasadas_al_recalcular_mes(self):
+        fecha_pasada = date.today() - timedelta(days=3)
+        self._crear_sesion(fecha_pasada)
+        turno_pasado = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_pasada,
+            aprendiz_1_id=self.aprendices[4].id,
+            aprendiz_2_id=self.aprendices[5].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_pasado)
+
+        fecha_futura = date.today() + timedelta(days=2)
+        self._crear_sesion(fecha_futura)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_pasada,
+            fecha_futura,
+            recalcular_existentes=True,
+            proteger_pasados=True,
+            rng=random.Random(99),
+        )
+        db.session.commit()
+
+        turno_pasado_bd = db.session.get(TurnoAseo, turno_pasado.id)
+        # El turno de la fecha pasada no debe haber sido sobreescrito
+        self.assertEqual(turno_pasado_bd.aprendiz_1_id, self.aprendices[4].id)
+        self.assertEqual(turno_pasado_bd.aprendiz_2_id, self.aprendices[5].id)
+
+    def test_marcar_cumplido_persiste_y_afecta_recalculo_futuro(self):
+        # 1. Creamos turno hoy con Ana (0) y Bruno (1)
+        fecha_hoy = date.today()
+        self._crear_sesion(fecha_hoy)
+        turno_hoy = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_hoy,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_hoy)
+        db.session.commit()
+
+        # 2. Marcamos cumplido vía cliente HTTP
+        cliente = self._cliente_instructor()
+        resp = cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/turnos-aseo/{turno_hoy.id}/cumplir',
+            follow_redirects=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # 3. Verificamos que se guardaron y persistieron los contadores
+        c_ana = ContadorAseo.query.filter_by(aprendiz_id=self.aprendices[0].id).first()
+        c_bruno = ContadorAseo.query.filter_by(aprendiz_id=self.aprendices[1].id).first()
+        self.assertEqual(c_ana.veces_aseo, 1)
+        self.assertEqual(c_bruno.veces_aseo, 1)
+        self.assertEqual(c_ana.ultima_vez_aseo, fecha_hoy)
+        self.assertEqual(c_bruno.ultima_vez_aseo, fecha_hoy)
+
+        # 4. Creamos 2 sesiones futuras y recalculamos todo el rango (incluyendo hoy)
+        f1 = fecha_hoy + timedelta(days=1)
+        f2 = fecha_hoy + timedelta(days=2)
+        self._crear_sesion(f1)
+        self._crear_sesion(f2)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_hoy,
+            f2,
+            recalcular_existentes=True,
+            rng=random.Random(10),
+        )
+        db.session.commit()
+
+        # El turno cumplido de hoy se conservó intacto
+        self.assertEqual(resultado['cumplidos_conservados'], 1)
+        turno_hoy_bd = db.session.get(TurnoAseo, turno_hoy.id)
+        self.assertEqual(turno_hoy_bd.estado, 'cumplido')
+        self.assertEqual(turno_hoy_bd.aprendiz_1_id, self.aprendices[0].id)
+        self.assertEqual(turno_hoy_bd.aprendiz_2_id, self.aprendices[1].id)
+
+        # Y en los nuevos turnos futuros (4 cupos), Ana y Bruno NO deben estar porque ya tienen 1 cumplido
+        asignados_futuros = set()
+        for t in resultado['creados']:
+            asignados_futuros.add(t.aprendiz_1_id)
+            asignados_futuros.add(t.aprendiz_2_id)
+
+        self.assertNotIn(self.aprendices[0].id, asignados_futuros)
+        self.assertNotIn(self.aprendices[1].id, asignados_futuros)
+        # Los 4 restantes (Carmen, Diego, Elena, Felipe) ocupan exactamente los 4 cupos
+        self.assertEqual(asignados_futuros, {a.id for a in self.aprendices[2:]})
+
 
 if __name__ == '__main__':
     unittest.main()

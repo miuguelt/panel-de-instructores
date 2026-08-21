@@ -262,8 +262,14 @@ document.addEventListener('DOMContentLoaded', function() {
             var asigEl = diaEl.querySelector('.calendar-assignment');
             if (numEl && asigEl) {
                 var diaNum = numEl.textContent.trim();
-                var learner = asigEl.querySelector('strong') ? asigEl.querySelector('strong').textContent.trim() : asigEl.textContent.trim();
-                asignaciones.push('• *' + diaNum + ' de ' + mesNombre + ':* ' + learner);
+                var strongs = asigEl.querySelectorAll('strong');
+                var learners = [];
+                strongs.forEach(function(s) {
+                    var t = s.textContent.trim();
+                    if (t) learners.push(t);
+                });
+                var learnerText = learners.length > 0 ? learners.join(' y ') : asigEl.textContent.trim();
+                asignaciones.push('• *' + diaNum + ' de ' + mesNombre + ':* ' + learnerText);
             }
         });
 
