@@ -218,24 +218,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-nav-bar">
-    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
-        <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
-        <span class="breadcrumb-separator">/</span>
-        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
-        <span class="breadcrumb-separator">/</span>
-        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}">Tareas</a>
-        <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current">{% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}</span>
-    </nav>
-    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}" class="btn-back">&larr; Volver a Tareas</a>
-</div>
-
 <div class="page-header">
-    <div class="page-header-info">
-        <span class="eyebrow">Evaluación y Evidencias</span>
-        <h1>{% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}: {{ tarea.titulo }}</h1>
-        <p class="text-muted">{{ ficha.codigo }} · {{ ficha.nombre_programa }}</p>
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}" class="btn-back" title="Volver a Tareas">&larr; Volver</a>
+        <h1>📝 {% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}: {{ tarea.titulo }}</h1>
     </div>
 </div>
 

@@ -2,25 +2,14 @@
 {% block title %}Alertas - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
-<div class="page-nav-bar">
-    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
-        <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
-        <span class="breadcrumb-separator">/</span>
-        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ficha {{ ficha.codigo }}</a>
-        <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current">Alertas de Rendimiento</span>
-    </nav>
-    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver</a>
-</div>
-
 <div class="page-header">
-    <div class="page-header-info">
-        <h1>Rendimiento y Alertas</h1>
-        <p class="text-muted"><a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">{{ ficha.codigo }} - {{ ficha.nombre_programa }}</a></p>
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
+        <h1>⚠️ Rendimiento y Alertas</h1>
     </div>
     <div class="page-header-actions">
-        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn btn-warning">Casos a seguimiento</a>
-        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline">🔔 Centro de notificaciones</a>
+        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn btn-warning">⚖️ Casos a seguimiento</a>
+        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline">🔔 Notificaciones</a>
     </div>
 </div>
 

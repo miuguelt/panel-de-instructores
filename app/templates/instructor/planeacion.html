@@ -7,42 +7,45 @@
 
 {% block content %}
 <div class="pl-page">
-    <div class="pl-header">
-        <div>
-            <a href="{{ url_for('instructor.fichas') }}" class="btn-back">&larr; Volver a Fichas</a>
+    <div class="page-header pl-header">
+        <div class="pl-title-cluster">
+            <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
             <h1>Línea de tiempo de la ficha</h1>
-            <p><strong>{{ ficha.codigo }}</strong> · {{ ficha.nombre_programa }}</p>
         </div>
-        <div class="pl-actions">
-            <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-secondary">Juicios por aprendiz</a>
-            <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="btn btn-outline">Estadísticas</a>
-            <button type="button" class="btn btn-outline" onclick="window.print()" title="Imprimir o guardar vista gráfica como PDF">
-                🖨️ Informe
-            </button>
+        <div class="page-header-actions pl-actions">
+            <div class="pl-actions-main">
+                <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-secondary">🎓 Juicios por aprendiz</a>
+                <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="btn btn-outline">📊 Estadísticas</a>
+                <button type="button" class="btn btn-outline" onclick="window.print()" title="Imprimir o guardar vista gráfica como PDF">
+                    🖨️ Informe
+                </button>
+            </div>
             {% set total_descargables = (1 if version_planeacion else 0) + (1 if version_reporte else 0) + (1 if version_programa else 0) %}
             {% if total_descargables %}
             <div class="pl-actions-group" role="group" aria-label="Descargar archivos fuente">
                 <span class="pl-actions-group-label">Fuentes:</span>
-                {% if version_planeacion %}
-                <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_planeacion.id) }}" class="btn btn-xs btn-outline" title="Descargar Planeación Pedagógica GFPI-F-134 (v{{ version_planeacion.version }})">
-                    📊 Planeación
-                </a>
-                {% endif %}
-                {% if version_reporte %}
-                <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_reporte.id) }}" class="btn btn-xs btn-outline" title="Descargar Reporte de Juicios SOFIA Plus (v{{ version_reporte.version }})">
-                    📋 Juicios
-                </a>
-                {% endif %}
-                {% if version_programa %}
-                <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}" class="btn btn-xs btn-outline" title="Descargar Programa de Formación Oficial en PDF (v{{ version_programa.version }})">
-                    📑 Programa
-                </a>
-                {% endif %}
-                {% if total_descargables > 1 %}
-                <a href="{{ url_for('planeacion.descargar_todos', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Descargar todos los archivos fuente en formato .zip">
-                    📦 .zip
-                </a>
-                {% endif %}
+                <div class="pl-actions-group-buttons">
+                    {% if version_planeacion %}
+                    <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_planeacion.id) }}" class="btn btn-xs btn-outline" title="Descargar Planeación Pedagógica GFPI-F-134 (v{{ version_planeacion.version }})">
+                        📊 Planeación
+                    </a>
+                    {% endif %}
+                    {% if version_reporte %}
+                    <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_reporte.id) }}" class="btn btn-xs btn-outline" title="Descargar Reporte de Juicios SOFIA Plus (v{{ version_reporte.version }})">
+                        📋 Juicios
+                    </a>
+                    {% endif %}
+                    {% if version_programa %}
+                    <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}" class="btn btn-xs btn-outline" title="Descargar Programa de Formación Oficial en PDF (v{{ version_programa.version }})">
+                        📑 Programa
+                    </a>
+                    {% endif %}
+                    {% if total_descargables > 1 %}
+                    <a href="{{ url_for('planeacion.descargar_todos', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Descargar todos los archivos fuente en formato .zip">
+                        📦 .zip
+                    </a>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
         </div>

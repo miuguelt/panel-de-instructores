@@ -2,20 +2,10 @@
 {% block title %}Fichas - SENA Control{% endblock %}
 
 {% block content %}
-<div class="page-nav-bar">
-    <nav class="breadcrumb-nav" aria-label="Ruta de navegación">
-        <a href="{{ url_for('instructor.dashboard') }}">Inicio</a>
-        <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current">Gestión de Fichas</span>
-    </nav>
-    <a href="{{ url_for('instructor.dashboard') }}" class="btn-back">&larr; Volver al Inicio</a>
-</div>
-
 <div class="page-header">
-    <div class="page-header-info">
-        <span class="eyebrow">Administración Académica</span>
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al Inicio">&larr; Volver al Inicio</a>
         <h1>Gestión de Fichas de Formación</h1>
-        <p class="text-muted">Crea, administra y consulta las fichas y programas asignados.</p>
     </div>
 </div>
 

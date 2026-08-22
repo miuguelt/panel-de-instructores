@@ -31,8 +31,17 @@
                 <a class="nav-brand" href="{{ url_for('instructor.dashboard') if current_user.is_authenticated else url_for('auth.login') }}">
                     <span class="nav-logo" aria-hidden="true">S</span>
                     <span class="nav-brand-copy">
-                        <strong class="nav-title">SENA Control</strong>
-                        <small>Gestión académica</small>
+                        <span class="nav-title-line">
+                            <strong class="nav-title">SENA Control</strong>
+                            {% if ficha is defined and ficha and ficha.codigo %}
+                            <span class="nav-program-badge">{{ ficha.codigo }}</span>
+                            {% endif %}
+                        </span>
+                        {% if ficha is defined and ficha and ficha.nombre_programa %}
+                        <small class="nav-subtitle" title="{{ ficha.nombre_programa }}">
+                            {{ ficha.nombre_programa }}
+                        </small>
+                        {% endif %}
                     </span>
                 </a>
 
@@ -70,10 +79,6 @@
         {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion') %}
         <div class="ficha-toolbar">
             <div class="ficha-toolbar-inner">
-                <div class="ficha-context" title="{{ ficha.nombre_programa }}">
-                    <span>Ficha</span>
-                    <strong>{{ ficha.codigo }}</strong>
-                </div>
                 <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
                     <!-- Día a Día -->
                     <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
