@@ -1,0 +1,26 @@
+<section class="tyt-productiva" data-etapa="productiva" aria-label="Etapa productiva adicional">
+    <div class="tyt-productiva-header">
+        <div class="tyt-productiva-identity">
+            <span class="tyt-productiva-icon" aria-hidden="true">💼</span>
+            <div>
+                <h3 class="tyt-productiva-title">Etapa productiva</h3>
+                <p class="tyt-productiva-subtitle">Fase adicional después de la etapa lectiva.</p>
+            </div>
+        </div>
+        <span class="tyt-productiva-badge">{{ tyt.calendario.meses_productiva }} meses</span>
+    </div>
+    <div class="tyt-productiva-timeline">
+        <span class="tyt-productiva-label">Período de desarrollo:</span>
+        <div class="tyt-productiva-dates">
+            <span class="tyt-productiva-date-item">
+                <small class="tyt-productiva-sublabel">Inicio etapa productiva:</small>
+                <time datetime="{{ tyt.calendario.inicio_productiva.isoformat() }}">{{ tyt.calendario.inicio_productiva.strftime('%d/%m/%Y') }}</time>
+            </span>
+            <span class="tyt-productiva-arrow" aria-hidden="true">&rarr;</span>
+            <span class="tyt-productiva-date-item">
+                <small class="tyt-productiva-sublabel">Fin de la ficha:</small>
+                <time datetime="{{ tyt.calendario.fin_productiva.isoformat() }}">{{ tyt.calendario.fin_productiva.strftime('%d/%m/%Y') }}</time>
+            </span>
+        </div>
+    </div>
+</section>

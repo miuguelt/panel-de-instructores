@@ -1,0 +1,809 @@
+/* ==========================================================================
+   SISTEMA DE SEGUIMIENTO SABER TyT — ESTILOS MODERNOS Y COCKPIT EJECUTIVO
+   ========================================================================== */
+
+.tyt-card, .tyt-page, .tyt-card *, .tyt-page * { 
+    box-sizing: border-box; 
+    min-width: 0; 
+}
+
+.tyt-card { 
+    container-type: inline-size; 
+    color: var(--text-strong); 
+    width: 100%; 
+    background: var(--bg-card);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius);
+    padding: clamp(16px, 2.5vw, 24px);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+}
+
+.timeline-card > .tyt-card {
+    background: transparent;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+}
+
+.tyt-card p, .tyt-page p { 
+    width: 100%; 
+    max-width: none; 
+}
+
+/* --------------------------------------------------------------------------
+   Encabezado Ejecutivo Unificado
+   -------------------------------------------------------------------------- */
+.tyt-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-divider);
+}
+
+.tyt-heading-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tyt-heading-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tyt-eyebrow-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-surface));
+    color: var(--accent-primary);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.tyt-heading-eyebrow .eyebrow {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.tyt-heading-title {
+    font-size: clamp(18px, 3.5cqi, 24px);
+    font-weight: 800;
+    color: var(--text-strong);
+    margin: 0;
+    line-height: 1.25;
+}
+
+.tyt-heading-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tyt-pill { 
+    display: inline-flex; 
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border-divider); 
+    border-radius: 999px; 
+    background: var(--bg-surface); 
+    padding: 5px 12px; 
+    color: var(--text-strong); 
+    font-size: 12px; 
+    font-weight: 700; 
+    line-height: 1;
+}
+
+.tyt-pill--primary {
+    background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--border-divider));
+    color: var(--accent-primary);
+}
+
+.tyt-pill--time {
+    background: color-mix(in srgb, var(--info) 10%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--info) 28%, var(--border-divider));
+    color: var(--info);
+}
+
+.tyt-pill--success {
+    background: color-mix(in srgb, var(--success) 10%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--success) 28%, var(--border-divider));
+    color: var(--success);
+}
+
+.tyt-pill-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   Grid Comparativo de Dos Pilares (Ritmo de Tiempo vs Aprobación)
+   -------------------------------------------------------------------------- */
+.tyt-comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+@container (min-width: 680px) {
+    .tyt-comparison-grid {
+        grid-template-columns: 1fr 1fr;
+        align-items: stretch;
+    }
+}
+
+.tyt-pillar-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    padding: clamp(16px, 2cqi, 20px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tyt-pillar-card:hover {
+    border-color: var(--border-subtle);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.tyt-pillar-card--tiempo {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--info) 5%, var(--bg-surface)), var(--bg-surface));
+}
+
+.tyt-pillar-card--aprobacion {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--accent-primary) 5%, var(--bg-surface)), var(--bg-surface));
+}
+
+.tyt-pillar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.tyt-pillar-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+}
+
+.tyt-pillar-tag--info {
+    background: color-mix(in srgb, var(--info) 14%, var(--bg-surface));
+    color: var(--info);
+}
+
+.tyt-pillar-tag--accent {
+    background: color-mix(in srgb, var(--accent-primary) 14%, var(--bg-surface));
+    color: var(--accent-primary);
+}
+
+/* --------------------------------------------------------------------------
+   Medidores y Barras de Progreso
+   -------------------------------------------------------------------------- */
+.tyt-meter { 
+    --tyt-color: var(--accent-primary); 
+    margin: 4px 0 8px; 
+}
+
+.tyt-meter--tiempo { 
+    --tyt-color: var(--info); 
+}
+
+.tyt-meter-heading { 
+    display: flex; 
+    align-items: baseline; 
+    justify-content: space-between; 
+    gap: 12px; 
+    margin-bottom: 8px; 
+    font-weight: 600; 
+    font-size: 14px; 
+    color: var(--text-strong);
+}
+
+.tyt-meter-heading strong { 
+    font-variant-numeric: tabular-nums; 
+    font-size: clamp(24px, 4cqi, 32px); 
+    line-height: 1; 
+    font-weight: 800;
+}
+
+.tyt-meter--tiempo .tyt-meter-heading strong {
+    color: var(--info);
+}
+
+.tyt-meter--aprobados .tyt-meter-heading strong {
+    color: var(--accent-primary);
+}
+
+.tyt-meter-heading small { 
+    font-size: .65em; 
+    margin-left: 2px; 
+}
+
+.tyt-track { 
+    height: 14px; 
+    border-radius: 999px; 
+    background: var(--bg-card); 
+    border: 1px solid var(--border-divider); 
+    position: relative; 
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+    overflow: visible;
+}
+
+.tyt-fill { 
+    display: block; 
+    width: var(--tyt-value); 
+    max-width: 100%; 
+    height: 100%; 
+    border-radius: inherit; 
+    background: var(--tyt-color); 
+    transition: width 0.4s ease;
+}
+
+.tyt-meter--tiempo .tyt-fill {
+    background: linear-gradient(90deg, #2563eb, #60a5fa);
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
+}
+
+.tyt-meter--aprobados .tyt-fill {
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover));
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.tyt-target { 
+    position: absolute; 
+    left: 70%; 
+    top: -4px; 
+    height: 22px; 
+    border-left: 2px solid var(--text-strong); 
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.tyt-target::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-strong);
+}
+
+.tyt-scale { 
+    display: flex; 
+    justify-content: space-between; 
+    position: relative; 
+    font-size: 11px; 
+    font-weight: 600;
+    margin-top: 6px; 
+    color: var(--text-muted); 
+}
+
+.tyt-scale strong { 
+    position: absolute; 
+    left: 70%; 
+    transform: translateX(-50%); 
+    white-space: nowrap; 
+    color: var(--text-strong);
+    font-weight: 800;
+}
+
+/* --------------------------------------------------------------------------
+   Caja de Metadatos y Detalles de Pilar
+   -------------------------------------------------------------------------- */
+.tyt-meta-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.tyt-meta-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.4;
+    font-size: 12px;
+}
+
+.tyt-meta-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.tyt-meta-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tyt-meta-label {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.tyt-meta-val {
+    color: var(--text-strong);
+    font-size: 12px;
+}
+
+.tyt-meta-sub {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+
+.tyt-meta-sub strong {
+    color: var(--text-strong);
+    font-weight: 700;
+}
+
+.tyt-status-achieved {
+    color: var(--success);
+    font-weight: 800;
+}
+
+.tyt-status-countdown {
+    color: var(--info);
+    font-weight: 700;
+}
+
+.tyt-gap-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.tyt-gap-badge--warning {
+    background: color-mix(in srgb, var(--warning) 12%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
+    color: var(--text-strong);
+}
+
+.tyt-gap-badge--success {
+    background: color-mix(in srgb, var(--success) 12%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
+    color: var(--success);
+    font-weight: 700;
+}
+
+.tyt-gap-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.tyt-evaluated {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-divider);
+    font-size: 12px;
+}
+
+.tyt-evaluated-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.tyt-evaluated strong {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.tyt-caption { 
+    color: var(--text-muted); 
+    font-size: 12px; 
+    line-height: 1.5; 
+    margin: 8px 0; 
+}
+
+.tyt-caption--meta {
+    padding: 10px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    margin: 14px 0;
+}
+
+/* --------------------------------------------------------------------------
+   Métricas Clave (KPI Facts Grid)
+   -------------------------------------------------------------------------- */
+.tyt-facts { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); 
+    gap: 12px; 
+    margin: 18px 0; 
+}
+
+.tyt-fact-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.tyt-fact-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-subtle);
+}
+
+.tyt-fact-item--warning {
+    border-left: 4px solid var(--warning);
+}
+
+.tyt-fact-item--info {
+    border-left: 4px solid var(--info);
+}
+
+.tyt-fact-item--target {
+    border-left: 4px solid var(--accent-primary);
+}
+
+.tyt-fact-icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.tyt-fact-icon-wrap.is-warning {
+    background: color-mix(in srgb, var(--warning) 14%, var(--bg-card));
+}
+
+.tyt-fact-icon-wrap.is-info {
+    background: color-mix(in srgb, var(--info) 14%, var(--bg-card));
+}
+
+.tyt-fact-icon-wrap.is-target {
+    background: color-mix(in srgb, var(--accent-primary) 14%, var(--bg-card));
+}
+
+.tyt-fact-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tyt-fact-text strong { 
+    font-size: 26px; 
+    line-height: 1.1; 
+    font-variant-numeric: tabular-nums; 
+    color: var(--text-strong);
+    font-weight: 800;
+}
+
+.tyt-fact-denom {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.tyt-fact-text span { 
+    font-size: 12px; 
+    line-height: 1.35; 
+    color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Banner de Diagnóstico y Aviso
+   -------------------------------------------------------------------------- */
+.tyt-notice { 
+    display: flex; 
+    align-items: flex-start; 
+    gap: 14px; 
+    background: var(--bg-surface); 
+    border: 1px solid var(--border-divider); 
+    border-left: 4px solid var(--info); 
+    padding: 16px 18px; 
+    border-radius: var(--radius-sm); 
+    margin: 16px 0; 
+    font-size: 13px; 
+}
+
+.tyt-notice-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.tyt-bell { 
+    font-size: 18px; 
+}
+
+.tyt-notice-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tyt-notice-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-strong);
+    margin: 0;
+}
+
+.tyt-notice-text { 
+    margin: 0; 
+    line-height: 1.5; 
+    color: var(--text-main);
+}
+
+.tyt-notice--alarm { 
+    border-left-color: var(--warning); 
+    background: color-mix(in srgb, var(--warning) 8%, var(--bg-card)); 
+    border-color: color-mix(in srgb, var(--warning) 25%, var(--border-divider));
+}
+
+.tyt-notice--ready { 
+    border-left-color: var(--success); 
+    background: color-mix(in srgb, var(--success) 8%, var(--bg-card)); 
+    border-color: color-mix(in srgb, var(--success) 25%, var(--border-divider));
+}
+
+/* --------------------------------------------------------------------------
+   Barra Inferior: Etapa Productiva y Acción
+   -------------------------------------------------------------------------- */
+.tyt-bottom-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 14px;
+    align-items: center;
+}
+
+@container (min-width: 680px) {
+    .tyt-bottom-bar {
+        grid-template-columns: 1fr auto;
+    }
+}
+
+.tyt-productiva { 
+    border: 1px solid var(--border-divider); 
+    padding: 14px 18px; 
+    border-radius: var(--radius-sm); 
+    background: var(--bg-surface); 
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tyt-productiva-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    gap: 12px; 
+    flex-wrap: wrap; 
+}
+
+.tyt-productiva-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tyt-productiva-icon {
+    font-size: 20px;
+}
+
+.tyt-productiva-title { 
+    font-size: 14px; 
+    font-weight: 700;
+    color: var(--text-strong);
+    margin: 0; 
+}
+
+.tyt-productiva-subtitle { 
+    font-size: 12px; 
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.tyt-productiva-badge { 
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-divider);
+    font-size: 13px; 
+    font-weight: 800;
+    color: var(--text-strong);
+}
+
+.tyt-productiva-timeline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-main);
+    flex-wrap: wrap;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-divider);
+}
+
+.tyt-productiva-label {
+    color: var(--text-muted);
+}
+
+.tyt-productiva-dates {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.tyt-productiva-arrow {
+    color: var(--accent-primary);
+}
+
+.tyt-productiva-date-item {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.tyt-productiva-sublabel {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    line-height: 1.2;
+}
+
+.tyt-action-wrap {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.tyt-action { 
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 10px; 
+    min-height: 44px; 
+    padding: 10px 20px; 
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent); 
+    border-radius: 999px; 
+    background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-card)); 
+    color: var(--accent-primary); 
+    font-weight: 700; 
+    font-size: 13px; 
+    text-decoration: none; 
+    transition: all 0.2s ease;
+}
+
+.tyt-action:hover { 
+    border-color: var(--accent-primary); 
+    background: var(--accent-primary); 
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.tyt-action-arrow {
+    transition: transform 0.2s ease;
+}
+
+.tyt-action:hover .tyt-action-arrow {
+    transform: translateX(4px);
+}
+
+/* --------------------------------------------------------------------------
+   Estado Vacío
+   -------------------------------------------------------------------------- */
+.tyt-empty { 
+    padding: 24px; 
+    margin: 16px 0; 
+    border: 1px dashed var(--border-divider); 
+    border-radius: var(--radius-sm); 
+    text-align: center;
+    background: var(--bg-surface);
+}
+
+.tyt-empty > span { 
+    display: inline-block; 
+    font-size: 28px; 
+    margin-bottom: 8px; 
+    color: var(--text-muted);
+}
+
+.tyt-empty strong {
+    display: block;
+    font-size: 15px;
+    color: var(--text-strong);
+}
+
+.tyt-empty p { 
+    margin-top: 6px; 
+    font-size: 13px; 
+    color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Vista de Detalle / Página TyT
+   -------------------------------------------------------------------------- */
+.tyt-page { display: grid; gap: 20px; }
+.tyt-page-heading { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; align-items: center; }
+.tyt-page-heading h1 { font-size: clamp(24px, 4vw, 36px); }
+.tyt-page > .tyt-card { background: var(--bg-card); padding: clamp(16px, 3vw, 28px); border: 1px solid var(--border-divider); border-radius: 16px; }
+.tyt-detail { padding: clamp(16px, 3vw, 28px); }
+.tyt-detail > p { margin: 12px 0; }
+.tyt-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; margin: 20px 0; }
+.tyt-filters label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+.tyt-filters input, .tyt-filters select { width: 100%; min-height: 44px; padding: 10px 14px; background: var(--bg-surface); color: var(--text-strong); border: 1px solid var(--border-divider); border-radius: 8px; font: inherit; }
+.tyt-filters select { padding-right: 2.25rem; }
+.tyt-table-wrap { width: 100%; overflow-x: auto; margin: 14px 0; }
+.tyt-table { width: 100%; min-width: 790px; border-collapse: collapse; }
+.tyt-table th, .tyt-table td { padding: 14px; text-align: left; border-bottom: 1px solid var(--border-divider); vertical-align: middle; }
+.tyt-table thead { background: var(--bg-surface); }
+.tyt-table .tyt-meter { min-width: 145px; margin: 0 0 6px; }
+.tyt-table .tyt-meter-heading > span { display: none; }
+.tyt-table .tyt-meter-heading strong { font-size: 20px; }
+.tyt-table .tyt-scale { display: none; }
+.tyt-table .tyt-track { height: 8px; }
+.tyt-table .tyt-target { height: 14px; top: -3px; }
+.tyt-table td > small { display: block; margin-top: 5px; }
+.tyt-deficit { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tyt-card :focus-visible, .tyt-page :focus-visible { outline: 3px solid var(--accent-primary); outline-offset: 3px; }
+
+@container (max-width: 330px) { 
+    .tyt-meter-heading { align-items: flex-start; } 
+    .tyt-meter-heading > span { flex-basis: 100%; } 
+}

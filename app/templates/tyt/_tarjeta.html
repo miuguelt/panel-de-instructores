@@ -1,0 +1,204 @@
+{% from 'tyt/_barra.html' import barra %}
+{% if tyt %}
+<div class="tyt-card" id="seguimiento-tyt-{{ ficha.id }}">
+    <!-- Encabezado Unificado y Ejecutivo -->
+    <div class="tyt-heading">
+        <div class="tyt-heading-text">
+            <div class="tyt-heading-eyebrow">
+                <span class="tyt-eyebrow-pill">Saber TyT</span>
+                <span class="eyebrow">Avance de la ficha &middot; Preparación para la certificación</span>
+            </div>
+            <h2 class="tyt-heading-title">Etapa lectiva y resultados</h2>
+        </div>
+        <div class="tyt-heading-badges">
+            <span class="tyt-pill tyt-pill--primary">
+                <span class="tyt-pill-dot" aria-hidden="true"></span>
+                Hito del 70%
+            </span>
+            {% if tyt.tiempo and tyt.tiempo.porcentaje is not none %}
+                {% if tyt.tiempo.alcanzado %}
+                <span class="tyt-pill tyt-pill--success">✅ Hito temporal alcanzado</span>
+                {% else %}
+                <span class="tyt-pill tyt-pill--time">⏳ Faltan <strong>{{ tyt.tiempo.dias_faltantes }} días</strong></span>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    {% if tyt.error %}
+    <div class="tyt-notice" role="alert">
+        <strong>No pudimos consultar el progreso.</strong>
+        <p>Vuelve a cargar la página para consultar los resultados actualizados.</p>
+        <a class="btn btn-outline" href="{{ request.path }}">Reintentar</a>
+    </div>
+    {% else %}
+    {% set propia = tyt.propia if tyt.personal else none %}
+    {% set aprobacion = propia.porcentaje_aprobados if propia else (none if tyt.personal else tyt.promedio_aprobados) %}
+    {% set evaluacion = propia.porcentaje_evaluados if propia else (none if tyt.personal else tyt.promedio_evaluados) %}
+
+    <!-- Grid Comparativo de Dos Pilares: Ritmo de Tiempo vs Rendimiento Académico -->
+    <div class="tyt-comparison-grid">
+        <!-- Pilar 1: Tiempo de Etapa Lectiva -->
+        <div class="tyt-pillar-card tyt-pillar-card--tiempo">
+            <div class="tyt-pillar-header">
+                <span class="tyt-pillar-tag tyt-pillar-tag--info">Cronograma lectivo</span>
+            </div>
+
+            {% if tyt.tiempo.porcentaje is not none %}
+                {{ barra('Tiempo transcurrido de la etapa lectiva', tyt.tiempo.porcentaje, 'tiempo') }}
+                <div class="tyt-meta-box">
+                    <div class="tyt-meta-row">
+                        <span class="tyt-meta-icon" aria-hidden="true">📅</span>
+                        <div class="tyt-meta-content">
+                            <span class="tyt-meta-label">Desde la inducción hasta el final de la etapa lectiva:</span>
+                            <strong class="tyt-meta-val">{{ tyt.calendario.inicio_lectiva.strftime('%d/%m/%Y') }} &rarr; {{ tyt.calendario.fin_lectiva.strftime('%d/%m/%Y') }}</strong>
+                            <span class="tyt-meta-sub">Inicio etapa lectiva: <strong>{{ tyt.calendario.inicio_lectiva.strftime('%d/%m/%Y') }}</strong></span>
+                        </div>
+                    </div>
+                    {% if tyt.calendario.configurado and tyt.calendario.inicio_productiva and tyt.calendario.fin_productiva %}
+                    <div class="tyt-meta-row">
+                        <span class="tyt-meta-icon" aria-hidden="true">💼</span>
+                        <div class="tyt-meta-content">
+                            <span class="tyt-meta-label">Etapa productiva y cierre de la ficha:</span>
+                            <strong class="tyt-meta-val">Inicio etapa productiva: {{ tyt.calendario.inicio_productiva.strftime('%d/%m/%Y') }} &rarr; Fin de la ficha: {{ tyt.calendario.fin_productiva.strftime('%d/%m/%Y') }}</strong>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="tyt-meta-row tyt-meta-row--milestone">
+                        <span class="tyt-meta-icon" aria-hidden="true">🎯</span>
+                        <div class="tyt-meta-content">
+                            <span class="tyt-meta-label">70% de la etapa lectiva:</span>
+                            <strong class="tyt-meta-val">{{ tyt.tiempo.fecha_hito.strftime('%d/%m/%Y') }} &middot; {% if tyt.tiempo.alcanzado %}<span class="tyt-status-achieved">Hito alcanzado</span>{% else %}<span class="tyt-status-countdown">Faltan <strong>{{ tyt.tiempo.dias_faltantes }} días</strong></span>{% endif %}</strong>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <p class="tyt-notice">Calendario pendiente: configura las fechas de la ficha para calcular el hito.</p>
+            {% endif %}
+        </div>
+
+        <!-- Pilar 2: Avance Académico de Resultados -->
+        <div class="tyt-pillar-card tyt-pillar-card--aprobacion">
+            <div class="tyt-pillar-header">
+                <span class="tyt-pillar-tag tyt-pillar-tag--accent">Rendimiento grupal</span>
+            </div>
+
+            {% if aprobacion is not none %}
+                {{ barra('Tus resultados aprobados' if tyt.personal else 'Resultados aprobados · promedio del grupo', aprobacion) }}
+                <div class="tyt-meta-box">
+                    {% if aprobacion < 70 %}
+                    <div class="tyt-gap-badge tyt-gap-badge--warning">
+                        <span class="tyt-gap-icon" aria-hidden="true">⚠️</span>
+                        <span>Faltan <strong>{{ ('%.1f'|format(70 - aprobacion)).replace('.', ',') }} puntos porcentuales</strong> para el 70% aprobado.</span>
+                    </div>
+                    {% else %}
+                    <div class="tyt-gap-badge tyt-gap-badge--success">
+                        <span class="tyt-gap-icon" aria-hidden="true">🎉</span>
+                        <span>Meta institucional del 70% de aprobación superada</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="tyt-evaluated">
+                        <div class="tyt-evaluated-label">
+                            <span class="tyt-meta-icon" aria-hidden="true">📊</span>
+                            <span>{{ 'Tus resultados evaluados' if tyt.personal else 'Resultados evaluados · promedio' }}</span>
+                        </div>
+                        <strong>{{ ('%.1f'|format(evaluacion)).replace('.', ',') }}%</strong>
+                    </div>
+                    {% if propia %}
+                    <p class="tyt-caption">{{ propia.aprobados }} aprobados · {{ propia.evaluados }} evaluados de {{ propia.total }} resultados.</p>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="tyt-empty">
+                    <span aria-hidden="true">▤</span>
+                    <strong>Sin resultados para calcular el avance</strong>
+                    <p>{{ 'Solicita a tu instructor la actualización del reporte de juicios.' if tyt.personal else 'Importa el reporte de juicios evaluativos para conocer la brecha de cada aprendiz.' }}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Bloque de Métricas Clave (KPI Fact Cards) -->
+    {% if aprobacion is not none %}
+    <div class="tyt-facts">
+        <div class="tyt-fact-item tyt-fact-item--warning">
+            <div class="tyt-fact-icon-wrap is-warning" aria-hidden="true">👥</div>
+            <div class="tyt-fact-text">
+                <strong>{{ propia.faltan_evaluar if propia else tyt.pendientes_evaluacion }}</strong>
+                <span>{{ 'resultados por evaluar para tu meta' if propia else 'aprendices por llegar al 70% evaluado' }}</span>
+            </div>
+        </div>
+
+        <div class="tyt-fact-item tyt-fact-item--info">
+            <div class="tyt-fact-icon-wrap is-info" aria-hidden="true">📋</div>
+            <div class="tyt-fact-text">
+                <strong>{{ propia.faltan_aprobar if propia else tyt.faltan_evaluar }}</strong>
+                <span>{{ 'resultados por aprobar para tu meta' if propia else 'evaluaciones faltantes para las metas individuales' }}</span>
+            </div>
+        </div>
+
+        {% if tyt.total_resultados %}
+        <div class="tyt-fact-item tyt-fact-item--target">
+            <div class="tyt-fact-icon-wrap is-target" aria-hidden="true">🎯</div>
+            <div class="tyt-fact-text">
+                <strong>{{ tyt.meta_resultados }} <small class="tyt-fact-denom">/ {{ tyt.total_resultados }}</small></strong>
+                <span>Meta individual de resultados (70% mínimo)</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Banner de Diagnóstico / Alerta -->
+    {% set pendiente = (not propia or not propia.cumple_evaluacion) if tyt.personal else (tyt.pendientes_evaluacion > 0) %}
+    {% set por_aprobar = (propia.faltan_aprobar if propia else none) if tyt.personal else tyt.pendientes_aprobacion %}
+    <div class="tyt-notice {% if tyt.tiempo.alcanzado and (pendiente or por_aprobar) %}tyt-notice--alarm{% elif not pendiente and not por_aprobar %}tyt-notice--ready{% endif %}" role="{{ 'alert' if tyt.tiempo.alcanzado and (pendiente or por_aprobar) else 'status' }}">
+        <div class="tyt-notice-icon-box" aria-hidden="true">
+            <span class="tyt-bell">{{ '🔔' if tyt.tiempo.alcanzado else '◷' }}</span>
+        </div>
+        <div class="tyt-notice-body">
+            <h4 class="tyt-notice-title">{% if tyt.tiempo.alcanzado %}70% de la etapa lectiva alcanzado{% else %}Preparar el hito del 70% lectivo{% endif %}</h4>
+            <p class="tyt-notice-text">
+                {% if propia %}
+                    {% if propia.cumple_evaluacion %}Ya alcanzaste el 70% evaluado.{% elif propia.total %}Te falta evaluar {{ propia.faltan_evaluar }} resultado(s) para llegar al 70%.{% endif %}
+                {% elif not tyt.personal %}
+                    {% if pendiente %}Revisa con los instructores las evaluaciones pendientes de cada aprendiz.{% elif tyt.total_aprendices %}Todos los aprendices activos alcanzaron el 70% evaluado.{% else %}No hay aprendices activos para realizar el seguimiento.{% endif %}
+                {% endif %}
+                {% if por_aprobar %}
+                    {{ 'Te faltan ' ~ por_aprobar ~ ' resultado(s) por aprobar para la meta.' if tyt.personal else por_aprobar ~ ' aprendiz(es) aún no alcanzan el 70% aprobado.' }}
+                {% endif %}
+                {% if tyt.tiempo.alcanzado %}El aviso del hito queda disponible en las notificaciones de instructores y aprendices activos.{% endif %}
+            </p>
+        </div>
+    </div>
+
+    {% if tyt.total_resultados %}
+    <p class="tyt-caption tyt-caption--meta">Meta individual: <strong>{{ tyt.meta_resultados }} de {{ tyt.total_resultados }} resultados</strong> del reporte de la ficha. Evaluados incluye aprobados y no aprobados. Los resultados sin registro cuentan como pendientes.</p>
+    {% endif %}
+
+    <!-- Etapa Productiva y Acción -->
+    <div class="tyt-bottom-bar">
+        {% if tyt.calendario.configurado %}
+            {% include 'tyt/_productiva.html' %}
+        {% endif %}
+
+        {% if not tyt.personal and request.endpoint != 'tyt.detalle' %}
+        <div class="tyt-action-wrap">
+            <a class="tyt-action" href="{{ url_for('tyt.detalle', ficha_id=ficha.id) }}">
+                <span>Ver cuánto le falta a cada aprendiz</span>
+                <span class="tyt-action-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+        </div>
+        {% elif propia %}
+        <div class="tyt-action-wrap">
+            <a class="tyt-action" href="#tab-competencias">
+                <span>Revisar mis resultados por competencia</span>
+                <span class="tyt-action-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}

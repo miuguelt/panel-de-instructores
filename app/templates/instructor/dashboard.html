@@ -25,20 +25,27 @@
         {% endif %}
     {% endfor %}
 
-    <!-- Barra de Herramientas del Dashboard: Buscador y Selector de Vista -->
+    <!-- Herramientas: una sola búsqueda global y una vista persistente -->
     <div class="dashboard-toolbar">
-        <div class="dashboard-search-wrap">
+        <div class="dashboard-search-wrap" role="search">
             <span class="dashboard-search-icon" aria-hidden="true">🔍</span>
             <input type="search" id="dashboard-ficha-search" class="dashboard-search-input" placeholder="Buscar por código de ficha o nombre del programa..." aria-label="Buscar fichas">
+            <button type="button" class="dashboard-search-clear" id="dashboard-search-clear" aria-label="Limpiar búsqueda" hidden>×</button>
         </div>
-        <div class="view-switcher" role="radiogroup" aria-label="Modo de visualización">
-            <button type="button" class="view-switch-btn is-active" id="view-mode-cards" title="Vista en cuadrícula de tarjetas">
+        <div class="view-switcher" role="group" aria-label="Modo de visualización">
+            <button type="button" class="view-switch-btn is-active" id="view-mode-cards" title="Vista en cuadrícula de tarjetas" aria-pressed="true">
                 <span>⊞</span> Tarjetas
             </button>
-            <button type="button" class="view-switch-btn" id="view-mode-compact" title="Vista compacta en lista">
+            <button type="button" class="view-switch-btn" id="view-mode-compact" title="Vista compacta en lista" aria-pressed="false">
                 <span>☰</span> Lista compacta
             </button>
         </div>
+        <span class="dashboard-result-count" id="dashboard-result-count" aria-live="polite"></span>
+    </div>
+
+    <div class="dashboard-no-results" id="dashboard-no-results" hidden>
+        <strong>No encontramos fichas con esa búsqueda.</strong>
+        <button type="button" class="btn btn-sm btn-outline" id="dashboard-no-results-clear">Limpiar búsqueda</button>
     </div>
 
     {% if activas %}
@@ -47,7 +54,9 @@
         {% set cronograma = cronogramas[ficha.id] %}
         {% set extra = estadisticas_extra.get(ficha.id, {}) %}
         {% set stats = estadisticas_fichas.get(ficha.id) %}
-        <article class="card card-ficha ficha-dashboard-active ficha-{{ cronograma.fase }}">
+        {% set fases_data = fases_fichas.get(ficha.id, {}) %}
+        <article class="card card-ficha ficha-dashboard-active ficha-{{ cronograma.fase }}" id="card-ficha-{{ ficha.codigo }}">
+            <!-- Header elegante con badges de estado -->
             <header class="ficha-card-header">
                 <div>
                     <div class="ficha-card-labels">
@@ -60,116 +69,382 @@
                         {% else %}
                         <span class="badge badge-warning">Fechas pendientes</span>
                         {% endif %}
-                        <span class="badge badge-secondary" title="Aprendices activos ({{ extra.get('total_aprendices_incl_inactivos', 0) }} en total)">{{ extra.get('total_aprendices', '?') }} activos</span>
+                        <span class="badge badge-secondary" title="Aprendices activos en formación">{{ extra.get('total_aprendices', stats.activos if stats else '?') }} activos</span>
+                        {% if fases_data and fases_data.desfase_fases is defined and fases_data.desfase_fases > 0 %}
+                        <span class="badge badge-warning" title="Desfase entre tiempo lectivo y RAPs aprobados">Retraso de {{ fases_data.desfase_fases }} {{ 'fase' if fases_data.desfase_fases == 1 else 'fases' }}</span>
+                        {% elif fases_data and fases_data.desfase_fases is defined and fases_data.desfase_fases == 0 and cronograma.configurado %}
+                        <span class="badge badge-success" title="Sincronizado con cronograma">Al día</span>
+                        {% endif %}
                     </div>
-                    <h2 class="card-title">{{ ficha.nombre_programa }}</h2>
+                    <h2 class="card-title">{{ ficha.nombre_programa|trim('.') }}</h2>
                 </div>
-                <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="ficha-open-link">
-                    Ver aprendices <span aria-hidden="true">→</span>
-                </a>
+                <div class="ficha-header-actions">
+                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn-ficha-planeacion" title="Ver análisis pedagógico detallado, horas y competencias">
+                        <span>Planeación & Juicios</span> <span aria-hidden="true">↗</span>
+                    </a>
+                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="ficha-open-link" title="Ver directorio completo de aprendices">
+                        Ver aprendices <span aria-hidden="true">→</span>
+                    </a>
+                </div>
             </header>
 
             <div class="ficha-card-body">
-                <div class="ficha-bars-container">
-                    {% include '_cronograma.html' %}
+                <!-- 1. SECCIÓN MASTER HERO: CRONOGRAMA, CULMINACIÓN Y FASES DEL PROYECTO (100% DE ANCHO) -->
+                {% set pct_tiempo = cronograma.porcentaje|default(0) %}
+                {% set pct_asistencia = extra.get('pct_asistencia', 0) %}
+                {% set pct_entregas = extra.get('pct_entregas', 0) %}
+                {% set cert_pct = ((extra.get('aprendices_certificados', 0) / extra.get('total_aprendices', 1)) * 100)|round|int if extra.get('total_aprendices', 0) > 0 else 0 %}
+                {% set pct_raps = fases_data.resumen_raps.porcentaje_aprobados if (fases_data and fases_data.resumen_raps) else extra.get('pct_juicios', 0) %}
+                {% set raps_aprobados_cnt = fases_data.resumen_raps.aprobados if (fases_data and fases_data.resumen_raps) else extra.get('juicios_aprobados', 0) %}
+                {% set raps_totales_cnt = fases_data.resumen_raps.total if (fases_data and fases_data.resumen_raps) else extra.get('juicios_totales', 0) %}
+                {% set raps_pendientes_cnt = [raps_totales_cnt - raps_aprobados_cnt, 0]|max %}
+                {% set group_delta = (pct_raps - pct_tiempo)|round(1) if raps_totales_cnt > 0 else none %}
+                <section class="ficha-time-hero ficha-formation-hero" aria-label="Progreso del tiempo lectivo, culminación y fases del proyecto">
+                    <div class="time-hero-grid">
+                        <!-- Columna 1: Avance Transcurrido & Estado Actual -->
+                        <div class="time-hero-col time-hero-col-progress">
+                            <div class="time-hero-header">
+                                <div class="time-hero-eyebrow">
+                                    <span class="time-hero-icon" aria-hidden="true">⏱️</span>
+                                    <span>Tiempo Lectivo Transcurrido</span>
+                                </div>
+                                <span class="time-hero-badge {% if pct_tiempo >= 70 %}is-goal{% elif cronograma.configurado %}is-active{% else %}is-warning{% endif %}">
+                                    {% if cronograma.configurado %}
+                                    {{ cronograma.fase_label }}
+                                    {% else %}Fechas pendientes{% endif %}
+                                </span>
+                            </div>
 
-                    <aside class="ficha-dashboard-summary" aria-label="Resumen de la ficha {{ ficha.codigo }}">
-                        {% if stats and stats.total > 0 %}
-                        <div class="ficha-state-summary">
-                            <div class="ficha-summary-heading">
-                                <span class="eyebrow">Estado del grupo</span>
-                                <strong>{{ extra.get('total_aprendices', stats.activos) }} activos</strong>
-                            </div>
-                            <div class="estados-bar" aria-label="Distribución del estado de aprendices">
-                                {% set bg_colors = {'EN_FORMACION': 'var(--info)', 'CERTIFICADO': 'var(--success)', 'CANCELADO': 'var(--danger)', 'RETIRO_VOLUNTARIO': 'var(--warning)', 'POR_CERTIFICAR': 'var(--primary)'} %}
-                                {% for estado, count in stats.estados.items() %}
-                                    {% set bg = bg_colors.get(estado, 'var(--gray-500)') %}
-                                    {% if count > 0 %}<div title="{{ estado|replace('_', ' ')|title }}: {{ count }} ({{ (count / stats.total * 100)|round|int }}%)" style="--state-color: {{ bg }}; width: {{ (count / stats.total * 100) }}%;"></div>{% endif %}
-                                {% endfor %}
-                            </div>
-                            <div class="estados-legend">
-                                {% for estado, count in stats.estados.items() %}
-                                    {% if count > 0 %}
-                                    <span>
-                                        <span class="estados-dot" style="--state-color: {{ bg_colors.get(estado, 'var(--gray-500)') }};"></span>
-                                        {{ count }} {{ estado|replace('_', ' ')|title }}
-                                    </span>
+                            <div class="time-hero-metric-group">
+                                <div class="time-hero-val-wrap">
+                                    <strong class="time-hero-val">{{ pct_tiempo }}%</strong>
+                                    <span class="time-hero-val-sub">completado</span>
+                                </div>
+                                <p class="time-hero-detail">
+                                    {% if cronograma.dias_totales > 0 %}
+                                    <strong>{{ cronograma.dias_transcurridos }}</strong> de {{ cronograma.dias_totales }} días lectivos cursados
+                                    {% else %}
+                                    Progreso según calendario lectivo
                                     {% endif %}
-                                {% endfor %}
+                                </p>
+                            </div>
+
+                            <div class="time-hero-track" role="progressbar" aria-label="Tiempo lectivo transcurrido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_tiempo }}" aria-valuetext="{{ pct_tiempo }}% del tiempo lectivo transcurrido" title="Progreso de tiempo lectivo: {{ pct_tiempo }}%">
+                                <div class="time-hero-bar" style="width: {{ [pct_tiempo, 100]|min }}%;"></div>
+                                <div class="time-hero-marker" style="left: 70%;" title="Hito institucional 70% (Saber TyT)">
+                                    <span class="time-hero-marker-label">Hito 70%</span>
+                                </div>
+                            </div>
+
+                            <div class="time-hero-meta-row">
+                                <span class="time-meta-item" title="Fecha de inicio de la etapa lectiva">
+                                    <span class="time-meta-k">Inicio etapa lectiva:</span>
+                                    <strong>{% if cronograma.inicio_lectiva %}{{ cronograma.inicio_lectiva.strftime('%d/%m/%Y') }}{% else %}Por definir{% endif %}</strong>
+                                </span>
+                                <span class="time-meta-divider" aria-hidden="true">·</span>
+                                <span class="time-meta-item" title="Fecha de inicio de la etapa productiva">
+                                    <span class="time-meta-k">Inicio etapa productiva:</span>
+                                    <strong>{% if cronograma.inicio_productiva %}{{ cronograma.inicio_productiva.strftime('%d/%m/%Y') }}{% else %}Por definir{% endif %}</strong>
+                                </span>
+                                <span class="time-meta-divider" aria-hidden="true">·</span>
+                                <span class="time-meta-item" title="Fecha de fin de la ficha">
+                                    <span class="time-meta-k">Fin de la ficha:</span>
+                                    <strong>{% if cronograma.fin_productiva %}{{ cronograma.fin_productiva.strftime('%d/%m/%Y') }}{% else %}Por definir{% endif %}</strong>
+                                </span>
+                                <span class="time-meta-divider" aria-hidden="true">·</span>
+                                <span class="time-meta-item" title="Fase institucional esperada según el calendario">
+                                    <span class="time-meta-k">Fase esperada:</span>
+                                    <strong>{{ fases_data.fase_esperada.icono if fases_data and fases_data.fase_esperada else '⚙️' }} {{ fases_data.fase_esperada.nombre|title if fases_data and fases_data.fase_esperada else 'Ejecución' }}</strong>
+                                </span>
                             </div>
                         </div>
-                        {% endif %}
 
-                        {% if extra %}
-                            {% set expected_deliveries = extra.get('tareas_totales', 0) * extra.get('total_aprendices', 0) %}
-                            {% set cert_pct = ((extra.get('aprendices_certificados', 0) / extra.get('total_aprendices', 1)) * 100)|round|int if extra.get('total_aprendices', 0) > 0 else 0 %}
-                            {% set pct_asistencia = extra.get('pct_asistencia', 100) %}
-                            {% set pct_entregas = extra.get('pct_entregas', 100) %}
-                            {% set pct_juicios = extra.get('pct_juicios', 100) %}
-                            {% set pct_tiempo = extra.get('pct_tiempo', 0) %}
-                            {% set notas_negativas = extra.get('notas_negativas', 0) %}
-                            {% set notas_positivas = extra.get('notas_positivas', 0) %}
-                            {% set notas_total = extra.get('notas_total', 0) %}
-
-                            <div class="ficha-time-progress" title="Tiempo transcurrido de la ficha">
-                                <span>⏱ Tiempo</span>
-                                <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_tiempo, 100]|min }}%;"></span></div>
-                                <strong>{{ pct_tiempo }}%</strong>
+                        <!-- Columna 2: Promedio de avance del grupo y próximos hitos -->
+                        <div class="time-hero-col time-hero-col-group group-average-progress">
+                            <div class="time-hero-header">
+                                <div class="time-hero-eyebrow">
+                                    <span class="time-hero-icon" aria-hidden="true">📊</span>
+                                    <span>Promedio de avance del grupo</span>
+                                </div>
+                                {% if raps_totales_cnt > 0 and pct_raps >= 70 %}
+                                <span class="time-hero-tag is-milestone" title="El promedio del grupo alcanzó la meta institucional">
+                                    ✓ Meta 70% alcanzada
+                                </span>
+                                {% elif raps_totales_cnt > 0 %}
+                                <span class="time-hero-tag is-pending" title="Brecha frente a la meta institucional de avance grupal">
+                                    Meta 70%: faltan {{ (70 - pct_raps)|round(1) }} puntos
+                                </span>
+                                {% else %}
+                                <span class="time-hero-tag is-pending">Sin resultados registrados</span>
+                                {% endif %}
                             </div>
 
-                            <div class="ficha-metric-grid">
-                                <div class="ficha-metric {% if pct_asistencia >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Asistencia promedio del grupo activo">
-                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Asistencia</span><strong class="ficha-metric-value">{{ pct_asistencia }}%</strong></div>
-                                    <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_asistencia, 100]|min }}%;"></span></div>
-                                    <small>{{ extra.get('sesiones', 0) }} sesiones registradas</small>
+                            <div class="group-average-summary">
+                                <div class="time-hero-val-wrap">
+                                    <strong class="time-hero-val text-accent">{{ pct_raps }}%</strong>
+                                    <span class="time-hero-val-sub">RAPs cerrados</span>
                                 </div>
-                                <div class="ficha-metric {% if pct_entregas >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Evidencias y trabajos entregados frente a los esperados">
-                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Evidencias</span><strong class="ficha-metric-value">{{ pct_entregas }}%</strong></div>
-                                    <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_entregas, 100]|min }}%;"></span></div>
-                                    <small>{% if expected_deliveries %}{{ extra.get('entregas_totales', 0) }} de {{ expected_deliveries }} entregadas{% else %}Sin tareas asignadas{% endif %}</small>
-                                </div>
-                                <div class="ficha-metric {% if pct_juicios >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Juicios evaluativos aprobados sobre el total">
-                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Evaluación</span><strong class="ficha-metric-value">{{ pct_juicios }}%</strong></div>
-                                    <div class="ficha-metric-track"><span style="--metric-value: {{ [pct_juicios, 100]|min }}%;"></span></div>
-                                    <small>{{ extra.get('juicios_aprobados', 0) }} de {{ extra.get('juicios_totales', 0) }} juicios aprobados</small>
-                                </div>
-                                <div class="ficha-metric {% if extra.get('alertas_activas', 0) > 0 %}is-danger{% elif extra.get('planes_pendientes', 0) > 0 %}is-warning{% else %}is-positive{% endif %}" title="Alertas activas y planes de mejoramiento pendientes">
-                                    <span class="ficha-metric-label">Alertas / Planes</span>
-                                    <strong class="ficha-metric-value">{{ extra.get('alertas_activas', 0) }} / {{ extra.get('planes_pendientes', 0) }}</strong>
-                                    <small>{% if extra.get('alertas_activas', 0) or extra.get('planes_pendientes', 0) %}Requieren revisión{% else %}Sin casos activos{% endif %}</small>
-                                </div>
-                                <div class="ficha-metric {% if cert_pct >= 80 %}is-positive{% else %}is-warning{% endif %}" title="Aprendices con todos sus juicios aprobados, listos para certificar">
-                                    <div class="ficha-metric-heading"><span class="ficha-metric-label">Certificación</span><strong class="ficha-metric-value">{{ extra.get('aprendices_certificados', 0) }}/{{ extra.get('total_aprendices', 0) }}</strong></div>
-                                    <div class="ficha-metric-track"><span style="--metric-value: {{ cert_pct }}%;"></span></div>
-                                    <small>Listos para certificar</small>
-                                </div>
-                                <div class="ficha-metric {% if notas_negativas > 0 %}is-warning{% else %}is-positive{% endif %}" title="Notas del observador: formación integral del grupo">
-                                    <span class="ficha-metric-label">Formación integral</span>
-                                    <strong class="ficha-metric-value">{{ notas_total }}</strong>
-                                    <small>{% if notas_negativas %}{{ notas_negativas }} llamados · {{ notas_positivas }} reconocimientos{% elif notas_total %}{{ notas_positivas }} reconocimientos{% else %}Sin notas registradas{% endif %}</small>
-                                </div>
+                                <p class="time-hero-detail">
+                                    {% if raps_totales_cnt > 0 %}
+                                    <strong>{{ raps_aprobados_cnt }}</strong> de {{ raps_totales_cnt }} RAPs cerrados · <strong>{{ raps_pendientes_cnt }}</strong> pendientes
+                                    {% else %}
+                                    Registra juicios para calcular el promedio del grupo.
+                                    {% endif %}
+                                </p>
                             </div>
 
-                        {% if extra.top_competencias %}
-                        <div class="ficha-competency-alert">
-                            <span class="eyebrow">Competencias con menor aprobación</span>
-                            <div class="ficha-competency-alert-list">
-                                {% for comp_name, comp_data in extra.top_competencias %}
-                                {% set comp_pct = ((comp_data.aprobados / comp_data.total) * 100)|round|int if comp_data.total > 0 else 0 %}
-                                <div class="ficha-competency-alert-item {% if comp_pct >= 80 %}is-positive{% endif %}">
-                                    <span title="{{ comp_name }}">{{ comp_name[:80] }}</span>
-                                    <strong>{{ comp_pct }}%</strong>
-                                </div>
-                                {% endfor %}
+                            <div class="group-average-track" role="progressbar" aria-label="Promedio de avance del grupo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_raps }}" aria-valuetext="{{ pct_raps }}% de RAPs cerrados" title="Promedio de avance del grupo: {{ pct_raps }}%">
+                                <div class="group-average-bar" style="width: {{ [pct_raps, 100]|min }}%;"></div>
+                                <span class="group-average-target-line" style="left: 70%;" title="Meta institucional del 70%"></span>
+                                <span class="group-average-target-label" style="left: 70%;">Meta 70%</span>
                             </div>
+                            <div class="group-average-scale" aria-hidden="true">
+                                <span>0%</span>
+                                <span>avance académico</span>
+                                <span>100%</span>
+                            </div>
+
+                            <details class="time-hero-more">
+                                <summary>
+                                    <span class="time-hero-more-copy">
+                                        <strong>Tiempo restante e hitos</strong>
+                                        <small>Brecha frente al calendario y fechas clave</small>
+                                    </span>
+                                    <span class="time-hero-more-icon" aria-hidden="true">＋</span>
+                                </summary>
+                                <div class="time-hero-more-content">
+                                    <div class="group-average-insight {% if group_delta is none %}is-neutral{% elif group_delta >= 0 %}is-positive{% else %}is-attention{% endif %}">
+                                        <span class="group-average-insight-icon" aria-hidden="true">{% if group_delta is none %}•{% elif group_delta >= 0 %}↗{% else %}↘{% endif %}</span>
+                                        <span>
+                                            {% if group_delta is none %}
+                                            Aún no hay resultados para comparar el avance académico con el tiempo.
+                                            {% elif group_delta >= 0 %}
+                                            El grupo va {{ group_delta }} puntos por encima del tiempo transcurrido.
+                                            {% else %}
+                                            El grupo va {{ (group_delta * -1)|round(1) }} puntos por debajo del tiempo transcurrido.
+                                            {% endif %}
+                                        </span>
+                                    </div>
+
+                                    <div class="time-remaining-note">
+                                        <span class="time-remaining-label">⏳ Tiempo restante</span>
+                                        {% if cronograma.configurado and cronograma.fase == 'lectiva' %}
+                                        <strong>Faltan {{ cronograma.dias_restantes_lectiva }} <span class="time-hero-unit">días</span></strong>
+                                        <span>(~{{ cronograma.meses_restantes_lectiva|default((cronograma.dias_restantes_lectiva / 30.44)|round(1)) }} meses para iniciar la etapa productiva)</span>
+                                        {% elif cronograma.configurado and cronograma.fase == 'productiva' %}
+                                        <strong>Faltan {{ cronograma.dias_restantes }} <span class="time-hero-unit">días</span></strong>
+                                        <span>para el cierre definitivo</span>
+                                        {% elif cronograma.configurado and cronograma.fase == 'finalizada' %}
+                                        <strong class="text-success">Formación completada</strong>
+                                        {% else %}
+                                        <strong class="text-warning">Fechas pendientes</strong>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="time-milestones-grid">
+                                        <div class="time-milestone-card is-lectiva-card">
+                                            <div class="time-milestone-icon-box" aria-hidden="true">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                                                    <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                                                </svg>
+                                            </div>
+                                            <div class="time-milestone-info">
+                                                <span class="milestone-label">Fin Etapa Lectiva</span>
+                                                <strong class="milestone-date">
+                                                    {% if cronograma.fin_lectiva %}
+                                                    {{ cronograma.fin_lectiva.strftime('%d/%m/%Y') }}
+                                                    {% else %}--/--/----{% endif %}
+                                                </strong>
+                                                <span class="milestone-sub-date">
+                                                    Inicio etapa lectiva: <strong>{% if cronograma.inicio_lectiva %}{{ cronograma.inicio_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="time-milestone-card is-productiva-card">
+                                            <div class="time-milestone-icon-box" aria-hidden="true">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                                                </svg>
+                                            </div>
+                                            <div class="time-milestone-info">
+                                                <span class="milestone-label">Etapa Productiva ({{ cronograma.meses_productiva|default('—') }}m)</span>
+                                                <strong class="milestone-date">
+                                                    {% if cronograma.fin_productiva %}
+                                                    Hasta {{ cronograma.fin_productiva.strftime('%d/%m/%Y') }}
+                                                    {% else %}--/--/----{% endif %}
+                                                </strong>
+                                                <span class="milestone-sub-date">
+                                                    Inicio etapa productiva: <strong>{% if cronograma.inicio_productiva %}{{ cronograma.inicio_productiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong> · Fin de la ficha: <strong>{% if cronograma.fin_productiva %}{{ cronograma.fin_productiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
+                                                </span>
+                                            </div>
+                                            <span class="milestone-status-tag is-productiva-tag" title="Duración de la práctica empresarial">
+                                                🏢 {{ cronograma.meses_productiva|default('—') }} meses
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+
+                    {% if fases_data and fases_data.disponible %}
+                    <details class="ficha-phase-details">
+                        <summary>
+                            <span class="ficha-phase-summary-copy">
+                                <strong>Seguimiento de fases</strong>
+                                <small>{{ fases_data.fase_esperada.icono }} {{ fases_data.fase_esperada.nombre|title }} por tiempo · {{ fases_data.fase_real.icono }} {{ fases_data.fase_real.nombre|title }} según RAPs</small>
+                            </span>
+                            <span class="ficha-phase-summary-action">Ver detalle <span aria-hidden="true">＋</span></span>
+                        </summary>
+                        <div class="ficha-phase-details-content">
+                            {% include 'instructor/_ficha_fases_tracker.html' %}
+                        </div>
+                    </details>
+                    {% endif %}
+                </section>
+
+                <!-- 3. KPIS COMPLEMENTARIOS: ASISTENCIA Y ESTADO (EL AVANCE GRUPAL VIVE EN EL HERO) -->
+                <div class="ficha-bento-kpis ficha-bento-kpis-2">
+                    <!-- KPI 1: Asistencia y Compromiso -->
+                    <div class="bento-kpi-card {% if pct_asistencia >= 80 %}is-positive{% else %}is-warning{% endif %}">
+                        <div class="bento-kpi-top">
+                            <span class="bento-kpi-label">Asistencia</span>
+                            <span class="bento-kpi-tag">{{ extra.get('sesiones', 0) }} sesiones</span>
+                        </div>
+                        <div class="bento-kpi-center">
+                            <strong class="bento-kpi-val">{{ pct_asistencia }}%</strong>
+                            <small class="bento-kpi-sub">
+                                {% set expected_deliveries = extra.get('tareas_totales', 0) * extra.get('total_aprendices', 0) %}
+                                {% if expected_deliveries %}
+                                {{ pct_entregas }}% evidencias entregadas
+                                {% else %}
+                                Asistencia regular del grupo
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="bento-kpi-track" role="progressbar" aria-label="Asistencia promedio del grupo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_asistencia }}" aria-valuetext="{{ pct_asistencia }}% de asistencia" title="Asistencia promedio: {{ pct_asistencia }}%">
+                            <div class="bento-kpi-bar is-attendance" style="width: {{ [pct_asistencia, 100]|min }}%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- KPI 2: Estado del Grupo y Novedades -->
+                    <div class="bento-kpi-card">
+                        <div class="bento-kpi-top">
+                            <span class="bento-kpi-label">Estado del Grupo</span>
+                            <span class="bento-kpi-tag {% if extra.get('alertas_activas', 0) > 0 %}tag-danger{% else %}tag-ok{% endif %}">
+                                {% if extra.get('alertas_activas', 0) > 0 %}
+                                {{ extra.get('alertas_activas') }} alerta{{ 's' if extra.get('alertas_activas') != 1 }}
+                                {% else %}
+                                Sin alertas activas
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="bento-kpi-center">
+                            <strong class="bento-kpi-val">{{ extra.get('total_aprendices', stats.activos if stats else 0) }}</strong>
+                            <small class="bento-kpi-sub">
+                                {% if stats and stats.total > 0 %}
+                                {{ stats.total }} aprendices en total
+                                {% else %}
+                                Aprendices en formación
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% if stats and stats.total > 0 %}
+                        <div class="estados-bar" role="img" aria-label="Distribución de aprendices" title="Distribución de aprendices">
+                            {% set bg_colors = {'EN_FORMACION': 'var(--info)', 'CERTIFICADO': 'var(--success)', 'CANCELADO': 'var(--danger)', 'RETIRO_VOLUNTARIO': 'var(--warning)', 'POR_CERTIFICAR': 'var(--primary)'} %}
+                            {% for estado, count in stats.estados.items() %}
+                                {% set bg = bg_colors.get(estado, 'var(--gray-500)') %}
+                                {% if count > 0 %}<div title="{{ estado|replace('_', ' ')|title }}: {{ count }} ({{ (count / stats.total * 100)|round|int }}%)" style="--state-color: {{ bg }}; width: {{ (count / stats.total * 100) }}%;"></div>{% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="estados-legend bento-state-legend" aria-label="Detalle de estados del grupo">
+                            {% for estado, count in stats.estados.items() if count > 0 %}
+                            <span title="{{ estado|replace('_', ' ')|title }}: {{ count }}">
+                                <span class="estados-dot" style="--state-color: {{ bg_colors.get(estado, 'var(--gray-500)') }};"></span>
+                                {{ count }} {{ estado|replace('_', ' ')|title }}
+                            </span>
+                            {% endfor %}
                         </div>
                         {% endif %}
-
-                        {% endif %}
-                    </aside>
+                    </div>
                 </div>
 
-                <nav class="ficha-action-grid" aria-label="Acciones de la ficha {{ ficha.codigo }}">
+                <!-- 3. FOCO ESTRATÉGICO Y ALERTAS ESENCIALES (SOLO SI APLICA) -->
+                {% if extra.top_competencias or (fases_data and fases_data.desfase_fases > 0) %}
+                <div class="ficha-strategic-focus">
+                    {% if fases_data and fases_data.desfase_fases > 0 %}
+                    <div class="strategic-alert-banner">
+                        <span class="strategic-alert-icon" aria-hidden="true">⏰</span>
+                        <div class="strategic-alert-body">
+                            <strong>Priorizar evaluaciones de {{ fases_data.fase_real.nombre|title }}</strong>
+                            <p>El grupo está en fase de {{ fases_data.fase_esperada.nombre|title }} por calendario, pero aún tiene resultados pendientes de {{ fases_data.fase_real.nombre|title }}. Se recomienda asentar juicios en SOFIA Plus con los instructores responsables.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if extra.top_competencias %}
+                    <div class="ficha-competencies-compact">
+                        <span class="competencies-caption">Competencias con menor aprobación:</span>
+                        <div class="competencies-chips">
+                            {% for comp_name, comp_data in extra.top_competencias %}
+                            {% set comp_pct = ((comp_data.aprobados / comp_data.total) * 100)|round|int if comp_data.total > 0 else 0 %}
+                            <span class="competency-chip {% if comp_pct >= 70 %}is-ok{% elif comp_pct >= 40 %}is-mid{% else %}is-low{% endif %}" title="{{ comp_name }}: {{ comp_data.aprobados }} de {{ comp_data.total }} aprobados">
+                                <span class="chip-dot"></span>
+                                <span class="chip-name">{{ comp_name }}</span>
+                                <strong class="chip-val">{{ comp_pct }}%</strong>
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- 4. INDICADORES OPERATIVOS CON DATOS YA CALCULADOS POR EL DASHBOARD -->
+                <section class="ficha-operational-panel" aria-labelledby="operational-title-{{ ficha.codigo }}">
+                    <div class="operational-panel-heading">
+                        <div>
+                            <span class="operational-eyebrow">Gestión operativa</span>
+                            <h3 id="operational-title-{{ ficha.codigo }}">Pendientes y actividad de la ficha</h3>
+                        </div>
+                        <span class="operational-panel-note">Datos del grupo activo</span>
+                    </div>
+                    <div class="ficha-operational-grid">
+                        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="operational-item operational-item--tasks">
+                            <span class="operational-item-icon" aria-hidden="true">📝</span>
+                            <span class="operational-item-copy">
+                                <span class="operational-item-label">Tareas publicadas</span>
+                                <strong>{{ extra.get('tareas_totales', 0) }}</strong>
+                                <small>{{ extra.get('pendientes', 0) }} pendientes de gestión</small>
+                            </span>
+                            <span class="operational-item-arrow" aria-hidden="true">→</span>
+                        </a>
+                        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="operational-item operational-item--evidence">
+                            <span class="operational-item-icon" aria-hidden="true">📥</span>
+                            <span class="operational-item-copy">
+                                <span class="operational-item-label">Entregas recibidas</span>
+                                <strong>{{ pct_entregas }}%</strong>
+                                <small>{{ extra.get('entregas_totales', 0) }} entregas registradas</small>
+                                <span class="operational-progress" role="progressbar" aria-label="Entregas recibidas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_entregas }}" aria-valuetext="{{ pct_entregas }}% de entregas recibidas"><span style="width: {{ [pct_entregas, 100]|min }}%;"></span></span>
+                            </span>
+                            <span class="operational-item-arrow" aria-hidden="true">→</span>
+                        </a>
+                        <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="operational-item operational-item--plans">
+                            <span class="operational-item-icon" aria-hidden="true">🧭</span>
+                            <span class="operational-item-copy">
+                                <span class="operational-item-label">Planes de mejoramiento</span>
+                                <strong>{{ extra.get('planes_pendientes', 0) }}</strong>
+                                <small>{% if extra.get('planes_pendientes', 0) %}requieren seguimiento{% else %}sin planes pendientes{% endif %}</small>
+                            </span>
+                            <span class="operational-item-arrow" aria-hidden="true">→</span>
+                        </a>
+                    </div>
+                </section>
+
+                <!-- 5. BARRA DE ACCIONES RÁPIDAS -->
+                <nav class="ficha-action-grid ficha-action-grid-primary" aria-label="Acciones principales de la ficha {{ ficha.codigo }}">
                     <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
                         <span class="module-icon" aria-hidden="true">📋</span>
                         <span><strong>Llamado a lista</strong><small>Registrar asistencia</small></span>
@@ -178,35 +453,250 @@
                         <span class="module-icon" aria-hidden="true">📝</span>
                         <span><strong>Tareas</strong><small>Asignaciones y entregas</small></span>
                     </a>
+                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">👥</span>
+                        <span><strong>Aprendices</strong><small>Directorio y notas</small></span>
+                    </a>
+                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="module-action">
+                        <span class="module-icon" aria-hidden="true">📊</span>
+                        <span><strong>Planeación & Juicios</strong><small>Avance pedagógico</small></span>
+                    </a>
                     <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
                         <span class="module-icon" aria-hidden="true">⚠️</span>
                         <span><strong>Alertas</strong><small>{% set num_alertas = extra.get('alertas_activas', 0) if extra else 0 %}{% if num_alertas %}{{ num_alertas }} activa{{ 's' if num_alertas != 1 }}{% else %}Sin riesgos{% endif %}</small></span>
                     </a>
-                    <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">📓</span>
-                        <span><strong>Observador</strong><small>Formación integral</small></span>
-                    </a>
-                    <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">🔍</span>
-                        <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
-                    </a>
-                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon module-icon-chart" aria-hidden="true">📊</span>
-                        <span><strong>Estadísticas</strong><small>Evaluaciones y juicios</small></span>
-                    </a>
-                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">📂</span>
-                        <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
-                    </a>
-                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">🏆</span>
-                        <span><strong>Ranking</strong><small>Participación del grupo</small></span>
-                    </a>
-                    <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">🧹</span>
-                        <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
-                    </a>
                 </nav>
+
+                <!-- 6. DETALLES AVANZADOS Y MÓDULOS SECUNDARIOS BAJO DEMANDA -->
+                <div class="ficha-expandable-section">
+                    <details class="ficha-secondary-details">
+                        <summary>
+                            <span>Hitos de formación, certificación y novedades</span>
+                            <span class="expand-icon" aria-hidden="true">▾</span>
+                        </summary>
+                        <div class="secondary-details-content">
+                            {% set tyt = progreso_tyt(ficha, none) %}
+                            <div class="secondary-details-grid">
+                                {% if tyt and not tyt.error %}
+                                {% set tyt_pct_eval = ((tyt.meta_resultados / tyt.total_resultados) * 100)|round(1) if (tyt.total_resultados and tyt.total_resultados > 0) else (tyt.promedio_evaluados if tyt.promedio_evaluados is not none else 0) %}
+                                <div class="detail-kpi-card is-tyt-card">
+                                    <div class="detail-kpi-header">
+                                        <div class="detail-kpi-identity">
+                                            <div class="detail-kpi-icon-badge is-tyt" aria-hidden="true">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <circle cx="12" cy="12" r="10"/>
+                                                    <circle cx="12" cy="12" r="6"/>
+                                                    <circle cx="12" cy="12" r="2"/>
+                                                </svg>
+                                            </div>
+                                            <div class="detail-kpi-title-block">
+                                                <span class="detail-item-label">Meta Saber TyT</span>
+                                                <strong>{{ tyt.meta_resultados }} de {{ tyt.total_resultados }} resultados (70%)</strong>
+                                            </div>
+                                        </div>
+                                        <!-- Velocímetro SVG Saber TyT -->
+                                        <div class="detail-kpi-gauge-wrap" title="Avance hacia el hito TyT: {{ tyt_pct_eval }}% de resultados evaluados">
+                                            <svg class="kpi-speedometer-svg" viewBox="0 0 90 52" aria-hidden="true">
+                                                <path d="M 10 46 A 35 35 0 0 1 80 46" fill="none" stroke="var(--bg-input)" stroke-width="7" stroke-linecap="round"/>
+                                                <path d="M 10 46 A 35 35 0 0 1 80 46" fill="none" stroke="{% if tyt_pct_eval >= 70 %}#10b981{% elif tyt_pct_eval >= 50 %}#3b82f6{% else %}#ef4444{% endif %}" stroke-width="7" stroke-linecap="round"
+                                                      stroke-dasharray="109.96"
+                                                      stroke-dashoffset="{{ (109.96 * (1.0 - ([0, [tyt_pct_eval, 100]|min]|max / 100.0)))|round(1) }}"/>
+                                                {% set tyt_needle_rot = ([0, [tyt_pct_eval, 100]|min]|max * 1.8)|round(1) %}
+                                                <line x1="45" y1="46" x2="18" y2="46" stroke="var(--text-strong)" stroke-width="2" stroke-linecap="round"
+                                                      transform="rotate({{ tyt_needle_rot }}, 45, 46)"/>
+                                                <circle cx="45" cy="46" r="3.5" fill="var(--text-strong)"/>
+                                                <text x="45" y="38" text-anchor="middle" font-size="8.5" font-weight="800" fill="var(--text-strong)">{{ tyt_pct_eval }}%</text>
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    <!-- Barra de progreso lineal Saber TyT -->
+                                    <div class="detail-kpi-track" title="Progreso: {{ tyt_pct_eval }}% de resultados evaluados">
+                                        <div class="detail-kpi-bar is-tyt" style="width: {{ [tyt_pct_eval, 100]|min }}%;"></div>
+                                        <span class="detail-kpi-target-line" style="left: 70%;" title="Meta institucional 70%"></span>
+                                    </div>
+
+                                    <div class="detail-kpi-chips">
+                                        <span class="kpi-mini-chip {% if tyt.pendientes_evaluacion > 0 %}is-warning{% else %}is-success{% endif %}">
+                                            👥 <strong>{{ tyt.pendientes_evaluacion }}</strong> aprendices por llegar al 70% evaluado
+                                        </span>
+                                        <span class="kpi-mini-chip">
+                                            📝 <strong>{{ tyt.faltan_evaluar }}</strong> evaluaciones faltantes.
+                                        </span>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if cronograma.configurado %}
+                                <div class="detail-kpi-card is-productiva-card">
+                                    <div class="detail-kpi-header">
+                                        <div class="detail-kpi-identity">
+                                            <div class="detail-kpi-icon-badge is-productiva" aria-hidden="true">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+                                                    <path d="M9 22v-4h6v4"/>
+                                                    <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01"/>
+                                                </svg>
+                                            </div>
+                                            <div class="detail-kpi-title-block">
+                                                <span class="detail-item-label">Etapa Productiva</span>
+                                                <strong>{{ cronograma.meses_productiva|default('—') }} meses</strong>
+                                            </div>
+                                        </div>
+                                             <span class="detail-kpi-badge is-productiva">{{ cronograma.meses_productiva|default('—') }} meses</span>
+                                    </div>
+
+                                    <!-- Figura visual: Pipeline de Etapas Formativas -->
+                                    <div class="stage-pipeline" role="img" aria-label="Línea de avance formativo">
+                                        <div class="stage-step {% if cronograma.fase == 'lectiva' %}is-active{% else %}is-done{% endif %}">
+                                            <span class="stage-dot"></span>
+                                            <span class="stage-text">Lectiva</span>
+                                        </div>
+                                        <div class="stage-connector {% if cronograma.fase in ('productiva', 'finalizada') %}is-done{% endif %}"></div>
+                                        <div class="stage-step {% if cronograma.fase == 'productiva' %}is-active{% elif cronograma.fase == 'finalizada' %}is-done{% else %}is-next{% endif %}">
+                                            <span class="stage-dot"></span>
+                                             <span class="stage-text">Productiva ({{ cronograma.meses_productiva|default('—') }}M)</span>
+                                        </div>
+                                        <div class="stage-connector {% if cronograma.fase == 'finalizada' %}is-done{% endif %}"></div>
+                                        <div class="stage-step {% if cronograma.fase == 'finalizada' %}is-active{% else %}is-pending{% endif %}">
+                                            <span class="stage-dot"></span>
+                                            <span class="stage-text">Certificación</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="detail-kpi-chips">
+                                        <small class="kpi-mini-chip is-date" title="Período de etapa productiva y fin de la ficha">
+                                            📅 Inicio etapa productiva: <strong>{{ cronograma.inicio_productiva.strftime('%d/%m/%Y') }}</strong> → Fin de la ficha: <strong>{{ cronograma.fin_productiva.strftime('%d/%m/%Y') }}</strong>
+                                        </small>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <div class="detail-kpi-card is-cert-card">
+                                    <div class="detail-kpi-header">
+                                        <div class="detail-kpi-identity">
+                                            <div class="detail-kpi-icon-badge is-cert" aria-hidden="true">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                    <polyline points="14 2 14 8 20 8"/>
+                                                    <circle cx="12" cy="14" r="3"/>
+                                                    <path d="m14 17 2 2M10 17l-2 2"/>
+                                                </svg>
+                                            </div>
+                                            <div class="detail-kpi-title-block">
+                                                <span class="detail-item-label">Certificación</span>
+                                                <strong>{{ extra.get('aprendices_certificados', 0) }} de {{ extra.get('total_aprendices', 0) }} aprendices</strong>
+                                            </div>
+                                        </div>
+                                        <!-- Indicador radial de certificación -->
+                                        <div class="detail-kpi-ring-wrap" title="{{ cert_pct }}% certificados">
+                                            <svg class="kpi-ring-svg" width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+                                                <circle class="ring-bg" cx="19" cy="19" r="15" fill="none" stroke="var(--bg-input)" stroke-width="4"/>
+                                                <circle class="ring-fg" cx="19" cy="19" r="15" fill="none"
+                                                        stroke="{% if cert_pct > 0 %}#10b981{% else %}var(--text-muted){% endif %}"
+                                                        stroke-width="4"
+                                                        stroke-linecap="round"
+                                                        stroke-dasharray="94.25"
+                                                        stroke-dashoffset="{{ (94.25 * (1.0 - ([0, [cert_pct, 100]|min]|max / 100.0)))|round(1) }}"
+                                                        transform="rotate(-90 19 19)"/>
+                                                <text x="19" y="22.5" text-anchor="middle" font-size="8.5" font-weight="800" fill="var(--text-strong)">{{ cert_pct }}%</text>
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    <!-- Barra de progreso Certificación -->
+                                    <div class="detail-kpi-track" title="Progreso de certificación: {{ cert_pct }}%">
+                                        <div class="detail-kpi-bar is-cert" style="width: {{ [cert_pct, 100]|min }}%;"></div>
+                                    </div>
+
+                                    <div class="detail-kpi-chips">
+                                        <span class="kpi-mini-chip">
+                                            🎓 <strong>{{ cert_pct }}%</strong> con 100% de juicios aprobados
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="detail-kpi-card is-integral-card">
+                                    {% set n_pos = extra.get('notas_positivas', 0) %}
+                                    {% set n_neg = extra.get('notas_negativas', 0) %}
+                                    {% set n_tot = extra.get('notas_total', 0) %}
+                                    {% set pct_pos = ((n_pos / n_tot) * 100)|round|int if n_tot > 0 else 0 %}
+                                    {% set pct_neg = ((n_neg / n_tot) * 100)|round|int if n_tot > 0 else 0 %}
+                                    <div class="detail-kpi-header">
+                                        <div class="detail-kpi-identity">
+                                            <div class="detail-kpi-icon-badge is-integral" aria-hidden="true">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                                </svg>
+                                            </div>
+                                            <div class="detail-kpi-title-block">
+                                                <span class="detail-item-label">Formación Integral</span>
+                                                <strong>{{ n_tot }} observaciones</strong>
+                                            </div>
+                                        </div>
+                                        <span class="detail-kpi-badge {% if n_neg > 0 %}is-attention{% else %}is-positive{% endif %}">
+                                            {% if n_neg > 0 %}Con novedades{% else %}Ejemplar{% endif %}
+                                        </span>
+                                    </div>
+
+                                    <!-- Figura visual: Barra de Balance Convivencial / Sentiment Ratio -->
+                                    <div class="behavior-balance-bar" title="Balance conductual: {{ n_pos }} felicitaciones, {{ n_neg }} llamados de atención">
+                                        {% if n_tot > 0 %}
+                                            {% if n_pos > 0 %}<div class="balance-segment is-positive" style="width: {{ pct_pos }}%;" title="{{ n_pos }} reconocimientos"></div>{% endif %}
+                                            {% if n_neg > 0 %}<div class="balance-segment is-negative" style="width: {{ pct_neg }}%;" title="{{ n_neg }} llamados de atención"></div>{% endif %}
+                                        {% else %}
+                                            <div class="balance-segment is-clean" style="width: 100%;" title="Sin llamados de atención registrados"></div>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="detail-kpi-chips">
+                                        <span class="kpi-mini-chip is-positive">
+                                            ⭐ <strong>{{ n_pos }}</strong> reconocimientos
+                                        </span>
+                                        <span class="kpi-mini-chip {% if n_neg > 0 %}is-danger{% endif %}">
+                                            ⚠️ <strong>{{ n_neg }}</strong> llamados de atención
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="secondary-details-actions">
+                                <a href="{{ url_for('tyt.detalle', ficha_id=ficha.id) }}" class="btn-detail-link">
+                                    Ver cuánto le falta a cada aprendiz para el hito del 70% →
+                                </a>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="ficha-more-actions">
+                        <summary>Más módulos <span aria-hidden="true">＋</span></summary>
+                        <nav class="ficha-action-grid" aria-label="Más módulos de la ficha {{ ficha.codigo }}">
+                            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">📓</span>
+                                <span><strong>Observador</strong><small>Formación integral</small></span>
+                            </a>
+                            <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">🔍</span>
+                                <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
+                            </a>
+                            <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon module-icon-chart" aria-hidden="true">📊</span>
+                                <span><strong>Estadísticas</strong><small>Evaluaciones y juicios</small></span>
+                            </a>
+                            <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">📂</span>
+                                <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                            </a>
+                            <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">🏆</span>
+                                <span><strong>Ranking</strong><small>Participación del grupo</small></span>
+                            </a>
+                            <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">🧹</span>
+                                <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
+                            </a>
+                        </nav>
+                    </details>
+                </div>
             </div>
         </article>
         {% endfor %}
@@ -214,9 +704,9 @@
     {% endif %}
 
     {% if terminadas %}
-    <details class="fichas-archivadas" style="margin-top: 32px;">
-        <summary style="font-weight: 700; font-size: 16px; color: var(--gray-700); cursor: pointer; padding: 12px; background: var(--gray-100); border-radius: var(--radius-sm); border: 1px solid var(--gray-300);">Ver fichas archivadas / finalizadas ({{ terminadas|length }})</summary>
-        <div class="dashboard-cards" style="margin-top: 16px;">
+    <details class="fichas-archivadas">
+        <summary>Ver fichas archivadas / finalizadas ({{ terminadas|length }})</summary>
+        <div class="dashboard-cards fichas-archivadas-list">
             {% for ficha in terminadas %}
             {% set cronograma = cronogramas[ficha.id] %}
             {% set extra = estadisticas_extra.get(ficha.id, {}) %}
@@ -301,7 +791,7 @@
                         {% endif %}
                     </div>
 
-                    <nav class="ficha-action-grid" aria-label="Acciones de la ficha {{ ficha.codigo }}">
+                    <nav class="ficha-action-grid ficha-action-grid-primary" aria-label="Acciones principales de la ficha {{ ficha.codigo }}">
                         <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
                             <span class="module-icon" aria-hidden="true">📋</span>
                             <span><strong>Llamado a lista</strong><small>Registrar asistencia</small></span>
@@ -310,35 +800,44 @@
                             <span class="module-icon" aria-hidden="true">📝</span>
                             <span><strong>Tareas</strong><small>Asignaciones y entregas</small></span>
                         </a>
-                        <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
-                            <span class="module-icon" aria-hidden="true">⚠️</span>
-                            <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
-                        </a>
-                        <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">📓</span>
-                            <span><strong>Observador</strong><small>Formación integral</small></span>
-                        </a>
-                        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">🔍</span>
-                            <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
-                        </a>
-                        <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">📊</span>
-                            <span><strong>Estadísticas</strong><small>Evaluaciones y juicios</small></span>
-                        </a>
-                        <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">📂</span>
-                            <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
-                        </a>
-                        <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">🏆</span>
-                            <span><strong>Ranking</strong><small>Participación del grupo</small></span>
-                        </a>
-                        <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
-                            <span class="module-icon" aria-hidden="true">🧹</span>
-                            <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
+                        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="module-action">
+                            <span class="module-icon" aria-hidden="true">👥</span>
+                            <span><strong>Aprendices</strong><small>Directorio del grupo</small></span>
                         </a>
                     </nav>
+                    <details class="ficha-more-actions">
+                        <summary>Más módulos <span aria-hidden="true">＋</span></summary>
+                        <nav class="ficha-action-grid" aria-label="Más módulos de la ficha {{ ficha.codigo }}">
+                            <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
+                                <span class="module-icon" aria-hidden="true">⚠️</span>
+                                <span><strong>Alertas</strong><small>Revisar riesgos</small></span>
+                            </a>
+                            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">📓</span>
+                                <span><strong>Observador</strong><small>Formación integral</small></span>
+                            </a>
+                            <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">🔍</span>
+                                <span><strong>Seguimiento</strong><small>Casos y evidencias</small></span>
+                            </a>
+                            <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon module-icon-chart" aria-hidden="true">📊</span>
+                                <span><strong>Estadísticas</strong><small>Evaluaciones y juicios</small></span>
+                            </a>
+                            <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">📂</span>
+                                <span><strong>Materiales</strong><small>Archivos de apoyo</small></span>
+                            </a>
+                            <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">🏆</span>
+                                <span><strong>Ranking</strong><small>Participación del grupo</small></span>
+                            </a>
+                            <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
+                                <span class="module-icon" aria-hidden="true">🧹</span>
+                                <span><strong>Turnos de aseo</strong><small>Organizar el ambiente</small></span>
+                            </a>
+                        </nav>
+                    </details>
                 </div>
             </article>
             {% endfor %}
@@ -378,7 +877,7 @@
                         <td>
                             {% if cronograma and cronograma.configurado %}
                             <span class="badge badge-info">{{ cronograma.fase_label }}</span>
-                            <small class="text-muted" style="display:block; font-size:11px; margin-top:2px;">{{ '%.0f'|format(cronograma.porcentaje) }}% transcurrido</small>
+                            <small class="text-muted" style="display:block; font-size:11px; margin-top:2px;">{{ '%.0f'|format(cronograma.porcentaje) }}% de la etapa lectiva</small>
                             {% else %}
                             <span class="badge badge-warning">Fechas pendientes</span>
                             {% endif %}
@@ -437,17 +936,27 @@ document.addEventListener('DOMContentLoaded', function() {
     var gridView = document.getElementById('dashboard-cards-grid');
     var compactView = document.getElementById('dashboard-compact-view');
     var searchInput = document.getElementById('dashboard-ficha-search');
+    var searchClear = document.getElementById('dashboard-search-clear');
+    var noResults = document.getElementById('dashboard-no-results');
+    var noResultsClear = document.getElementById('dashboard-no-results-clear');
+    var resultCount = document.getElementById('dashboard-result-count');
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.card-ficha'));
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.compact-ficha-row'));
 
     function setViewMode(mode) {
         if (mode === 'compact') {
             if (btnCompact) btnCompact.classList.add('is-active');
             if (btnCards) btnCards.classList.remove('is-active');
+            if (btnCompact) btnCompact.setAttribute('aria-pressed', 'true');
+            if (btnCards) btnCards.setAttribute('aria-pressed', 'false');
             if (compactView) compactView.classList.add('is-visible');
             if (gridView) gridView.classList.add('is-hidden');
             localStorage.setItem('dashboard-view-mode', 'compact');
         } else {
             if (btnCards) btnCards.classList.add('is-active');
             if (btnCompact) btnCompact.classList.remove('is-active');
+            if (btnCards) btnCards.setAttribute('aria-pressed', 'true');
+            if (btnCompact) btnCompact.setAttribute('aria-pressed', 'false');
             if (compactView) compactView.classList.remove('is-visible');
             if (gridView) gridView.classList.remove('is-hidden');
             localStorage.setItem('dashboard-view-mode', 'cards');
@@ -463,24 +972,45 @@ document.addEventListener('DOMContentLoaded', function() {
         setViewMode('compact');
     }
 
-    // Buscador en tiempo real
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            var q = this.value.toLowerCase().trim();
-            var cards = document.querySelectorAll('.card-ficha');
-            var rows = document.querySelectorAll('.compact-ficha-row');
+    function clearSearch() {
+        if (searchInput) searchInput.value = '';
+        filterFichas('');
+        if (searchInput) searchInput.focus();
+    }
 
-            cards.forEach(function(card) {
-                var text = card.textContent.toLowerCase();
-                card.style.display = (q === '' || text.indexOf(q) !== -1) ? '' : 'none';
-            });
+    function filterFichas(query) {
+        var q = query.toLowerCase().trim();
+        var visibleCards = 0;
+        var visibleRows = 0;
 
-            rows.forEach(function(row) {
-                var text = row.textContent.toLowerCase();
-                row.style.display = (q === '' || text.indexOf(q) !== -1) ? '' : 'none';
-            });
+        cards.forEach(function(card) {
+            var matches = q === '' || card.textContent.toLowerCase().indexOf(q) !== -1;
+            card.style.display = matches ? '' : 'none';
+            if (matches) visibleCards++;
+        });
+
+        rows.forEach(function(row) {
+            var matches = q === '' || row.textContent.toLowerCase().indexOf(q) !== -1;
+            row.style.display = matches ? '' : 'none';
+            if (matches) visibleRows++;
+        });
+
+        var total = q === '' ? rows.length : Math.max(visibleCards, visibleRows);
+        if (resultCount) {
+            resultCount.textContent = total + (total === 1 ? ' ficha' : ' fichas');
+        }
+        if (searchClear) searchClear.hidden = q === '';
+        if (noResults) noResults.hidden = q === '' || total > 0;
+        var archived = document.querySelector('.fichas-archivadas');
+        if (archived && q !== '') archived.open = visibleCards > 0 && Array.prototype.some.call(cards, function(card) {
+            return card.closest('.fichas-archivadas') && card.style.display !== 'none';
         });
     }
+
+    if (searchInput) searchInput.addEventListener('input', function() { filterFichas(this.value); });
+    if (searchClear) searchClear.addEventListener('click', clearSearch);
+    if (noResultsClear) noResultsClear.addEventListener('click', clearSearch);
+    filterFichas('');
 });
 </script>
 {% endblock %}
