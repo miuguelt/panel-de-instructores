@@ -76,6 +76,34 @@
                         {% elif fases_data and fases_data.desfase_fases is defined and fases_data.desfase_fases == 0 and cronograma.configurado %}
                         <span class="badge badge-success" title="Sincronizado con cronograma">Al día</span>
                         {% endif %}
+                        {% if cronograma.configurado %}
+                            {% set d_inicio = cronograma.get('dias_para_iniciar_lectiva') if cronograma.get is defined else cronograma.dias_para_iniciar_lectiva %}
+                            {% set d_cierre = cronograma.get('dias_cierre_ficha') if cronograma.get is defined else cronograma.dias_cierre_ficha %}
+                            {% if d_inicio is not none and cronograma.fase == 'por_iniciar' %}
+                                {% if d_inicio == 0 %}
+                                <span class="badge badge-warning badge-countdown-urgent" title="¡La etapa lectiva inicia hoy!">🚀 Inicia hoy</span>
+                                {% elif d_inicio <= 7 %}
+                                <span class="badge badge-warning badge-countdown-urgent" title="Faltan {{ d_inicio }} días para iniciar la etapa lectiva">⚡ Inicia en {{ d_inicio }}d</span>
+                                {% elif d_inicio <= 30 %}
+                                <span class="badge badge-info badge-countdown-notice" title="Faltan {{ d_inicio }} días para iniciar la etapa lectiva">⏳ Inicia en {{ d_inicio }}d</span>
+                                {% else %}
+                                <span class="badge badge-secondary" title="Faltan {{ d_inicio }} días para iniciar la etapa lectiva">📅 Inicia en {{ d_inicio }}d</span>
+                                {% endif %}
+                            {% endif %}
+                            {% if d_cierre is not none and not (cronograma.get('ficha_cerrada', false) if cronograma.get is defined else false) and cronograma.fase != 'finalizada' %}
+                                {% if d_cierre == 0 %}
+                                <span class="badge badge-danger badge-countdown-urgent" title="¡Hoy es la fecha de cierre de la ficha!">🛑 Cierra hoy</span>
+                                {% elif d_cierre <= 15 %}
+                                <span class="badge badge-danger badge-countdown-urgent" title="Cierre inminente: faltan {{ d_cierre }} días para cerrar la ficha">🚨 Cierre en {{ d_cierre }}d</span>
+                                {% elif d_cierre <= 45 %}
+                                <span class="badge badge-warning badge-countdown-warning" title="Próximo cierre: faltan {{ d_cierre }} días para cerrar la ficha">⚠️ Cierre en {{ d_cierre }}d</span>
+                                {% else %}
+                                <span class="badge badge-secondary badge-countdown-normal" title="Faltan {{ d_cierre }} días para el cierre de la ficha">🏁 Cierre en {{ d_cierre }}d</span>
+                                {% endif %}
+                            {% elif (cronograma.get('ficha_cerrada', false) if cronograma.get is defined else false) or cronograma.fase == 'finalizada' %}
+                                <span class="badge badge-secondary" title="Ficha finalizada">🏁 Cerrada</span>
+                            {% endif %}
+                        {% endif %}
                     </div>
                     <h2 class="card-title">{{ ficha.nombre_programa|trim('.') }}</h2>
                 </div>
@@ -93,6 +121,136 @@
             </header>
 
             <div class="ficha-card-body">
+                {% set d_inicio = cronograma.get('dias_para_iniciar_lectiva') if cronograma.get is defined else cronograma.dias_para_iniciar_lectiva %}
+                {% set d_cierre = cronograma.get('dias_cierre_ficha') if cronograma.get is defined else cronograma.dias_cierre_ficha %}
+                {% set alt_inicio = cronograma.get('alerta_inicio_lectiva') if cronograma.get is defined else cronograma.alerta_inicio_lectiva %}
+                {% set alt_cierre = cronograma.get('alerta_cierre_ficha') if cronograma.get is defined else cronograma.alerta_cierre_ficha %}
+
+                <!-- ALERTAS VISUALES DE CRONOGRAMA CUANDO SE ACERCAN LAS FECHAS -->
+                {% if cronograma.configurado and ((alt_inicio and alt_inicio.get('activa')) or (alt_cierre and alt_cierre.get('activa'))) %}
+                <div class="ficha-countdown-alerts" aria-label="Alertas de fechas clave de la ficha">
+                    {% if alt_inicio and alt_inicio.get('activa') %}
+                    <div class="ficha-countdown-alert alert-lectiva alert-level-{{ alt_inicio.get('nivel', 'aviso') }}">
+                        <span class="countdown-alert-icon" aria-hidden="true">{% if alt_inicio.get('tipo') == 'hoy' %}🚀{% elif alt_inicio.get('tipo') == 'inminente' %}⚡{% else %}🔔{% endif %}</span>
+                        <div class="countdown-alert-text">
+                            <strong>Inicio de Etapa Lectiva:</strong> {{ alt_inicio.get('mensaje') }}
+                        </div>
+                        <span class="countdown-alert-pill">
+                            {% if alt_inicio.get('dias') == 0 %}¡Hoy!{% elif alt_inicio.get('dias') == 1 %}1 día{% else %}{{ alt_inicio.get('dias') }} días{% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    {% if alt_cierre and alt_cierre.get('activa') %}
+                    <div class="ficha-countdown-alert alert-cierre alert-level-{{ alt_cierre.get('nivel', 'aviso') }}">
+                        <span class="countdown-alert-icon" aria-hidden="true">{% if alt_cierre.get('tipo') == 'hoy' %}🛑{% elif alt_cierre.get('tipo') == 'inminente' %}🚨{% else %}⚠️{% endif %}</span>
+                        <div class="countdown-alert-text">
+                            <strong>Cierre de Ficha:</strong> {{ alt_cierre.get('mensaje') }}
+                        </div>
+                        <span class="countdown-alert-pill">
+                            {% if alt_cierre.get('dias') == 0 %}¡Hoy!{% elif alt_cierre.get('dias') == 1 %}1 día{% else %}{{ alt_cierre.get('dias') }} días{% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- WIDGET ELEGANTE DE CUENTA REGRESIVA DUAL (INICIO LECTIVA & CIERRE FICHA) -->
+                {% if cronograma.configurado %}
+                <div class="ficha-countdown-strip" aria-label="Cuenta regresiva de inicio de etapa lectiva y cierre de ficha">
+                    <!-- Tarjeta 1: Días para Iniciar Etapa Lectiva -->
+                    <div class="ficha-countdown-card card-countdown-lectiva {% if cronograma.fase == 'por_iniciar' %}{% if d_inicio is not none and d_inicio <= 7 %}is-imminent{% elif d_inicio is not none and d_inicio <= 30 %}is-upcoming{% endif %}{% else %}is-running{% endif %}">
+                        <div class="countdown-card-icon-box" aria-hidden="true">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                                <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                            </svg>
+                        </div>
+                        <div class="countdown-card-content">
+                            <div class="countdown-card-top">
+                                <span class="countdown-card-label">Inicio Etapa Lectiva</span>
+                                {% if cronograma.fase == 'por_iniciar' %}
+                                    {% if d_inicio is not none and d_inicio == 0 %}
+                                    <span class="countdown-card-status is-urgent">🚀 ¡Inicia hoy!</span>
+                                    {% elif d_inicio is not none and d_inicio <= 7 %}
+                                    <span class="countdown-card-status is-urgent">⚡ Inminente</span>
+                                    {% elif d_inicio is not none and d_inicio <= 30 %}
+                                    <span class="countdown-card-status is-notice">🔔 Próximo</span>
+                                    {% else %}
+                                    <span class="countdown-card-status is-normal">📅 Programado</span>
+                                    {% endif %}
+                                {% elif cronograma.fase in ('lectiva', 'productiva') %}
+                                    <span class="countdown-card-status is-success">✓ En curso</span>
+                                {% else %}
+                                    <span class="countdown-card-status is-normal">✓ Finalizada</span>
+                                {% endif %}
+                            </div>
+                            <div class="countdown-card-figure">
+                                {% if cronograma.fase == 'por_iniciar' %}
+                                    {% if d_inicio is not none and d_inicio == 0 %}
+                                    <strong class="countdown-card-val text-success">¡Hoy!</strong>
+                                    <span class="countdown-card-subval">inicia la formación</span>
+                                    {% else %}
+                                    <strong class="countdown-card-val">{{ d_inicio if d_inicio is not none else '—' }}</strong>
+                                    <span class="countdown-card-subval">días para iniciar</span>
+                                    {% endif %}
+                                {% elif cronograma.fase in ('lectiva', 'productiva') %}
+                                    <strong class="countdown-card-val text-info">Iniciada</strong>
+                                    <span class="countdown-card-subval">hace {{ cronograma.dias_transcurridos }} días</span>
+                                {% else %}
+                                    <strong class="countdown-card-val text-muted">Completada</strong>
+                                    <span class="countdown-card-subval">etapa lectiva cerrada</span>
+                                {% endif %}
+                            </div>
+                            <div class="countdown-card-footer">
+                                <span class="countdown-footer-date">Fecha de inicio: <strong>{% if cronograma.inicio_lectiva %}{{ cronograma.inicio_lectiva.strftime('%d/%m/%Y') }}{% else %}Por definir{% endif %}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 2: Días para Cerrar la Ficha -->
+                    <div class="ficha-countdown-card card-countdown-cierre {% if (cronograma.get('ficha_cerrada', false) if cronograma.get is defined else false) or cronograma.fase == 'finalizada' %}is-closed{% elif d_cierre is not none and d_cierre <= 15 %}is-imminent{% elif d_cierre is not none and d_cierre <= 45 %}is-upcoming{% endif %}">
+                        <div class="countdown-card-icon-box" aria-hidden="true">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </div>
+                        <div class="countdown-card-content">
+                            <div class="countdown-card-top">
+                                <span class="countdown-card-label">Cierre de Ficha</span>
+                                {% if (cronograma.get('ficha_cerrada', false) if cronograma.get is defined else false) or cronograma.fase == 'finalizada' %}
+                                    <span class="countdown-card-status is-normal">✓ Finalizada</span>
+                                {% elif d_cierre is not none and d_cierre == 0 %}
+                                    <span class="countdown-card-status is-critical">🛑 ¡Cierra hoy!</span>
+                                {% elif d_cierre is not none and d_cierre <= 15 %}
+                                    <span class="countdown-card-status is-critical">🚨 Cierre inminente</span>
+                                {% elif d_cierre is not none and d_cierre <= 45 %}
+                                    <span class="countdown-card-status is-warning">⚠️ Próximo a cerrar</span>
+                                {% else %}
+                                    <span class="countdown-card-status is-info">⏳ En desarrollo</span>
+                                {% endif %}
+                            </div>
+                            <div class="countdown-card-figure">
+                                {% if (cronograma.get('ficha_cerrada', false) if cronograma.get is defined else false) or cronograma.fase == 'finalizada' %}
+                                    <strong class="countdown-card-val text-muted">Cerrada</strong>
+                                    <span class="countdown-card-subval">ficha culminada</span>
+                                {% elif d_cierre is not none and d_cierre == 0 %}
+                                    <strong class="countdown-card-val text-danger">¡Hoy!</strong>
+                                    <span class="countdown-card-subval">último día lectivo/productivo</span>
+                                {% else %}
+                                    <strong class="countdown-card-val {% if d_cierre is not none and d_cierre <= 15 %}text-danger{% elif d_cierre is not none and d_cierre <= 45 %}text-warning{% endif %}">{{ d_cierre if d_cierre is not none else '—' }}</strong>
+                                    <span class="countdown-card-subval">días para el cierre definitivo</span>
+                                {% endif %}
+                            </div>
+                            <div class="countdown-card-footer">
+                                <span class="countdown-footer-date">Fecha fin: <strong>{% if cronograma.fin_productiva %}{{ cronograma.fin_productiva.strftime('%d/%m/%Y') }}{% else %}Por definir{% endif %}</strong>{% if cronograma.meses_restantes_total %} (~{{ cronograma.meses_restantes_total }} meses){% endif %}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- 1. SECCIÓN MASTER HERO: CRONOGRAMA, CULMINACIÓN Y FASES DEL PROYECTO (100% DE ANCHO) -->
                 {% set pct_tiempo = cronograma.porcentaje|default(0) %}
                 {% set pct_asistencia = extra.get('pct_asistencia', 0) %}
@@ -378,7 +536,7 @@
                 <!-- 3. FOCO ESTRATÉGICO Y ALERTAS ESENCIALES (SOLO SI APLICA) -->
                 {% set recs_ficha = recomendaciones_fichas.get(ficha.id, []) if recomendaciones_fichas is defined else [] %}
                 {% set top_rec = recs_ficha[0] if recs_ficha else None %}
-                {% if top_rec or extra.top_competencias or (fases_data and fases_data.desfase_fases > 0) %}
+                {% if top_rec or extra.top_competencias or (fases_data and fases_data.desfase_fases is defined and fases_data.desfase_fases > 0) %}
                 <div class="ficha-strategic-focus">
                     {% if top_rec %}
                         {{ render_banner_recomendacion(top_rec) }}
@@ -389,7 +547,7 @@
                             </a>
                         </div>
                         {% endif %}
-                    {% elif fases_data and fases_data.desfase_fases > 0 %}
+                    {% elif fases_data and fases_data.desfase_fases is defined and fases_data.desfase_fases > 0 %}
                     <div class="strategic-alert-banner">
                         <span class="strategic-alert-icon" aria-hidden="true">⏰</span>
                         <div class="strategic-alert-body">
@@ -893,6 +1051,28 @@
                             {% if cronograma and cronograma.configurado %}
                             <span class="badge badge-info">{{ cronograma.fase_label }}</span>
                             <small class="text-muted" style="display:block; font-size:11px; margin-top:2px;">{{ '%.0f'|format(cronograma.porcentaje) }}% de la etapa lectiva</small>
+                            {% set compact_d_inicio = cronograma.get('dias_para_iniciar_lectiva') if cronograma.get is defined else cronograma.dias_para_iniciar_lectiva %}
+                            {% set compact_d_cierre = cronograma.get('dias_cierre_ficha') if cronograma.get is defined else cronograma.dias_cierre_ficha %}
+                            <div class="compact-countdown-tags" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+                                {% if compact_d_inicio is not none and cronograma.fase == 'por_iniciar' %}
+                                    {% if compact_d_inicio <= 7 %}
+                                    <span class="badge badge-warning badge-xs" style="font-size: 10px;" title="Días para iniciar etapa lectiva">⚡ Inicia en {{ compact_d_inicio }}d</span>
+                                    {% else %}
+                                    <span class="badge badge-info badge-xs" style="font-size: 10px;" title="Días para iniciar etapa lectiva">⏳ Inicia en {{ compact_d_inicio }}d</span>
+                                    {% endif %}
+                                {% endif %}
+                                {% if compact_d_cierre is not none and not (cronograma.get('ficha_cerrada', false) if cronograma.get is defined else false) and cronograma.fase != 'finalizada' %}
+                                    {% if compact_d_cierre <= 15 %}
+                                    <span class="badge badge-danger badge-xs" style="font-size: 10px;" title="Días para cierre de ficha">🚨 Cierre en {{ compact_d_cierre }}d</span>
+                                    {% elif compact_d_cierre <= 45 %}
+                                    <span class="badge badge-warning badge-xs" style="font-size: 10px;" title="Días para cierre de ficha">⚠️ Cierre en {{ compact_d_cierre }}d</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary badge-xs" style="font-size: 10px;" title="Días para cierre de ficha">🏁 Cierre en {{ compact_d_cierre }}d</span>
+                                    {% endif %}
+                                {% elif (cronograma.get('ficha_cerrada', false) if cronograma.get is defined else false) or cronograma.fase == 'finalizada' %}
+                                    <span class="badge badge-secondary badge-xs" style="font-size: 10px;">🏁 Finalizada</span>
+                                {% endif %}
+                            </div>
                             {% else %}
                             <span class="badge badge-warning">Fechas pendientes</span>
                             {% endif %}

@@ -5,31 +5,261 @@
 
 {# REGLA: No mostrar números de documento/cédula en esta vista #}
 {% block content %}
-<div class="panel-aprendiz">
-    <!-- Header del panel -->
-    <div class="card panel-header-card">
-        <div class="panel-header-main">
-            <div>
-                <span class="eyebrow">Panel del Aprendiz</span>
-                <h1 class="panel-title">Hola, {{ aprendiz.nombre }}</h1>
-                <p class="text-muted panel-subtitle">{{ ficha.codigo }} — {{ ficha.nombre_programa }}</p>
+<div class="panel-aprendiz" id="panel-aprendiz-root">
+    <!-- ============================================================ -->
+    <!-- CABECERA PRINCIPAL PERSONALIZADA DEL APRENDIZ                -->
+    <!-- ============================================================ -->
+    <header class="card panel-header-card learner-hero-header">
+        <div class="learner-hero-content">
+            <!-- Avatar interactivo con indicador de rol -->
+            <div class="learner-avatar-container">
+                <div class="learner-avatar-disc" id="learner-avatar-disc" role="button" tabindex="0" title="Haz clic para personalizar tu avatar">
+                    <span class="learner-avatar-symbol" id="learner-avatar-display">💻</span>
+                    <span class="learner-avatar-edit-badge" aria-hidden="true">✏️</span>
+                </div>
+                {% if aprendiz.rol_administrativo %}
+                <span class="badge badge-success learner-role-tag" title="Tienes rol administrativo delegado por el instructor">⭐ Delegado</span>
+                {% else %}
+                <span class="badge badge-secondary learner-role-tag">Aprendiz</span>
+                {% endif %}
             </div>
-            <div class="header-actions">
-                <a href="{{ url_for('aprendiz.descargar_reporte', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">
+
+            <!-- Identidad, saludo y subtítulo -->
+            <div class="learner-identity-block">
+                <div class="learner-greeting-line">
+                    <span class="eyebrow" id="learner-greeting-label">{{ resumen_rapido.saludo if resumen_rapido and resumen_rapido.saludo else 'Bienvenido' }}, este es tu espacio</span>
+                    {% if resumen_rapido %}
+                    <span class="badge {{ resumen_rapido.estado_badge_class }} learner-status-pill">{{ resumen_rapido.estado_academico }}</span>
+                    {% endif %}
+                </div>
+                <h1 class="panel-title learner-title">
+                    <span id="learner-greeting-prefix">Hola, </span><span id="learner-display-name">{{ aprendiz.nombre }}</span>
+                </h1>
+                <p class="text-muted panel-subtitle">
+                    <span class="ficha-code-badge">{{ ficha.codigo }}</span> · {{ ficha.nombre_programa }}
+                </p>
+
+                <!-- Lema o frase personal editable -->
+                <div class="learner-motto-wrapper" id="learner-motto-wrapper" role="button" tabindex="0" title="Haz clic para cambiar tu frase o meta semanal">
+                    <span class="motto-icon" aria-hidden="true">🎯</span>
+                    <span class="motto-text" id="learner-motto-text">¡Constancia y enfoque para alcanzar tus metas de formación!</span>
+                    <span class="motto-edit-icon" aria-hidden="true">✎</span>
+                </div>
+            </div>
+
+            <!-- Acciones rápidas de la cabecera -->
+            <div class="header-actions learner-hero-actions">
+                <button type="button" class="btn btn-sm btn-primary-gradient btn-customize-hub" id="btn-open-customizer">
+                    🎨 Personalizar mi espacio
+                </button>
+                <a href="{{ url_for('aprendiz.descargar_reporte', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline" title="Descargar reporte académico oficial en PDF">
                     📄 Reporte PDF
                 </a>
-                <a href="{{ url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">
-                    🔔 Notificaciones{% if notificaciones_aprendiz %} ({{ notificaciones_aprendiz|length }}){% endif %}
+                <a href="{{ url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline" title="Ver notificaciones">
+                    🔔 Notificaciones{% if notificaciones_aprendiz %} <span class="badge badge-danger">({{ notificaciones_aprendiz|length }})</span>{% endif %}
                 </a>
-                <a href="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">
-                    Cambiar usuario
+                <a href="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-ghost" title="Cambiar usuario o salir">
+                    Cerrar sesión
                 </a>
+            </div>
+        </div>
+
+        <!-- Cinta de Indicadores Ejecutivos (Quick Status Ribbon) -->
+        <div class="learner-quick-ribbon" aria-label="Resumen de indicadores clave">
+            <div class="quick-ribbon-item">
+                <span class="ribbon-label">📅 Asistencia</span>
+                <span class="ribbon-value text-{% if pct_asistencia >= 85 %}success{% elif pct_asistencia >= 70 %}warning{% else %}danger{% endif %}">
+                    {{ '%.0f'|format(pct_asistencia) }}%
+                </span>
+                <span class="ribbon-sub">{{ total_sesiones - total_faltas }}/{{ total_sesiones }} sesiones</span>
+            </div>
+
+            <div class="quick-ribbon-item">
+                <span class="ribbon-label">🎓 Juicios Oficiales</span>
+                <span class="ribbon-value text-accent">{{ stats_juicios.pct_total }}%</span>
+                <span class="ribbon-sub">{{ stats_juicios.aprobados }} de {{ stats_juicios.total }} RAPs</span>
+            </div>
+
+            <div class="quick-ribbon-item">
+                <span class="ribbon-label">📋 Evidencias</span>
+                <span class="ribbon-value {% if resumen_rapido and resumen_rapido.tareas_pendientes_count > 0 %}text-warning{% else %}text-success{% endif %}">
+                    {{ resumen_rapido.tareas_pendientes_count if resumen_rapido else 0 }}
+                </span>
+                <span class="ribbon-sub">{% if resumen_rapido and resumen_rapido.tareas_pendientes_count > 0 %}por entregar{% else %}al día{% endif %}</span>
+            </div>
+
+            {% if fila_propia %}
+            <div class="quick-ribbon-item">
+                <span class="ribbon-label">🏆 Ranking Ficha</span>
+                <span class="ribbon-value text-accent">#{{ fila_propia.posicion }}</span>
+                <span class="ribbon-sub">{{ '%.1f'|format(fila_propia.puntaje_total) }} pts</span>
+            </div>
+            {% endif %}
+
+            {% if aseo.turno_propio %}
+            <div class="quick-ribbon-item">
+                <span class="ribbon-label">🧹 Próximo Aseo</span>
+                <span class="ribbon-value">
+                    {% if aseo.turno_propio.fecha == aseo.hoy %}
+                    <span class="badge badge-solid-danger">¡Hoy!</span>
+                    {% elif resumen_rapido and resumen_rapido.dias_proximo_aseo is not none and resumen_rapido.dias_proximo_aseo >= 0 %}
+                    En {{ resumen_rapido.dias_proximo_aseo }}d
+                    {% else %}
+                    {{ aseo.turno_propio.fecha.strftime('%d/%m') }}
+                    {% endif %}
+                </span>
+                <span class="ribbon-sub">{{ aseo.contador.veces_aseo }} cumplidos</span>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- ============================================================ -->
+    <!-- CENTRO DE ACCIÓN PRIORITARIO ("MI DÍA Y PRÓXIMOS PASOS")     -->
+    <!-- ============================================================ -->
+    <section class="learner-action-center" aria-label="Centro de acción y tareas prioritarias">
+        <!-- Card 1: Lo más urgente / Próxima evidencia -->
+        <div class="action-card action-card-urgent">
+            <div class="action-card-header">
+                <span class="action-card-icon">⚡</span>
+                <span class="action-card-badge">Prioridad del día</span>
+            </div>
+            <div class="action-card-body">
+                {% if resumen_rapido and resumen_rapido.proxima_tarea %}
+                    {% set pt = resumen_rapido.proxima_tarea %}
+                    <h3 class="action-card-title">{{ pt.tarea.titulo }}</h3>
+                    <p class="action-card-meta">
+                        {% if pt.estado == 'vencida' %}
+                            <span class="badge badge-danger">⚠️ Plazo vencido · Entrega extemporánea permitida</span>
+                        {% elif pt.limite_efectivo %}
+                            <span class="badge badge-info">🕒 Límite: {{ pt.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}</span>
+                        {% else %}
+                            <span class="badge badge-secondary">Sin fecha límite estricta</span>
+                        {% endif %}
+                    </p>
+                    {% if pt.tarea.descripcion %}
+                    <p class="action-card-desc">
+                        {{ pt.tarea.descripcion[:100] }}{% if pt.tarea.descripcion|length > 100 %}...{% endif %}
+                    </p>
+                    {% endif %}
+                    <button type="button" class="btn btn-sm btn-primary action-jump-btn" data-jump-tab="evidencias" data-jump-task="task-item-{{ pt.tarea.id }}">
+                        📤 Ir a entregar evidencia
+                    </button>
+                {% else %}
+                    <h3 class="action-card-title">¡Todo al día en evidencias!</h3>
+                    <p class="action-card-desc">No tienes tareas pendientes urgentes por entregar en este momento. ¡Excelente gestión!</p>
+                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="evidencias">
+                        📋 Consultar histórico de tareas
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Card 2: Convivencia y turno de aseo -->
+        <div class="action-card action-card-community">
+            <div class="action-card-header">
+                <span class="action-card-icon">🧹</span>
+                <span class="action-card-badge">Aula y Convivencia</span>
+            </div>
+            <div class="action-card-body">
+                {% if aseo.turno_propio %}
+                    <h3 class="action-card-title">
+                        {% if aseo.turno_propio.fecha == aseo.hoy %}
+                        ¡Hoy te corresponde turno!
+                        {% else %}
+                        Turno programado: {{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}
+                        {% endif %}
+                    </h3>
+                    <p class="action-card-desc">
+                        Compañero asignado: <strong>{{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</strong>
+                    </p>
+                    <div class="action-card-buttons">
+                        <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="convivencia">
+                            🤝 Ver turno y opciones de cambio
+                        </button>
+                    </div>
+                {% else %}
+                    <h3 class="action-card-title">Aseo sin pendientes</h3>
+                    <p class="action-card-desc">Has completado <strong>{{ aseo.contador.veces_aseo }}</strong> turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }}. El promedio de la ficha es {{ '%.1f'|format(aseo.promedio) }}.</p>
+                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="convivencia">
+                        🔍 Ver equidad del grupo
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Card 3: Participación y Logros -->
+        <div class="action-card action-card-growth">
+            <div class="action-card-header">
+                <span class="action-card-icon">🏆</span>
+                <span class="action-card-badge">Motivación y Metas</span>
+            </div>
+            <div class="action-card-body">
+                {% if fila_propia %}
+                    <h3 class="action-card-title">Puesto #{{ fila_propia.posicion }} en participación</h3>
+                    <p class="action-card-desc">
+                        Puntaje: <strong>{{ '%.1f'|format(fila_propia.puntaje_total) }} pts</strong>
+                        {% if punto_siguiente %}
+                        · Estás a <strong>{{ '%.1f'|format(punto_siguiente) }} pts</strong> del puesto #{{ fila_propia.posicion - 1 }}.
+                        {% endif %}
+                    </p>
+                    <p class="action-card-subdesc">"{{ mensaje_ranking }}"</p>
+                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="rendimiento">
+                        🏅 Ver ranking e insignias
+                    </button>
+                {% else %}
+                    <h3 class="action-card-title">Participación Activa</h3>
+                    <p class="action-card-desc">Asiste puntualmente y sube tus actividades a tiempo para destacar en la ficha.</p>
+                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="rendimiento">
+                        🌟 Conocer catálogo de insignias
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- BARRA DE PESTAÑAS MODULARES CON SELECTOR DE VISTA            -->
+    <!-- ============================================================ -->
+    <div class="learner-navigation-sticky">
+        <div class="learner-tab-navigation-bar">
+            <div class="learner-tabs-track" role="tablist" aria-label="Pestañas principales del panel">
+                <button type="button" class="learner-tab-btn is-active" data-tab-target="resumen" role="tab" aria-selected="true" id="btn-tab-resumen-main">
+                    <span class="tab-icon">📊</span>
+                    <span class="tab-label">Resumen</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="evidencias" role="tab" aria-selected="false" id="btn-tab-evidencias-main">
+                    <span class="tab-icon">📋</span>
+                    <span class="tab-label">Mis Evidencias</span>
+                    <span class="tab-pill-badge" id="tab-evidencias-counter">{{ tareas_estado|length if tareas_estado else 0 }}</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="juicios" role="tab" aria-selected="false" id="btn-tab-juicios-main">
+                    <span class="tab-icon">🎓</span>
+                    <span class="tab-label">Juicios de Evaluación</span>
+                    <span class="tab-pill-badge">{{ stats_juicios.pct_total }}%</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="rendimiento" role="tab" aria-selected="false" id="btn-tab-rendimiento-main">
+                    <span class="tab-icon">🏆</span>
+                    <span class="tab-label">Rendimiento & Logros</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="convivencia" role="tab" aria-selected="false" id="btn-tab-convivencia-main">
+                    <span class="tab-icon">🤝</span>
+                    <span class="tab-label">Aseo & Convivencia</span>
+                </button>
+            </div>
+
+            <!-- Botón para alternar entre pestañas y vista continua (cascada) -->
+            <div class="learner-view-mode-toggle">
+                <button type="button" id="btn-toggle-view-mode" class="btn btn-sm btn-ghost view-toggle-button" title="Alternar entre modo pestañas y ver todo en una sola página">
+                    <span id="view-mode-icon">📜</span>
+                    <span id="view-mode-text">Ver Todo</span>
+                </button>
             </div>
         </div>
     </div>
 
     {% if aprendiz.rol_administrativo %}
-    <section class="card" aria-labelledby="herramientas-administrador">
+    <section class="card" aria-labelledby="herramientas-administrador" data-learner-tab="resumen">
         <div class="section-title-row">
             <div>
                 <span class="eyebrow">Rol delegado por el instructor</span>
@@ -65,7 +295,9 @@
     </section>
     {% endif %}
 
-    {% include '_cronograma.html' %}
+    <div data-learner-tab="resumen">
+        {% include '_cronograma.html' %}
+    </div>
 
     {# Compute evidence progress for unified section #}
     {% if tareas_estado %}
@@ -80,7 +312,7 @@
     {% endif %}
 
     {# ── Consolidated Progress Dashboard ── #}
-    <section class="section-container" id="seccion-progreso">
+    <section class="section-container" id="seccion-progreso" data-learner-tab="resumen">
         <div class="section-title-row">
             <h2 class="section-title">Mi Progreso</h2>
             <span class="badge badge-secondary">Panorama general</span>
@@ -201,7 +433,7 @@
         </div>
     </section>
 
-    <section class="learner-attendance-calendar card" aria-labelledby="learner-attendance-title">
+    <section class="learner-attendance-calendar card" aria-labelledby="learner-attendance-title" data-learner-tab="resumen">
         <div class="learner-attendance-heading">
             <div>
                 <span class="eyebrow">Consulta personal</span>
@@ -234,7 +466,7 @@
         </div>
     </section>
 
-    <section class="metrics-grid" id="seccion-juicios">
+    <section class="metrics-grid" id="seccion-juicios" data-learner-tab="juicios">
         <div class="metric-card">
             <div class="metric-card-header">
                 <div>
@@ -416,7 +648,7 @@
         {% endif %}
     </section>
 
-    <section class="learner-cleaning-card {% if aseo.aviso_visible %}is-upcoming{% endif %}" id="seccion-aseo">
+    <section class="learner-cleaning-card {% if aseo.aviso_visible %}is-upcoming{% endif %}" id="seccion-aseo" data-learner-tab="convivencia">
         <div class="learner-cleaning-heading">
             <div>
                 <span class="eyebrow">Responsabilidad compartida</span>
@@ -533,7 +765,7 @@
     </section>
 
     {% if nuevas_insignias %}
-    <div class="unlock-banner" role="status">
+    <div class="unlock-banner" role="status" data-learner-tab="rendimiento">
         <span class="unlock-icon">{{ nuevas_insignias[0].insignia.icono }}</span>
         <div>
             <strong>¡Nueva insignia desbloqueada: {{ nuevas_insignias[0].insignia.nombre }}!</strong>
@@ -547,7 +779,7 @@
 
     <!-- RECOMENDACIONES DE ACCIÓN PERSONALIZADAS PARA EL APRENDIZ -->
     {% if recomendaciones_aprendiz %}
-    <section class="learner-recommendations-cluster" aria-label="Recomendaciones y próximos pasos">
+    <section class="learner-recommendations-cluster" aria-label="Recomendaciones y próximos pasos" data-learner-tab="resumen">
         <div class="learner-rec-header">
             <span class="eyebrow">Orientación y Próximos Pasos</span>
             <span class="badge badge-info">{{ recomendaciones_aprendiz|length }} sugerencia{{ 's' if recomendaciones_aprendiz|length > 1 else '' }}</span>
@@ -561,20 +793,22 @@
     {% endif %}
 
     {% if alertas_activas %}
-    <div class="active-alerts-label">
-        <span class="badge badge-solid-danger">{{ alertas_activas|length }} alerta{% if alertas_activas|length != 1 %}s{% endif %} activa{% if alertas_activas|length != 1 %}s{% endif %}</span>
+    <div data-learner-tab="resumen">
+        <div class="active-alerts-label">
+            <span class="badge badge-solid-danger">{{ alertas_activas|length }} alerta{% if alertas_activas|length != 1 %}s{% endif %} activa{% if alertas_activas|length != 1 %}s{% endif %}</span>
+        </div>
+        {% for alerta in alertas_activas %}
+        <div class="alert alert-{% if alerta.nivel == 'roja' %}error{% else %}warning{% endif %}">
+            <strong>{{ alerta.titulo }}</strong>
+            <p class="alert-message">{{ alerta.mensaje }}</p>
+            <small class="alert-note">Este aviso es informativo; conversa con tu instructor para revisar tu situación.</small>
+        </div>
+        {% endfor %}
     </div>
-    {% for alerta in alertas_activas %}
-    <div class="alert alert-{% if alerta.nivel == 'roja' %}error{% else %}warning{% endif %}">
-        <strong>{{ alerta.titulo }}</strong>
-        <p class="alert-message">{{ alerta.mensaje }}</p>
-        <small class="alert-note">Este aviso es informativo; conversa con tu instructor para revisar tu situación.</small>
-    </div>
-    {% endfor %}
     {% endif %}
 
     {% if notas_observador %}
-    <section class="card learner-observer-card" aria-labelledby="learner-observer-title">
+    <section class="card learner-observer-card" aria-labelledby="learner-observer-title" data-learner-tab="convivencia">
         <div class="learner-observer-heading">
             <div>
                 <span class="eyebrow">Observador</span>
@@ -601,7 +835,7 @@
     </section>
     {% endif %}
 
-    <section class="card learner-plan-card" aria-labelledby="learner-plan-title">
+    <section class="card learner-plan-card" aria-labelledby="learner-plan-title" data-learner-tab="convivencia">
         <div class="learner-observer-heading">
             <div>
                 <span class="eyebrow">Debido proceso · Art. 28</span>
@@ -675,7 +909,7 @@
     </section>
 
     {% if inasistencias_pendientes %}
-    <section class="card support-card">
+    <section class="card support-card" data-learner-tab="convivencia">
         <h2>Presentar soporte de una inasistencia</h2>
         <p class="text-muted">Adjunta tu soporte o deja una nota para que el instructor pueda revisar el contexto.</p>
         {% for registro in inasistencias_pendientes[:3] %}
@@ -691,22 +925,24 @@
     </section>
     {% endif %}
 
-    {% if nivel_alerta == 'rojo' %}
-    <div class="alert alert-error">
-        <strong class="alert-lead">🚨 Estás en zona de alerta.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Habla con tu instructor para definir tu situación.
+    <div data-learner-tab="resumen">
+        {% if nivel_alerta == 'rojo' %}
+        <div class="alert alert-error">
+            <strong class="alert-lead">🚨 Estás en zona de alerta.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Habla con tu instructor para definir tu situación.
+        </div>
+        {% elif nivel_alerta == 'amarillo' %}
+        <div class="alert alert-warning">
+            <strong class="alert-lead">⚠️ Estás en riesgo.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Cuida tu asistencia para no afectar tu proceso.
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+            <strong class="alert-lead">🌟 ¡Excelente desempeño!</strong> Tu asistencia es constante y estás al día. ¡Sigue así!
+        </div>
+        {% endif %}
     </div>
-    {% elif nivel_alerta == 'amarillo' %}
-    <div class="alert alert-warning">
-        <strong class="alert-lead">⚠️ Estás en riesgo.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Cuida tu asistencia para no afectar tu proceso.
-    </div>
-    {% else %}
-    <div class="alert alert-success">
-        <strong class="alert-lead">🌟 ¡Excelente desempeño!</strong> Tu asistencia es constante y estás al día. ¡Sigue así!
-    </div>
-    {% endif %}
 
     {% if juicios and resumen_aprendiz %}
-    <section class="card juicio-detail-card">
+    <section class="card juicio-detail-card" data-learner-tab="juicios">
         <div class="juicio-detail-header">
             <div>
                 <span class="eyebrow">Detalle de Evaluación</span>
@@ -940,7 +1176,7 @@
     {% endif %}
 
     {% if ranking %}
-    <section class="card my-ranking-card" id="seccion-ranking">
+    <section class="card my-ranking-card" id="seccion-ranking" data-learner-tab="rendimiento">
         <div class="my-ranking-top">
             <div>
                 <span class="eyebrow">Mi participación</span>
@@ -970,7 +1206,7 @@
         <p class="ranking-disclaimer">Este es un indicador de participación; no es una nota oficial.</p>
     </section>
 
-    <section class="card learner-leaderboard">
+    <section class="card learner-leaderboard" data-learner-tab="rendimiento">
         <div class="section-header compact">
             <div>
                 <span class="eyebrow">Para inspirarte</span>
@@ -1002,9 +1238,11 @@
     {% endif %}
 
     {% if resumen_logros %}
-        {% include 'components/_logros_grid.html' %}
+        <div data-learner-tab="rendimiento">
+            {% include 'components/_logros_grid.html' %}
+        </div>
     {% else %}
-    <section class="achievements-section">
+    <section class="achievements-section" data-learner-tab="rendimiento">
         <div class="section-header">
             <div>
                 <span class="eyebrow">Reconocimiento de participación</span>
@@ -1027,47 +1265,94 @@
     </section>
     {% endif %}
 
-    <div class="tasks-section-header" id="seccion-tareas">
-        <div>
-            <span class="eyebrow">Espacio de Evidencias</span>
-            <h2 class="tasks-section-title">Mis Tareas Programadas</h2>
-        </div>
-        
-        {% if tareas_estado %}
-        {% set total_tareas = tareas_estado|length %}
-        {% set entregadas = [] %}
-        {% set pendientes = [] %}
-        {% for item in tareas_estado %}
-            {% if item.estado in ['entregada', 'retraso'] %}
-                {% set _ = entregadas.append(item) %}
-            {% else %}
-                {% set _ = pendientes.append(item) %}
+    <section class="tasks-section-wrapper" data-learner-tab="evidencias">
+        <div class="tasks-section-header" id="seccion-tareas">
+            <div>
+                <span class="eyebrow">Espacio de Evidencias</span>
+                <h2 class="tasks-section-title">Mis Tareas Programadas</h2>
+            </div>
+            
+            {% if tareas_estado %}
+            {% set total_tareas = tareas_estado|length %}
+            {% set entregadas = [] %}
+            {% set pendientes = [] %}
+            {% for item in tareas_estado %}
+                {% if item.estado in ['entregada', 'retraso'] %}
+                    {% set _ = entregadas.append(item) %}
+                {% else %}
+                    {% set _ = pendientes.append(item) %}
+                {% endif %}
+            {% endfor %}
+            {% set pct = (entregadas|length / total_tareas * 100)|round|int if total_tareas > 0 else 0 %}
+            
+            <div class="evidence-progress-mini">
+                <div class="evidence-progress-row">
+                    <span>Progreso de Evidencias</span>
+                    <span class="evidence-progress-value">{{ pct }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if pct > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct }}%; --metric-color: var(--success);"></div>{% endif %}
+                </div>
+                <small class="text-muted evidence-progress-caption">{{ entregadas|length }} de {{ total_tareas }} entregadas</small>
+            </div>
             {% endif %}
-        {% endfor %}
-        {% set pct = (entregadas|length / total_tareas * 100)|round|int if total_tareas > 0 else 0 %}
-        
-        <div class="evidence-progress-mini">
-            <div class="evidence-progress-row">
-                <span>Progreso de Evidencias</span>
-                <span class="evidence-progress-value">{{ pct }}%</span>
-            </div>
-            <div class="progress-card-track">
-                {% if pct > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct }}%; --metric-color: var(--success);"></div>{% endif %}
-            </div>
-            <small class="text-muted evidence-progress-caption">{{ entregadas|length }} de {{ total_tareas }} entregadas</small>
         </div>
-        {% endif %}
-    </div>
 
-    {% if tareas_estado %}
-    <!-- TAREAS PENDIENTES (VISIBLES) -->
-    {% if pendientes %}
-    <h3 class="tasks-pending-title">
-        ⚠️ Por Entregar ({{ pendientes|length }})
-    </h3>
-    <div class="tasks-list-aprendiz">
-        {% for item in pendientes %}
-        <div class="task-item task-{{ item.estado }}">
+        {% if tareas_estado %}
+        <!-- Barra de herramientas: Búsqueda y Filtros Rápidos de Evidencias -->
+        <div class="task-filter-toolbar card-subtle">
+            <div class="task-search-box">
+                <span class="task-search-icon" aria-hidden="true">🔍</span>
+                <input type="search" id="task-search-input" class="form-control task-search-field"
+                       placeholder="Buscar evidencia por título, descripción o tema..."
+                       aria-label="Buscar evidencia">
+                <button type="button" id="task-search-clear" class="btn btn-sm btn-ghost btn-clear-search" title="Limpiar búsqueda" style="display:none;">✕</button>
+            </div>
+            <div class="task-filter-chips" role="group" aria-label="Filtrar evidencias por estado">
+                <button type="button" class="task-chip is-active" data-task-filter="all">
+                    <span>Todas</span>
+                    <span class="chip-count" id="chip-count-all">{{ tareas_estado|length }}</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="pending">
+                    <span>⚠️ Por Entregar</span>
+                    <span class="chip-count" id="chip-count-pending">{{ pendientes|length }}</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="extemporaneous">
+                    <span>📤 Extemporáneas</span>
+                    <span class="chip-count" id="chip-count-extemp">0</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="plan">
+                    <span>📋 En Plan</span>
+                    <span class="chip-count" id="chip-count-plan">0</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="delivered">
+                    <span>✅ Entregadas</span>
+                    <span class="chip-count" id="chip-count-delivered">{{ entregadas|length }}</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="tasks-empty-filter-state" class="empty-state" style="display:none; padding: 2.5rem 1rem;">
+            <div class="empty-icon">🔍</div>
+            <h3>No se encontraron evidencias</h3>
+            <p class="text-muted">Ninguna evidencia coincide con el término de búsqueda o filtro seleccionado.</p>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-reset-task-filters">Ver todas las evidencias</button>
+        </div>
+
+        <!-- TAREAS PENDIENTES (VISIBLES) -->
+        {% if pendientes %}
+        <h3 class="tasks-pending-title" id="heading-tareas-pendientes">
+            ⚠️ Por Entregar ({{ pendientes|length }})
+        </h3>
+        <div class="tasks-list-aprendiz">
+            {% for item in pendientes %}
+            <div class="task-item task-{{ item.estado }}"
+                 data-task-item
+                 data-task-title="{{ item.tarea.titulo|lower }}"
+                 data-task-desc="{{ item.tarea.descripcion|lower if item.tarea.descripcion else '' }}"
+                 data-task-status="pending"
+                 data-task-extemp="{{ 'true' if (item.estado == 'vencida' or item.es_vencida_original) else 'false' }}"
+                 data-task-plan="{{ 'true' if item.plan else 'false' }}">
             <div class="task-item-header">
                 <div class="task-info">
                     <h3 class="task-title">{{ item.tarea.titulo }}</h3>
@@ -1221,7 +1506,13 @@
         
         <div class="tasks-list-aprendiz tasks-inner">
             {% for item in entregadas %}
-            <div class="task-item task-{{ item.estado }}">
+            <div class="task-item task-{{ item.estado }}"
+                 data-task-item
+                 data-task-title="{{ item.tarea.titulo|lower }}"
+                 data-task-desc="{{ item.tarea.descripcion|lower if item.tarea.descripcion else '' }}"
+                 data-task-status="delivered"
+                 data-task-extemp="false"
+                 data-task-plan="false">
                 <div class="task-item-header">
                     <div class="task-info">
                         <h3 class="task-title">{{ item.tarea.titulo }}</h3>
@@ -1336,7 +1627,7 @@
         <p>Tu instructor aún no ha creado tareas para esta ficha.</p>
     </div>
     {% endif %}
-</div>
+    </section>
 
 <style>
 .learner-attendance-calendar {
@@ -1609,6 +1900,1209 @@
     render();
 })();
 </script>
+
+    <!-- ============================================================ -->
+    <!-- MODAL DE PERSONALIZACIÓN DEL APRENDIZ                         -->
+    <!-- ============================================================ -->
+    <dialog id="personalizacion-modal" class="app-modal-overlay" aria-modal="true" aria-labelledby="personalizacion-modal-title">
+        <div class="personalizacion-modal-shell app-modal-content">
+            <header class="personalizacion-modal-header app-modal-header">
+                <div>
+                    <span class="eyebrow">Personalización local</span>
+                    <h2 id="personalizacion-modal-title">🎨 Mi Espacio de Aprendizaje</h2>
+                </div>
+                <button type="button" class="app-modal-close" data-close-personalizacion-modal aria-label="Cerrar modal">&times;</button>
+            </header>
+
+            <div class="personalizacion-modal-body app-modal-body">
+                <p class="text-muted" style="margin-top:0; font-size: 0.9rem;">
+                    Personaliza la apariencia y motivación de tu panel. Tus preferencias se guardan de forma privada en tu navegador.
+                </p>
+
+                <!-- 1. Selección de Avatar Emoji -->
+                <div class="customizer-section">
+                    <label class="customizer-label">1. Elige tu avatar personal</label>
+                    <div class="avatar-picker-grid" id="avatar-picker-grid">
+                        {% set avatars = ['💻', '🚀', '⚡', '🎯', '🧠', '🎨', '🔬', '🦊', '🦁', '🦉', '🌟', '💡', '🛡️', '⚙️', '📚', '🏆'] %}
+                        {% for av in avatars %}
+                        <button type="button" class="avatar-option-btn" data-avatar="{{ av }}" aria-label="Avatar {{ av }}">
+                            <span>{{ av }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 2. Selección de Color de Acento / Tema -->
+                <div class="customizer-section">
+                    <label class="customizer-label">2. Color de acento del panel</label>
+                    <div class="theme-color-grid" id="theme-color-grid">
+                        <button type="button" class="color-option-btn is-selected" data-theme-name="sena" data-accent="#39a900" title="Verde SENA Institucional" style="--btn-color: #39a900;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">SENA</span>
+                        </button>
+                        <button type="button" class="color-option-btn" data-theme-name="indigo" data-accent="#2563eb" title="Azul Índigo" style="--btn-color: #2563eb;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">Índigo</span>
+                        </button>
+                        <button type="button" class="color-option-btn" data-theme-name="cyan" data-accent="#0891b2" title="Cian Tecnológico" style="--btn-color: #0891b2;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">Cian</span>
+                        </button>
+                        <button type="button" class="color-option-btn" data-theme-name="purple" data-accent="#7c3aed" title="Púrpura Creativo" style="--btn-color: #7c3aed;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">Púrpura</span>
+                        </button>
+                        <button type="button" class="color-option-btn" data-theme-name="amber" data-accent="#d97706" title="Ámbar Energía" style="--btn-color: #d97706;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">Ámbar</span>
+                        </button>
+                        <button type="button" class="color-option-btn" data-theme-name="emerald" data-accent="#059669" title="Esmeralda" style="--btn-color: #059669;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">Esmeralda</span>
+                        </button>
+                        <button type="button" class="color-option-btn" data-theme-name="rose" data-accent="#e11d48" title="Rosa Vibrante" style="--btn-color: #e11d48;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">Rosa</span>
+                        </button>
+                        <button type="button" class="color-option-btn" data-theme-name="slate" data-accent="#475569" title="Pizarra Minimal" style="--btn-color: #475569;">
+                            <span class="color-circle"></span>
+                            <span class="color-title">Pizarra</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. Lema o Frase Motivacional -->
+                <div class="customizer-section">
+                    <label for="customizer-motto-input" class="customizer-label">3. Tu lema o frase de inspiración</label>
+                    <input type="text" id="customizer-motto-input" class="form-control" maxlength="80"
+                           placeholder="Ej: Código limpio, metas claras.">
+                    <div class="motto-suggestions">
+                        <button type="button" class="motto-suggestion-chip" data-motto="Construyendo software con impacto">💡 Con impacto</button>
+                        <button type="button" class="motto-suggestion-chip" data-motto="Disciplina, código y constancia">⚡ Constancia</button>
+                        <button type="button" class="motto-suggestion-chip" data-motto="Cada día un paso más cerca de la meta">🎯 Mi meta</button>
+                        <button type="button" class="motto-suggestion-chip" data-motto="Aprendiendo con pasión y rigor">🚀 Pasión y rigor</button>
+                    </div>
+                </div>
+
+                <!-- 4. Sobrenombre o Alias en cabecera -->
+                <div class="customizer-section">
+                    <label for="customizer-alias-input" class="customizer-label">4. Sobrenombre o alias preferido</label>
+                    <input type="text" id="customizer-alias-input" class="form-control" maxlength="30"
+                           placeholder="{{ aprendiz.nombre.split()[0] if aprendiz.nombre else 'Aprendiz' }}">
+                    <small class="text-muted">Se mostrará en el saludo principal de tu panel en este dispositivo.</small>
+                </div>
+            </div>
+
+            <footer class="personalizacion-modal-footer app-modal-footer">
+                <button type="button" id="btn-reset-personalizacion" class="btn btn-outline">Restablecer valores</button>
+                <div style="display:flex; gap:0.5rem;">
+                    <button type="button" class="btn btn-ghost" data-close-personalizacion-modal>Cancelar</button>
+                    <button type="button" id="btn-save-personalizacion" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </footer>
+        </div>
+    </dialog>
+
+    <!-- ============================================================ -->
+    <!-- ESTILOS COMPLETOS DEL PANEL MODERNIZADO DEL APRENDIZ          -->
+    <!-- ============================================================ -->
+    <style>
+    /* Variables de Personalización Dinámica */
+    :root {
+        --learner-custom-accent: var(--accent-primary, #39a900);
+        --learner-custom-accent-soft: rgba(57, 169, 0, 0.12);
+    }
+
+    #panel-aprendiz-root {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    /* Hero Header */
+    .learner-hero-header {
+        position: relative;
+        background: linear-gradient(135deg, var(--bg-surface, #ffffff) 0%, rgba(57, 169, 0, 0.05) 100%);
+        border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    .learner-hero-content {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .learner-avatar-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .learner-avatar-disc {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: var(--surface-card, #f8fafc);
+        border: 3px solid var(--learner-custom-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        user-select: none;
+    }
+
+    .learner-avatar-disc:hover,
+    .learner-avatar-disc:focus-visible {
+        transform: scale(1.06);
+        box-shadow: 0 6px 16px var(--learner-custom-accent-soft);
+        outline: none;
+    }
+
+    .learner-avatar-edit-badge {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 24px;
+        height: 24px;
+        background: var(--learner-custom-accent);
+        color: #ffffff;
+        border-radius: 50%;
+        font-size: 0.72rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--bg-surface, #ffffff);
+    }
+
+    .learner-role-tag {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+
+    .learner-identity-col {
+        flex: 1;
+        min-width: 240px;
+    }
+
+    .learner-program-eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .learner-greeting-title {
+        margin: 0.25rem 0 0.35rem 0;
+        font-size: 1.75rem;
+        font-weight: 800;
+        line-height: 1.2;
+        color: var(--text-color, #1e293b);
+    }
+
+    .greeting-highlight {
+        color: var(--learner-custom-accent);
+    }
+
+    .learner-motto-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+    }
+
+    .learner-motto-text {
+        margin: 0;
+        font-size: 0.95rem;
+        font-style: italic;
+        color: var(--text-muted);
+    }
+
+    .btn-edit-motto {
+        padding: 0.15rem 0.45rem;
+        font-size: 0.8rem;
+        opacity: 0.65;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+    }
+
+    .btn-edit-motto:hover {
+        opacity: 1;
+    }
+
+    .learner-quick-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    /* Cinta de Métricas Rápidas */
+    .learner-quick-ribbon {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
+    }
+
+    .ribbon-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.6rem 0.85rem;
+        background: var(--surface-card, rgba(255,255,255,0.6));
+        border: 1px solid var(--border-color, rgba(0,0,0,0.06));
+        border-radius: 10px;
+        transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    .ribbon-cell:hover {
+        transform: translateY(-2px);
+        background: var(--bg-surface, #ffffff);
+    }
+
+    .ribbon-icon {
+        font-size: 1.35rem;
+    }
+
+    .ribbon-metric {
+        display: block;
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--text-color);
+        line-height: 1.1;
+    }
+
+    .ribbon-label {
+        display: block;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-top: 2px;
+    }
+
+    /* Centro de Acción: Mi Día */
+    .learner-action-center {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+    }
+
+    .action-center-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .action-center-title-row h2 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 800;
+    }
+
+    .action-center-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .action-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 1.25rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+        background: var(--bg-surface, #ffffff);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    }
+
+    .action-card-urgent {
+        border-left: 5px solid #ef4444;
+        background: linear-gradient(to right, rgba(239, 68, 68, 0.03), var(--bg-surface, #ffffff));
+    }
+
+    .action-card-cleaning {
+        border-left: 5px solid #0891b2;
+        background: linear-gradient(to right, rgba(8, 145, 178, 0.03), var(--bg-surface, #ffffff));
+    }
+
+    .action-card-ranking {
+        border-left: 5px solid #f59e0b;
+        background: linear-gradient(to right, rgba(245, 158, 11, 0.03), var(--bg-surface, #ffffff));
+    }
+
+    .action-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.65rem;
+    }
+
+    .action-card-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.2rem 0.55rem;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-urgent { background: #fee2e2; color: #dc2626; }
+    .badge-cleaning { background: #e0f2fe; color: #0369a1; }
+    .badge-ranking { background: #fef3c7; color: #b45309; }
+
+    .action-card-title {
+        margin: 0 0 0.4rem 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .action-card-desc {
+        margin: 0 0 0.5rem 0;
+        font-size: 0.88rem;
+        color: var(--text-color);
+        line-height: 1.4;
+    }
+
+    .action-card-subdesc {
+        margin: 0 0 0.85rem 0;
+        font-size: 0.82rem;
+        font-style: italic;
+        color: var(--text-muted);
+    }
+
+    .action-jump-btn {
+        align-self: flex-start;
+        margin-top: auto;
+    }
+
+    /* Barra de Pestañas Modular */
+    .learner-navigation-sticky {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: var(--bg-body, #f8fafc);
+        padding: 0.5rem 0;
+        margin-bottom: 0.5rem;
+    }
+
+    .learner-tab-navigation-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+        border-radius: 12px;
+        padding: 0.4rem 0.6rem;
+        box-shadow: 0 4px 12px -2px rgba(0,0,0,0.06);
+        gap: 0.75rem;
+        overflow-x: auto;
+    }
+
+    .learner-tabs-track {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex: 1;
+        overflow-x: auto;
+        scrollbar-width: thin;
+    }
+
+    .learner-tab-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.55rem 0.95rem;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-weight: 700;
+        font-size: 0.88rem;
+        border-radius: 8px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+    }
+
+    .learner-tab-btn:hover {
+        background: var(--surface-card, #f1f5f9);
+        color: var(--text-color);
+    }
+
+    .learner-tab-btn.is-active {
+        background: var(--learner-custom-accent);
+        color: #ffffff;
+        box-shadow: 0 2px 8px var(--learner-custom-accent-soft);
+    }
+
+    .learner-tab-btn.is-active .tab-pill-badge {
+        background: rgba(255,255,255,0.25);
+        color: #ffffff;
+    }
+
+    .tab-pill-badge {
+        padding: 0.1rem 0.45rem;
+        font-size: 0.72rem;
+        border-radius: 10px;
+        background: var(--surface-card, #e2e8f0);
+        color: var(--text-color);
+        font-weight: 800;
+    }
+
+    .view-toggle-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 700;
+        white-space: nowrap;
+        border: 1px dashed var(--border-color, #cbd5e1);
+        padding: 0.45rem 0.75rem;
+        border-radius: 8px;
+    }
+
+    /* Visibilidad de Pestañas: En Modo Pestañas vs Modo Cascada */
+    #panel-aprendiz-root:not(.is-cascade-mode) [data-learner-tab]:not(.tab-pane-active) {
+        display: none !important;
+    }
+
+    #panel-aprendiz-root.is-cascade-mode [data-learner-tab] {
+        display: block !important;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Toolbar de Filtros de Evidencias */
+    .task-filter-toolbar {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        padding: 1rem;
+        margin-bottom: 1.25rem;
+        border-radius: 12px;
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+    }
+
+    .task-search-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .task-search-icon {
+        position: absolute;
+        left: 0.85rem;
+        font-size: 1rem;
+        pointer-events: none;
+        opacity: 0.6;
+    }
+
+    .task-search-field {
+        width: 100%;
+        padding-left: 2.5rem;
+        padding-right: 2.2rem;
+        height: 2.6rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color, #cbd5e1);
+        font-size: 0.92rem;
+    }
+
+    .task-search-field:focus {
+        border-color: var(--learner-custom-accent);
+        outline: none;
+        box-shadow: 0 0 0 3px var(--learner-custom-accent-soft);
+    }
+
+    .btn-clear-search {
+        position: absolute;
+        right: 0.5rem;
+        padding: 0.2rem 0.5rem;
+    }
+
+    .task-filter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .task-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 20px;
+        border: 1px solid var(--border-color, #e2e8f0);
+        background: var(--surface-card, #f8fafc);
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .task-chip:hover {
+        background: #e2e8f0;
+        color: var(--text-color);
+    }
+
+    .task-chip.is-active {
+        background: var(--learner-custom-accent);
+        color: #ffffff;
+        border-color: var(--learner-custom-accent);
+        box-shadow: 0 2px 6px var(--learner-custom-accent-soft);
+    }
+
+    .task-chip.is-active .chip-count {
+        background: rgba(255,255,255,0.25);
+        color: #ffffff;
+    }
+
+    .chip-count {
+        padding: 0.05rem 0.4rem;
+        border-radius: 10px;
+        background: rgba(0,0,0,0.08);
+        font-size: 0.7rem;
+        font-weight: 800;
+    }
+
+    /* Modal de Personalización */
+    .personalizacion-modal-shell {
+        max-width: 540px;
+        width: 100%;
+        border-radius: 16px;
+    }
+
+    .customizer-section {
+        margin-bottom: 1.25rem;
+    }
+
+    .customizer-label {
+        display: block;
+        font-weight: 700;
+        font-size: 0.88rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-color);
+    }
+
+    .avatar-picker-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 0.5rem;
+    }
+
+    .avatar-option-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        border: 2px solid var(--border-color, #e2e8f0);
+        background: var(--bg-surface, #ffffff);
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .avatar-option-btn:hover {
+        transform: scale(1.1);
+        border-color: var(--learner-custom-accent);
+    }
+
+    .avatar-option-btn.is-selected {
+        border-color: var(--learner-custom-accent);
+        background: var(--learner-custom-accent-soft);
+        box-shadow: 0 0 0 2px var(--learner-custom-accent);
+    }
+
+    .theme-color-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.6rem;
+    }
+
+    .color-option-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.65rem;
+        border-radius: 10px;
+        border: 2px solid var(--border-color, #e2e8f0);
+        background: var(--bg-surface, #ffffff);
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 0.82rem;
+        transition: all 0.15s ease;
+    }
+
+    .color-option-btn:hover {
+        border-color: var(--btn-color);
+    }
+
+    .color-option-btn.is-selected {
+        border-color: var(--btn-color);
+        background: rgba(0,0,0,0.03);
+        box-shadow: 0 0 0 2px var(--btn-color);
+    }
+
+    .color-circle {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--btn-color);
+    }
+
+    .motto-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.5rem;
+    }
+
+    .motto-suggestion-chip {
+        padding: 0.25rem 0.6rem;
+        border-radius: 16px;
+        border: 1px solid var(--border-color, #cbd5e1);
+        background: var(--surface-card, #f8fafc);
+        font-size: 0.78rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .motto-suggestion-chip:hover {
+        background: var(--learner-custom-accent-soft);
+        border-color: var(--learner-custom-accent);
+    }
+
+    @media (max-width: 640px) {
+        .learner-hero-header {
+            padding: 1.25rem 1rem;
+        }
+
+        .avatar-picker-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .theme-color-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .action-center-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .learner-greeting-title {
+            font-size: 1.45rem;
+        }
+    }
+    </style>
+
+    <!-- ============================================================ -->
+    <!-- JAVASCRIPT DEL PANEL Y PERSONALIZACIÓN                       -->
+    <!-- ============================================================ -->
+    <script>
+    (function () {
+        'use strict';
+
+        const LEARNER_ID = '{{ aprendiz.id }}';
+        const PREFS_KEY = 'sena_learner_prefs_' + LEARNER_ID;
+        const ACTIVE_TAB_KEY = 'sena_learner_active_tab_' + LEARNER_ID;
+        const VIEW_MODE_KEY = 'sena_learner_view_mode_' + LEARNER_ID;
+
+        // Elementos principales
+        const rootEl = document.getElementById('panel-aprendiz-root');
+        const modalEl = document.getElementById('personalizacion-modal');
+        const avatarDiscBtn = document.getElementById('learner-avatar-disc');
+        const avatarDisplay = document.getElementById('learner-avatar-display');
+        const aliasDisplay = document.getElementById('learner-alias-text');
+        const mottoDisplay = document.getElementById('learner-motto-text');
+        const btnCustomizePanel = document.getElementById('btn-customize-panel');
+        const btnEditMotto = document.getElementById('btn-edit-motto');
+        const viewModeToggleBtn = document.getElementById('btn-toggle-view-mode');
+        const viewModeIcon = document.getElementById('view-mode-icon');
+        const viewModeText = document.getElementById('view-mode-text');
+
+        // Modal elements
+        const inputMotto = document.getElementById('customizer-motto-input');
+        const inputAlias = document.getElementById('customizer-alias-input');
+        const btnSavePrefs = document.getElementById('btn-save-personalizacion');
+        const btnResetPrefs = document.getElementById('btn-reset-personalizacion');
+        const avatarBtns = document.querySelectorAll('.avatar-option-btn');
+        const colorBtns = document.querySelectorAll('.color-option-btn');
+        const mottoChips = document.querySelectorAll('.motto-suggestion-chip');
+        const closeBtns = document.querySelectorAll('[data-close-personalizacion-modal]');
+
+        // Estado local en memoria para modal
+        let selectedAvatar = '💻';
+        let selectedAccent = '#39a900';
+        let selectedTheme = 'sena';
+
+        // -------------------------------------------------------------
+        // 1. CARGA Y APLICACIÓN DE PREFERENCIAS (LOCALSTORAGE)
+        // -------------------------------------------------------------
+        function loadPreferences() {
+            try {
+                const raw = localStorage.getItem(PREFS_KEY);
+                if (raw) {
+                    const prefs = JSON.parse(raw);
+                    if (prefs.avatar) {
+                        selectedAvatar = prefs.avatar;
+                        if (avatarDisplay) avatarDisplay.textContent = prefs.avatar;
+                    }
+                    if (prefs.accent) {
+                        selectedAccent = prefs.accent;
+                        selectedTheme = prefs.themeName || 'custom';
+                        applyAccentColor(prefs.accent);
+                    }
+                    if (prefs.motto && mottoDisplay) {
+                        mottoDisplay.textContent = prefs.motto;
+                    }
+                    if (prefs.alias && aliasDisplay) {
+                        aliasDisplay.textContent = prefs.alias;
+                    }
+                }
+            } catch (e) {
+                console.warn('No se pudieron leer las preferencias del aprendiz:', e);
+            }
+        }
+
+        function applyAccentColor(color) {
+            document.documentElement.style.setProperty('--learner-custom-accent', color);
+            document.documentElement.style.setProperty('--learner-custom-accent-soft', hexToRgba(color, 0.15));
+            // Actualizar color de bordes activos
+            document.querySelectorAll('.learner-tab-btn.is-active').forEach(b => {
+                b.style.backgroundColor = color;
+            });
+        }
+
+        function hexToRgba(hex, alpha) {
+            let c = hex.replace('#', '');
+            if (c.length === 3) c = c.split('').map(x => x + x).join('');
+            const num = parseInt(c, 16);
+            return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+        }
+
+        function savePreferences() {
+            const prefs = {
+                avatar: selectedAvatar,
+                accent: selectedAccent,
+                themeName: selectedTheme,
+                motto: inputMotto.value.trim() || mottoDisplay.getAttribute('data-original-motto') || 'Construyendo software con impacto y rigor.',
+                alias: inputAlias.value.trim() || '{{ aprendiz.nombre }}'
+            };
+
+            try {
+                localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+            } catch (e) {
+                console.warn('No se pudieron guardar las preferencias del aprendiz:', e);
+            }
+
+            if (avatarDisplay) avatarDisplay.textContent = prefs.avatar;
+            if (mottoDisplay) mottoDisplay.textContent = prefs.motto;
+            if (aliasDisplay) aliasDisplay.textContent = prefs.alias;
+            applyAccentColor(prefs.accent);
+            closeCustomizerModal();
+        }
+
+        function resetPreferences() {
+            try {
+                localStorage.removeItem(PREFS_KEY);
+            } catch (e) {}
+
+            selectedAvatar = '💻';
+            selectedAccent = '#39a900';
+            selectedTheme = 'sena';
+            if (avatarDisplay) avatarDisplay.textContent = selectedAvatar;
+            if (aliasDisplay) aliasDisplay.textContent = '{{ aprendiz.nombre }}';
+            if (mottoDisplay) mottoDisplay.textContent = 'Construyendo software con impacto y rigor.';
+            if (inputMotto) inputMotto.value = '';
+            if (inputAlias) inputAlias.value = '';
+            applyAccentColor(selectedAccent);
+            syncModalInputs();
+        }
+
+        // -------------------------------------------------------------
+        // 2. MODAL DE PERSONALIZACIÓN
+        // -------------------------------------------------------------
+        function openCustomizerModal() {
+            if (!modalEl) return;
+            syncModalInputs();
+            if (typeof modalEl.showModal === 'function') {
+                modalEl.showModal();
+            } else {
+                modalEl.setAttribute('open', '');
+            }
+            document.body.classList.add('modal-open');
+        }
+
+        function closeCustomizerModal() {
+            if (!modalEl) return;
+            if (typeof modalEl.close === 'function' && modalEl.open) {
+                modalEl.close();
+            } else {
+                modalEl.removeAttribute('open');
+            }
+            document.body.classList.remove('modal-open');
+        }
+
+        function syncModalInputs() {
+            if (inputMotto && mottoDisplay) {
+                inputMotto.value = mottoDisplay.textContent.trim();
+            }
+            if (inputAlias && aliasDisplay) {
+                inputAlias.value = aliasDisplay.textContent.trim();
+            }
+            avatarBtns.forEach(btn => {
+                btn.classList.toggle('is-selected', btn.dataset.avatar === selectedAvatar);
+            });
+            colorBtns.forEach(btn => {
+                btn.classList.toggle('is-selected', btn.dataset.accent === selectedAccent);
+            });
+        }
+
+        if (avatarDiscBtn) avatarDiscBtn.addEventListener('click', openCustomizerModal);
+        if (btnCustomizePanel) btnCustomizePanel.addEventListener('click', openCustomizerModal);
+        if (btnEditMotto) btnEditMotto.addEventListener('click', openCustomizerModal);
+        if (btnSavePrefs) btnSavePrefs.addEventListener('click', savePreferences);
+        if (btnResetPrefs) btnResetPrefs.addEventListener('click', resetPreferences);
+
+        closeBtns.forEach(b => b.addEventListener('click', closeCustomizerModal));
+        if (modalEl) {
+            modalEl.addEventListener('close', () => document.body.classList.remove('modal-open'));
+            modalEl.addEventListener('click', e => { if (e.target === modalEl) closeCustomizerModal(); });
+        }
+
+        avatarBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedAvatar = btn.dataset.avatar;
+                avatarBtns.forEach(b => b.classList.remove('is-selected'));
+                btn.classList.add('is-selected');
+            });
+        });
+
+        colorBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedAccent = btn.dataset.accent;
+                selectedTheme = btn.dataset.themeName;
+                colorBtns.forEach(b => b.classList.remove('is-selected'));
+                btn.classList.add('is-selected');
+            });
+        });
+
+        mottoChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                if (inputMotto) inputMotto.value = chip.dataset.motto;
+            });
+        });
+
+        // -------------------------------------------------------------
+        // 3. NAVEGACIÓN MODULAR POR PESTAÑAS Y MODO CASCADA
+        // -------------------------------------------------------------
+        const tabBtns = document.querySelectorAll('.learner-tab-btn');
+        const tabPanes = document.querySelectorAll('[data-learner-tab]');
+
+        function activateTab(tabTarget, updateHash = true) {
+            const isCascade = rootEl && rootEl.classList.contains('is-cascade-mode');
+
+            tabBtns.forEach(btn => {
+                const isActive = btn.dataset.tabTarget === tabTarget;
+                btn.classList.toggle('is-active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                if (isActive) {
+                    btn.style.backgroundColor = selectedAccent;
+                } else {
+                    btn.style.backgroundColor = '';
+                }
+            });
+
+            tabPanes.forEach(pane => {
+                const matches = pane.getAttribute('data-learner-tab') === tabTarget;
+                pane.classList.toggle('tab-pane-active', matches);
+            });
+
+            if (updateHash && window.history.replaceState) {
+                window.history.replaceState(null, null, '#tab-' + tabTarget);
+            }
+
+            try {
+                localStorage.setItem(ACTIVE_TAB_KEY, tabTarget);
+            } catch (e) {}
+
+            // Si está en cascada, hacer scroll suave al primer elemento de la pestaña
+            if (isCascade) {
+                const firstEl = document.querySelector(`[data-learner-tab="${tabTarget}"]`);
+                if (firstEl) {
+                    firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        }
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                activateTab(btn.dataset.tabTarget, true);
+            });
+        });
+
+        // Jump buttons desde Action Center "Mi Día"
+        document.querySelectorAll('[data-jump-tab]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.jumpTab;
+                activateTab(target, true);
+                const firstEl = document.querySelector(`[data-learner-tab="${target}"]`);
+                if (firstEl) {
+                    firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Toggle Modo Vista: Pestañas vs Cascada
+        function setCascadeMode(enabled) {
+            if (!rootEl) return;
+            rootEl.classList.toggle('is-cascade-mode', enabled);
+            if (enabled) {
+                if (viewModeIcon) viewModeIcon.textContent = '📑';
+                if (viewModeText) viewModeText.textContent = 'Ver en Pestañas';
+            } else {
+                if (viewModeIcon) viewModeIcon.textContent = '📜';
+                if (viewModeText) viewModeText.textContent = 'Ver Todo';
+            }
+            try {
+                localStorage.setItem(VIEW_MODE_KEY, enabled ? 'cascade' : 'tabs');
+            } catch (e) {}
+        }
+
+        if (viewModeToggleBtn) {
+            viewModeToggleBtn.addEventListener('click', () => {
+                const currentlyCascade = rootEl.classList.contains('is-cascade-mode');
+                setCascadeMode(!currentlyCascade);
+            });
+        }
+
+        // Enlaces de la barra móvil inferior
+        document.querySelectorAll('.learner-bottom-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const href = link.getAttribute('href');
+                let targetTab = null;
+                if (href === '#seccion-progreso') targetTab = 'resumen';
+                else if (href === '#seccion-juicios') targetTab = 'juicios';
+                else if (href === '#seccion-tareas') targetTab = 'evidencias';
+                else if (href === '#seccion-ranking') targetTab = 'rendimiento';
+                else if (href === '#seccion-aseo') targetTab = 'convivencia';
+
+                if (targetTab) {
+                    activateTab(targetTab, false);
+                }
+            });
+        });
+
+        // -------------------------------------------------------------
+        // 4. BÚSQUEDA Y FILTRADO EN TIEMPO REAL DE EVIDENCIAS
+        // -------------------------------------------------------------
+        const searchInput = document.getElementById('task-search-input');
+        const clearSearchBtn = document.getElementById('task-search-clear');
+        const filterChips = document.querySelectorAll('.task-chip');
+        const taskItems = document.querySelectorAll('[data-task-item]');
+        const emptyStateFilter = document.getElementById('tasks-empty-filter-state');
+        const btnResetFilters = document.getElementById('btn-reset-task-filters');
+        const entregadasDetails = document.querySelector('.entregadas-details');
+        const headingPendientes = document.getElementById('heading-tareas-pendientes');
+
+        let activeFilter = 'all';
+        let searchQuery = '';
+
+        function applyTaskFilters() {
+            if (!taskItems.length) return;
+
+            let visibleCount = 0;
+            let visiblePendientes = 0;
+            let visibleEntregadas = 0;
+
+            taskItems.forEach(item => {
+                const title = item.getAttribute('data-task-title') || '';
+                const desc = item.getAttribute('data-task-desc') || '';
+                const status = item.getAttribute('data-task-status') || '';
+                const isUrgent = item.getAttribute('data-task-urgent') === 'true';
+                const isExtemp = item.getAttribute('data-task-extemp') === 'true';
+                const isPlan = item.getAttribute('data-task-plan') === 'true';
+
+                // Coincidencia de texto
+                const matchesSearch = !searchQuery || title.includes(searchQuery) || desc.includes(searchQuery);
+
+                // Coincidencia de chip
+                let matchesFilter = true;
+                if (activeFilter === 'pending') {
+                    matchesFilter = (status === 'pending');
+                } else if (activeFilter === 'urgent') {
+                    matchesFilter = isUrgent && (status === 'pending');
+                } else if (activeFilter === 'extemporaneous') {
+                    matchesFilter = isExtemp && (status === 'pending');
+                } else if (activeFilter === 'plan') {
+                    matchesFilter = isPlan;
+                } else if (activeFilter === 'delivered') {
+                    matchesFilter = (status === 'delivered');
+                }
+
+                const shouldShow = matchesSearch && matchesFilter;
+                item.style.display = shouldShow ? '' : 'none';
+
+                if (shouldShow) {
+                    visibleCount++;
+                    if (status === 'delivered') visibleEntregadas++;
+                    else visiblePendientes++;
+                }
+            });
+
+            // Abrir automáticamente el details de entregadas si el filtro es "delivered" o si hay búsqueda activa con resultados entregados
+            if (entregadasDetails) {
+                if (activeFilter === 'delivered' || (searchQuery && visibleEntregadas > 0)) {
+                    entregadasDetails.open = true;
+                }
+            }
+
+            // Ocultar encabezado de pendientes si no hay pendientes visibles
+            if (headingPendientes) {
+                headingPendientes.style.display = (visiblePendientes > 0 || activeFilter === 'all') ? '' : 'none';
+            }
+
+            // Mostrar estado vacío de filtro
+            if (emptyStateFilter) {
+                emptyStateFilter.style.display = (visibleCount === 0) ? 'block' : 'none';
+            }
+        }
+
+        // Calcular conteos dinámicos en los chips
+        function updateChipCounts() {
+            let countAll = 0, countPending = 0, countUrgent = 0, countExtemp = 0, countPlan = 0, countDelivered = 0;
+
+            taskItems.forEach(item => {
+                countAll++;
+                const status = item.getAttribute('data-task-status');
+                const isUrgent = item.getAttribute('data-task-urgent') === 'true';
+                const isExtemp = item.getAttribute('data-task-extemp') === 'true';
+                const isPlan = item.getAttribute('data-task-plan') === 'true';
+
+                if (status === 'delivered') countDelivered++;
+                else {
+                    countPending++;
+                    if (isUrgent) countUrgent++;
+                    if (isExtemp) countExtemp++;
+                }
+                if (isPlan) countPlan++;
+            });
+
+            const elAll = document.getElementById('chip-count-all');
+            const elPending = document.getElementById('chip-count-pending');
+            const elUrgent = document.getElementById('chip-count-urgent');
+            const elExtemp = document.getElementById('chip-count-extemp');
+            const elPlan = document.getElementById('chip-count-plan');
+            const elDelivered = document.getElementById('chip-count-delivered');
+
+            if (elAll) elAll.textContent = countAll;
+            if (elPending) elPending.textContent = countPending;
+            if (elUrgent) elUrgent.textContent = countUrgent;
+            if (elExtemp) elExtemp.textContent = countExtemp;
+            if (elPlan) elPlan.textContent = countPlan;
+            if (elDelivered) elDelivered.textContent = countDelivered;
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value.toLowerCase().trim();
+                if (clearSearchBtn) clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
+                applyTaskFilters();
+            });
+        }
+
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                searchQuery = '';
+                clearSearchBtn.style.display = 'none';
+                applyTaskFilters();
+            });
+        }
+
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                filterChips.forEach(c => c.classList.remove('is-active'));
+                chip.classList.add('is-active');
+                activeFilter = chip.dataset.taskFilter;
+                applyTaskFilters();
+            });
+        });
+
+        if (btnResetFilters) {
+            btnResetFilters.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                searchQuery = '';
+                if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+                filterChips.forEach(c => c.classList.remove('is-active'));
+                const allChip = document.querySelector('.task-chip[data-task-filter="all"]');
+                if (allChip) allChip.classList.add('is-active');
+                activeFilter = 'all';
+                applyTaskFilters();
+            });
+        }
+
+        // -------------------------------------------------------------
+        // 5. INICIALIZACIÓN GENERAL
+        // -------------------------------------------------------------
+        loadPreferences();
+        updateChipCounts();
+
+        // Determinar pestaña inicial según hash de URL o pestaña guardada
+        let initialTab = 'resumen';
+        const hash = window.location.hash;
+        if (hash === '#tab-evidencias' || hash === '#seccion-tareas') initialTab = 'evidencias';
+        else if (hash === '#tab-juicios' || hash === '#seccion-juicios') initialTab = 'juicios';
+        else if (hash === '#tab-rendimiento' || hash === '#seccion-ranking') initialTab = 'rendimiento';
+        else if (hash === '#tab-convivencia' || hash === '#seccion-aseo') initialTab = 'convivencia';
+        else if (hash === '#tab-resumen' || hash === '#seccion-progreso') initialTab = 'resumen';
+        else {
+            try {
+                const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+                if (saved && ['resumen', 'evidencias', 'juicios', 'rendimiento', 'convivencia'].includes(saved)) {
+                    initialTab = saved;
+                }
+            } catch (e) {}
+        }
+
+        // Determinar modo de vista inicial
+        try {
+            const savedMode = localStorage.getItem(VIEW_MODE_KEY);
+            if (savedMode === 'cascade') {
+                setCascadeMode(true);
+            }
+        } catch (e) {}
+
+        activateTab(initialTab, false);
+    })();
+    </script>
 
     <!-- Barra de Navegación Inferior Móvil para Aprendices -->
     <nav class="learner-bottom-nav" aria-label="Navegación rápida móvil">

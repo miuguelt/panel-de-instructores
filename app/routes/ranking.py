@@ -86,16 +86,10 @@ def ranking(ficha_id):
         return redirect(url_for('ranking.ranking', ficha_id=ficha_id))
     corte_id = corte.id if corte else None
 
-    filas_generales, _ = actualizar_participacion_ficha(
-        ficha_id, corte_id=corte_id
+    actualizar_participacion_ficha(ficha_id, corte_id=corte_id)
+    filas, config = calcular_ranking(
+        ficha_id, periodo=_periodo(), corte_id=corte_id
     )
-    if _periodo() == 'general':
-        filas = filas_generales
-        config = obtener_configuracion(ficha_id)
-    else:
-        filas, config = calcular_ranking(
-            ficha_id, periodo=_periodo(), corte_id=corte_id
-        )
     return render_template(
         'ranking.html',
         ficha=ficha,

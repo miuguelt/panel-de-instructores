@@ -54,10 +54,38 @@ def actualizar_alertas_cronograma(ficha_id, ahora=None):
     if not cronograma['configurado']:
         return []
     alertas = []
+    inicio_lectiva = cronograma['inicio_lectiva']
     inicio_productiva = cronograma['inicio_productiva']
     fin = cronograma['fin_productiva']
+
+    dias_inicio = (inicio_lectiva - hoy).days
     dias_productiva = (inicio_productiva - hoy).days
     dias_fin = (fin - hoy).days
+
+    # 1. Alerta por inicio de etapa lectiva
+    if 0 <= dias_inicio <= 30:
+        if dias_inicio == 0:
+            tit_inicio = '¡Hoy inicia la etapa lectiva!'
+            msg_inicio = f'¡Hoy {inicio_lectiva.strftime("%d/%m/%Y")} inicia la etapa lectiva de la ficha {ficha.codigo}! Alista la inducción y el recibimiento de aprendices.'
+        elif dias_inicio <= 7:
+            tit_inicio = 'Inicio inminente de la etapa lectiva'
+            msg_inicio = f'Faltan solo {dias_inicio} día(s) para iniciar la etapa lectiva el {inicio_lectiva.strftime("%d/%m/%Y")}. Alista la planeación pedagógica y ambientes.'
+        else:
+            tit_inicio = 'Se acerca el inicio de la etapa lectiva'
+            msg_inicio = f'Faltan {dias_inicio} días para iniciar la etapa lectiva el {inicio_lectiva.strftime("%d/%m/%Y")}.'
+        alertas.append(_alerta_ficha(
+            ficha, 'cronograma_inicio_lectiva', 'amarilla', tit_inicio, msg_inicio,
+            {'inicio_lectiva': inicio_lectiva.isoformat(), 'dias_restantes': dias_inicio}, ahora,
+        ))
+    elif dias_inicio < 0:
+        alerta_lectiva = Alerta.query.filter_by(
+            ficha_id=ficha.id, aprendiz_id=None, tipo='cronograma_inicio_lectiva', estado='activa'
+        ).first()
+        if alerta_lectiva:
+            alerta_lectiva.estado = 'resuelta'
+            alerta_lectiva.fecha_resuelta = ahora
+
+    # 2. Alerta por inicio de etapa productiva
     if 0 <= dias_productiva <= 30:
         alertas.append(_alerta_ficha(
             ficha, 'cronograma_productiva', 'amarilla',
@@ -66,6 +94,8 @@ def actualizar_alertas_cronograma(ficha_id, ahora=None):
             f'La etapa productiva inicia el {inicio_productiva.strftime("%d/%m/%Y")} y dura {cronograma["meses_productiva"]} meses.',
             {'inicio_productiva': inicio_productiva.isoformat()}, ahora,
         ))
+
+    # 3. Alerta por cierre / finalización de ficha
     if dias_fin < 0:
         alertas.append(_alerta_ficha(
             ficha, 'cronograma_fin', 'amarilla', 'La ficha ya finalizó',
@@ -73,9 +103,20 @@ def actualizar_alertas_cronograma(ficha_id, ahora=None):
             {'fecha_fin': fin.isoformat(), 'fase': 'finalizada'}, ahora,
         ))
     elif 0 <= dias_fin <= 30:
+        if dias_fin == 0:
+            tit_fin = '¡Hoy es el cierre de la ficha!'
+            msg_fin = f'Hoy {fin.strftime("%d/%m/%Y")} finaliza la ficha {ficha.codigo}. Verifica los juicios evaluativos y el cierre de la etapa productiva.'
+            nivel_fin = 'roja'
+        elif dias_fin <= 15:
+            tit_fin = 'Cierre inminente de la ficha'
+            msg_fin = f'Faltan solo {dias_fin} día(s) para finalizar la ficha, el {fin.strftime("%d/%m/%Y")}. Revisa con urgencia las certificaciones y cierres pendientes.'
+            nivel_fin = 'roja' if dias_fin <= 7 else 'amarilla'
+        else:
+            tit_fin = 'La ficha termina pronto'
+            msg_fin = f'Faltan {dias_fin} día(s) para finalizar la ficha, el {fin.strftime("%d/%m/%Y")}. Revisa los cierres de la etapa productiva.'
+            nivel_fin = 'amarilla'
         alertas.append(_alerta_ficha(
-            ficha, 'cronograma_fin', 'amarilla', 'La ficha termina pronto',
-            f'Faltan {dias_fin} día(s) para finalizar la ficha, el {fin.strftime("%d/%m/%Y")}. Revisa los cierres de la etapa productiva.',
+            ficha, 'cronograma_fin', nivel_fin, tit_fin, msg_fin,
             {'fecha_fin': fin.isoformat(), 'dias_restantes': dias_fin}, ahora,
         ))
     db.session.commit()

@@ -266,6 +266,105 @@ class DashboardRenderTestCase(unittest.TestCase):
             self.assertIn('1', html)
             self.assertIn('llamados de atención', html)
 
+    def test_dashboard_renders_countdown_and_alerts(self):
+        with self.app.test_request_context('/instructor/dashboard'):
+            ficha = SimpleNamespace(
+                id=2,
+                codigo='2891234',
+                codigo_programa='228118',
+                nombre_programa='ANALISIS Y DESARROLLO DE SOFTWARE',
+                fecha_inicio=date(2027, 2, 15),
+                fecha_fin=date(2028, 5, 14),
+                duracion_productiva_meses=6,
+            )
+            cronograma = {
+                'configurado': True,
+                'porcentaje': 0.0,
+                'porcentaje_lectiva': 0.0,
+                'porcentaje_restante': 100.0,
+                'fase': 'por_iniciar',
+                'fase_label': 'Por iniciar',
+                'inicio_lectiva': date(2027, 2, 15),
+                'fin_lectiva': date(2027, 11, 14),
+                'inicio_productiva': date(2027, 11, 15),
+                'fin_productiva': date(2028, 5, 14),
+                'dias_transcurridos': 0,
+                'dias_totales': 273,
+                'dias_restantes': 454,
+                'dias_restantes_lectiva': 273,
+                'meses_restantes_lectiva': 9.0,
+                'meses_restantes_total': 14.9,
+                'meses_productiva': 6,
+                'dias_para_iniciar_lectiva': 5,
+                'dias_para_cerrar_ficha': 454,
+                'dias_cierre_ficha': 454,
+                'etapa_lectiva_iniciada': False,
+                'etapa_lectiva_inicia_hoy': False,
+                'ficha_cerrada': False,
+                'ficha_cierra_hoy': False,
+                'alerta_inicio_lectiva': {
+                    'activa': True,
+                    'tipo': 'inminente',
+                    'nivel': 'urgente',
+                    'dias': 5,
+                    'mensaje': 'Inicio inminente de etapa lectiva: faltan 5 días (15/02/2027).',
+                },
+                'alerta_cierre_ficha': {
+                    'activa': False,
+                    'tipo': 'normal',
+                    'nivel': 'normal',
+                    'dias': 454,
+                    'mensaje': '',
+                },
+                'mensaje': 'La etapa productiva dura 6 meses.',
+            }
+            extra = {
+                'total_aprendices': 30,
+                'sesiones': 0,
+                'pct_asistencia': 100,
+                'pct_entregas': 100,
+                'tareas_totales': 0,
+                'entregas_totales': 0,
+                'pendientes': 0,
+                'planes_pendientes': 0,
+                'aprendices_certificados': 0,
+                'alertas_activas': 1,
+                'top_competencias': [],
+            }
+
+            html = render_template(
+                'instructor/dashboard.html',
+                fichas=[ficha],
+                cronogramas={2: cronograma},
+                fases_fichas={2: {'disponible': False}},
+                estadisticas_fichas={2: {'activos': 30, 'total': 30, 'estados': {'EN_FORMACION': 30}}},
+                estadisticas_extra={2: extra},
+                progreso_tyt=lambda f, n: None,
+            )
+
+            # Verificar presencia del strip de cuenta regresiva dual
+            self.assertIn('ficha-countdown-strip', html)
+            self.assertIn('Inicio Etapa Lectiva', html)
+            self.assertIn('Cierre de Ficha', html)
+            self.assertIn('card-countdown-lectiva', html)
+            self.assertIn('card-countdown-cierre', html)
+
+            # Verificar números de días
+            self.assertIn('>5<', html)
+            self.assertIn('días para iniciar', html)
+            self.assertIn('>454<', html)
+            self.assertIn('días para el cierre definitivo', html)
+
+            # Verificar banner de alertas de cronograma
+            self.assertIn('ficha-countdown-alerts', html)
+            self.assertIn('alert-lectiva', html)
+            self.assertIn('Inicio inminente de etapa lectiva', html)
+
+            # Verificar badges en header y vista compacta
+            self.assertIn('badge-countdown-urgent', html)
+            self.assertIn('Inicia en 5d', html)
+            self.assertIn('Cierre en 454d', html)
+
 
 if __name__ == '__main__':
     unittest.main()
