@@ -1,68 +1,14 @@
 """Cálculo y alertas del avance temporal de una ficha SENA."""
 
-import calendar
-from datetime import date, datetime, timedelta
+from datetime import datetime
 
 from app import db
-from app.models.alertas import Alerta, Notificacion
+from app.models.alertas import Alerta
 from app.models.aprendiz import Aprendiz
 from app.models.ficha import Ficha
 from app.models.ficha_instructor import FichaInstructor
 from app.services.alertas import registrar_notificacion
-
-
-def _restar_meses(fecha, meses):
-    total = fecha.year * 12 + fecha.month - 1 - meses
-    año, mes0 = divmod(total, 12)
-    mes = mes0 + 1
-    return date(año, mes, min(fecha.day, calendar.monthrange(año, mes)[1]))
-
-
-def obtener_cronograma(ficha, hoy=None):
-    """Devuelve fechas y porcentaje sin inventar avance cuando faltan fechas."""
-    hoy = hoy or date.today()
-    inicio = ficha.fecha_inicio
-    fin = ficha.fecha_fin
-    if not inicio or not fin or fin < inicio:
-        return {
-            'configurado': False, 'porcentaje': 0, 'fase': 'sin_fechas',
-            'inicio_lectiva': inicio, 'fin_lectiva': None,
-            'inicio_productiva': None, 'fin_productiva': fin,
-            'dias_transcurridos': 0, 'dias_totales': 0, 'dias_restantes': None,
-            'porcentaje_lectiva': 0,
-            'mensaje': 'Configura las fechas de inicio y finalización para ver el avance temporal.',
-        }
-
-    meses_productiva = max(int(ficha.duracion_productiva_meses or 6), 1)
-    inicio_productiva = _restar_meses(fin, meses_productiva)
-    fin_lectiva = inicio_productiva - timedelta(days=1)
-    dias_totales = (fin - inicio).days + 1
-    dias_transcurridos = max(0, min((hoy - inicio).days + 1, dias_totales))
-    porcentaje = round(dias_transcurridos / dias_totales * 100, 1)
-    dias_lectiva = max((fin_lectiva - inicio).days + 1, 0)
-    if hoy < inicio:
-        fase = 'por_iniciar'
-    elif hoy < inicio_productiva:
-        fase = 'lectiva'
-    elif hoy <= fin:
-        fase = 'productiva'
-    else:
-        fase = 'finalizada'
-    dias_restantes = (fin - hoy).days if hoy <= fin else 0
-    nombres = {
-        'por_iniciar': 'Por iniciar', 'lectiva': 'Etapa lectiva',
-        'productiva': 'Etapa productiva', 'finalizada': 'Ficha finalizada',
-    }
-    return {
-        'configurado': True, 'porcentaje': porcentaje, 'fase': fase,
-        'fase_label': nombres[fase], 'inicio_lectiva': inicio,
-        'fin_lectiva': fin_lectiva, 'inicio_productiva': inicio_productiva,
-        'fin_productiva': fin, 'dias_transcurridos': dias_transcurridos,
-        'dias_totales': dias_totales, 'dias_restantes': dias_restantes,
-        'porcentaje_lectiva': round(dias_lectiva / dias_totales * 100, 1),
-        'meses_productiva': meses_productiva,
-        'mensaje': f'La etapa productiva dura {meses_productiva} meses y termina el {fin.strftime("%d/%m/%Y")}.',
-    }
+from app.services.periodo_formacion import obtener_periodo_formacion as obtener_cronograma
 
 
 def _instructores_ficha(ficha):
@@ -100,6 +46,8 @@ def actualizar_alertas_cronograma(ficha_id, ahora=None):
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha:
         return []
+    from app.tyt.avisos import actualizar_avisos
+    actualizar_avisos(ficha, ahora=ahora)
     ahora = ahora or datetime.utcnow()
     hoy = ahora.date()
     cronograma = obtener_cronograma(ficha, hoy)

@@ -1,0 +1,95 @@
+{# Componente visual del Tracker de Fases del Proyecto Formativo #}
+{% if fases_data and fases_data.disponible %}
+<section class="ficha-fases-tracker" aria-label="Seguimiento de fases del proyecto formativo">
+    <div class="fases-tracker-header">
+        <div class="fases-tracker-title">
+            <span class="fases-eyebrow">Fases del Proyecto Formativo</span>
+            <div class="fases-badges-row">
+                {% if fases_data.desfase_fases > 0 %}
+                <span class="fases-status-pill is-danger" title="El tiempo lectivo ha avanzado más rápido que los RAPs aprobados">
+                    <span class="fases-dot"></span> Retraso de {{ fases_data.desfase_fases }} {{ 'fase' if fases_data.desfase_fases == 1 else 'fases' }}
+                </span>
+                {% elif fases_data.desfase_fases < 0 %}
+                <span class="fases-status-pill is-info" title="Los RAPs aprobados van por delante del tiempo programado">
+                    <span class="fases-dot"></span> Adelantada
+                </span>
+                {% else %}
+                <span class="fases-status-pill is-success" title="El avance de RAPs coincide con la fase esperada por tiempo">
+                    <span class="fases-dot"></span> Al día con el cronograma
+                </span>
+                {% endif %}
+
+                {% if fases_data.planeacion_sincronizada %}
+                <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">
+                    ✓ GFPI-F-134
+                </span>
+                {% else %}
+                <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="fases-source-pill is-estimated" title="Carga la Planeación GFPI-F-134 para obtener el mapeo exacto de RAPs por fase">
+                    ⚡ Estimación por juicios · Subir GFPI-F-134
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="fases-comparison-summary">
+            <div class="fases-comparison-item">
+                <span class="fases-comparison-label">Tiempo</span>
+                <strong class="fases-comparison-val text-primary">{{ fases_data.fase_esperada.icono }} {{ fases_data.fase_esperada.nombre|title }}</strong>
+            </div>
+            <span class="fases-comparison-divider" aria-hidden="true">vs</span>
+            <div class="fases-comparison-item">
+                <span class="fases-comparison-label">Juicios RAPs</span>
+                <strong class="fases-comparison-val text-accent">{{ fases_data.fase_real.icono }} {{ fases_data.fase_real.nombre|title }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stepper de 4 Fases -->
+    <div class="fases-stepper" role="list">
+        {% for fase in fases_data.fases %}
+        {% set es_esperada = (fase.nombre == fases_data.fase_esperada.nombre) %}
+        {% set es_real = (fase.nombre == fases_data.fase_real.nombre) %}
+        {% set es_completada = (fase.porcentaje_aprobados >= 80) %}
+        {% set orden_esperada = fases_data.fase_esperada.orden|default(0) %}
+        {% set es_atrasada = (fase.orden < orden_esperada and not es_completada) %}
+
+        <div class="fase-step {% if es_completada %}is-completed{% elif es_atrasada %}is-delayed{% elif es_esperada %}is-current-time{% elif es_real %}is-current-rap{% else %}is-pending{% endif %}" role="listitem">
+            <div class="fase-step-header">
+                <div class="fase-step-title">
+                    <span class="fase-step-num">{{ loop.index }}</span>
+                    <span class="fase-step-name">{{ fase.nombre|title }}</span>
+                </div>
+                <div class="fase-step-badges">
+                    {% if es_esperada %}
+                    <span class="fase-marker-time" title="Fase en la que debería ir la ficha según el tiempo lectivo transcurrido">
+                        ⏱️ Tiempo
+                    </span>
+                    {% endif %}
+                    {% if es_real %}
+                    <span class="fase-marker-rap" title="Fase actual según los resultados de aprendizaje aprobados en SOFIA">
+                        📚 RAPs
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="fase-step-metric">
+                <span class="fase-step-pct">{{ fase.porcentaje_aprobados }}% RAPs</span>
+                {% if fase.resultados_total > 0 %}
+                <span class="fase-step-count">{{ fase.resultados_aprobados }}/{{ fase.resultados_total }}</span>
+                {% endif %}
+            </div>
+
+            <div class="fase-step-bar" role="progressbar" aria-label="Aprobación de RAPs en {{ fase.nombre|title }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ fase.porcentaje_aprobados }}" aria-valuetext="{{ fase.porcentaje_aprobados }}% de RAPs aprobados" title="Aprobación de RAPs en esta fase: {{ fase.porcentaje_aprobados }}%">
+                <div class="fase-step-bar-fill" style="width: {{ [fase.porcentaje_aprobados, 100]|min }}%;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="fases-veredicto-caption">
+        <span class="veredicto-icon" aria-hidden="true">📌</span>
+        <p>{{ fases_data.mensaje_veredicto }}</p>
+    </div>
+</section>
+{% endif %}

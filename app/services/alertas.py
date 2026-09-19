@@ -20,7 +20,7 @@ from app.models.ficha import Ficha
 from app.models.instructor import Instructor
 from app.models.ficha_instructor import FichaInstructor
 from app.models.observador import TIPO_NEGATIVA, NotaObservador
-from app.models.tarea import Entrega, Tarea
+from app.models.tarea import Entrega, ProrrogaTarea, Tarea
 from app.services.asistencia import contar_sesiones_registradas
 
 
@@ -88,6 +88,16 @@ class ContextoFicha:
         for entrega in entregas:
             self.entregas[entrega.aprendiz_id].setdefault(entrega.tarea_id, entrega)
 
+        self.prorrogas = defaultdict(dict)
+        prorrogas = (
+            ProrrogaTarea.query
+            .join(Tarea, ProrrogaTarea.tarea_id == Tarea.id)
+            .filter(Tarea.ficha_id == ficha_id)
+            .all()
+        )
+        for p in prorrogas:
+            self.prorrogas[p.aprendiz_id][p.tarea_id] = p
+
         # Se llenan bajo demanda: solo actualizar_alertas_ficha los necesita.
         self._alertas = None
         self._notas_negativas = None
@@ -100,6 +110,9 @@ class ContextoFicha:
 
     def entregas_de(self, aprendiz_id):
         return self.entregas.get(aprendiz_id, {})
+
+    def prorroga(self, aprendiz_id, tarea_id):
+        return self.prorrogas.get(aprendiz_id, {}).get(tarea_id)
 
     def alertas_de(self, aprendiz_id):
         if self._alertas is None:
@@ -385,9 +398,11 @@ def _incumplimientos_academicos(aprendiz_id, ficha_id, ahora, contexto=None):
     incumplidas = []
     for tarea in tareas:
         entrega = por_tarea.get(tarea.id)
-        vencida = tarea.fecha_limite and tarea.fecha_limite < ahora
+        prorroga = ctx.prorroga(aprendiz_id, tarea.id)
+        limite_efectivo = prorroga.nueva_fecha_limite if prorroga and prorroga.nueva_fecha_limite else tarea.fecha_limite
+        vencida = limite_efectivo and limite_efectivo < ahora
         rechazada = entrega and entrega.estado_revision == 'rechazada'
-        tarde = entrega and entrega.fecha_entrega and tarea.fecha_limite and entrega.fecha_entrega > tarea.fecha_limite
+        tarde = entrega and entrega.fecha_entrega and limite_efectivo and entrega.fecha_entrega > limite_efectivo
         if rechazada or (vencida and (not entrega or tarde)):
             incumplidas.append(tarea)
     return incumplidas
@@ -639,11 +654,12 @@ def ejecutar_revision_automatica():
 
 
 def crear_plan_mejoramiento(aprendiz_id, ficha_id, instructor_id, actividades,
-                            fecha_limite=None, alerta_id=None):
+                            fecha_limite=None, alerta_id=None, tarea_id=None):
     plan = PlanMejoramiento(
         aprendiz_id=aprendiz_id,
         ficha_id=ficha_id,
         alerta_id=alerta_id,
+        tarea_id=tarea_id,
         actividades=actividades,
         fecha_limite=fecha_limite,
         creado_por=instructor_id,
@@ -944,12 +960,62 @@ def obtener_linea_tiempo(aprendiz_id, ficha_id):
         .all()
     )
     for entrega in entregas:
+        detalle_entrega = 'Entrega ' + (entrega.estado_revision or 'pendiente')
+        if getattr(entrega, 'justificacion_retraso', None):
+            detalle_entrega += f' (Extemporánea: {entrega.justificacion_retraso})'
         eventos.append({
             'fecha': (entrega.fecha_entrega or datetime.utcnow()).date(),
             'tipo': 'academica',
             'titulo': entrega.tarea.titulo,
-            'detalle': 'Entrega ' + (entrega.estado_revision or 'pendiente'),
+            'detalle': detalle_entrega,
             'nota': entrega.feedback,
+        })
+
+    prorrogas = (
+        ProrrogaTarea.query
+        .options(joinedload(ProrrogaTarea.tarea))
+        .join(Tarea)
+        .filter(
+            Tarea.ficha_id == ficha_id,
+            ProrrogaTarea.aprendiz_id == aprendiz_id,
+        )
+        .all()
+    )
+    for prorroga in prorrogas:
+        fecha_pr = prorroga.nueva_fecha_limite.strftime('%d/%m/%Y %H:%M') if prorroga.nueva_fecha_limite else '—'
+        det = f'Prórroga concedida hasta {fecha_pr}'
+        if prorroga.motivo:
+            det += f' · Motivo: {prorroga.motivo}'
+        eventos.append({
+            'fecha': (prorroga.creada_en or datetime.utcnow()).date(),
+            'tipo': 'academica',
+            'titulo': f'Prórroga: {prorroga.tarea.titulo}',
+            'detalle': det,
+            'nota': prorroga.motivo,
+        })
+
+    planes_ap = (
+        PlanMejoramiento.query
+        .options(joinedload(PlanMejoramiento.tarea))
+        .filter(
+            PlanMejoramiento.ficha_id == ficha_id,
+            PlanMejoramiento.aprendiz_id == aprendiz_id,
+        )
+        .all()
+    )
+    for plan_item in planes_ap:
+        tit = 'Plan de mejoramiento'
+        if plan_item.tarea:
+            tit += f': {plan_item.tarea.titulo}'
+        det_plan = f'Estado: {plan_item.estado} · Actividades: {plan_item.actividades}'
+        if plan_item.fecha_limite:
+            det_plan += f' (Límite: {plan_item.fecha_limite.strftime("%d/%m/%Y")})'
+        eventos.append({
+            'fecha': (plan_item.fecha_creacion or datetime.utcnow()).date(),
+            'tipo': 'academica',
+            'titulo': tit,
+            'detalle': det_plan,
+            'nota': plan_item.observaciones_instructor,
         })
     # Las notas del observador son la única traza de la dimensión integral
     # (puntualidad, convivencia, trabajo en equipo). Sin ellas el borrador del

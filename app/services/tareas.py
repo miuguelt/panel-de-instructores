@@ -7,11 +7,15 @@ from itertools import groupby
 from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
+from app.helpers import utc_now
 from app.models.ficha import Ficha
 from app.models.corte import Corte
+from app.models.aprendiz import Aprendiz
+from app.models.alertas import PlanMejoramiento
 from app.models.tarea import (
     MODALIDAD_EVIDENCIA,
     MODALIDADES_TAREA,
+    ProrrogaTarea,
     Tarea,
 )
 from app.services.archivos import ArchivoService, ErrorArchivo, TiposCarpeta
@@ -123,3 +127,84 @@ def eliminar_tarea_con_archivos(tarea: Tarea) -> str:
         ArchivoService.eliminar(url)
 
     return titulo
+
+
+def conceder_prorroga_tarea(
+    tarea_id: int,
+    aprendiz_id: int,
+    instructor_id: int,
+    nueva_fecha_limite: datetime,
+    motivo: Optional[str] = None,
+) -> ProrrogaTarea:
+    """Otorga o actualiza una prórroga individual para la entrega de una tarea."""
+    prorroga = ProrrogaTarea.query.filter_by(tarea_id=tarea_id, aprendiz_id=aprendiz_id).first()
+    if prorroga:
+        prorroga.nueva_fecha_limite = nueva_fecha_limite
+        prorroga.motivo = motivo.strip() if motivo else None
+        prorroga.instructor_id = instructor_id
+        prorroga.actualizada_en = utc_now()
+    else:
+        prorroga = ProrrogaTarea(
+            tarea_id=tarea_id,
+            aprendiz_id=aprendiz_id,
+            instructor_id=instructor_id,
+            nueva_fecha_limite=nueva_fecha_limite,
+            motivo=motivo.strip() if motivo else None,
+            creada_en=utc_now(),
+        )
+        db.session.add(prorroga)
+
+    db.session.commit()
+
+    tarea = db.session.get(Tarea, tarea_id)
+    aprendiz = db.session.get(Aprendiz, aprendiz_id)
+    if tarea and aprendiz:
+        from app.services.alertas import registrar_notificacion
+        fecha_fmt = nueva_fecha_limite.strftime('%d/%m/%Y %H:%M')
+        mensaje = (
+            f'Se te ha concedido una prórroga para entregar la evidencia "{tarea.titulo}" '
+            f'hasta el {fecha_fmt}.'
+        )
+        if motivo:
+            mensaje += f' Motivo: {motivo.strip()}.'
+        registrar_notificacion(
+            destinatario_tipo='aprendiz',
+            destinatario_id=aprendiz.id,
+            mensaje=mensaje,
+            tipo='tarea',
+            clave=f'prorroga:{tarea.id}:{aprendiz.id}:{nueva_fecha_limite.isoformat()}',
+            ficha_id=tarea.ficha_id,
+            url=f'/aprendiz/{tarea.ficha_id}/panel?documento={aprendiz.documento}',
+        )
+        db.session.commit()
+
+    return prorroga
+
+
+def revocar_prorroga_tarea(tarea_id: int, aprendiz_id: int) -> bool:
+    """Revoca la prórroga individual concedida a un aprendiz para una tarea."""
+    prorroga = ProrrogaTarea.query.filter_by(tarea_id=tarea_id, aprendiz_id=aprendiz_id).first()
+    if prorroga:
+        db.session.delete(prorroga)
+        db.session.commit()
+        return True
+    return False
+
+
+def obtener_prorrogas_tarea(tarea_id: int) -> Dict[int, ProrrogaTarea]:
+    """Retorna un diccionario {aprendiz_id: ProrrogaTarea} para una tarea dada."""
+    prorrogas = ProrrogaTarea.query.filter_by(tarea_id=tarea_id).all()
+    return {p.aprendiz_id: p for p in prorrogas}
+
+
+def obtener_planes_de_tarea(tarea_id: int) -> Dict[int, PlanMejoramiento]:
+    """Retorna un diccionario {aprendiz_id: PlanMejoramiento} para planes activos vinculados a una tarea."""
+    planes = PlanMejoramiento.query.filter_by(tarea_id=tarea_id).order_by(
+        PlanMejoramiento.fecha_creacion.desc()
+    ).all()
+    # Tomar el plan más reciente por aprendiz
+    resultado: Dict[int, PlanMejoramiento] = {}
+    for plan in planes:
+        resultado.setdefault(plan.aprendiz_id, plan)
+    return resultado
+

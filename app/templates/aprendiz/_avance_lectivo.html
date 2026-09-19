@@ -1,0 +1,12 @@
+<div class="progress-card">
+    <div class="progress-card-header">
+        <span class="progress-card-label">📅 Avance de la etapa lectiva</span>
+        {% if cronograma.configurado %}<span class="progress-card-value" style="--metric-color: var(--accent-hover);">{{ ('%.1f'|format(cronograma.porcentaje)).replace('.', ',') }}%</span>{% endif %}
+    </div>
+    {% if cronograma.configurado %}
+    <div class="progress-card-track" role="progressbar" aria-label="Avance de la etapa lectiva" aria-valuenow="{{ cronograma.porcentaje }}" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-card-fill" style="--progress-value: {{ cronograma.porcentaje }}%; --metric-color: var(--accent-primary);"></div>
+    </div>
+    <div class="progress-card-footer"><span>Desde la inducción</span><span>{% if cronograma.porcentaje == 100 %}Etapa lectiva completada{% else %}{{ cronograma.dias_restantes_lectiva }} días hasta el fin lectivo{% endif %}</span></div>
+    {% else %}<div class="progress-card-footer"><span>Cronograma no configurado</span></div>{% endif %}
+</div>

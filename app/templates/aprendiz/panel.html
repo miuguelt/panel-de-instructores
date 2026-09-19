@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
 {% block title %}Mi Panel - {{ aprendiz.nombre }} - SENA Control{% endblock %}
 {% block body_class %}has-learner-bottom-nav{% endblock %}
 
@@ -26,6 +27,43 @@
             </div>
         </div>
     </div>
+
+    {% if aprendiz.rol_administrativo %}
+    <section class="card" aria-labelledby="herramientas-administrador">
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">Rol delegado por el instructor</span>
+                <h2 id="herramientas-administrador">Herramientas del aprendiz administrador</h2>
+            </div>
+            <span class="badge badge-success">Activo</span>
+        </div>
+        <p class="text-muted">Puedes operar el aseo y registrar el llamado a lista de esta ficha. Tus acciones quedan auditadas.</p>
+        <div class="header-actions">
+            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-primary">Gestionar turnos de aseo</a>
+            <a href="{{ url_for('aprendiz.asistencia_admin', ficha_id=ficha.id) }}" class="btn btn-outline">Hacer llamado a lista</a>
+        </div>
+        {% if turno_hoy %}
+        <div class="cleaning-today-banner" style="margin-top: 1rem; padding: 0.85rem 1rem; background: var(--surface-secondary, rgba(255,255,255,0.04)); border: 1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🧹 Turno de aseo de hoy ({{ turno_hoy.fecha.strftime('%d/%m/%Y') }})</div>
+                <div style="font-weight: 600; margin-top: 2px;">
+                    {{ turno_hoy.aprendiz_1.nombre_completo }} y {{ turno_hoy.aprendiz_2.nombre_completo }}
+                    <span class="badge badge-{{ 'success' if turno_hoy.estado == 'cumplido' else 'warning' }}" style="margin-left: 6px;">{{ turno_hoy.estado|capitalize }}</span>
+                </div>
+            </div>
+            {% if turno_hoy.estado != 'cumplido' %}
+            <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno_hoy.id) }}" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="origen" value="panel">
+                <button type="submit" class="btn btn-sm btn-primary">✓ Marcar aseo de hoy hecho</button>
+            </form>
+            {% else %}
+            <span class="text-muted" style="font-size: 0.88rem; font-weight: 500;">✓ Aseo cumplido hoy</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
 
     {% include '_cronograma.html' %}
 
@@ -142,25 +180,7 @@
                 </div>
             </div>
 
-            {# ── Cronograma ── #}
-            <div class="progress-card">
-                {% set pct_cro = cronograma.porcentaje if cronograma.configurado else 0 %}
-                <div class="progress-card-header">
-                    <span class="progress-card-label">📅 Avance de la ficha</span>
-                    <span class="progress-card-value" style="--metric-color: var(--accent-hover);">{{ '%.0f'|format(pct_cro) }}%</span>
-                </div>
-                <div class="progress-card-track">
-                    {% if pct_cro > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_cro }}%; --metric-color: var(--accent-primary);"></div>{% endif %}
-                </div>
-                <div class="progress-card-footer">
-                    {% if cronograma.configurado %}
-                    <span>{{ cronograma.fase_label }}</span>
-                    <span>{{ cronograma.dias_restantes }} días restantes</span>
-                    {% else %}
-                    <span>Cronograma no configurado</span>
-                    {% endif %}
-                </div>
-            </div>
+            {% include 'aprendiz/_avance_lectivo.html' %}
 
             {# ── Faltas ── #}
             {% set pct_faltas = (faltas_no_justificadas / total_sesiones * 100)|round|int if total_sesiones > 0 else 0 %}
@@ -523,6 +543,21 @@
             {% endif %}
         </div>
     </div>
+    {% endif %}
+
+    <!-- RECOMENDACIONES DE ACCIÓN PERSONALIZADAS PARA EL APRENDIZ -->
+    {% if recomendaciones_aprendiz %}
+    <section class="learner-recommendations-cluster" aria-label="Recomendaciones y próximos pasos">
+        <div class="learner-rec-header">
+            <span class="eyebrow">Orientación y Próximos Pasos</span>
+            <span class="badge badge-info">{{ recomendaciones_aprendiz|length }} sugerencia{{ 's' if recomendaciones_aprendiz|length > 1 else '' }}</span>
+        </div>
+        <div class="learner-rec-list">
+            {% for rec in recomendaciones_aprendiz %}
+                {{ render_banner_recomendacion(rec) }}
+            {% endfor %}
+        </div>
+    </section>
     {% endif %}
 
     {% if alertas_activas %}
@@ -966,6 +1001,9 @@
     </section>
     {% endif %}
 
+    {% if resumen_logros %}
+        {% include 'components/_logros_grid.html' %}
+    {% else %}
     <section class="achievements-section">
         <div class="section-header">
             <div>
@@ -987,6 +1025,7 @@
         </div>
         <p class="ranking-disclaimer">Estos reconocimientos son motivacionales y no hacen parte de tu evaluación oficial.</p>
     </section>
+    {% endif %}
 
     <div class="tasks-section-header" id="seccion-tareas">
         <div>
@@ -1035,8 +1074,17 @@
                     {% if item.tarea.fecha_limite %}
                     <p class="task-deadline">🕒 Límite: {{ item.tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</p>
                     {% endif %}
+                    {% if item.prorroga %}
+                    <p class="task-deadline" style="color: #0284c7; font-weight: 700;">⏱️ Prórroga hasta: {{ item.prorroga.nueva_fecha_limite.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
                 </div>
                 <div class="task-status">
+                    {% if item.prorroga and item.estado != 'vencida' %}
+                    <span class="badge badge-info">Prórroga concedida</span>
+                    {% endif %}
+                    {% if item.plan %}
+                    <span class="badge badge-warning">En Plan de Mejoramiento</span>
+                    {% endif %}
                     {% if item.estado == 'pendiente' %}
                     <span class="badge badge-warning">Pendiente</span>
                     {% elif item.estado == 'vencida' %}
@@ -1049,6 +1097,23 @@
 
             {% if item.tarea.descripcion %}
             <p class="task-desc">{{ item.tarea.descripcion }}</p>
+            {% endif %}
+            {% if item.plan %}
+            <div class="task-feedback" style="background: #fffbe6; border-left: 4px solid #faad14; padding: 10px 12px; margin: 10px 0; border-radius: 4px;">
+                <strong style="color: #ad6800;">📋 Asignada a Plan de Mejoramiento</strong>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: #613400;">
+                    Esta evidencia hace parte de tu plan de mejoramiento académico. Plazo límite: {{ item.plan.fecha_limite.strftime('%d/%m/%Y') if item.plan.fecha_limite else 'Concertado' }}.
+                </p>
+            </div>
+            {% endif %}
+
+            {% if item.estado == 'vencida' or (item.es_vencida_original and not item.entrega) %}
+            <div style="background: #fff2f0; border-left: 4px solid #ff4d4f; padding: 10px 12px; margin: 10px 0; border-radius: 4px; font-size: 13px; color: #a8071a;">
+                <strong>⚠️ Entrega extemporánea permitida</strong>
+                <p style="margin: 4px 0 0 0;">
+                    El plazo inicial ha vencido. Según el Reglamento del Aprendiz SENA, puedes subir tu evidencia de forma extemporánea adjuntando tu justificación para valoración del instructor.
+                </p>
+            </div>
             {% endif %}
 
             {% if item.entrega and item.entrega.calificada %}
@@ -1120,8 +1185,23 @@
                                placeholder="https://github.com/..." class="form-control">
                     </div>
 
+                    {% if item.estado == 'vencida' or item.es_vencida_original %}
+                    <div class="form-group">
+                        <label for="justificacion-{{ item.tarea.id }}" style="font-weight: 600; color: #a8071a;">
+                            Justificación o motivo de la entrega extemporánea (requerido por reglamento)
+                        </label>
+                        <textarea id="justificacion-{{ item.tarea.id }}" name="justificacion_retraso" rows="2"
+                                  class="form-control" placeholder="Indica el motivo por el cual entregas fuera de fecha..." required>{{ item.entrega.justificacion_retraso or '' if item.entrega else '' }}</textarea>
+                    </div>
+                    {% endif %}
                     <button type="submit" class="btn btn-primary full-width">
-                        {% if item.entrega %}Guardar cambios en evidencia{% else %}Enviar evidencia{% endif %}
+                        {% if item.estado == 'vencida' or item.es_vencida_original %}
+                            📤 Enviar evidencia extemporánea
+                        {% elif item.entrega %}
+                            Guardar cambios en evidencia
+                        {% else %}
+                            Enviar evidencia
+                        {% endif %}
                     </button>
                 </form>
             </details>
@@ -1168,6 +1248,12 @@
                     {% if item.entrega.feedback %}
                     <p>{{ item.entrega.feedback }}</p>
                     {% endif %}
+                </div>
+                {% endif %}
+                {% if item.entrega and item.entrega.justificacion_retraso %}
+                <div style="background: #fff8e6; border: 1px solid #ffd591; border-radius: 6px; padding: 8px 10px; margin: 8px 0; font-size: 12px;">
+                    <strong style="color: #ad4e00;">💬 Justificación de entrega extemporánea:</strong>
+                    <p style="margin: 2px 0 0 0; color: #612500; font-style: italic;">"{{ item.entrega.justificacion_retraso }}"</p>
                 </div>
                 {% endif %}
 

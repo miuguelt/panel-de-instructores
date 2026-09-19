@@ -15,6 +15,7 @@ from app.models.alertas import (
 )
 from app.models.aprendiz import Aprendiz
 from app.models.ficha import Ficha
+from app.models.tarea import Tarea
 from app.models.observador import TIPO_NEGATIVA, TIPO_POSITIVA, NotaObservador
 from app.services.alertas import (
     ContextoFicha,
@@ -252,6 +253,7 @@ def gestionar_planes(ficha_id):
         actividades = request.form.get('actividades', '').strip()
         fecha_limite_str = request.form.get('fecha_limite', '').strip()
         alerta_id = request.form.get('alerta_id', type=int)
+        tarea_id = request.form.get('tarea_id', type=int)
         if not aprendiz_id or not actividades:
             flash('Debes seleccionar un aprendiz y describir las actividades.', 'error')
             return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
@@ -266,6 +268,11 @@ def gestionar_planes(ficha_id):
             ):
                 flash('La alerta seleccionada no pertenece al aprendiz ni a la ficha.', 'error')
                 return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
+        if tarea_id:
+            tarea = db.session.get(Tarea, tarea_id)
+            if not tarea or tarea.ficha_id != ficha_id:
+                flash('La tarea seleccionada no pertenece a esta ficha.', 'error')
+                return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
         fecha_limite = None
         if fecha_limite_str:
             try:
@@ -273,7 +280,7 @@ def gestionar_planes(ficha_id):
             except ValueError:
                 flash('Fecha límite no válida.', 'error')
                 return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
-        crear_plan_mejoramiento(aprendiz_id, ficha_id, current_user.id, actividades, fecha_limite, alerta_id)
+        crear_plan_mejoramiento(aprendiz_id, ficha_id, current_user.id, actividades, fecha_limite, alerta_id, tarea_id=tarea_id)
         flash('Plan de mejoramiento creado. El aprendiz recibirá una notificación.', 'success')
         return redirect(url_for('seguimiento.casos_seguimiento', ficha_id=ficha_id))
     planes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id).order_by(
@@ -289,9 +296,16 @@ def gestionar_planes(ficha_id):
         if alertas and alertas[0].aprendiz
     ]
     fecha_limite_sugerida = (datetime.utcnow().date() + timedelta(days=15)).isoformat()
-    # Historial del observador del aprendiz preseleccionado: el plan se redacta
-    # sobre hechos fechados, no sobre la impresión del día en que se abre.
+    tareas_ficha = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite.desc()).all()
     aprendiz_preseleccionado = request.args.get('aprendiz_id', type=int)
+    tarea_preseleccionada_id = request.args.get('tarea_id', type=int)
+    tarea_preseleccionada = db.session.get(Tarea, tarea_preseleccionada_id) if tarea_preseleccionada_id else None
+    actividades_sugeridas = ''
+    if tarea_preseleccionada:
+        actividades_sugeridas = (
+            f'Desarrollar y presentar la evidencia correspondiente a la actividad "{tarea_preseleccionada.titulo}". '
+            'Demostrar el logro del resultado de aprendizaje asociado conforme a los criterios de evaluación.'
+        )
     notas_observador = []
     if aprendiz_preseleccionado:
         notas_observador = (
@@ -304,6 +318,9 @@ def gestionar_planes(ficha_id):
         )
     return render_template('planes_mejoramiento.html', ficha=ficha, planes=planes,
                            aprendices=aprendices, casos_activos=casos_activos,
+                           tareas_ficha=tareas_ficha,
+                           tarea_preseleccionada=tarea_preseleccionada,
+                           actividades_sugeridas=actividades_sugeridas,
                            notas_observador=notas_observador,
                            aprendiz_preseleccionado=aprendiz_preseleccionado,
                            fecha_limite_sugerida=fecha_limite_sugerida)

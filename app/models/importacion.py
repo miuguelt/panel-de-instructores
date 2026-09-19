@@ -11,6 +11,9 @@ class ImportacionJob(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
+    aprendiz_administrativo_id = db.Column(
+        db.Integer, db.ForeignKey('aprendices.id'), nullable=True, index=True
+    )
     archivo_version_id = db.Column(db.Integer, db.ForeignKey('archivos_ficha_versiones.id'), nullable=True, index=True)
     archivo_path = db.Column(db.String(500), nullable=False)
     nombre_archivo = db.Column(db.String(255), nullable=False)
@@ -23,4 +26,5 @@ class ImportacionJob(db.Model):
 
     ficha = db.relationship('Ficha', backref=db.backref('importaciones', lazy='dynamic'))
     instructor = db.relationship('Instructor', backref=db.backref('importaciones', lazy='dynamic'))
+    aprendiz_administrativo = db.relationship('Aprendiz')
     archivo_version = db.relationship('ArchivoFichaVersion', backref=db.backref('importacion', uselist=False))

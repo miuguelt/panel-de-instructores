@@ -338,6 +338,7 @@ def create_app(test_config=None):
     _register('app.routes.aprendiz', 'aprendiz_bp', url_prefix='/aprendiz')
     _register('app.routes.aseo', 'aseo_aprendiz_bp', url_prefix='/aprendiz')
     _register('app.routes.seguimiento', 'aprendiz_seguimiento_bp', url_prefix='/aprendiz')
+    _register('app.tyt.vistas', 'tyt_bp', url_prefix='/instructor')
 
     if app.config['STARTUP_ERRORS']:
         log.critical(
@@ -366,10 +367,19 @@ def create_app(test_config=None):
         # pasan a la plantilla una variable local llamada `config` (la
         # configuracion de alertas, ranking o aseo de la ficha) que tapa el
         # objeto global de Flask y romperia el render de base.html.
+        static_v = '1.0'
+        try:
+            css_file = os.path.join(app.root_path, 'static', 'css', 'styles.css')
+            if os.path.isfile(css_file):
+                static_v = str(int(os.path.getmtime(css_file)))
+        except Exception:
+            pass
+
         return {
             'notificaciones_no_leidas': no_leidas,
             'datetime': datetime,
             'max_upload_bytes': app.config.get('MAX_CONTENT_LENGTH') or 0,
+            'static_v': static_v,
         }
 
     @app.template_filter('tipo_competencia')

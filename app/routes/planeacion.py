@@ -123,6 +123,7 @@ def analisis(ficha_id):
         analisis=panorama.get('analisis') if panorama else None,
         calendario=panorama.get('calendario') if panorama else None,
         linea=panorama.get('linea') if panorama else None,
+        seguimiento_fases=panorama.get('seguimiento_fases') if panorama else None,
         proyeccion=panorama.get('proyeccion') if panorama else None,
         diagnostico=panorama.get('diagnostico', []) if panorama else [],
         veredicto=panorama.get('veredicto') if panorama else None,

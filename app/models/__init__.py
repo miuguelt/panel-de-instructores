@@ -3,7 +3,7 @@ from app.models.ficha import Ficha
 from app.models.corte import Corte
 from app.models.aprendiz import Aprendiz
 from app.models.asistencia import SesionAsistencia, RegistroAsistencia
-from app.models.tarea import Tarea, Entrega
+from app.models.tarea import Tarea, Entrega, ProrrogaTarea
 from app.models.alertas import (
     Alerta,
     ConfiguracionAlertas,
@@ -35,7 +35,7 @@ from app.models.observador import NotaObservador
 __all__ = [
     'Instructor', 'Ficha', 'Corte', 'Aprendiz',
     'SesionAsistencia', 'RegistroAsistencia',
-    'Tarea', 'Entrega', 'ConfiguracionAlertas', 'ConfiguracionAlertasComite',
+    'Tarea', 'Entrega', 'ProrrogaTarea', 'ConfiguracionAlertas', 'ConfiguracionAlertasComite',
     'Alerta', 'Notificacion', 'PlanMejoramiento',
     'ConfiguracionRanking', 'PuntajeHistorico',
     'Insignia', 'InsigniaOtorgada',

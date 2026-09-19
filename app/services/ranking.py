@@ -2,13 +2,16 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from app import db
+from app.models.alertas import Alerta, PlanMejoramiento
 from app.models.aprendiz import Aprendiz
+from app.models.aseo import TurnoAseo
 from app.models.asistencia import RegistroAsistencia, SesionAsistencia
 from app.models.corte import Corte
 from app.models.insignia import Insignia, InsigniaOtorgada
 from app.models.juicio import JuicioEvaluativo
+from app.models.observador import NotaObservador, TIPO_NEGATIVA, TIPO_POSITIVA
 from app.models.ranking import ConfiguracionRanking, PuntajeHistorico
-from app.models.tarea import Entrega, Tarea
+from app.models.tarea import Entrega, ProrrogaTarea, Tarea
 
 
 CATALOGO_INSIGNIAS = (
@@ -158,6 +161,54 @@ def _numero_calificacion(valor):
         return None
 
 
+def _calidad_entrega(entrega, limite_efectivo, ahora, umbral_alta):
+    """Evalúa la calidad y cumplimiento de una entrega devolviendo (calidad_ponderada, es_a_tiempo, es_alta)."""
+    if not entrega:
+        return 0.0, False, False
+
+    fecha_entrega = entrega.fecha_entrega or ahora
+    es_a_tiempo = (
+        bool(entrega.registrada_por_instructor)
+        or not limite_efectivo
+        or fecha_entrega <= limite_efectivo
+    )
+
+    nota = _numero_calificacion(entrega.calificacion)
+    es_alta = False
+    if nota is not None:
+        if nota >= umbral_alta:
+            es_alta = True
+        # Si la nota es <= 5.0 (escala colombiana habitual 1.0 - 5.0)
+        if nota <= 5.0:
+            calidad = max(0.0, min(1.0, nota / 5.0))
+        else:
+            calidad = max(0.0, min(1.0, nota / 100.0))
+    elif entrega.calificacion:
+        txt = str(entrega.calificacion).strip().upper()
+        if txt in ('A', 'APROBADO', 'APROBADA'):
+            calidad = 1.0
+            es_alta = True
+        elif txt in ('D', 'NO APROBADO', 'DEFICIENTE'):
+            calidad = 0.0
+        else:
+            calidad = 1.0 if es_a_tiempo else 0.75
+    else:
+        # Según estado_revision
+        estado = (entrega.estado_revision or 'pendiente').lower()
+        if estado == 'aprobada':
+            calidad = 1.0
+        elif estado == 'corregir':
+            calidad = 0.6
+        elif estado == 'rechazada':
+            calidad = 0.0
+        else:  # pendiente
+            calidad = 1.0 if es_a_tiempo else 0.75
+
+    # Factor de temporalidad: si es a tiempo factor 1.0; si es tardía pero no rechazada 0.75
+    factor_tiempo = 1.0 if es_a_tiempo else (0.75 if entrega.estado_revision != 'rechazada' else 0.0)
+    return calidad * factor_tiempo, es_a_tiempo, es_alta
+
+
 def _racha_perfecta(registros, sesiones_map, semanas, ahora):
     if semanas <= 0:
         return False
@@ -190,6 +241,7 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
     inicio_corte = corte.fecha_inicio if corte else config.inicio_corte
     aprendices = Aprendiz.query_en_formacion(ficha_id).all()
 
+    # 1. Sesiones y Asistencia
     consulta_sesiones = SesionAsistencia.query.filter_by(ficha_id=ficha_id)
     if corte:
         consulta_sesiones = consulta_sesiones.filter(SesionAsistencia.corte_id == corte.id)
@@ -207,6 +259,7 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         for registro in registros:
             registros_por_aprendiz[registro.aprendiz_id].append(registro)
 
+    # 2. Tareas, Entregas y Prórrogas
     consulta_tareas = Tarea.query.filter_by(ficha_id=ficha_id)
     if corte:
         consulta_tareas = consulta_tareas.filter(Tarea.corte_id == corte.id)
@@ -217,13 +270,17 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
     ]
     tareas_map = {tarea.id: tarea for tarea in tareas}
     entregas_por_aprendiz = defaultdict(dict)
+    prorrogas_map = {}
     if tareas_map:
         entregas = Entrega.query.filter(Entrega.tarea_id.in_(tareas_map)).all()
         for entrega in sorted(entregas, key=lambda item: item.fecha_entrega or ahora):
             entregas_por_aprendiz[entrega.aprendiz_id].setdefault(
                 entrega.tarea_id, entrega
             )
+        for pr in ProrrogaTarea.query.filter(ProrrogaTarea.tarea_id.in_(tareas_map)).all():
+            prorrogas_map[(pr.tarea_id, pr.aprendiz_id)] = pr
 
+    # 3. Juicios Evaluativos
     juicios = JuicioEvaluativo.query.filter(
         JuicioEvaluativo.ficha_id == ficha_id,
     ).all()
@@ -231,6 +288,33 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
     for j in juicios:
         juicios_por_aprendiz[j.aprendiz_id].append(j)
 
+    # 4. Formación Integral: Observador, Turnos de Aseo, Planes y Alertas
+    consulta_notas = NotaObservador.query.filter_by(ficha_id=ficha_id)
+    if inicio:
+        consulta_notas = consulta_notas.filter(NotaObservador.fecha >= inicio.date())
+    consulta_notas = consulta_notas.filter(NotaObservador.fecha <= ahora.date())
+    notas_por_aprendiz = defaultdict(list)
+    for nota in consulta_notas.all():
+        notas_por_aprendiz[nota.aprendiz_id].append(nota)
+
+    consulta_turnos = TurnoAseo.query.filter_by(ficha_id=ficha_id)
+    if inicio:
+        consulta_turnos = consulta_turnos.filter(TurnoAseo.fecha >= inicio.date())
+    consulta_turnos = consulta_turnos.filter(TurnoAseo.fecha <= ahora.date())
+    turnos_aseo = consulta_turnos.all()
+
+    consulta_planes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id)
+    planes_por_aprendiz = defaultdict(list)
+    for plan in consulta_planes.all():
+        planes_por_aprendiz[plan.aprendiz_id].append(plan)
+
+    consulta_alertas = Alerta.query.filter_by(ficha_id=ficha_id, estado='activa')
+    alertas_por_aprendiz = defaultdict(list)
+    for alerta in consulta_alertas.all():
+        if alerta.aprendiz_id:
+            alertas_por_aprendiz[alerta.aprendiz_id].append(alerta)
+
+    # 5. Histórico para cálculo de tendencia
     fecha_referencia = ahora - timedelta(days=7)
     consulta_historicos = PuntajeHistorico.query.filter(
         PuntajeHistorico.ficha_id == ficha_id,
@@ -245,6 +329,48 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
     for historico in historicos:
         anterior_por_aprendiz.setdefault(historico.aprendiz_id, historico)
 
+    # 6. Rebalanceo dinámico de pesos evaluables
+    tiene_sesiones = bool(sesiones)
+    tiene_tareas = bool(tareas)
+    tiene_juicios = bool(juicios)
+    fase_inicial = (not tiene_sesiones and not tiene_tareas)
+
+    peso_asist_base = config.peso_asistencia
+    peso_evid_base = config.peso_evidencias
+    peso_juic_base = config.peso_juicios
+
+    # Si peso_juic_base está en 0 pero la ficha cuenta con juicios evaluativos oficiales:
+    if peso_juic_base <= 0.01 and tiene_juicios:
+        if fase_inicial:
+            peso_juic_base = 100.0
+        elif not tiene_tareas or not tiene_sesiones:
+            peso_juic_base = 30.0
+
+    pesos_activos = {}
+    if tiene_sesiones and peso_asist_base > 0:
+        pesos_activos['asistencia'] = peso_asist_base
+    if tiene_tareas and peso_evid_base > 0:
+        pesos_activos['evidencias'] = peso_evid_base
+    if tiene_juicios and peso_juic_base > 0:
+        pesos_activos['juicios'] = peso_juic_base
+
+    suma_pesos = sum(pesos_activos.values())
+    if suma_pesos > 0:
+        peso_asist_efectivo = (pesos_activos.get('asistencia', 0.0) / suma_pesos) * 100.0
+        peso_evid_efectivo = (pesos_activos.get('evidencias', 0.0) / suma_pesos) * 100.0
+        peso_juic_efectivo = (pesos_activos.get('juicios', 0.0) / suma_pesos) * 100.0
+    else:
+        peso_asist_efectivo = config.peso_asistencia
+        peso_evid_efectivo = config.peso_evidencias
+        peso_juic_efectivo = config.peso_juicios
+
+    config.fase_inicial = fase_inicial
+    config.pesos_efectivos = {
+        'asistencia': round(peso_asist_efectivo, 1),
+        'evidencias': round(peso_evid_efectivo, 1),
+        'juicios': round(peso_juic_efectivo, 1),
+    }
+
     filas = []
     for aprendiz in aprendices:
         registros = registros_por_aprendiz.get(aprendiz.id, [])
@@ -253,17 +379,23 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
             for registro in registros
             if registro.estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
         )
+        asistencias_puntuales = sum(
+            1 for registro in registros if registro.estado == 'ASISTE'
+        )
+        tardanzas = sum(
+            1 for registro in registros if registro.estado == 'TARDANZA'
+        )
         no_justificadas = sum(
             1 for registro in registros if registro.estado == 'FALTA'
         )
         sesiones_computables = max(len(registros) - justificadas, 0)
-        asistencias = sum(
-            1 for registro in registros if registro.estado in ('ASISTE', 'TARDANZA')
-        )
         if sesiones_computables:
-            porcentaje_asistencia = (asistencias / sesiones_computables) * 100
+            # 1.0 por puntual, 0.8 por tardanza (reconoce asistencia y premia puntualidad)
+            porcentaje_asistencia = min(
+                100.0,
+                ((asistencias_puntuales + 0.8 * tardanzas) / sesiones_computables) * 100.0,
+            )
         elif registros and justificadas == len(registros):
-            # Si todo el periodo estuvo debidamente justificado, no se castiga al aprendiz.
             porcentaje_asistencia = 100.0
         else:
             porcentaje_asistencia = 0.0
@@ -272,50 +404,92 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         entregadas_a_tiempo = 0
         entregas_anticipadas = 0
         calificaciones_altas = 0
+        suma_calidad_evidencias = 0.0
+
         for tarea in tareas:
+            prorroga = prorrogas_map.get((tarea.id, aprendiz.id))
+            limite_efectivo = (
+                prorroga.nueva_fecha_limite
+                if prorroga and prorroga.nueva_fecha_limite
+                else tarea.fecha_limite
+            )
             entrega = entregas.get(tarea.id)
             if not entrega:
                 continue
-            fecha_entrega = entrega.fecha_entrega or ahora
-            if not tarea.fecha_limite or fecha_entrega <= tarea.fecha_limite:
+
+            calidad_ponderada, es_a_tiempo, es_alta = _calidad_entrega(
+                entrega, limite_efectivo, ahora, config.umbral_calificacion_alta
+            )
+            suma_calidad_evidencias += calidad_ponderada * 100.0
+            if es_a_tiempo:
                 entregadas_a_tiempo += 1
-            if (
-                tarea.fecha_limite
-                and fecha_entrega <= tarea.fecha_limite
-                - timedelta(hours=max(config.horas_entrega_anticipada, 0))
-            ):
-                entregas_anticipadas += 1
-            nota = _numero_calificacion(entrega.calificacion)
-            if nota is not None and nota >= config.umbral_calificacion_alta:
+            if es_alta:
                 calificaciones_altas += 1
 
+            fecha_entrega = entrega.fecha_entrega or ahora
+            if (
+                limite_efectivo
+                and not entrega.registrada_por_instructor
+                and fecha_entrega <= limite_efectivo - timedelta(hours=max(config.horas_entrega_anticipada, 0))
+            ):
+                entregas_anticipadas += 1
+
         porcentaje_evidencias = (
-            (entregadas_a_tiempo / len(tareas)) * 100 if tareas else 0.0
+            (suma_calidad_evidencias / len(tareas)) if tareas else 0.0
         )
 
         juicios_aprendiz = juicios_por_aprendiz.get(aprendiz.id, [])
         total_juicios = len(juicios_aprendiz)
         aprobados = sum(1 for j in juicios_aprendiz if j.juicio and j.juicio.strip().upper() == 'APROBADO')
-        porcentaje_aprobados = (aprobados / total_juicios * 100) if total_juicios else 0.0
+        porcentaje_aprobados = (aprobados / total_juicios * 100.0) if total_juicios else 0.0
 
-        puntos_asistencia = (
-            config.peso_asistencia * porcentaje_asistencia / 100
+        # Mérito formativo / Integral
+        turnos_ap = [t for t in turnos_aseo if t.incluye(aprendiz.id)]
+        turnos_cumplidos = sum(
+            1 for t in turnos_ap
+            if (t.aprendiz_1_id == aprendiz.id and t.completado_1)
+            or (t.aprendiz_2_id == aprendiz.id and t.completado_2)
+            or t.estado == 'cumplido'
         )
-        puntos_evidencias = (
-            config.peso_evidencias * porcentaje_evidencias / 100
+        notas_ap = notas_por_aprendiz.get(aprendiz.id, [])
+        reconocimientos = sum(1 for n in notas_ap if n.tipo == TIPO_POSITIVA)
+        llamados_atencion = sum(1 for n in notas_ap if n.tipo == TIPO_NEGATIVA)
+
+        planes_ap = planes_por_aprendiz.get(aprendiz.id, [])
+        planes_cumplidos = sum(1 for p in planes_ap if p.estado in ('cumplido', 'aprobado'))
+
+        alertas_criticas = sum(
+            1 for a in alertas_por_aprendiz.get(aprendiz.id, [])
+            if a.estado == 'activa' and a.nivel == 'roja' and a.tipo in ('comite_desercion', 'asistencia')
         )
-        puntos_juicios = (
-            config.peso_juicios * porcentaje_aprobados / 100
+
+        merito_formativo = (
+            (turnos_cumplidos * 1.5)
+            + (reconocimientos * 2.0)
+            + (planes_cumplidos * 2.0)
+            - (llamados_atencion * 2.0)
         )
+
+        puntos_asistencia = (peso_asist_efectivo * porcentaje_asistencia) / 100.0
+        puntos_evidencias = (peso_evid_efectivo * porcentaje_evidencias) / 100.0
+        puntos_juicios = (peso_juic_efectivo * porcentaje_aprobados) / 100.0
+
         tiene_racha = _racha_perfecta(
             registros, sesiones_map, config.semanas_racha, ahora
         )
+
         bonus = (
             entregas_anticipadas * config.bonus_entrega_anticipada
             + calificaciones_altas * config.bonus_calificacion_alta
-            + (config.bonus_racha_asistencia if tiene_racha else 0)
+            + (config.bonus_racha_asistencia if tiene_racha else 0.0)
+            + max(0.0, merito_formativo)
         )
-        penalizacion = no_justificadas * config.penalizacion_falla_injustificada
+        penalizacion = (
+            no_justificadas * config.penalizacion_falla_injustificada
+            + max(0.0, -merito_formativo)
+            + (alertas_criticas * 5.0)
+        )
+
         total = max(0.0, puntos_asistencia + puntos_evidencias + puntos_juicios + bonus - penalizacion)
 
         filas.append(
@@ -328,16 +502,23 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
                 'puntaje_asistencia': round(puntos_asistencia, 2),
                 'puntaje_evidencias': round(puntos_evidencias, 2),
                 'puntaje_juicios': round(puntos_juicios, 2),
+                'merito_formativo': round(merito_formativo, 2),
+                'turnos_aseo_cumplidos': turnos_cumplidos,
+                'reconocimientos': reconocimientos,
+                'llamados_atencion': llamados_atencion,
+                'alertas_criticas': alertas_criticas,
+                'tardanzas': tardanzas,
                 'bonus': round(bonus, 2),
                 'penalizacion': round(penalizacion, 2),
                 'puntaje_total': round(total, 2),
-                'barra_puntaje': min(round(total, 2), 100),
+                'barra_puntaje': min(round(total, 2), 100.0),
                 'faltas_no_justificadas': no_justificadas,
                 'entregadas_a_tiempo': entregadas_a_tiempo,
                 'total_tareas': len(tareas),
                 'total_juicios': total_juicios,
                 'aprobados': aprobados,
                 'tiene_racha': tiene_racha,
+                'fase_inicial': fase_inicial,
                 'posicion_anterior': (
                     anterior_por_aprendiz[aprendiz.id].posicion
                     if aprendiz.id in anterior_por_aprendiz
@@ -350,8 +531,9 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         key=lambda fila: (
             -fila['puntaje_total'],
             -fila['porcentaje_evidencias'],
-            -fila['porcentaje_aprobados'],
             -fila['porcentaje_asistencia'],
+            -fila['porcentaje_aprobados'],
+            -fila['merito_formativo'],
             fila['aprendiz'].apellidos.lower(),
             fila['aprendiz'].nombre.lower(),
         )
@@ -387,7 +569,6 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
 
 
 def guardar_snapshot(ficha_id, filas, ahora=None, tipo='automatico', corte_id=None):
-    ahora = ahora or datetime.utcnow()
     inicio_dia = datetime.combine(ahora.date(), time.min)
     fin_dia = inicio_dia + timedelta(days=1)
     existentes = {}

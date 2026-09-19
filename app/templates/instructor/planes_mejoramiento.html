@@ -46,12 +46,26 @@
             </select>
         </div>
         <div class="form-group">
+            <label for="tarea_id">Asociar a tarea / evidencia no entregada (opcional)</label>
+            <select id="tarea_id" name="tarea_id">
+                <option value="">Sin tarea específica (plan general)...</option>
+                {% for t in tareas_ficha %}
+                <option value="{{ t.id }}" {% if (tarea_preseleccionada and tarea_preseleccionada.id == t.id) or request.args.get('tarea_id')|int == t.id %}selected{% endif %}>
+                    {{ t.titulo }} {% if t.fecha_limite %}(Vence: {{ t.fecha_limite.strftime('%d/%m/%Y') }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            {% if tarea_preseleccionada %}
+            <small class="text-muted" style="display: block; margin-top: 4px;">Originado desde la evidencia pendiente de: <strong>{{ tarea_preseleccionada.titulo }}</strong></small>
+            {% endif %}
+        </div>
+        <div class="form-group">
             <label for="fecha_limite">Fecha límite para cumplimiento</label>
             <input type="date" id="fecha_limite" name="fecha_limite" value="{{ fecha_limite_sugerida }}">
         </div>
         <div class="form-group">
             <label for="actividades">Actividades del plan</label>
-            <textarea id="actividades" name="actividades" rows="4" placeholder="Describe las actividades que el aprendiz debe realizar, los compromisos y fechas de revisión..." required></textarea>
+            <textarea id="actividades" name="actividades" rows="4" placeholder="Describe las actividades que el aprendiz debe realizar, los compromisos y fechas de revisión..." required>{{ actividades_sugeridas or '' }}</textarea>
         </div>
         <button type="submit" class="btn btn-primary">Crear plan de mejoramiento</button>
     </form>
@@ -89,6 +103,12 @@
             <div>
                 <h3>{{ plan.aprendiz.nombre_completo }}</h3>
                 <p class="text-muted">Creado {{ plan.fecha_creacion.strftime('%d/%m/%Y') }}</p>
+                {% if plan.tarea %}
+                <p style="margin: 4px 0 0 0; font-size: 13px;">
+                    <span class="badge badge-info">Evidencia origen: {{ plan.tarea.titulo }}</span>
+                    <a href="{{ url_for('instructor.ver_entregas', tarea_id=plan.tarea.id) }}" style="font-size: 12px; margin-left: 6px;">Ver entregas de la tarea &rarr;</a>
+                </p>
+                {% endif %}
             </div>
             <span class="badge badge-{{ 'success' if plan.estado == 'cumplido' else 'danger' if plan.estado == 'vencido' else 'warning' }} plan-state-badge">
                 {{ {'pendiente': 'Pendiente', 'cumplido': 'Cumplido', 'vencido': 'Vencido'}[plan.estado] }}

@@ -14,6 +14,12 @@ from app.models.aseo import (
 )
 from app.models.ficha import Ficha
 from app.models.juicio import JuicioEvaluativo
+from app.services.festivos import (
+    es_dia_habil,
+    es_festivo_colombia,
+    nombre_festivo_colombia,
+    obtener_festivos_colombia,
+)
 
 
 ESTADOS_ACTIVOS = ESTADOS_EN_FORMACION
@@ -158,7 +164,7 @@ def _crear_sesiones_faltantes(ficha_id, fechas, observacion):
 
 
 def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
-    """Asegura sesiones en el rango (juicios + días hábiles) y las devuelve."""
+    """Asegura sesiones en el rango (juicios + días hábiles) y las devuelve sin festivos."""
     ficha = db.session.get(Ficha, ficha_id)
     limite_inicio = fecha_inicio
     limite_fin = fecha_fin
@@ -171,7 +177,7 @@ def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
     if limite_fin >= limite_inicio:
         actual = limite_inicio
         while actual <= limite_fin:
-            if actual.weekday() < 5:
+            if not es_festivo_colombia(actual):
                 fechas_objetivo.add(actual)
             actual += timedelta(days=1)
 
@@ -188,7 +194,7 @@ def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
             if isinstance(fecha_juicio, datetime)
             else fecha_juicio
         )
-        if fecha_inicio <= fecha <= fecha_fin:
+        if fecha_inicio <= fecha <= fecha_fin and not es_festivo_colombia(fecha):
             fechas_objetivo.add(fecha)
 
     if fechas_objetivo:
@@ -198,10 +204,17 @@ def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
             'Creada automáticamente para asignar turnos de aseo.',
         )
 
-    return SesionAsistencia.query.filter(
+    sesiones_todas = SesionAsistencia.query.filter(
         SesionAsistencia.ficha_id == ficha_id,
         SesionAsistencia.fecha.between(fecha_inicio, fecha_fin),
     ).order_by(SesionAsistencia.fecha).all()
+
+    sesiones_unicas = {}
+    for sesion in sesiones_todas:
+        if not es_festivo_colombia(sesion.fecha) and sesion.fecha not in sesiones_unicas:
+            sesiones_unicas[sesion.fecha] = sesion
+
+    return [sesiones_unicas[f] for f in sorted(sesiones_unicas)]
 
 
 def generar_turnos(
@@ -221,6 +234,7 @@ def generar_turnos(
       pendientes/programados para equilibrar las cargas y rotar parejas sin repeticiones consecutivas.
     - Si respetar_manuales=True, conserva las asignaciones manuales del instructor.
     - Si proteger_pasados=True, no sobreescribe turnos de fechas anteriores a hoy.
+    - Evita programar en días festivos de Colombia.
     """
     if fecha_fin < fecha_inicio:
         raise ValueError('La fecha final no puede ser anterior a la inicial.')
@@ -237,6 +251,17 @@ def generar_turnos(
             TurnoAseo.fecha.between(fecha_inicio, fecha_fin),
         ).all()
     }
+
+    # Limpiar turnos pendientes que hayan quedado en días festivos
+    turnos_festivos = [
+        turno for turno in existentes.values()
+        if es_festivo_colombia(turno.fecha) and turno.estado in ESTADOS_PENDIENTES
+    ]
+    for turno_f in turnos_festivos:
+        existentes.pop(turno_f.fecha, None)
+        db.session.delete(turno_f)
+    if turnos_festivos:
+        db.session.flush()
     historial_parejas = _obtener_historial_parejas(ficha_id)
     cargas_programadas = defaultdict(int)
     ultimo_turno_asignado = {}
@@ -548,12 +573,16 @@ def _elegir_por_cola_justa(
 
 
 def _presentes_en_fecha(ficha_id, fecha):
-    sesion = SesionAsistencia.query.filter_by(
-        ficha_id=ficha_id, fecha=fecha
-    ).first()
-    if not sesion:
-        return None
-    registros = sesion.registros.all()
+    from app.models.asistencia import RegistroAsistencia
+    registros = (
+        RegistroAsistencia.query
+        .join(SesionAsistencia, RegistroAsistencia.sesion_id == SesionAsistencia.id)
+        .filter(
+            SesionAsistencia.ficha_id == ficha_id,
+            SesionAsistencia.fecha == fecha,
+        )
+        .all()
+    )
     if not registros:
         return None
     return {
@@ -564,12 +593,13 @@ def _presentes_en_fecha(ficha_id, fecha):
 
 
 def _proxima_fecha_disponible(ficha_id, despues_de):
-    sesion = SesionAsistencia.query.filter(
+    sesiones = SesionAsistencia.query.filter(
         SesionAsistencia.ficha_id == ficha_id,
         SesionAsistencia.fecha > despues_de,
-    ).order_by(SesionAsistencia.fecha).first()
-    if sesion:
-        return sesion.fecha
+    ).order_by(SesionAsistencia.fecha).all()
+    for s in sesiones:
+        if not es_festivo_colombia(s.fecha):
+            return s.fecha
 
     ficha = db.session.get(Ficha, ficha_id)
     limite = (
@@ -579,7 +609,7 @@ def _proxima_fecha_disponible(ficha_id, despues_de):
     )
     candidata = despues_de + timedelta(days=1)
     while candidata <= limite:
-        if candidata.weekday() < 5:
+        if not es_festivo_colombia(candidata):
             if not SesionAsistencia.query.filter_by(
                 ficha_id=ficha_id, fecha=candidata
             ).first():
@@ -703,7 +733,14 @@ def _reemplazar_ausentes_del_dia(turno, presentes):
         candidatos = [
             aprendiz
             for aprendiz in activos
-            if aprendiz.id in presentes and aprendiz.id not in ocupados
+            if (
+                aprendiz.id in presentes
+                and aprendiz.id not in ocupados
+                and not (
+                    contadores[aprendiz.id].excluido_hasta
+                    and contadores[aprendiz.id].excluido_hasta >= turno.fecha
+                )
+            )
         ]
         if not candidatos:
             continue
@@ -812,7 +849,7 @@ def recalcular_contadores(ficha_id):
     return contadores
 
 
-def completar_turno(turno):
+def completar_turno(turno, completado_1=None, completado_2=None):
     config = obtener_configuracion(turno.ficha_id)
     presentes = _presentes_en_fecha(turno.ficha_id, turno.fecha)
     if (
@@ -825,18 +862,83 @@ def completar_turno(turno):
     turno.estado = 'cumplido'
     turno.completado_en = datetime.utcnow()
 
-    presentes = _presentes_en_fecha(turno.ficha_id, turno.fecha)
-    if presentes is not None:
-        turno.completado_1 = turno.aprendiz_1_id in presentes
-        turno.completado_2 = turno.aprendiz_2_id in presentes
+    if completado_1 is not None and completado_2 is not None:
+        turno.completado_1 = bool(completado_1)
+        turno.completado_2 = bool(completado_2)
     else:
-        turno.completado_1 = True
-        turno.completado_2 = True
+        presentes = _presentes_en_fecha(turno.ficha_id, turno.fecha)
+        if presentes is not None:
+            turno.completado_1 = turno.aprendiz_1_id in presentes
+            turno.completado_2 = turno.aprendiz_2_id in presentes
+        else:
+            turno.completado_1 = True
+            turno.completado_2 = True
 
     recalcular_contadores(turno.ficha_id)
 
 
-def reemplazar_aprendices(turno, aprendiz_1, aprendiz_2, observacion=None):
+def asignar_o_actualizar_turno(
+    ficha_id,
+    fecha,
+    aprendiz_1_id,
+    aprendiz_2_id,
+    observacion=None,
+    origen='aprendiz_admin',
+    actor_label=None,
+):
+    """Crea o actualiza un turno de aseo para una fecha específica asegurando validaciones y días hábiles."""
+    if aprendiz_1_id == aprendiz_2_id:
+        raise ValueError('Un turno necesita dos aprendices diferentes.')
+
+    aprendiz_1 = db.session.get(Aprendiz, aprendiz_1_id)
+    aprendiz_2 = db.session.get(Aprendiz, aprendiz_2_id)
+    if not aprendiz_1 or not aprendiz_2:
+        raise ValueError('Selecciona dos aprendices válidos.')
+    if aprendiz_1.ficha_id != ficha_id or aprendiz_2.ficha_id != ficha_id:
+        raise ValueError('Los aprendices deben pertenecer a la misma ficha.')
+
+    if es_festivo_colombia(fecha):
+        raise ValueError(f'No se pueden programar turnos en días festivos ({fecha.strftime("%d/%m/%Y")}).')
+
+    actor = actor_label or (
+        'el instructor' if origen == 'instructor' else 'el aprendiz administrador'
+    )
+    turno = TurnoAseo.query.filter_by(ficha_id=ficha_id, fecha=fecha).first()
+    if turno:
+        reemplazar_aprendices(
+            turno,
+            aprendiz_1,
+            aprendiz_2,
+            observacion=observacion,
+            origen=origen,
+            actor_label=actor,
+        )
+    else:
+        turno = TurnoAseo(
+            ficha_id=ficha_id,
+            fecha=fecha,
+            aprendiz_1_id=aprendiz_1.id,
+            aprendiz_2_id=aprendiz_2.id,
+            estado='programado',
+            generado_por=origen,
+            auditoria_1=f'Asignación manual realizada por {actor} para {aprendiz_1.nombre_completo}.',
+            auditoria_2=f'Asignación manual realizada por {actor} para {aprendiz_2.nombre_completo}.',
+            observacion=observacion or f'Asignación manual de {actor}.',
+        )
+        db.session.add(turno)
+
+    db.session.flush()
+    return turno
+
+
+def reemplazar_aprendices(
+    turno,
+    aprendiz_1,
+    aprendiz_2,
+    observacion=None,
+    origen='instructor',
+    actor_label=None,
+):
     if aprendiz_1.id == aprendiz_2.id:
         raise ValueError('Un turno necesita dos aprendices diferentes.')
     if (
@@ -845,18 +947,21 @@ def reemplazar_aprendices(turno, aprendiz_1, aprendiz_2, observacion=None):
     ):
         raise ValueError('Los aprendices deben pertenecer a la misma ficha.')
 
+    actor = actor_label or (
+        'el instructor' if origen == 'instructor' else 'el aprendiz administrador'
+    )
     turno.aprendiz_1_id = aprendiz_1.id
     turno.aprendiz_2_id = aprendiz_2.id
-    turno.generado_por = 'instructor'
+    turno.generado_por = origen
     turno.auditoria_1 = (
-        f'Asignacion manual realizada por el instructor para '
+        f'Asignacion manual realizada por {actor} para '
         f'{aprendiz_1.nombre_completo}.'
     )
     turno.auditoria_2 = (
-        f'Asignacion manual realizada por el instructor para '
+        f'Asignacion manual realizada por {actor} para '
         f'{aprendiz_2.nombre_completo}.'
     )
-    turno.observacion = observacion or 'Ajuste manual del instructor.'
+    turno.observacion = observacion or f'Ajuste manual de {actor}.'
     if turno.estado != 'cumplido':
         turno.estado = 'programado'
         turno.completado_1 = None
@@ -1033,10 +1138,17 @@ def datos_transparencia(ficha_id, mes=None):
     )
 
     semanas = cal.Calendar(firstweekday=0).monthdatescalendar(mes.year, mes.month)
+    anios_mes = {mes.year, fin_mes.year}
+    festivos_mes = {}
+    for anio in anios_mes:
+        for f, nom in obtener_festivos_colombia(anio).items():
+            if mes <= f <= fin_mes:
+                festivos_mes[f] = nom
 
     return {
         'turnos_por_fecha': turnos_por_fecha,
         'sesiones_mes': sesiones_mes,
+        'festivos_mes': festivos_mes,
         'equidad': equidad,
         'semanas': semanas,
         'mes': mes,

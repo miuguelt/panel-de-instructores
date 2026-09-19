@@ -95,19 +95,19 @@
                 {% for ficha in fichas %}
                 <tr data-estado="activo">
                     <td data-label="Código">
-                        <a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}" style="color: inherit; text-decoration: none;" class="hover-link">
+                        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" style="color: inherit; text-decoration: none;" class="hover-link" title="Abrir Visión General de la Ficha {{ ficha.codigo }}">
                             <strong>{{ ficha.codigo }}</strong>
                         </a>
                     </td>
-                    <td data-label="Programa">{{ ficha.nombre_programa }}<br><small class="text-muted">{{ cronogramas[ficha.id].fase_label if cronogramas[ficha.id].configurado else 'Fechas pendientes' }} · {{ '%.1f'|format(cronogramas[ficha.id].porcentaje) }}% de tiempo</small></td>
+                    <td data-label="Programa">{{ ficha.nombre_programa }}<br><small class="text-muted">{{ cronogramas[ficha.id].fase_label if cronogramas[ficha.id].configurado else 'Fechas pendientes' }} · {{ '%.1f'|format(cronogramas[ficha.id].porcentaje) }}% de la etapa lectiva</small></td>
                     <td data-label="Acciones" class="actions-cell">
-                        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">Aprendices</a>
+                        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary" title="Centro de mando y visión 360 de la ficha">🌟 Visión General</a>
                         <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Asistencia</a>
                         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Tareas</a>
-                        <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Materiales</a>
-                        <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Juicios</a>
-                        <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">Planeación</a>
-                        <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ranking</a>
+                        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Aprendices</a>
+                        <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Planeación</a>
+                        <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="btn btn-sm btn-secondary">Alertas</a>
+                        <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Juicios</a>
                     </td>
                 </tr>
                 {% endfor %}

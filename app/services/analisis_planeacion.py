@@ -123,6 +123,12 @@ def _aprobaciones_previas(juicios, inicio_ficha):
     return total
 
 
+def _es_juicio_evaluado(valor):
+    """Distingue un juicio emitido de una fila administrativa POR EVALUAR."""
+    clave = _clave(valor)
+    return bool(clave) and clave not in {'por evaluar', 'pendiente', 'sin evaluar'}
+
+
 def _fechas_aprobacion(relacionados, activo_ids):
     """Primera aprobación de cada aprendiz, que es la marca de tiempo real.
 
@@ -196,6 +202,12 @@ def construir_analisis(ficha, contenido_planeacion, version_planeacion=None, ver
         juicios_coincidentes.update(juicio.id for juicio in relacionados)
         aprendices_evaluados = {juicio.aprendiz_id for juicio in relacionados}
         aprendices_aprobados = {juicio.aprendiz_id for juicio in relacionados if _aprobado(juicio.juicio)}
+        juicios_emitidos = [
+            juicio for juicio in relacionados
+            if _es_juicio_evaluado(juicio.juicio)
+            and (not activo_ids or juicio.aprendiz_id in activo_ids)
+        ]
+        aprendices_con_juicio = {juicio.aprendiz_id for juicio in juicios_emitidos}
         evaluadores = {}
         for juicio in relacionados:
             nombre = _texto(juicio.funcionario_registro) or 'Sin funcionario registrado'
@@ -225,7 +237,9 @@ def construir_analisis(ficha, contenido_planeacion, version_planeacion=None, ver
             'porcentaje_cobertura': pct_cobertura,
             'estado': 'completado' if completo else ('en_progreso' if total else 'pendiente'),
             'evaluadores': sorted(evaluadores.values(), key=lambda dato: (-dato['total'], dato['nombre'])),
-            'ultima_evaluacion': max((juicio.fecha_juicio for juicio in relacionados if juicio.fecha_juicio), default=None),
+            'ultima_evaluacion': max((juicio.fecha_juicio for juicio in juicios_emitidos if juicio.fecha_juicio), default=None),
+            'total_juicios_evaluados': len(juicios_emitidos),
+            'aprendices_con_juicio': len(aprendices_con_juicio),
             'fechas_aprobacion': _fechas_aprobacion(relacionados, activo_ids),
         })
         items.append(unidad)

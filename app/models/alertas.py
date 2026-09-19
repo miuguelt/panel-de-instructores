@@ -103,6 +103,7 @@ class PlanMejoramiento(db.Model):
     aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
     alerta_id = db.Column(db.Integer, db.ForeignKey('alertas.id'), nullable=True)
+    tarea_id = db.Column(db.Integer, db.ForeignKey('tareas.id'), nullable=True, index=True)
     fecha_creacion = db.Column(db.DateTime, nullable=False, default=utc_now)
     fecha_limite = db.Column(db.DateTime, nullable=True)
     fecha_cumplimiento = db.Column(db.DateTime, nullable=True)
@@ -117,3 +118,4 @@ class PlanMejoramiento(db.Model):
     aprendiz = db.relationship('Aprendiz', backref=db.backref('planes_mejoramiento', lazy='dynamic'))
     ficha = db.relationship('Ficha', backref=db.backref('planes_mejoramiento', lazy='dynamic'))
     alerta = db.relationship('Alerta', backref=db.backref('planes_mejoramiento', lazy='dynamic'))
+    tarea = db.relationship('Tarea', backref=db.backref('planes_mejoramiento', lazy='dynamic'))

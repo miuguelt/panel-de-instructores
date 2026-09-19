@@ -1,0 +1,79 @@
+{# Componente para visualizar los logros formativos y feedback del aprendiz #}
+
+<section class="card learner-achievements-card" aria-labelledby="learner-achievements-title">
+    <div class="learner-achievements-header">
+        <div>
+            <span class="eyebrow">Formación y Excelencia</span>
+            <h2 id="learner-achievements-title">Tus Logros y Reconocimientos Formativos</h2>
+        </div>
+        {% if resumen_logros %}
+        <div class="learner-achievements-summary">
+            <span class="badge badge-rank-level badge-rank--{{ resumen_logros.rango|lower|replace(' ', '-') }}">
+                🏆 {{ resumen_logros.rango }}
+            </span>
+            <span class="text-muted small">
+                {{ resumen_logros.total_desbloqueados }} de {{ resumen_logros.total_logros }} hitos conquistados
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <p class="text-muted achievements-intro">
+        Cada esfuerzo cuenta en tu proceso de formación profesional. Aquí reconocemos tu constancia,
+        asistencia, puntualidad y cumplimiento de competencias.
+    </p>
+
+    {% if resumen_logros and resumen_logros.logros %}
+    <div class="achievements-bento-grid">
+        {% for logro in resumen_logros.logros %}
+        <article class="achievement-card achievement-card--{{ logro.nivel }} {% if logro.desbloqueado %}is-unlocked{% else %}is-locked{% endif %}">
+            <div class="achievement-card-top">
+                <div class="achievement-badge-icon" aria-hidden="true">
+                    {{ logro.icono }}
+                </div>
+                <div class="achievement-status-tag">
+                    {% if logro.desbloqueado %}
+                    <span class="badge badge-achievement-unlocked">✨ ¡Conquistado!</span>
+                    {% else %}
+                    <span class="badge badge-achievement-locked">En Progreso</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="achievement-card-body">
+                <h3 class="achievement-title">{{ logro.titulo }}</h3>
+                <span class="achievement-tier tier-{{ logro.nivel }}">Nivel {{ logro.nivel|title }}</span>
+                <p class="achievement-desc">{{ logro.descripcion }}</p>
+            </div>
+
+            <div class="achievement-card-progress">
+                <div class="achievement-progress-info">
+                    <span class="achievement-progress-label">Avance</span>
+                    <strong class="achievement-progress-val">
+                        {% if logro.desbloqueado %}
+                        100%
+                        {% else %}
+                        {{ logro.progreso_actual }} / {{ logro.progreso_meta }} ({{ logro.porcentaje }}%)
+                        {% endif %}
+                    </strong>
+                </div>
+                <div class="achievement-progress-bar">
+                    <div class="achievement-progress-fill fill-{{ logro.nivel }}" style="width: {{ logro.porcentaje }}%;"></div>
+                </div>
+            </div>
+
+            {% if logro.mensaje_feedback %}
+            <div class="achievement-feedback">
+                <span class="feedback-quote-icon" aria-hidden="true">💬</span>
+                <p>{{ logro.mensaje_feedback }}</p>
+            </div>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state-achievements">
+        <p>Iniciando tu trayectoria formativa. ¡Completa actividades y asiste a clases para comenzar a desbloquear logros!</p>
+    </div>
+    {% endif %}
+</section>

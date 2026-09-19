@@ -31,7 +31,9 @@ class Tarea(db.Model):
     actualizada_en = db.Column(db.DateTime, nullable=True)
 
     entregas = db.relationship('Entrega', backref='tarea', lazy='dynamic',
-                               cascade='all, delete-orphan')
+                                cascade='all, delete-orphan')
+    prorrogas = db.relationship('ProrrogaTarea', backref='tarea', lazy='dynamic',
+                                cascade='all, delete-orphan')
     corte = db.relationship('Corte', back_populates='tareas')
     creador = db.relationship(
         'Instructor',
@@ -48,6 +50,33 @@ class Tarea(db.Model):
         return f'<Tarea {self.titulo}>'
 
 
+class ProrrogaTarea(db.Model):
+    __tablename__ = 'prorrogas_tareas'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tarea_id = db.Column(db.Integer, db.ForeignKey('tareas.id'), nullable=False, index=True)
+    aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
+    instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
+    nueva_fecha_limite = db.Column(db.DateTime, nullable=False)
+    motivo = db.Column(db.Text, nullable=True)
+    creada_en = db.Column(db.DateTime, default=utc_now)
+    actualizada_en = db.Column(db.DateTime, nullable=True)
+
+    aprendiz = db.relationship('Aprendiz', backref=db.backref('prorrogas_tareas', lazy='dynamic'))
+    instructor = db.relationship('Instructor', foreign_keys=[instructor_id])
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'tarea_id',
+            'aprendiz_id',
+            name='uq_prorroga_tarea_aprendiz',
+        ),
+    )
+
+    def __repr__(self):
+        return f'<ProrrogaTarea tarea={self.tarea_id} aprendiz={self.aprendiz_id}>'
+
+
 class Entrega(db.Model):
     __tablename__ = 'entregas'
 
@@ -56,6 +85,7 @@ class Entrega(db.Model):
     aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
     archivo_url = db.Column(db.String(500), nullable=True)
     enlace_repositorio = db.Column(db.String(500), nullable=True)
+    justificacion_retraso = db.Column(db.Text, nullable=True)
     fecha_entrega = db.Column(db.DateTime, default=utc_now)
     calificada = db.Column(db.Boolean, default=False)
     calificacion = db.Column(db.String(10), nullable=True)
@@ -89,14 +119,27 @@ class Entrega(db.Model):
         # como retraso castigaría al aprendiz por el momento de la revisión.
         if self.registrada_por_instructor:
             return True
-        if not self.tarea.fecha_limite:
+        # NOTA: Este property NO consulta prórrogas individuales para evitar
+        # N+1 queries. Compara solo con la fecha_limite de la tarea.
+        # Las rutas o servicios que necesiten considerar prórrogas deben calcular
+        # el límite efectivo fuera del modelo (ver panel del aprendiz).
+        limite_efectivo = self.tarea.fecha_limite if self.tarea else None
+        if not limite_efectivo:
             return True
-        return self.fecha_entrega <= self.tarea.fecha_limite
+        return self.fecha_entrega <= limite_efectivo
+
 
     @property
     def entregada_con_retraso(self):
         if self.registrada_por_instructor:
             return False
-        if not self.tarea.fecha_limite:
+        return not self.entregada_a_tiempo
+
+    @property
+    def es_extemporanea(self):
+        """Indica si fue entregada después de la fecha límite original de la tarea."""
+        if self.registrada_por_instructor:
+            return False
+        if not self.tarea or not self.tarea.fecha_limite:
             return False
         return self.fecha_entrega > self.tarea.fecha_limite

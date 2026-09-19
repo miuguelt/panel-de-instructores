@@ -8,6 +8,7 @@ la matriz de carga docente y el progreso por fases.
 from __future__ import annotations
 
 import math
+import unicodedata
 from datetime import date
 
 from app.services.planeacion import componente_instructor, normalizar_instructor
@@ -568,9 +569,15 @@ def construir_heatmap_docente(linea, calendario):
     }
 
 
-def construir_fases_progreso(linea):
+def construir_fases_progreso(linea, seguimiento=None):
     """Resume las fases del proyecto formativo para tarjetas visuales de progreso."""
     fases = (linea or {}).get('fases') or []
+    seguimiento_por_fase = {}
+    if seguimiento:
+        for fase in seguimiento.get('fases') or []:
+            clave = unicodedata.normalize('NFKD', str(fase.get('nombre') or ''))
+            clave = ''.join(c for c in clave if not unicodedata.combining(c)).lower()
+            seguimiento_por_fase[clave] = fase
     resumen_fases = []
 
     for f in fases:
@@ -596,6 +603,17 @@ def construir_fases_progreso(linea):
         elif 'productiva' in nom_l or 'practica' in nom_l:
             icono = '🏢'
 
+        clave_fase = unicodedata.normalize('NFKD', nombre)
+        clave_fase = ''.join(c for c in clave_fase if not unicodedata.combining(c)).lower()
+        seguimiento_fase = seguimiento_por_fase.get(clave_fase, {})
+        estado_ritmo = seguimiento_fase.get('estado_ritmo')
+        tono_ritmo = {
+            'atrasado': 'danger',
+            'adelantado': 'success',
+            'al_dia': 'success',
+            'futura': 'neutral',
+        }.get(estado_ritmo, f.get('estado_tono'))
+
         resumen_fases.append({
             'nombre': nombre,
             'icono': icono,
@@ -609,6 +627,13 @@ def construir_fases_progreso(linea):
             'competencias_tecnicas': comps_tecnicas,
             'competencias_transversales': comps_transversales,
             'dias_desfase': desfase_dias,
+            'resultados_evaluados': seguimiento_fase.get('resultados_evaluados', 0),
+            'resultados_aprobados': seguimiento_fase.get('resultados_aprobados', 0),
+            'resultados_esperados': seguimiento_fase.get('resultados_esperados', 0),
+            'brecha_resultados': seguimiento_fase.get('brecha_resultados', 0),
+            'porcentaje_evaluados': seguimiento_fase.get('porcentaje_evaluados', 0),
+            'estado_ritmo': estado_ritmo or 'sin_datos',
+            'estado_ritmo_tono': tono_ritmo or 'neutral',
         })
 
     return resumen_fases

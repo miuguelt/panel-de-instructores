@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Ranking - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block body_class %}ranking-page{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -201,31 +202,35 @@
         background: var(--sena-red-light);
     }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ranking.css') }}">
 {% endblock %}
 
 {% block content %}
 <div class="page-header ranking-heading">
     <div class="page-title-cluster">
         <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-        <h1>🏆 Ranking de Desempeño</h1>
+        <h1>🏆 Ranking de participación</h1>
     </div>
     <div class="page-header-actions">
         <a href="{{ url_for('ranking.insignias', ficha_id=ficha.id) }}" class="btn btn-secondary">🏅 Insignias</a>
-        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='excel', corte_id=corte_actual.id if corte_actual else None) }}" class="btn btn-outline">📊 Excel</a>
-        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='pdf', corte_id=corte_actual.id if corte_actual else None) }}" class="btn btn-outline">📄 PDF</a>
+        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='excel', corte_id=corte_actual.id if corte_actual else None) }}"
+           class="btn btn-outline" aria-label="Descargar ranking en Excel" title="Descargar ranking en Excel">📊 Excel</a>
+        <a href="{{ url_for('ranking.exportar_ranking', ficha_id=ficha.id, periodo=periodo, formato='pdf', corte_id=corte_actual.id if corte_actual else None) }}"
+           class="btn btn-outline" aria-label="Descargar ranking en PDF" title="Descargar ranking en PDF">📄 PDF</a>
     </div>
 </div>
 
 {% if cortes %}
 <div class="page-control-panel">
     <div class="control-selectors-cluster">
-        <div class="control-item" style="max-width: 480px;">
+        <div class="control-item ranking-cut-selector">
             <label class="control-label" for="corte-ranking">
                 <span class="control-icon" aria-hidden="true">📂</span>
                 <span>Corte de trabajo</span>
             </label>
             <div class="control-select-wrap">
-                <select id="corte-ranking" onchange="window.location.href=this.value" aria-label="Seleccionar corte">
+                <select id="corte-ranking" onchange="window.location.href=this.value"
+                        aria-label="Seleccionar corte" title="Seleccionar corte del ranking">
                     {% for item in cortes %}
                     <option value="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo=periodo, corte_id=item.id) }}"
                             {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
@@ -269,9 +274,16 @@
 <div class="ranking-layout">
     <div class="ranking-main">
         <div class="participation-note">
-            <span aria-hidden="true" style="font-size: 1.1rem; flex-shrink: 0;">ℹ️</span>
+            <span class="participation-note-icon" aria-hidden="true">ℹ️</span>
             <p><strong>Ranking de participación.</strong> Es una herramienta motivacional y no corresponde a una nota ni a una evaluación oficial del SENA.</p>
         </div>
+
+        {% if config.fase_inicial %}
+        <div class="participation-note" style="border-left: 4px solid var(--primary, #39a900); background: var(--bg-surface);">
+            <span class="participation-note-icon" aria-hidden="true">🚀</span>
+            <p><strong>Corte en fase inicial de actividades.</strong> Este corte aún no registra sesiones de asistencia ni evidencias creadas. El puntaje se calcula de forma justa y dinámica con base en los juicios evaluativos acumulados y mérito formativo institucional.</p>
+        </div>
+        {% endif %}
 
         {% if filas %}
         {% set promedio_puntaje = (filas | sum(attribute='puntaje_total')) / (filas | length) %}
@@ -300,7 +312,7 @@
                     <small>Puntos de participación</small>
                 </div>
             </article>
-            <article class="ranking-overview-card">
+            <article class="ranking-overview-card ranking-overview-period">
                 <span class="overview-icon" aria-hidden="true">🗓️</span>
                 <div>
                     <span class="overview-label">Periodo visible</span>
@@ -314,26 +326,49 @@
         <div class="ranking-card-container">
             <nav class="period-tabs" aria-label="Periodo del ranking" data-filter-region="ranking-period-tabs">
                 <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='general', corte_id=corte_actual.id if corte_actual else None) }}"
-                   class="{% if periodo == 'general' %}active{% endif %}">General</a>
+                   class="{% if periodo == 'general' %}active{% endif %}"
+                   {% if periodo == 'general' %}aria-current="page"{% endif %}>General</a>
                 <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='semanal', corte_id=corte_actual.id if corte_actual else None) }}"
-                   class="{% if periodo == 'semanal' %}active{% endif %}">Esta semana</a>
+                   class="{% if periodo == 'semanal' %}active{% endif %}"
+                   {% if periodo == 'semanal' %}aria-current="page"{% endif %}>Esta semana</a>
                 <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, periodo='mensual', corte_id=corte_actual.id if corte_actual else None) }}"
-                   class="{% if periodo == 'mensual' %}active{% endif %}">Este mes</a>
+                   class="{% if periodo == 'mensual' %}active{% endif %}"
+                   {% if periodo == 'mensual' %}aria-current="page"{% endif %}>Este mes</a>
             </nav>
 
             <div class="ranking-list-head">
                 <div>
                     <span class="eyebrow">Clasificación</span>
                     <h2>Participación del grupo</h2>
-                    <p>Los puestos combinan asistencia, evidencias y juicios aprobados.</p>
+                    <p>Los puestos combinan asistencia, evidencias, juicios aprobados y mérito formativo.</p>
                 </div>
                 {% if filas %}<span class="ranking-total">{{ filas|length }} aprendices</span>{% endif %}
             </div>
 
+            <div id="ranking-loading" class="ranking-loading htmx-indicator" role="status" aria-live="polite">
+                <span class="sr-only">Actualizando la clasificación</span>
+                {% for _ in range(3) %}
+                <span class="ranking-skeleton-row" aria-hidden="true">
+                    <i></i><b></b><em></em>
+                </span>
+                {% endfor %}
+            </div>
+            <div id="ranking-error" class="ranking-update-error" role="alert" hidden>
+                <div>
+                    <strong>No fue posible actualizar la clasificación.</strong>
+                    <span>La información anterior sigue disponible.</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline"
+                        hx-get="{{ url_for('ranking.ranking_lista', ficha_id=ficha.id, periodo=periodo, corte_id=corte_actual.id if corte_actual else None) }}"
+                        hx-target="#ranking-lista" hx-swap="innerHTML" hx-indicator="#ranking-loading">
+                    Reintentar
+                </button>
+            </div>
             <section id="ranking-lista"
-                     hx-get="{{ url_for('ranking.ranking_lista', ficha_id=ficha.id, periodo=periodo) }}"
+                     hx-get="{{ url_for('ranking.ranking_lista', ficha_id=ficha.id, periodo=periodo, corte_id=corte_actual.id if corte_actual else None) }}"
                      hx-trigger="every 30s"
-                     hx-swap="innerHTML">
+                     hx-swap="innerHTML"
+                     hx-indicator="#ranking-loading">
                 {% include "instructor/_ranking_lista.html" %}
             </section>
         </div>
@@ -350,7 +385,7 @@
                 {% if filas %}
                 <label class="chart-selector">
                     <span>Aprendiz</span>
-                    <select id="aprendiz-chart">
+                    <select id="aprendiz-chart" title="Aprendiz cuyo puntaje se muestra">
                         {% for fila in filas %}
                         <option value="{{ fila.aprendiz.id }}">{{ fila.aprendiz.nombre_completo }}</option>
                         {% endfor %}
@@ -360,7 +395,7 @@
             </div>
             {% if filas %}
             <div class="chart-wrap">
-                <canvas id="ranking-chart" height="260" aria-label="Gráfico de evolución del puntaje"></canvas>
+                <canvas id="ranking-chart" height="260" role="img" aria-label="Gráfico de evolución del puntaje"></canvas>
             </div>
             {% else %}
             <div style="padding: 1.5rem 20px;">
@@ -471,7 +506,7 @@
                 </div>
 
                 <div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">Guardar configuración</button>
+                    <button type="submit" class="btn btn-primary ranking-submit-full">Guardar configuración</button>
                 </div>
             </form>
         </details>
@@ -486,12 +521,12 @@
                   onsubmit="return confirm('¿Iniciar un nuevo corte? El resultado actual se guardará en el histórico.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">{% endif %}
-                <div class="form-row" style="margin: 12px 0;">
+                <div class="form-row new-cut-fields">
                     <div class="form-group flex-grow">
                         <label for="nombre_corte">Nombre del nuevo corte</label>
                         <input type="text" id="nombre_corte" name="nombre_corte" maxlength="120" placeholder="Ej: Corte de marzo">
                     </div>
-                    <label class="privacy-checkbox" style="align-self: end; padding-bottom: 10px;">
+                    <label class="privacy-checkbox share-cut-checkbox">
                         <input type="checkbox" name="compartido" checked>
                         Compartir con instructores vinculados
                     </label>
@@ -510,6 +545,14 @@ document.addEventListener('click', function(e) {
     if (clickable) {
         window.location.href = clickable.getAttribute('data-url');
     }
+});
+
+document.body.addEventListener('htmx:afterRequest', function(event) {
+    const target = event.detail && event.detail.target;
+    if (!target || target.id !== 'ranking-lista') return;
+
+    const error = document.getElementById('ranking-error');
+    if (error) error.hidden = Boolean(event.detail.successful);
 });
 </script>
 {% if filas %}

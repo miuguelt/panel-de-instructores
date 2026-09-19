@@ -1,0 +1,7 @@
+<div class="ficha-time-progress" title="Desde la inducción hasta el final de la etapa lectiva">
+    <span>⏱ Tiempo lectivo</span>
+    {% if cronograma.configurado %}
+    <div class="ficha-metric-track" role="progressbar" aria-label="Tiempo transcurrido de la etapa lectiva" aria-valuenow="{{ cronograma.porcentaje }}" aria-valuemin="0" aria-valuemax="100"><span style="--metric-value: {{ cronograma.porcentaje }}%;"></span></div>
+    <strong>{{ ('%.1f'|format(cronograma.porcentaje)).replace('.', ',') }}%</strong>
+    {% else %}<strong>Fechas pendientes</strong>{% endif %}
+</div>

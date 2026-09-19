@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Llamado a lista - {{ ficha.codigo }}{% endblock %}
+{% block body_class %}has-learner-bottom-nav{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back">&larr; Mi panel</a>
+        <div>
+            <span class="eyebrow">Aprendiz administrador · {{ ficha.codigo }}</span>
+            <h1>Llamado a lista</h1>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <p class="text-muted" style="margin: 0;">Registra la asistencia de cada aprendiz para la fecha indicada. Las faltas justificadas y las excusas médicas requieren una causal.</p>
+</div>
+
+<form method="POST" class="card" action="{{ url_for('aprendiz.asistencia_admin', ficha_id=ficha.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group" style="max-width: 260px;">
+        <label for="fecha-lista">Fecha de la sesión</label>
+        <input id="fecha-lista" type="date" name="fecha" value="{{ fecha_actual }}" required>
+    </div>
+
+    <div class="table-container">
+        <div class="table-responsive" tabindex="0">
+            <table class="table table-sena">
+                <caption class="sr-only">Llamado a lista del {{ fecha_actual }}</caption>
+                <thead><tr><th>Aprendiz</th><th>Estado</th><th>Causal, si aplica</th></tr></thead>
+                <tbody>
+                {% for aprendiz in aprendices %}
+                    {% set registro = registros_map.get(aprendiz.id) %}
+                    <tr>
+                        <td data-label="Aprendiz"><strong>{{ aprendiz.nombre_completo }}</strong><br><span class="text-muted">{{ aprendiz.estado|etiqueta_estado }}</span></td>
+                        <td data-label="Estado">
+                            <select name="asistencia_{{ aprendiz.id }}" required>
+                                {% for valor, etiqueta in estados_asistencia %}
+                                <option value="{{ valor }}" {% if (registro.estado if registro else 'ASISTE') == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td data-label="Causal">
+                            <select name="causal_{{ aprendiz.id }}">
+                                <option value="">No aplica</option>
+                                {% for valor, etiqueta in causales_justificadas %}
+                                <option value="{{ valor }}" {% if registro and registro.causal_justificacion == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Guardar llamado a lista</button>
+</form>
+{% endblock %}

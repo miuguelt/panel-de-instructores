@@ -24,6 +24,7 @@ from app.services.graficos_planeacion import (
 )
 from app.services.linea_tiempo import construir_linea_tiempo
 from app.services.proyeccion_ficha import construir_proyeccion
+from app.services.seguimiento_fases import construir_seguimiento_fases
 
 
 def _texto_proyeccion(proyeccion, calendario):
@@ -141,6 +142,7 @@ def construir_panorama(ficha, contenido_planeacion, version_planeacion=None,
     linea = construir_linea_tiempo(
         analisis['items'], calendario, aprendices_meta=aprendices_meta, hoy=hoy,
     )
+    seguimiento_fases = construir_seguimiento_fases(linea, calendario, hoy=hoy)
     proyeccion = construir_proyeccion(
         linea['resultados'], calendario, aprendices_meta=aprendices_meta, hoy=hoy,
     )
@@ -161,13 +163,14 @@ def construir_panorama(ficha, contenido_planeacion, version_planeacion=None,
     radar = construir_radar(linea, contraste, programa)
     heatmap_docente = construir_heatmap_docente(linea, calendario)
     curva_svg = construir_curva_svg(proyeccion, calendario, hoy=hoy)
-    fases_progreso = construir_fases_progreso(linea)
+    fases_progreso = construir_fases_progreso(linea, seguimiento=seguimiento_fases)
     desempeno = _calcular_desempeno_ficha(analisis, linea, proyeccion, contraste, catalogo_ped)
 
     return {
         'analisis': analisis,
         'calendario': calendario,
         'linea': linea,
+        'seguimiento_fases': seguimiento_fases,
         'proyeccion': proyeccion,
         'diagnostico': diagnostico,
         'contraste': contraste,

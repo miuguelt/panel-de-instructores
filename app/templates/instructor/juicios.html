@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
 {% block title %}Juicios Evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
@@ -219,6 +220,14 @@
             <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">🧭 Analizar planeación</a>
         </div>
     </div>
+
+    {% if recomendaciones_juicios %}
+    <div class="juicios-recommendations-banner">
+        {% for rec in recomendaciones_juicios[:2] %}
+            {{ render_banner_recomendacion(rec) }}
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Stats Grid -->
     <div class="juicios-stats-grid">

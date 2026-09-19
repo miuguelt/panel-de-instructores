@@ -5,13 +5,16 @@
 <div class="page-header">
     <div class="page-title-cluster">
         <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-        <h1>👥 Directorio de Aprendices</h1>
+        <div>
+            <span class="eyebrow">Ficha {{ ficha.codigo }} &middot; {{ ficha.nombre_programa }}</span>
+            <h1>👥 Directorio de Aprendices</h1>
+        </div>
     </div>
 </div>
 
 {% set importacion_id = request.args.get('importacion_id')|int %}
 {% if importacion_id %}
-<div class="card" id="import-status" data-status-url="{{ url_for('instructor.estado_importacion', ficha_id=ficha.id, job_id=importacion_id) }}" aria-busy="true" style="margin-bottom: 1rem;">
+<div class="card" id="import-status" data-status-url="{{ url_for('instructor.estado_importacion', ficha_id=ficha.id, job_id=importacion_id) }}" aria-busy="true" style="margin-bottom: 1.25rem;">
     <strong>Solicitud recibida: importación en segundo plano</strong>
     <p id="import-status-message" class="text-muted" role="status" aria-live="polite">El archivo fue recibido y está en cola (trabajo #{{ importacion_id }}). El sistema te avisará cuando termine; puedes seguir usando el panel.</p>
 </div>
@@ -50,112 +53,390 @@
 </script>
 {% endif %}
 
-<details class="card share-access-card" open>
-    <summary>Compartir panel con los aprendices (QR)</summary>
-    <p class="text-muted">Los aprendices acceden directamente ingresando su documento de identidad en este enlace, sin necesidad de crear una cuenta.</p>
-    
-    <div style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem; margin-top: 1.5rem;">
-        <!-- Código QR -->
-        <div id="qr-code" style="background: white; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);"></div>
-        
-        <div class="share-access-row" style="width: 100%; max-width: 500px;">
-            <label class="sr-only" for="learner-access-url">Enlace de acceso para aprendices</label>
-            <input id="learner-access-url" type="text"
-                   value="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}"
-                   readonly>
-            <button type="button" class="btn btn-primary" id="copy-learner-access">Copiar Enlace</button>
+{# ============================================================
+   RESUMEN EJECUTIVO: AVANCE GLOBAL Y MÉTRICAS CLAVE (MOBILE FIRST)
+   ============================================================ #}
+<section class="aprendices-kpi-grid" aria-label="Resumen de rendimiento de la ficha">
+    <!-- Tarjeta 1: Avance Global de la Ficha con Barra y Porcentaje -->
+    <article class="kpi-card kpi-card-featured">
+        <div class="kpi-header">
+            <span class="kpi-icon" aria-hidden="true">📊</span>
+            <div>
+                <span class="kpi-label">Avance Académico de la Ficha</span>
+                <div class="kpi-headline">
+                    <span class="kpi-value">{{ pct_global }}%</span>
+                    <span class="badge badge-{% if pct_global >= 80 %}success{% elif pct_global >= 50 %}warning{% else %}danger{% endif %}">
+                        {% if pct_global >= 80 %}Al día{% elif pct_global >= 50 %}En proceso{% else %}Atención requerida{% endif %}
+                    </span>
+                </div>
+            </div>
         </div>
-        <p class="copy-feedback" id="copy-feedback" role="status" aria-live="polite" style="margin-top: 0;"></p>
+        <div class="kpi-progress-bar-wrap">
+            <div class="kpi-progress-track">
+                <div class="kpi-progress-fill" style="width: {{ pct_global }}%; background: {% if pct_global >= 80 %}var(--success){% elif pct_global >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>
+            </div>
+            <div class="kpi-progress-legend">
+                <span><strong>{{ total_aprobados_ficha }}</strong> de {{ total_juicios_ficha }} juicios aprobados</span>
+                <small class="text-muted">Global de la ficha</small>
+            </div>
+        </div>
+    </article>
+
+    <!-- Tarjeta 2: Distribución de Aprendices por Estado -->
+    <article class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-icon" aria-hidden="true">👥</span>
+            <div>
+                <span class="kpi-label">Aprendices Matriculados</span>
+                <div class="kpi-headline">
+                    <span class="kpi-value">{{ total_aprendices }}</span>
+                    <small class="text-muted">en total</small>
+                </div>
+            </div>
+        </div>
+        <div class="kpi-chip-summary">
+            {% for estado, conteo in estados_disponibles %}
+            <span class="badge badge-{{ estado|tono_estado }} badge-chip">
+                {{ estado|etiqueta_estado }}: <strong>{{ conteo }}</strong>
+            </span>
+            {% endfor %}
+        </div>
+    </article>
+
+    <!-- Tarjeta 3: Semáforo de Rendimiento Individual -->
+    <article class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-icon" aria-hidden="true">🎯</span>
+            <div>
+                <span class="kpi-label">Semáforo de Rendimiento</span>
+                <div class="kpi-headline">
+                    <span class="kpi-value">{{ aprendices|length }}</span>
+                    <small class="text-muted">en vista actual</small>
+                </div>
+            </div>
+        </div>
+        <div class="kpi-traffic-bars">
+            <div class="traffic-row">
+                <span class="traffic-label">🟢 Al día (&ge;80%)</span>
+                <div class="traffic-track"><div class="traffic-fill" style="width: {% if aprendices|length %}{{ (al_dia_count / aprendices|length * 100)|round|int }}{% else %}0{% endif %}%; background: var(--success);"></div></div>
+                <span class="traffic-count">{{ al_dia_count }}</span>
+            </div>
+            <div class="traffic-row">
+                <span class="traffic-label">🟡 En proceso (50-79%)</span>
+                <div class="traffic-track"><div class="traffic-fill" style="width: {% if aprendices|length %}{{ (en_proceso_count / aprendices|length * 100)|round|int }}{% else %}0{% endif %}%; background: var(--warning);"></div></div>
+                <span class="traffic-count">{{ en_proceso_count }}</span>
+            </div>
+            <div class="traffic-row">
+                <span class="traffic-label">🔴 En rezago (&lt;50%)</span>
+                <div class="traffic-track"><div class="traffic-fill" style="width: {% if aprendices|length %}{{ (en_riesgo_count / aprendices|length * 100)|round|int }}{% else %}0{% endif %}%; background: var(--danger);"></div></div>
+                <span class="traffic-count">{{ en_riesgo_count }}</span>
+            </div>
+        </div>
+    </article>
+</section>
+
+{# ============================================================
+   HERRAMIENTAS Y CARGA AGRUPADAS (COLAPSABLE PARA PRIORIZAR MÓVIL)
+   ============================================================ #}
+<details class="card tools-accordion" id="herramientas-card">
+    <summary class="tools-summary">
+        <div class="tools-summary-main">
+            <span class="tools-summary-icon" aria-hidden="true">⚙</span>
+            <div>
+                <strong class="tools-summary-title">Herramientas de Gestión y Carga de Archivos</strong>
+                <p class="tools-summary-desc text-muted">Actualiza la información del grupo, asigna permisos operativos y comparte el acceso.</p>
+            </div>
+        </div>
+        <span class="tools-summary-action">
+            <span class="tools-accordion-badge">3 herramientas</span>
+            <span class="tools-summary-chevron" aria-hidden="true"></span>
+        </span>
+    </summary>
+
+    <div class="tools-accordion-body">
+        <section class="tools-subcard tools-upload-panel" aria-labelledby="tools-upload-title">
+            <div class="tools-subcard-heading">
+                <span class="tools-step-badge" aria-hidden="true">01</span>
+                <div>
+                    <h3 id="tools-upload-title">Actualizar información del grupo</h3>
+                    <p class="text-muted">Carga la plantilla o el reporte oficial de Juicios de Evaluación. Los datos existentes y el historial se conservan.</p>
+                </div>
+            </div>
+
+            <form class="tools-upload-form" method="POST" action="{{ url_for('instructor.cargar_excel', ficha_id=ficha.id) }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="tools-file-row">
+                    <div class="form-group tools-file-field">
+                        <label for="archivo-aprendices">Archivo Excel de aprendices</label>
+                        <div class="tools-file-control">
+                            <input class="tools-file-input" type="file" id="archivo-aprendices" name="archivo" accept=".xlsx,.xls" aria-describedby="archivo-aprendices-ayuda" required>
+                            <span class="tools-file-button" aria-hidden="true">Seleccionar archivo</span>
+                            <span class="tools-file-name" id="archivo-aprendices-nombre" aria-live="polite">Sin archivo seleccionado</span>
+                        </div>
+                        <small class="tools-field-help text-muted" id="archivo-aprendices-ayuda">Formatos permitidos: .xls y .xlsx</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary tools-submit-btn">
+                        <span aria-hidden="true">↑</span>
+                        Subir y procesar
+                    </button>
+                </div>
+
+                {% if estado_seleccionado == 'todos' %}
+                <div class="form-group tools-admin-field">
+                    <label for="aprendiz-administrativo">Asignar aprendiz administrador <span class="field-optional">Opcional</span></label>
+                    <select id="aprendiz-administrativo" name="aprendiz_administrativo_id" class="form-control" aria-describedby="aprendiz-administrativo-ayuda" title="Selecciona el aprendiz que tendrá permisos operativos">
+                        <option value="">No cambiar el rol actual</option>
+                        {% for aprendiz in aprendices_administrables %}
+                        <option value="{{ aprendiz.id }}" {% if aprendiz.rol_administrativo %}selected{% endif %}>
+                            {{ aprendiz.nombre_completo }} — {{ aprendiz.estado|etiqueta_estado }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="tools-field-help text-muted" id="aprendiz-administrativo-ayuda">Este rol permite registrar el llamado a lista y gestionar los turnos de aseo.</small>
+                </div>
+                {% endif %}
+            </form>
+
+            <nav class="tools-actions-row" aria-label="Acciones complementarias de actualización">
+                <a href="{{ url_for('instructor.descargar_plantilla', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm"><span aria-hidden="true">↓</span> Descargar plantilla</a>
+                <a href="{{ url_for('instructor.configuracion_aprendices', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm"><span aria-hidden="true">♙</span> Configurar roles</a>
+            </nav>
+        </section>
+
+        <section class="tools-subcard tools-share-panel" aria-labelledby="tools-share-title">
+            <div class="tools-subcard-heading">
+                <span class="tools-step-badge" aria-hidden="true">02</span>
+                <div>
+                    <h3 id="tools-share-title">Compartir acceso con aprendices</h3>
+                    <p class="text-muted">El grupo ingresa con su documento de identidad. No necesita usuario ni contraseña.</p>
+                </div>
+            </div>
+
+            <div class="share-qr-cluster">
+                <div class="qr-code-box">
+                    <button type="button" class="qr-preview-interactive" id="btn-open-tv-modal" aria-haspopup="dialog" aria-controls="qr-tv-modal" title="Haz clic para expandir y proyectar el QR en máxima resolución para TV">
+                        <div id="qr-code" class="qr-code-canvas" aria-label="Código QR de acceso para aprendices">
+                            <span class="qr-loading" aria-hidden="true"></span>
+                        </div>
+                        <span class="qr-expand-overlay" aria-hidden="true">
+                            <span class="qr-expand-badge"><span aria-hidden="true">⛶</span> Ampliar</span>
+                        </span>
+                    </button>
+                    <span class="qr-caption">Escanea para ingresar</span>
+                    <button type="button" class="btn btn-outline btn-sm qr-tv-trigger-btn" id="btn-open-tv-modal-action" aria-haspopup="dialog" aria-controls="qr-tv-modal">
+                        <span aria-hidden="true">📺</span> Ampliar
+                    </button>
+                </div>
+                <div class="share-url-box">
+                    <div class="share-url-header-row">
+                        <span class="share-access-badge"><span aria-hidden="true">✓</span> Acceso habilitado</span>
+                        {% if url_red_local and url_red_local != url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) %}
+                        <span class="share-wifi-badge" title="IP de red local detectada en el aula"><span aria-hidden="true">📶</span> WiFi: {{ ip_local }}</span>
+                        {% endif %}
+                    </div>
+                    <label for="learner-access-url">Enlace directo de la ficha</label>
+                    <input id="learner-access-url" type="text" value="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" readonly class="form-control" data-url-local="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" {% if url_red_local %}data-url-wifi="{{ url_red_local }}"{% endif %}>
+                    
+                    {% if url_red_local and url_red_local != url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) %}
+                    <div class="share-network-switch" id="share-network-switch">
+                        <span class="network-switch-label">Conexión de aprendices:</span>
+                        <div class="network-switch-pills">
+                            <button type="button" class="network-switch-btn is-active" id="btn-switch-url-wifi" data-target-url="{{ url_red_local }}" title="Recomendado para que los aprendices se conecten desde sus celulares vía WiFi">
+                                📶 Red WiFi ({{ ip_local }})
+                            </button>
+                            <button type="button" class="network-switch-btn" id="btn-switch-url-local" data-target-url="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" title="Solo accesible desde este mismo computador">
+                                💻 Localhost
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="share-actions-row">
+                        <button type="button" class="btn btn-primary" id="copy-learner-access"><span aria-hidden="true">⧉</span> Copiar enlace</button>
+                        <button type="button" class="btn btn-outline" id="btn-open-tv-modal-secondary" aria-haspopup="dialog" aria-controls="qr-tv-modal"><span aria-hidden="true">⛶</span> Ampliar</button>
+                    </div>
+                    <p class="copy-feedback" id="copy-feedback" role="status" aria-live="polite"></p>
+                </div>
+            </div>
+        </section>
     </div>
 </details>
 
-<div class="card form-card">
-    <h2>Actualizar o Cargar Aprendices</h2>
-    <p class="text-muted">Sube una plantilla .xlsx o el reporte oficial de Juicios de Evaluación (.xls/.xlsx). <strong>Si la ficha ya tiene datos, se actualizarán y se mantendrá el historial intacto (ideal para instructores de relevo).</strong></p>
-    <form method="POST" action="{{ url_for('instructor.cargar_excel', ficha_id=ficha.id) }}" enctype="multipart/form-data">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-row">
-            <div class="form-group flex-grow">
-                <label for="archivo-aprendices">Archivo Excel de aprendices</label>
-                <input type="file" id="archivo-aprendices" name="archivo" accept=".xlsx,.xls" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Actualizar Datos</button>
-        </div>
-    </form>
-    <a href="{{ url_for('instructor.descargar_plantilla', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">Descargar plantilla de ejemplo</a>
-</div>
+{# ============================================================
+   BARRA DE FILTROS Y BÚSQUEDA RÁPIDA
+   ============================================================ #}
+<div class="aprendices-toolbar">
+    <!-- Buscador en tiempo real -->
+    <div class="search-field-wrap">
+        <span class="search-field-icon" aria-hidden="true">🔍</span>
+        <input type="search" id="aprendices-search" class="search-field-input" placeholder="Buscar por nombre, apellido o documento..." aria-label="Buscar aprendiz en la lista">
+        <span id="search-counter" class="search-counter-badge" style="display: none;"></span>
+    </div>
 
-<div class="section-header">
-    <h2>Aprendices ({{ aprendices|length }}{% if estado_seleccionado != 'todos' %} de {{ total_aprendices }}{% endif %})</h2>
+    <!-- Chips de filtrado por estado -->
+    {% if total_aprendices %}
+    <div class="estado-chips-scroll" role="group" aria-label="Filtrar aprendices por estado">
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
+           class="estado-chip {% if estado_seleccionado == 'todos' %}is-active{% endif %}">
+            Todos los estados <span class="chip-count">{{ total_aprendices }}</span>
+        </a>
+        {% for estado, conteo in estados_disponibles %}
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id, estado=estado) }}"
+           class="estado-chip chip-{{ estado|tono_estado }} {% if estado_seleccionado == estado %}is-active{% endif %}">
+            {{ estado|etiqueta_estado }} <span class="chip-count">{{ conteo }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
-
-{% if total_aprendices %}
-<div class="estado-chips" role="group" aria-label="Filtrar aprendices por estado" data-filter-region="aprendices-estado-chips">
-    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
-       class="estado-chip {% if estado_seleccionado == 'todos' %}is-active{% endif %}">
-        Todos los estados <span class="chip-count">{{ total_aprendices }}</span>
-    </a>
-    {% for estado, conteo in estados_disponibles %}
-    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id, estado=estado) }}"
-       class="estado-chip chip-{{ estado|tono_estado }} {% if estado_seleccionado == estado %}is-active{% endif %}">
-        {{ estado|etiqueta_estado }} <span class="chip-count">{{ conteo }}</span>
-    </a>
-    {% endfor %}
-</div>
-{% endif %}
 
 {% if estado_seleccionado != 'todos' %}
-<p class="text-muted" style="margin-top: 0;">Mostrando solo aprendices en estado <strong>{{ estado_seleccionado|etiqueta_estado }}</strong>. Con “Todos los estados” ves a todos los que entraron a la ficha, incluidos condicionados y retirados.</p>
+<p class="text-muted filter-disclaimer">
+    Mostrando aprendices en estado <strong>{{ estado_seleccionado|etiqueta_estado }}</strong>. <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}">Ver todos los estados</a>.
+</p>
 {% endif %}
 
+{# ============================================================
+   LISTA DE APRENDICES (MOBILE-FIRST + DESKTOP TABLE)
+   ============================================================ #}
 {% if aprendices %}
-<div class="table-container">
-    <div class="table-responsive" tabindex="0" aria-label="Lista de aprendices" data-filter-region="aprendices-tabla">
-        <table class="table table-sena">
-            <caption class="sr-only">Aprendices registrados en la ficha {{ ficha.codigo }}</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Documento</th>
-                    <th scope="col">Nombre</th>
-                    <th scope="col">Apellidos</th>
-                    <th scope="col" class="text-center">Tipo</th>
-                    <th scope="col" class="text-center">Estado</th>
-                    <th scope="col">Progreso Juicios</th>
-                    <th scope="col" class="text-center">Seguimiento</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ap in aprendices %}
-                {% set js = juicios_stats.get(ap.id, None) %}
-                <tr data-estado="{{ ap.estado }}">
-                    <td data-label="Documento">{{ ap.documento }}</td>
-                    <td data-label="Nombre">{{ ap.nombre }}</td>
-                    <td data-label="Apellidos">{{ ap.apellidos }}</td>
-                    <td data-label="Tipo"><span class="badge">{{ ap.tipo_documento }}</span></td>
-                    <td data-label="Estado"><span class="badge badge-{{ ap.estado|tono_estado }}">{{ ap.estado|etiqueta_estado }}</span></td>
-                    <td data-label="Progreso Juicios">
-                        {% if js and js.total > 0 %}
-                        {% set pct = (js.aprobados / js.total * 100)|round|int %}
-                        <div class="progress-inline">
-                            <div class="progress-track-inline">
-                                {% if pct > 0 %}<div class="progress-fill-inline" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>{% endif %}
+
+<!-- VISTA MÓVIL: TARJETAS ENRIQUECIDAS (PANTALLAS < 768px) -->
+<div class="aprendices-mobile-cards" id="aprendices-cards-container">
+    {% for ap in aprendices %}
+    {% set js = juicios_stats.get(ap.id, {'total': 0, 'aprobados': 0, 'pct': 0}) %}
+    {% set pct = js.pct if js.pct is defined else ( (js.aprobados / js.total * 100)|round|int if js and js.total > 0 else 0 ) %}
+    <article class="learner-card"
+             data-nombre="{{ ap.nombre_completo|lower }}"
+             data-documento="{{ ap.documento }}"
+             data-estado="{{ ap.estado }}">
+        <div class="learner-card-header">
+            <div class="learner-avatar" aria-hidden="true">
+                {{ ap.nombre[:1]|upper }}{{ ap.apellidos[:1]|upper }}
+            </div>
+            <div class="learner-identity">
+                <h3 class="learner-name">{{ ap.nombre_completo }}</h3>
+                <div class="learner-meta">
+                    <span class="learner-doc">{{ ap.tipo_documento }} {{ ap.documento }}</span>
+                    <span class="badge badge-{{ ap.estado|tono_estado }}">{{ ap.estado|etiqueta_estado }}</span>
+                    {% if ap.rol_administrativo %}
+                    <span class="badge badge-success" title="Aprendiz administrador de la ficha">👑 Admin</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Carga y Porcentaje del Aprendiz -->
+        <div class="learner-progress-section">
+            <div class="learner-progress-header">
+                <span class="learner-progress-title">Juicios Evaluativos</span>
+                <span class="pct-badge pct-badge-{% if pct >= 80 %}high{% elif pct >= 50 %}mid{% else %}low{% endif %}">
+                    {{ pct }}%
+                </span>
+            </div>
+            <div class="learner-progress-track">
+                <div class="learner-progress-fill" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>
+            </div>
+            <div class="learner-progress-footer">
+                {% if js and js.total > 0 %}
+                <span><strong>{{ js.aprobados }}</strong> de {{ js.total }} aprobados</span>
+                <span class="progress-status-indicator">
+                    {% if pct >= 80 %}&#9679; Al día{% elif pct >= 50 %}&#9679; En proceso{% else %}&#9679; Bajo avance{% endif %}
+                </span>
+                {% else %}
+                <span class="text-muted">Sin juicios evaluativos</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Botones táctiles mobile -->
+        <div class="learner-card-actions">
+            <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" class="btn btn-outline btn-action-mobile">
+                📊 Ver Avance
+            </a>
+            <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id) }}#registrar" class="btn btn-outline btn-action-mobile">
+                📓 Observador
+            </a>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+
+<!-- VISTA ESCRITORIO: TABLA OPTIMIZADA CON BARRA Y PORCENTAJE (PANTALLAS >= 768px) -->
+<div class="aprendices-desktop-table">
+    <div class="table-container">
+        <div class="table-responsive" tabindex="0" aria-label="Lista de aprendices">
+            <table class="table table-sena table-aprendices" id="tabla-aprendices">
+                <caption class="sr-only">Aprendices registrados en la ficha {{ ficha.codigo }}</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Documento</th>
+                        <th scope="col">Aprendiz</th>
+                        <th scope="col" class="text-center">Estado</th>
+                        <th scope="col" class="text-center">Rol operativo</th>
+                        <th scope="col" style="min-width: 200px;">Progreso Juicios</th>
+                        <th scope="col" class="text-center" style="width: 190px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ap in aprendices %}
+                    {% set js = juicios_stats.get(ap.id, {'total': 0, 'aprobados': 0, 'pct': 0}) %}
+                    {% set pct = js.pct if js.pct is defined else ( (js.aprobados / js.total * 100)|round|int if js and js.total > 0 else 0 ) %}
+                    <tr data-nombre="{{ ap.nombre_completo|lower }}" data-documento="{{ ap.documento }}" data-estado="{{ ap.estado }}">
+                        <td data-label="Documento">
+                            <span class="badge badge-subtle">{{ ap.tipo_documento }}</span>
+                            <strong>{{ ap.documento }}</strong>
+                        </td>
+                        <td data-label="Aprendiz">
+                            <strong class="learner-fullname">{{ ap.nombre_completo }}</strong>
+                        </td>
+                        <td data-label="Estado" class="text-center">
+                            <span class="badge badge-{{ ap.estado|tono_estado }}">{{ ap.estado|etiqueta_estado }}</span>
+                        </td>
+                        <td data-label="Rol operativo" class="text-center">
+                            {% if ap.rol_administrativo %}
+                            <span class="badge badge-success" title="Aprendiz administrador de la ficha">👑 Administrador</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Progreso Juicios">
+                            {% if js and js.total > 0 %}
+                            <div class="table-progress-cell">
+                                <div class="table-progress-meta">
+                                    <span class="pct-badge pct-badge-{% if pct >= 80 %}high{% elif pct >= 50 %}mid{% else %}low{% endif %}">
+                                        {{ pct }}%
+                                    </span>
+                                    <span class="table-progress-counts">{{ js.aprobados }}/{{ js.total }}</span>
+                                </div>
+                                <div class="table-progress-track">
+                                    <div class="table-progress-fill" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>
+                                </div>
                             </div>
-                            <span class="progress-label">{{ js.aprobados }}/{{ js.total }}</span>
-                        </div>
-                        {% else %}
-                        <span class="text-muted">—</span>
-                        {% endif %}
-                    </td>
-                    <td data-label="Seguimiento">
-                        <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" class="btn btn-sm btn-outline">Ver Avance</a>
-                        <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id) }}#registrar" class="btn btn-sm btn-outline" title="Registrar una observación fechada">Observador</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Acciones" class="text-center">
+                            <div class="table-actions-cluster">
+                                <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" class="btn btn-sm btn-outline" title="Ver historial de avance del aprendiz">Ver Avance</a>
+                                <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id) }}#registrar" class="btn btn-sm btn-outline" title="Registrar observación en el observador">Observador</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<div id="no-search-results" class="empty-state" style="display: none; padding: 2rem 1rem;">
+    <div class="empty-icon">🔍</div>
+    <h3>No se encontraron aprendices</h3>
+    <p class="text-muted">Ningún aprendiz coincide con el criterio de búsqueda actual.</p>
+</div>
+
 {% else %}
 <div class="empty-state">
     {% if total_aprendices %}
@@ -165,49 +446,2038 @@
     {% else %}
     <div class="empty-icon">👥</div>
     <h3>Todavía no hay aprendices cargados</h3>
-    <p>Sube un archivo Excel con la lista de aprendices usando el formulario de arriba.</p>
+    <p>Sube un archivo Excel con la lista de aprendices usando la sección de herramientas de arriba.</p>
     {% endif %}
 </div>
 {% endif %}
+
+{# ============================================================
+   MODAL DE PROYECCIÓN TV EN MÁXIMA RESOLUCIÓN
+   ============================================================ #}
+<div id="qr-tv-modal" class="app-modal-overlay qr-tv-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-tv-title" hidden>
+    <div class="app-modal-content qr-tv-modal-content" id="qr-tv-dialog-box">
+        <!-- Header -->
+        <header class="app-modal-header qr-tv-header">
+            <div class="qr-tv-header-info">
+                <div class="qr-tv-meta-row">
+                    <span class="qr-tv-badge-pill"><span aria-hidden="true">📺</span> MODO PROYECCIÓN TV</span>
+                    <span class="qr-tv-badge-ficha">FICHA {{ ficha.codigo }}</span>
+                    <span class="qr-tv-badge-live" aria-live="polite">● Acceso Activo</span>
+                </div>
+                <h2 id="qr-tv-title" class="qr-tv-title">
+                    {{ ficha.nombre_programa or 'Portal de Aprendices' }}
+                </h2>
+                <p class="qr-tv-subtitle">
+                    Apunta la cámara de tu celular al código QR para ingresar directamente al portal del grupo.
+                </p>
+            </div>
+            <div class="qr-tv-header-actions">
+                <button type="button" class="btn btn-outline btn-sm qr-tv-fullscreen-btn" id="btn-qr-tv-fullscreen" title="Activar o salir de pantalla completa (F11)">
+                    <span class="fullscreen-icon" id="fullscreen-icon" aria-hidden="true">⛶</span>
+                    <span class="fullscreen-label" id="fullscreen-label">Pantalla Completa</span>
+                </button>
+                <button type="button" class="app-modal-close qr-tv-close-btn" id="btn-close-qr-tv-modal" title="Cerrar proyección (Esc)" aria-label="Cerrar modal de proyección">&times;</button>
+            </div>
+        </header>
+
+        <!-- Body -->
+        <div class="app-modal-body qr-tv-body">
+            <div class="qr-tv-stage">
+                <!-- QR Box Max Res -->
+                <div class="qr-tv-card">
+                    <div class="qr-tv-quiet-zone" id="qr-tv-canvas-wrapper" title="Código QR en máxima resolución (1024x1024 px)">
+                        <div id="qr-code-tv" class="qr-tv-canvas" aria-label="Código QR de alta resolución proyectable en TV">
+                            <span class="qr-loading" aria-hidden="true"></span>
+                        </div>
+                    </div>
+                    <div class="qr-tv-card-footer">
+                        <span class="qr-tv-scan-prompt">
+                            <span class="scan-pulse" aria-hidden="true"></span>
+                            Escanea con la cámara de tu celular
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Guidance & Instructions Side -->
+                <div class="qr-tv-instructions-panel">
+                    <h3 class="qr-tv-instructions-title">¿Cómo ingresar?</h3>
+                    <ol class="qr-tv-steps-list">
+                        <li class="qr-tv-step-item">
+                            <span class="step-num" aria-hidden="true">1</span>
+                            <div class="step-text">
+                                <strong>Abre la cámara de tu celular</strong>
+                                <span>Apunta directamente hacia el código QR proyectado en la pantalla.</span>
+                            </div>
+                        </li>
+                        <li class="qr-tv-step-item">
+                            <span class="step-num" aria-hidden="true">2</span>
+                            <div class="step-text">
+                                <strong>Toca la notificación o enlace</strong>
+                                <span>Se abrirá el portal de aprendices de la ficha en tu navegador web.</span>
+                            </div>
+                        </li>
+                        <li class="qr-tv-step-item">
+                            <span class="step-num" aria-hidden="true">3</span>
+                            <div class="step-text">
+                                <strong>Ingresa tu número de documento</strong>
+                                <span>Sin contraseñas. Accede al llamado a lista, evidencias y turnos de aseo.</span>
+                            </div>
+                        </li>
+                    </ol>
+
+                    <div class="qr-tv-url-card">
+                        <span class="qr-tv-url-label">Enlace directo si prefieres escribirlo:</span>
+                        <div class="qr-tv-url-row">
+                            <code class="qr-tv-url-text" id="qr-tv-current-url">{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}</code>
+                            <button type="button" class="btn btn-sm btn-outline qr-tv-copy-btn" id="qr-tv-copy-btn" title="Copiar enlace directo">
+                                <span aria-hidden="true">⧉</span> Copiar
+                            </button>
+                        </div>
+                        <span class="copy-feedback qr-tv-copy-feedback" id="qr-tv-copy-feedback" role="status" aria-live="polite"></span>
+                    </div>
+
+                    {% if url_red_local and url_red_local != url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) %}
+                    <div class="qr-tv-network-selector">
+                        <span class="network-selector-title">Dirección de red proyectada:</span>
+                        <div class="network-pills-row">
+                            <button type="button" class="network-pill is-active" id="modal-pill-wifi" data-url="{{ url_red_local }}" title="Recomendada para conexión de aprendices en el aula">
+                                📶 WiFi Aula ({{ ip_local }})
+                            </button>
+                            <button type="button" class="network-pill" id="modal-pill-local" data-url="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" title="Solo para pruebas en este computador">
+                                💻 Localhost
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-modal-footer qr-tv-footer">
+            <div class="qr-tv-footer-meta">
+                <span class="qr-tv-tip">💡 Presiona <kbd>F11</kbd> o el botón superior para proyectar a pantalla completa en el TV.</span>
+            </div>
+            <div class="qr-tv-footer-buttons">
+                <button type="button" class="btn btn-outline" id="btn-download-qr-hd" title="Descargar imagen PNG en máxima resolución (1024x1024 px)">
+                    <span aria-hidden="true">📥</span> Descargar QR HD (PNG)
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-close-qr-tv-modal-bottom">
+                    Listo / Cerrar
+                </button>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<style>
+/* ==========================================================================
+   ESTILOS MOBILE-FIRST Y COMPONENTES DE PROGRESO - APRENDICES SENA
+   ========================================================================== */
+
+/* ---- Grid de KPIs y Progreso Global ---- */
+.aprendices-kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .aprendices-kpi-grid {
+        grid-template-columns: 1.4fr 1fr 1fr;
+    }
+}
+
+.kpi-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg, 12px);
+    padding: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kpi-card:hover {
+    border-color: var(--border-divider);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+}
+
+.kpi-card-featured {
+    border-color: rgba(57, 169, 0, 0.25);
+    background: linear-gradient(145deg, var(--bg-surface) 0%, rgba(57, 169, 0, 0.04) 100%);
+}
+
+.kpi-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.kpi-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.kpi-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.kpi-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text-strong);
+}
+
+.kpi-progress-bar-wrap {
+    margin-top: 0.5rem;
+}
+
+.kpi-progress-track {
+    height: 10px;
+    background: var(--border-divider, rgba(0,0,0,0.08));
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+}
+
+.kpi-progress-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kpi-progress-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-main);
+}
+
+.kpi-chip-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+}
+
+.badge-chip {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+}
+
+.kpi-traffic-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+}
+
+.traffic-row {
+    display: grid;
+    grid-template-columns: 105px 1fr 28px;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.76rem;
+}
+
+.traffic-label {
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.traffic-track {
+    height: 7px;
+    background: var(--border-divider, rgba(0,0,0,0.08));
+    border-radius: 3.5px;
+    overflow: hidden;
+}
+
+.traffic-fill {
+    height: 100%;
+    border-radius: 3.5px;
+    transition: width 0.4s ease;
+}
+
+.traffic-count {
+    font-weight: 700;
+    text-align: right;
+    color: var(--text-strong);
+}
+
+/* ---- Acordeón de Herramientas de Gestión ---- */
+.tools-accordion {
+    margin-bottom: clamp(1.25rem, 2vw, 1.75rem);
+    border-radius: var(--radius-lg, 14px);
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    padding: 0;
+    box-shadow: 0 12px 32px rgba(31, 41, 55, 0.06);
+    container-type: inline-size;
+}
+
+.tools-summary {
+    min-height: 72px;
+    padding: clamp(1rem, 2vw, 1.25rem) clamp(1rem, 2.4vw, 1.5rem);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    cursor: pointer;
+    background: var(--bg-card);
+    user-select: none;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    list-style: none;
+}
+
+.tools-summary::-webkit-details-marker {
+    display: none;
+}
+
+.tools-summary:hover {
+    background: var(--bg-surface);
+}
+
+.tools-summary:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 3px solid var(--accent-primary);
+    outline-offset: -3px;
+}
+
+.tools-summary-main {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 0.9rem;
+}
+
+.tools-summary-icon {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    flex-shrink: 0;
+    color: var(--accent-hover);
+    background: var(--sena-green-light);
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 24%, transparent);
+    border-radius: var(--radius-md, 10px);
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.tools-summary-title {
+    font-size: clamp(0.94rem, 1.6vw, 1.05rem);
+    line-height: 1.25;
+    color: var(--text-strong);
+    display: block;
+}
+
+.tools-summary-desc {
+    width: 100%;
+    margin: 0.25rem 0 0;
+    font-size: clamp(0.78rem, 1.25vw, 0.86rem);
+    line-height: 1.4;
+}
+
+.tools-summary-action {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 0.75rem;
+}
+
+.tools-accordion-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    color: var(--text-main);
+}
+
+.tools-summary-chevron {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.tools-summary-chevron::before {
+    content: "+";
+}
+
+.tools-accordion[open] .tools-summary-chevron::before {
+    content: "−";
+}
+
+.tools-accordion-body {
+    padding: clamp(1rem, 2.4vw, 1.5rem);
+    border-top: 1px solid var(--border-divider);
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: clamp(1rem, 2vw, 1.25rem);
+    background: var(--bg-surface);
+}
+
+@container (min-width: 900px) {
+    .tools-accordion-body {
+        grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+    }
+}
+
+.tools-subcard {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 1rem;
+    padding: clamp(1rem, 2vw, 1.35rem);
+    background: var(--bg-card);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-lg, 12px);
+    box-shadow: 0 2px 8px rgba(31, 41, 55, 0.04);
+}
+
+.tools-subcard-heading {
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    gap: 0.8rem;
+}
+
+.tools-subcard-heading > div {
+    min-width: 0;
+}
+
+.tools-step-badge {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    flex: 0 0 auto;
+    color: var(--accent-hover);
+    background: var(--sena-green-light);
+    border-radius: 9px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.tools-subcard h3 {
+    margin: 0;
+    font-size: clamp(0.98rem, 1.45vw, 1.08rem);
+    font-weight: 800;
+    line-height: 1.3;
+    color: var(--text-strong);
+}
+
+.tools-subcard-heading p {
+    width: 100%;
+    margin: 0.3rem 0 0;
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+.tools-upload-form,
+.tools-file-field,
+.tools-admin-field {
+    min-width: 0;
+}
+
+.tools-file-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.85rem;
+}
+
+@container (min-width: 560px) {
+    .tools-file-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+}
+
+.tools-file-field,
+.tools-admin-field {
+    margin-bottom: 0;
+}
+
+.tools-file-control {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    min-height: 46px;
+    color: var(--text-main);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md, 8px);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.tools-file-input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.tools-file-button {
+    display: inline-flex;
+    align-items: center;
+    align-self: stretch;
+    padding: 0.45rem 0.8rem;
+    color: var(--text-strong);
+    background: var(--bg-card);
+    border-right: 1px solid var(--border-divider);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.tools-file-name {
+    min-width: 0;
+    padding: 0.45rem 0.75rem;
+    color: var(--text-main);
+    font-size: 0.78rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.tools-file-control:hover .tools-file-button {
+    color: var(--accent-hover);
+    background: var(--sena-green-light);
+}
+
+.tools-file-control:has(.tools-file-input:focus-visible) {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: var(--focus-ring);
+}
+
+.tools-field-help {
+    display: block;
+    width: 100%;
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.tools-submit-btn {
+    min-height: 46px;
+    margin-top: 1.45rem;
+    padding-inline: 1.1rem;
+    white-space: nowrap;
+}
+
+.tools-submit-btn span,
+.tools-actions-row .btn span,
+#copy-learner-access span {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.tools-submit-btn,
+.tools-actions-row .btn,
+#copy-learner-access {
+    gap: 0.45rem;
+}
+
+.tools-admin-field {
+    margin-top: 1rem;
+}
+
+.tools-admin-field select {
+    min-height: 46px;
+    padding-right: 2.5rem;
+}
+
+.field-optional {
+    margin-left: 0.35rem;
+    padding: 0.16rem 0.45rem;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tools-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: auto;
+    padding-top: 0.1rem;
+}
+
+.tools-actions-row .btn {
+    min-height: 42px;
+    padding-inline: 0.85rem;
+    background: var(--bg-surface);
+    border-color: var(--border-divider);
+}
+
+.tools-actions-row .btn:hover {
+    color: var(--accent-hover);
+    border-color: var(--accent-primary);
+}
+
+.share-qr-cluster {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    flex: 1;
+    gap: 1.1rem;
+    padding: clamp(0.9rem, 2vw, 1.15rem);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-md, 10px);
+}
+
+@container (min-width: 460px) {
+    .share-qr-cluster {
+        grid-template-columns: minmax(144px, 168px) minmax(0, 1fr);
+    }
+}
+
+.qr-code-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    max-width: 196px;
+    margin-inline: auto;
+    background: #ffffff;
+    padding: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.09);
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qr-preview-interactive {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    position: relative;
+    display: block;
+    border-radius: 8px;
+    outline-offset: 4px;
+    transition: transform 0.18s ease;
+}
+
+.qr-preview-interactive:hover,
+.qr-preview-interactive:focus-visible {
+    transform: scale(1.02);
+}
+
+.qr-expand-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.45);
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+}
+
+.qr-preview-interactive:hover .qr-expand-overlay,
+.qr-preview-interactive:focus-visible .qr-expand-overlay {
+    opacity: 1;
+}
+
+.qr-expand-badge {
+    background: rgba(15, 23, 42, 0.92);
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.35rem 0.65rem;
+    border-radius: 9999px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.qr-tv-trigger-btn {
+    width: 100%;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.4rem 0.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 8px;
+    color: var(--sena-green-dark, #246B00);
+    border-color: rgba(57, 169, 0, 0.35);
+    background: rgba(57, 169, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.qr-tv-trigger-btn:hover,
+.qr-tv-trigger-btn:focus-visible {
+    background: var(--sena-green, #39A900);
+    color: #ffffff;
+    border-color: var(--sena-green, #39A900);
+}
+
+.qr-code-canvas {
+    display: grid;
+    width: 160px;
+    height: 160px;
+    place-items: center;
+    overflow: hidden;
+}
+
+.qr-code-canvas img,
+.qr-code-canvas canvas {
+    display: block;
+    max-width: 100%;
+    height: auto !important;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+
+.qr-loading {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(100deg, #f3f4f6 20%, #ffffff 42%, #f3f4f6 64%);
+    background-size: 200% 100%;
+    animation: qr-skeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes qr-skeleton {
+    to { background-position-x: -200%; }
+}
+
+.qr-caption {
+    color: #4b5563;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.share-url-box {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.55rem;
+}
+
+.share-url-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.2rem;
+}
+
+.share-wifi-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #1e40af;
+    background: #dbeafe;
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+}
+
+.share-network-switch {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.5rem 0.65rem;
+    background: var(--bg-surface-subtle, #f8fafc);
+    border: 1px dashed var(--border-subtle, #e2e8f0);
+    border-radius: 8px;
+    margin-top: 0.2rem;
+}
+
+.network-switch-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.network-switch-pills {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.network-switch-btn {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.network-switch-btn:hover {
+    border-color: #94a3b8;
+    background: #f1f5f9;
+}
+
+.network-switch-btn.is-active {
+    background: #39A900;
+    border-color: #39A900;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.share-actions-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.3rem;
+}
+
+.share-actions-row .btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+}
+
+.share-url-box label {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.share-url-box .form-control {
+    min-height: 46px;
+    width: 100%;
+    padding-inline: 0.8rem;
+    color: var(--text-main);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md, 8px);
+    font: inherit;
+    font-size: 0.78rem;
+}
+
+.share-access-badge {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    color: var(--accent-hover);
+    background: var(--sena-green-light);
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, transparent);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+#copy-learner-access {
+    min-height: 44px;
+}
+
+.copy-feedback {
+    min-height: 1.15rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.copy-feedback.is-success {
+    color: var(--success);
+}
+
+/* ==========================================================================
+   MODO PROYECCIÓN TV (QR EN MÁXIMA RESOLUCIÓN)
+   ========================================================================== */
+.qr-tv-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 12, 22, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: clamp(0.75rem, 2vw, 1.5rem);
+    animation: qrFadeIn 0.2s ease-out;
+}
+
+.qr-tv-overlay.is-open {
+    display: flex;
+}
+
+@keyframes qrFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.qr-tv-modal-content {
+    width: min(96vw, 58rem);
+    max-height: min(94vh, 52rem);
+    background: var(--bg-card, #ffffff);
+    border: 1px solid var(--border-subtle, #e2e8f0);
+    border-radius: 18px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.25s ease, height 0.25s ease, border-radius 0.25s ease;
+}
+
+/* Fullscreen Proyección TV */
+.qr-tv-overlay:fullscreen .qr-tv-modal-content,
+.qr-tv-overlay:-webkit-full-screen .qr-tv-modal-content,
+.qr-tv-modal-content.is-fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+}
+
+.qr-tv-header {
+    padding: 1.25rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--border-subtle, #e5e7eb);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    background: var(--bg-surface, #ffffff);
+}
+
+.qr-tv-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.4rem;
+}
+
+.qr-tv-badge-pill {
+    background: #0f172a;
+    color: #38bdf8;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.qr-tv-badge-ficha {
+    background: rgba(57, 169, 0, 0.12);
+    color: var(--sena-green-dark, #246B00);
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+}
+
+.qr-tv-badge-live {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #16a34a;
+}
+
+.qr-tv-title {
+    font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+    font-weight: 800;
+    color: var(--text-strong, #0f172a);
+    line-height: 1.25;
+    margin: 0 0 0.25rem 0;
+}
+
+.qr-tv-subtitle {
+    font-size: 0.88rem;
+    color: var(--text-muted, #64748b);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.qr-tv-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+
+.qr-tv-fullscreen-btn {
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.45rem 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 8px;
+    border-color: #cbd5e1;
+    cursor: pointer;
+}
+
+.qr-tv-body {
+    padding: clamp(1rem, 2.5vw, 1.75rem);
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.qr-tv-stage {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+@media (min-width: 820px) {
+    .qr-tv-stage {
+        grid-template-columns: minmax(320px, 480px) minmax(280px, 1fr);
+        gap: 2rem;
+    }
+}
+
+/* Card central del QR */
+.qr-tv-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-inline: auto;
+    width: 100%;
+}
+
+.qr-tv-quiet-zone {
+    background: #ffffff;
+    padding: clamp(1rem, 2.5vw, 1.75rem);
+    border-radius: 20px;
+    border: 3px solid #e2e8f0;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+}
+
+.qr-tv-canvas {
+    width: clamp(230px, 36vmin, 440px);
+    height: clamp(230px, 36vmin, 440px);
+    display: grid;
+    place-items: center;
+}
+
+.qr-tv-overlay:fullscreen .qr-tv-canvas,
+.qr-tv-overlay:-webkit-full-screen .qr-tv-canvas,
+.qr-tv-modal-content.is-fullscreen .qr-tv-canvas {
+    width: clamp(300px, 50vmin, 580px);
+    height: clamp(300px, 50vmin, 580px);
+}
+
+.qr-tv-canvas img,
+.qr-tv-canvas canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+
+.qr-tv-scan-prompt {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-strong, #0f172a);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.scan-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #16a34a;
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
+    animation: scanPulse 1.8s infinite;
+}
+
+@keyframes scanPulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(22, 163, 74, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+/* Panel de instrucciones */
+.qr-tv-instructions-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.qr-tv-instructions-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-strong, #0f172a);
+    margin: 0;
+}
+
+.qr-tv-steps-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.qr-tv-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.qr-tv-step-item .step-num {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #39A900;
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.qr-tv-step-item .step-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.qr-tv-step-item .step-text strong {
+    font-size: 0.92rem;
+    color: var(--text-strong, #0f172a);
+}
+
+.qr-tv-step-item .step-text span {
+    font-size: 0.82rem;
+    color: var(--text-muted, #64748b);
+    line-height: 1.35;
+}
+
+.qr-tv-url-card {
+    background: var(--bg-surface, #f8fafc);
+    border: 1px solid var(--border-subtle, #e2e8f0);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.qr-tv-url-label {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text-muted, #64748b);
+}
+
+.qr-tv-url-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.qr-tv-url-text {
+    font-size: 0.84rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: #0f172a;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.qr-tv-network-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.6rem 0.8rem;
+    background: rgba(57, 169, 0, 0.06);
+    border: 1px solid rgba(57, 169, 0, 0.2);
+    border-radius: 10px;
+}
+
+.network-selector-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--sena-green-dark, #246B00);
+}
+
+.network-pills-row {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.network-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1e293b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.network-pill:hover {
+    background: #f1f5f9;
+}
+
+.network-pill.is-active {
+    background: #39A900;
+    border-color: #39A900;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.qr-tv-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-subtle, #e5e7eb);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    background: var(--bg-surface, #ffffff);
+}
+
+.qr-tv-tip {
+    font-size: 0.8rem;
+    color: var(--text-muted, #64748b);
+}
+
+.qr-tv-tip kbd {
+    background: #e2e8f0;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 700;
+}
+
+.qr-tv-footer-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-left: auto;
+}
+
+.copy-feedback.is-warning {
+    color: var(--warning);
+}
+
+.qr-fallback {
+    color: #4b5563;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+}
+
+@media (max-width: 560px) {
+    .tools-summary {
+        align-items: flex-start;
+    }
+
+    .tools-accordion-badge {
+        display: none;
+    }
+
+    .tools-summary-chevron {
+        margin-top: 0.65rem;
+        margin-right: 0.25rem;
+    }
+
+    .tools-summary-desc {
+        font-size: 0.76rem;
+    }
+
+    .tools-subcard-heading {
+        gap: 0.65rem;
+    }
+
+    .tools-file-row,
+    .share-qr-cluster {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tools-file-control {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tools-file-button {
+        justify-content: center;
+        min-height: 42px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-divider);
+    }
+
+    .tools-file-name {
+        text-align: center;
+    }
+
+    .tools-submit-btn,
+    .tools-actions-row .btn {
+        width: 100%;
+    }
+
+    .tools-submit-btn {
+        margin-top: 0;
+    }
+
+    .tools-actions-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tools-summary,
+    .tools-summary-chevron,
+    .qr-loading {
+        transition: none;
+        animation: none;
+    }
+}
+
+/* ---- Toolbar: Búsqueda y Chips de Estado ---- */
+.aprendices-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+}
+
+@media (min-width: 768px) {
+    .aprendices-toolbar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+}
+
+.search-field-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+}
+
+.search-field-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+.search-field-input {
+    width: 100%;
+    padding: 0.65rem 0.85rem 0.65rem 2.4rem;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-field-input:focus {
+    outline: none;
+    border-color: var(--accent-primary, #39a900);
+    box-shadow: 0 0 0 3px rgba(57, 169, 0, 0.15);
+}
+
+.search-counter-badge {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    background: var(--border-divider);
+    padding: 0.15rem 0.45rem;
+    border-radius: 10px;
+    color: var(--text-muted);
+}
+
+.estado-chips-scroll {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.estado-chips-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-disclaimer {
+    margin: -0.5rem 0 1rem;
+    font-size: 0.82rem;
+}
+
+/* ---- Badges de Porcentaje ---- */
+.pct-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 0.18rem 0.5rem;
+    border-radius: 6px;
+    letter-spacing: -0.02em;
+}
+
+.pct-badge-high {
+    background: rgba(46, 125, 50, 0.15);
+    color: #2e7d32;
+}
+
+.pct-badge-mid {
+    background: rgba(239, 108, 0, 0.15);
+    color: #ef6c00;
+}
+
+.pct-badge-low {
+    background: rgba(198, 40, 40, 0.15);
+    color: #c62828;
+}
+
+/* En dark mode los badges de porcentaje usan colores brillantes legibles */
+[data-theme="dark"] .pct-badge-high { background: rgba(76, 175, 80, 0.25); color: #81c784; }
+[data-theme="dark"] .pct-badge-mid  { background: rgba(255, 152, 0, 0.25); color: #ffb74d; }
+[data-theme="dark"] .pct-badge-low  { background: rgba(244, 67, 54, 0.25); color: #e57373; }
+
+/* ---- Vista Móvil: Tarjetas de Aprendiz ---- */
+.aprendices-mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.learner-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg, 12px);
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.learner-card:hover {
+    border-color: var(--border-divider);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.learner-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.learner-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary, #39a900) 0%, #1e5f00 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+}
+
+.learner-identity {
+    flex: 1;
+    min-width: 0;
+}
+
+.learner-name {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-strong);
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.learner-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+}
+
+.learner-doc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Caja de Progreso del Aprendiz */
+.learner-progress-section {
+    background: var(--bg-card, rgba(0,0,0,0.02));
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md, 8px);
+    padding: 0.75rem;
+}
+
+.learner-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.45rem;
+}
+
+.learner-progress-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.learner-progress-track {
+    height: 8px;
+    background: var(--border-divider, rgba(0,0,0,0.08));
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+}
+
+.learner-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.learner-progress-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.76rem;
+    color: var(--text-main);
+}
+
+.progress-status-indicator {
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+/* Botones de acción móvil */
+.learner-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+}
+
+.btn-action-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.55rem 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    min-height: 42px; /* Target táctil ergonómico */
+}
+
+/* ---- Vista Escritorio: Tabla de Aprendices ---- */
+.table-aprendices .table-progress-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.table-progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.table-progress-counts {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.table-progress-track {
+    height: 7px;
+    background: var(--border-divider, rgba(0,0,0,0.08));
+    border-radius: 3.5px;
+    overflow: hidden;
+}
+
+.table-progress-fill {
+    height: 100%;
+    border-radius: 3.5px;
+    transition: width 0.4s ease;
+}
+
+.table-actions-cluster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.learner-fullname {
+    font-size: 0.9rem;
+    color: var(--text-strong);
+}
+
+/* Control responsive de vistas */
+@media (max-width: 768px) {
+    .aprendices-desktop-table {
+        display: none !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .aprendices-mobile-cards {
+        display: none !important;
+    }
+    .aprendices-desktop-table {
+        display: block !important;
+    }
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
-<!-- QR Code Library -->
+<!-- Librería QR Code -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (function () {
+    // 1. Manejo del código QR, Proyección TV en Máxima Resolución y Enlace
     const button = document.getElementById('copy-learner-access');
     const input = document.getElementById('learner-access-url');
     const feedback = document.getElementById('copy-feedback');
-    if (!button || !input || !feedback) return;
+    const qrContainer = document.getElementById("qr-code");
+    const qrTvContainer = document.getElementById("qr-code-tv");
+    const tvModal = document.getElementById("qr-tv-modal");
+    const tvModalDialog = document.getElementById("qr-tv-dialog-box");
+    const tvCurrentUrl = document.getElementById("qr-tv-current-url");
+    const btnOpenTv = document.getElementById("btn-open-tv-modal");
+    const btnOpenTvAction = document.getElementById("btn-open-tv-modal-action");
+    const btnOpenTvSecondary = document.getElementById("btn-open-tv-modal-secondary");
+    const btnCloseTv = document.getElementById("btn-close-qr-tv-modal");
+    const btnCloseTvBottom = document.getElementById("btn-close-qr-tv-modal-bottom");
+    const btnFullscreen = document.getElementById("btn-qr-tv-fullscreen");
+    const fullscreenIcon = document.getElementById("fullscreen-icon");
+    const fullscreenLabel = document.getElementById("fullscreen-label");
+    const btnDownloadHd = document.getElementById("btn-download-qr-hd");
+    const tvCopyBtn = document.getElementById("qr-tv-copy-btn");
+    const tvCopyFeedback = document.getElementById("qr-tv-copy-feedback");
+    const btnSwitchWifi = document.getElementById("btn-switch-url-wifi");
+    const btnSwitchLocal = document.getElementById("btn-switch-url-local");
+    const modalPillWifi = document.getElementById("modal-pill-wifi");
+    const modalPillLocal = document.getElementById("modal-pill-local");
+    const fileInput = document.getElementById('archivo-aprendices');
+    const fileName = document.getElementById('archivo-aprendices-nombre');
 
-    // Generar el código QR
-    new QRCode(document.getElementById("qr-code"), {
-        text: input.value,
-        width: 180,
-        height: 180,
-        colorDark : "#050505",
-        colorLight : "#ffffff",
-        correctLevel : QRCode.CorrectLevel.H
-    });
+    let currentUrl = (input && input.dataset.urlWifi) ? input.dataset.urlWifi : (input ? input.value : '');
+    let qrGeneradoPreview = false;
+    let qrGeneradoTv = false;
+    let previousFocusedElement = null;
 
-    button.addEventListener('click', async function () {
+    if (input && currentUrl && input.value !== currentUrl) {
+        input.value = currentUrl;
+    }
+    if (tvCurrentUrl && currentUrl) {
+        tvCurrentUrl.textContent = currentUrl;
+    }
+
+    if (fileInput && fileName) {
+        fileInput.addEventListener('change', function () {
+            fileName.textContent = this.files && this.files.length
+                ? this.files[0].name
+                : 'Sin archivo seleccionado';
+        });
+    }
+
+    function renderPreviewQR(url) {
+        if (!qrContainer || !url) return;
         try {
-            await navigator.clipboard.writeText(input.value);
-            feedback.textContent = '¡Enlace copiado! Ya puedes compartirlo.';
-            feedback.style.color = 'var(--emerald-400)';
-            button.textContent = 'Copiado';
-            setTimeout(() => {
-                button.textContent = 'Copiar Enlace';
-                feedback.textContent = '';
-            }, 3000);
+            if (typeof QRCode !== 'function') throw new Error('Librería QR no disponible');
+            qrContainer.replaceChildren();
+            new QRCode(qrContainer, {
+                text: url,
+                width: 320,
+                height: 320,
+                colorDark: "#050505",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            qrGeneradoPreview = true;
         } catch (error) {
-            input.focus();
-            input.select();
-            feedback.textContent = 'Seleccionamos el enlace. Cópialo con Ctrl+C.';
-            feedback.style.color = 'var(--warning-color)';
+            qrContainer.innerHTML = '<span class="qr-fallback">QR no disponible.<br>Usa el enlace.</span>';
+        }
+    }
+
+    function renderTvQR(url, force = false) {
+        if (!qrTvContainer || !url) return;
+        if (qrGeneradoTv && !force) return;
+        try {
+            if (typeof QRCode !== 'function') throw new Error('Librería QR no disponible');
+            qrTvContainer.replaceChildren();
+            // Generar a 1024x1024 px nativos para máxima resolución en pantallas grandes / 4K / TV
+            new QRCode(qrTvContainer, {
+                text: url,
+                width: 1024,
+                height: 1024,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            qrGeneradoTv = true;
+        } catch (error) {
+            qrTvContainer.innerHTML = '<span class="qr-fallback">QR de proyección no disponible.</span>';
+        }
+    }
+
+    function setActiveUrl(newUrl) {
+        if (!newUrl) return;
+        currentUrl = newUrl;
+        if (input) input.value = newUrl;
+        if (tvCurrentUrl) tvCurrentUrl.textContent = newUrl;
+
+        // Sincronizar botones de selector en tarjeta
+        if (btnSwitchWifi && btnSwitchLocal) {
+            const isWifi = btnSwitchWifi.dataset.targetUrl === newUrl;
+            btnSwitchWifi.classList.toggle('is-active', isWifi);
+            btnSwitchLocal.classList.toggle('is-active', !isWifi);
+        }
+
+        // Sincronizar botones de selector en modal
+        if (modalPillWifi && modalPillLocal) {
+            const isWifi = modalPillWifi.dataset.url === newUrl;
+            modalPillWifi.classList.toggle('is-active', isWifi);
+            modalPillLocal.classList.toggle('is-active', !isWifi);
+        }
+
+        renderPreviewQR(currentUrl);
+        renderTvQR(currentUrl, true);
+    }
+
+    function openTvModal() {
+        if (!tvModal) return;
+        previousFocusedElement = document.activeElement;
+        tvModal.removeAttribute('hidden');
+        tvModal.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+
+        // Asegurar que el QR en alta resolución esté generado con la URL activa
+        renderTvQR(currentUrl, !qrGeneradoTv);
+
+        if (btnFullscreen) {
+            btnFullscreen.focus();
+        } else if (btnCloseTv) {
+            btnCloseTv.focus();
+        }
+    }
+
+    function closeTvModal() {
+        if (!tvModal) return;
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+        tvModal.classList.remove('is-open');
+        tvModal.setAttribute('hidden', '');
+        document.body.style.overflow = '';
+        if (previousFocusedElement && typeof previousFocusedElement.focus === 'function') {
+            previousFocusedElement.focus();
+        }
+    }
+
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            const target = tvModal.requestFullscreen ? tvModal : tvModalDialog;
+            if (target && target.requestFullscreen) {
+                target.requestFullscreen().catch((err) => {
+                    console.warn('Pantalla completa no disponible:', err);
+                });
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+    }
+
+    function updateFullscreenUi() {
+        const isFs = Boolean(document.fullscreenElement);
+        if (fullscreenIcon) fullscreenIcon.textContent = isFs ? '🗗' : '⛶';
+        if (fullscreenLabel) fullscreenLabel.textContent = isFs ? 'Salir de Pantalla Completa' : 'Pantalla Completa';
+        if (tvModalDialog) tvModalDialog.classList.toggle('is-fullscreen', isFs);
+    }
+
+    document.addEventListener('fullscreenchange', updateFullscreenUi);
+
+    // Eventos de apertura / cierre del modal de TV
+    if (btnOpenTv) btnOpenTv.addEventListener('click', openTvModal);
+    if (btnOpenTvAction) btnOpenTvAction.addEventListener('click', openTvModal);
+    if (btnOpenTvSecondary) btnOpenTvSecondary.addEventListener('click', openTvModal);
+    if (btnCloseTv) btnCloseTv.addEventListener('click', closeTvModal);
+    if (btnCloseTvBottom) btnCloseTvBottom.addEventListener('click', closeTvModal);
+    if (btnFullscreen) btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    if (tvModal) {
+        tvModal.addEventListener('click', function (e) {
+            if (e.target === tvModal) {
+                closeTvModal();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && tvModal && tvModal.classList.contains('is-open')) {
+            closeTvModal();
         }
     });
-}());
+
+    // Conmutador de URL (WiFi vs Localhost)
+    if (btnSwitchWifi) {
+        btnSwitchWifi.addEventListener('click', function () {
+            setActiveUrl(this.dataset.targetUrl);
+        });
+    }
+    if (btnSwitchLocal) {
+        btnSwitchLocal.addEventListener('click', function () {
+            setActiveUrl(this.dataset.targetUrl);
+        });
+    }
+    if (modalPillWifi) {
+        modalPillWifi.addEventListener('click', function () {
+            setActiveUrl(this.dataset.url);
+        });
+    }
+    if (modalPillLocal) {
+        modalPillLocal.addEventListener('click', function () {
+            setActiveUrl(this.dataset.url);
+        });
+    }
+
+    // Descarga de QR en máxima resolución (PNG 1024x1024 px)
+    if (btnDownloadHd) {
+        btnDownloadHd.addEventListener('click', function () {
+            const canvas = qrTvContainer ? qrTvContainer.querySelector('canvas') : null;
+            const img = qrTvContainer ? qrTvContainer.querySelector('img') : null;
+            let dataUrl = null;
+
+            if (canvas && typeof canvas.toDataURL === 'function') {
+                dataUrl = canvas.toDataURL('image/png');
+            } else if (img && img.src && img.src.startsWith('data:image')) {
+                dataUrl = img.src;
+            }
+
+            if (!dataUrl) {
+                alert('El código QR aún se está generando. Intenta en un segundo.');
+                return;
+            }
+
+            const downloadLink = document.createElement('a');
+            const fichaCode = '{{ ficha.codigo }}'.trim() || 'acceso';
+            downloadLink.download = `QR_Acceso_Ficha_${fichaCode}_HD.png`;
+            downloadLink.href = dataUrl;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+
+            const originalHtml = btnDownloadHd.innerHTML;
+            btnDownloadHd.innerHTML = '<span aria-hidden="true">✓</span> ¡QR HD Descargado!';
+            setTimeout(() => {
+                btnDownloadHd.innerHTML = originalHtml;
+            }, 2500);
+        });
+    }
+
+    // Generar vista previa del QR al inicio o al abrir el acordeón de herramientas
+    const toolsAccordion = document.getElementById('herramientas-card');
+    if (toolsAccordion) {
+        toolsAccordion.addEventListener('toggle', function () {
+            if (toolsAccordion.open && !qrGeneradoPreview) renderPreviewQR(currentUrl);
+        });
+    }
+    setTimeout(() => {
+        renderPreviewQR(currentUrl);
+    }, 600);
+
+    // Copiar enlace en tarjeta principal
+    if (button && input && feedback) {
+        button.addEventListener('click', async function () {
+            try {
+                await navigator.clipboard.writeText(input.value);
+                feedback.textContent = '¡Enlace copiado! Ya puedes compartirlo con el grupo.';
+                feedback.classList.remove('is-warning');
+                feedback.classList.add('is-success');
+                button.innerHTML = '<span aria-hidden="true">✓</span> Enlace copiado';
+                setTimeout(() => {
+                    button.innerHTML = '<span aria-hidden="true">⧉</span> Copiar enlace';
+                    feedback.textContent = '';
+                    feedback.classList.remove('is-success');
+                }, 3000);
+            } catch (error) {
+                input.focus();
+                input.select();
+                feedback.textContent = 'Seleccionamos el enlace. Cópialo con Ctrl+C.';
+                feedback.classList.remove('is-success');
+                feedback.classList.add('is-warning');
+            }
+        });
+    }
+
+    // Copiar enlace dentro del modal de TV
+    if (tvCopyBtn && tvCurrentUrl && tvCopyFeedback) {
+        tvCopyBtn.addEventListener('click', async function () {
+            try {
+                await navigator.clipboard.writeText(currentUrl);
+                tvCopyFeedback.textContent = '¡Enlace copiado al portapapeles!';
+                tvCopyFeedback.classList.remove('is-warning');
+                tvCopyFeedback.classList.add('is-success');
+                tvCopyBtn.innerHTML = '<span aria-hidden="true">✓</span> Copiado';
+                setTimeout(() => {
+                    tvCopyBtn.innerHTML = '<span aria-hidden="true">⧉</span> Copiar';
+                    tvCopyFeedback.textContent = '';
+                    tvCopyFeedback.classList.remove('is-success');
+                }, 2500);
+            } catch (err) {
+                tvCopyFeedback.textContent = 'Copia manual: ' + currentUrl;
+            }
+        });
+    }
+
+    // 2. Buscador en tiempo real (Mobile Cards + Desktop Table)
+    const searchInput = document.getElementById('aprendices-search');
+    const searchCounter = document.getElementById('search-counter');
+    const noResults = document.getElementById('no-search-results');
+    const cards = document.querySelectorAll('.learner-card');
+    const tableRows = document.querySelectorAll('#tabla-aprendices tbody tr');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const terms = query.split(/\s+/).filter(Boolean);
+            let visibles = 0;
+
+            // Filtrar Tarjetas Móviles
+            cards.forEach(card => {
+                const nombre = card.getAttribute('data-nombre') || '';
+                const doc = card.getAttribute('data-documento') || '';
+                const match = terms.every(term => nombre.includes(term) || doc.includes(term));
+                card.style.display = match ? '' : 'none';
+                if (match) visibles++;
+            });
+
+            // Filtrar Filas de Tabla de Escritorio
+            tableRows.forEach(row => {
+                const nombre = row.getAttribute('data-nombre') || '';
+                const doc = row.getAttribute('data-documento') || '';
+                const match = terms.every(term => nombre.includes(term) || doc.includes(term));
+                row.style.display = match ? '' : 'none';
+            });
+
+            // Actualizar contador y estado vacío
+            if (terms.length > 0) {
+                searchCounter.style.display = 'inline-block';
+                searchCounter.textContent = `${visibles} encontrado(s)`;
+                if (noResults) {
+                    noResults.style.display = (visibles === 0) ? 'block' : 'none';
+                }
+            } else {
+                searchCounter.style.display = 'none';
+                if (noResults) noResults.style.display = 'none';
+            }
+        });
+    }
+})();
 </script>
 {% endblock %}

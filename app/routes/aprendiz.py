@@ -10,11 +10,12 @@ from app.models.aprendiz import Aprendiz
 from app.models.asistencia import (
     RegistroAsistencia,
     SesionAsistencia,
+    ESTADOS_ASISTENCIA,
     CAUSALES_JUSTIFICADAS,
 )
-from app.models.tarea import Tarea, Entrega
+from app.models.tarea import Tarea, Entrega, ProrrogaTarea
 from app.models.material import MaterialFicha
-from app.models.alertas import ConfiguracionAlertas
+from app.models.alertas import ConfiguracionAlertas, PlanMejoramiento
 from app.models.insignia import Insignia, InsigniaOtorgada
 from app.models.observador import NotaObservador
 from app.services.ranking import (
@@ -30,8 +31,9 @@ from app.services.alertas import (
     vencer_planes_pendientes,
 )
 from app.services.cronograma import obtener_cronograma
-from app.services.asistencia import mapa_asistencia_por_fecha
-from app.services.aseo import resumen_aprendiz
+from app.services.asistencia import guardar_asistencia, mapa_asistencia_por_fecha
+from app.services.aseo import ajustar_turno_por_asistencia, resumen_aprendiz
+from app.services.cortes import corte_actual
 from app.services.archivos import (
     ArchivoService,
     ErrorArchivo,
@@ -39,8 +41,13 @@ from app.services.archivos import (
     nombre_original_desde_ruta,
     resolver_archivo_subido,
 )
-from app.services.permisos import puede_gestionar_ficha, puede_gestionar_tarea
-from datetime import datetime
+from app.services.permisos import (
+    aprendiz_de_sesion,
+    puede_administrar_ficha_como_aprendiz,
+    puede_gestionar_ficha,
+    puede_gestionar_tarea,
+)
+from datetime import date, datetime, timedelta
 
 aprendiz_bp = Blueprint('aprendiz', __name__, template_folder='../templates/aprendiz')
 
@@ -170,35 +177,69 @@ def panel(ficha_id):
     ).order_by(Insignia.nombre).all()
 
     tareas = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite).all()
-    # Todas las entregas del aprendiz en una consulta: recorrer tarea por tarea
-    # costaba un SELECT por actividad de la ficha.
+    # Todas las entregas, prórrogas y planes del aprendiz en consultas agregadas
     entregas_aprendiz = {}
+    prorrogas_aprendiz = {}
+    planes_tarea_aprendiz = {}
     if tareas:
+        tarea_ids = [tarea.id for tarea in tareas]
         for entrega in (
             Entrega.query
             .filter(
                 Entrega.aprendiz_id == aprendiz.id,
-                Entrega.tarea_id.in_([tarea.id for tarea in tareas]),
+                Entrega.tarea_id.in_(tarea_ids),
             )
             .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
             .all()
         ):
             entregas_aprendiz.setdefault(entrega.tarea_id, entrega)
 
+        for pr in ProrrogaTarea.query.filter(
+            ProrrogaTarea.aprendiz_id == aprendiz.id,
+            ProrrogaTarea.tarea_id.in_(tarea_ids),
+        ).all():
+            prorrogas_aprendiz[pr.tarea_id] = pr
+
+        for pl in PlanMejoramiento.query.filter(
+            PlanMejoramiento.aprendiz_id == aprendiz.id,
+            PlanMejoramiento.tarea_id.in_(tarea_ids),
+        ).order_by(PlanMejoramiento.fecha_creacion.desc()).all():
+            planes_tarea_aprendiz.setdefault(pl.tarea_id, pl)
+
     tareas_estado = []
+    ahora_utc = datetime.utcnow()
     for tarea in tareas:
         entrega = entregas_aprendiz.get(tarea.id)
+        prorroga = prorrogas_aprendiz.get(tarea.id)
+        plan_tarea = planes_tarea_aprendiz.get(tarea.id)
+        limite_efectivo = prorroga.nueva_fecha_limite if prorroga and prorroga.nueva_fecha_limite else tarea.fecha_limite
+
         estado = 'pendiente'
         if entrega:
             if entrega.estado_revision == 'rechazada':
                 estado = 'correccion'
-            elif entrega.entregada_a_tiempo:
+            elif (
+                entrega.registrada_por_instructor
+                or not limite_efectivo
+                or entrega.fecha_entrega <= limite_efectivo
+            ):
+                # Usamos limite_efectivo pre-cargado (considera prórroga) para
+                # evitar el N+1 que dispara entregada_a_tiempo vía lazy query.
                 estado = 'entregada'
             else:
                 estado = 'retraso'
-        elif tarea.fecha_limite and tarea.fecha_limite < datetime.utcnow():
+        elif limite_efectivo and limite_efectivo < ahora_utc:
             estado = 'vencida'
-        tareas_estado.append({'tarea': tarea, 'entrega': entrega, 'estado': estado})
+
+        tareas_estado.append({
+            'tarea': tarea,
+            'entrega': entrega,
+            'estado': estado,
+            'prorroga': prorroga,
+            'plan': plan_tarea,
+            'limite_efectivo': limite_efectivo,
+            'es_vencida_original': bool(tarea.fecha_limite and tarea.fecha_limite < ahora_utc),
+        })
 
     filas_ranking, config_ranking = calcular_ranking(ficha_id)
     fila_propia = next(
@@ -251,6 +292,12 @@ def panel(ficha_id):
         .all()
     )
     aseo = resumen_aprendiz(ficha_id, aprendiz)
+    turno_hoy = None
+    if aprendiz.rol_administrativo:
+        from app.models.aseo import TurnoAseo
+        turno_hoy = TurnoAseo.query.filter_by(
+            ficha_id=ficha_id, fecha=date.today()
+        ).first()
 
     # El aprendiz solo recibe sus propios registros; el mismo mapa de estados
     # que usa el modal del instructor evita colores distintos entre roles.
@@ -414,9 +461,51 @@ def panel(ficha_id):
     # e insignias, que la plantilla volvia a leer una por una.
 
     cronograma = obtener_cronograma(ficha)
+    from app.services.recomendaciones import (
+        obtener_recomendaciones_aprendiz,
+        obtener_logros_aprendiz,
+    )
+    recomendaciones_aprendiz = obtener_recomendaciones_aprendiz(ficha_id, aprendiz.id)
+    resumen_logros = obtener_logros_aprendiz(ficha_id, aprendiz.id)
+
+    # Métricas y contexto personalizado para el aprendiz (hora de Colombia UTC-5)
+    hora_col = (datetime.utcnow() - timedelta(hours=5)).hour
+    if 5 <= hora_col < 12:
+        saludo_tiempo = "¡Buenos días"
+    elif 12 <= hora_col < 19:
+        saludo_tiempo = "¡Buenas tardes"
+    else:
+        saludo_tiempo = "¡Buenas noches"
+
+    tareas_pendientes = [t for t in tareas_estado if t['estado'] in ('pendiente', 'correccion', 'vencida')]
+    tareas_entregadas = [t for t in tareas_estado if t['estado'] in ('entregada', 'retraso')]
+    pendientes_futuras = [
+        t for t in tareas_pendientes
+        if t.get('limite_efectivo') and t['limite_efectivo'] >= ahora_utc
+    ]
+    pendientes_futuras.sort(key=lambda x: x['limite_efectivo'])
+    proxima_tarea_urgente = pendientes_futuras[0] if pendientes_futuras else (tareas_pendientes[0] if tareas_pendientes else None)
+
+    dias_proximo_aseo = None
+    if aseo and aseo.get('turno_propio') and aseo['turno_propio'].fecha:
+        dias_proximo_aseo = (aseo['turno_propio'].fecha - date.today()).days
+
+    resumen_rapido = {
+        'saludo': saludo_tiempo,
+        'tareas_pendientes_count': len(tareas_pendientes),
+        'tareas_entregadas_count': len(tareas_entregadas),
+        'proxima_tarea': proxima_tarea_urgente,
+        'dias_proximo_aseo': dias_proximo_aseo,
+        'estado_academico': 'Excelente' if pct_asistencia >= 85 and nivel_alerta == 'verde' else ('En Riesgo' if nivel_alerta == 'amarillo' else ('Crítico' if nivel_alerta == 'rojo' else 'Al Día')),
+        'estado_badge_class': 'badge-success' if nivel_alerta == 'verde' else ('badge-warning' if nivel_alerta == 'amarillo' else 'badge-danger'),
+    }
+
     return render_template('panel.html',
                            ficha=ficha,
                            aprendiz=aprendiz,
+                           resumen_rapido=resumen_rapido,
+                           recomendaciones_aprendiz=recomendaciones_aprendiz,
+                           resumen_logros=resumen_logros,
                            total_sesiones=total_sesiones,
                            total_faltas=total_faltas,
                            faltas_no_justificadas=faltas_no_justificadas,
@@ -443,6 +532,7 @@ def panel(ficha_id):
                            asistencia_calendario=asistencia_calendario,
                            cronograma=cronograma,
                            aseo=aseo,
+                           turno_hoy=turno_hoy,
                            stats_juicios=stats_juicios,
                            juicios_pendientes=juicios_pendientes,
                            juicios_aprobados=juicios_aprobados,
@@ -452,6 +542,107 @@ def panel(ficha_id):
                            timeline_aprendiz=timeline_aprendiz_orden,
                            instructores_aprendiz=instructores_aprendiz,
                            resumen_aprendiz=stats_resumen_aprendiz)
+
+
+def _aprendiz_admin_autorizado(ficha_id):
+    if not puede_administrar_ficha_como_aprendiz(ficha_id):
+        return None
+    return aprendiz_de_sesion(ficha_id)
+
+
+@aprendiz_bp.route('/<int:ficha_id>/asistencia/gestionar', methods=['GET', 'POST'])
+@limiter.limit('60 per minute')
+def asistencia_admin(ficha_id):
+    """Llamado a lista delegado, limitado al aprendiz administrador vigente."""
+    ficha = db.session.get(Ficha, ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
+    if not ficha or not actor:
+        flash('Esta herramienta solo está disponible para el aprendiz administrador.', 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    fecha_str = request.values.get('fecha', date.today().isoformat())
+    try:
+        fecha = date.fromisoformat(fecha_str)
+    except (TypeError, ValueError):
+        flash('La fecha de la sesión no tiene un formato válido.', 'error')
+        return redirect(url_for('aprendiz.asistencia_admin', ficha_id=ficha_id))
+
+    aprendices = Aprendiz.query_llamado_lista(ficha_id).order_by(
+        Aprendiz.apellidos, Aprendiz.nombre
+    ).all()
+
+    if request.method == 'POST':
+        estados_validos = {valor for valor, _etiqueta in ESTADOS_ASISTENCIA}
+        causales_validas = {valor for valor, _etiqueta in CAUSALES_JUSTIFICADAS}
+        registros = {}
+        for aprendiz in aprendices:
+            estado = request.form.get(f'asistencia_{aprendiz.id}')
+            causal = request.form.get(f'causal_{aprendiz.id}', '').strip()
+            if estado not in estados_validos:
+                flash(f'Selecciona la asistencia de {aprendiz.nombre_completo}.', 'error')
+                return redirect(url_for('aprendiz.asistencia_admin', ficha_id=ficha_id, fecha=fecha.isoformat()))
+            if estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA') and causal not in causales_validas:
+                flash(f'Selecciona una causal válida para {aprendiz.nombre_completo}.', 'error')
+                return redirect(url_for('aprendiz.asistencia_admin', ficha_id=ficha_id, fecha=fecha.isoformat()))
+            registros[aprendiz.id] = (
+                estado,
+                causal if estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA') else None,
+            )
+
+        corte = corte_actual(ficha_id)
+        corte_id = corte.id if corte else None
+        try:
+            guardar_asistencia(ficha_id, fecha, registros, corte_id=corte_id)
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception(
+                'Error al guardar asistencia delegada para ficha %s', ficha_id
+            )
+            flash('No fue posible guardar el llamado a lista. Inténtalo de nuevo.', 'error')
+        else:
+            try:
+                ajustar_turno_por_asistencia(ficha_id, fecha)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception(
+                    'Falló el ajuste de aseo tras asistencia delegada para ficha %s', ficha_id
+                )
+            try:
+                actualizar_alertas_ficha(ficha_id)
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception(
+                    'Falló la actualización de alertas tras asistencia delegada para ficha %s',
+                    ficha_id,
+                )
+            try:
+                actualizar_participacion_ficha(ficha_id)
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception(
+                    'Falló la actualización del ranking tras asistencia delegada para ficha %s',
+                    ficha_id,
+                )
+            flash('Llamado a lista guardado correctamente.', 'success')
+        return redirect(url_for(
+            'aprendiz.asistencia_admin', ficha_id=ficha_id, fecha=fecha.isoformat()
+        ))
+
+    sesion = SesionAsistencia.query.filter_by(
+        ficha_id=ficha_id, fecha=fecha, corte_id=None
+    ).first()
+    registros_map = {registro.aprendiz_id: registro for registro in sesion.registros} if sesion else {}
+    return render_template(
+        'aprendiz/asistencia.html',
+        ficha=ficha,
+        actor=actor,
+        aprendices=aprendices,
+        registros_map=registros_map,
+        fecha_actual=fecha.isoformat(),
+        estados_asistencia=ESTADOS_ASISTENCIA,
+        causales_justificadas=CAUSALES_JUSTIFICADAS,
+    )
 
 
 @aprendiz_bp.route('/<int:ficha_id>/descargar-reporte')
@@ -842,11 +1033,15 @@ def subir_evidencia(ficha_id, tarea_id):
             flash(str(exc), 'error')
             return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
+    justificacion_retraso = request.form.get('justificacion_retraso', '').strip() or None
+
     if entrega_existente:
         if archivo_url:
             entrega_existente.archivo_url = archivo_url
         if 'enlace_repositorio' in request.form:
             entrega_existente.enlace_repositorio = enlace_repo or None
+        if justificacion_retraso:
+            entrega_existente.justificacion_retraso = justificacion_retraso
         entrega_existente.fecha_entrega = datetime.utcnow()
         entrega_existente.calificada = False
         entrega_existente.estado_revision = 'pendiente'
@@ -857,6 +1052,7 @@ def subir_evidencia(ficha_id, tarea_id):
             aprendiz_id=aprendiz.id,
             archivo_url=archivo_url,
             enlace_repositorio=enlace_repo or None,
+            justificacion_retraso=justificacion_retraso,
         )
         db.session.add(entrega)
 
@@ -879,6 +1075,8 @@ def subir_evidencia(ficha_id, tarea_id):
         if archivo_url:
             entrega_existente.archivo_url = archivo_url
         entrega_existente.enlace_repositorio = enlace_repo or None
+        if justificacion_retraso:
+            entrega_existente.justificacion_retraso = justificacion_retraso
         entrega_existente.fecha_entrega = datetime.utcnow()
         entrega_existente.calificada = False
         entrega_existente.estado_revision = 'pendiente'
@@ -912,7 +1110,10 @@ def subir_evidencia(ficha_id, tarea_id):
             'La evidencia de la tarea %s quedó guardada, pero falló la actualización del ranking.',
             tarea_id,
         )
-    flash('Evidencia guardada correctamente. El sistema actualizará sus indicadores en segundo plano.', 'success')
+    if tarea.fecha_limite and datetime.utcnow() > tarea.fecha_limite:
+        flash('Evidencia extemporánea guardada correctamente. Tu justificación ha sido registrada para valoración del instructor.', 'info')
+    else:
+        flash('Evidencia guardada correctamente. El sistema actualizará sus indicadores en segundo plano.', 'success')
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
 

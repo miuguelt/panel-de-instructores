@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Configuración de aprendices - {{ ficha.codigo }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn-back">&larr; Aprendices</a>
+        <div>
+            <span class="eyebrow">{{ ficha.codigo }}</span>
+            <h1>Configuración de aprendices</h1>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <h2>Delegar herramientas operativas</h2>
+    <p class="text-muted">
+        Elige un aprendiz para que pueda generar y ajustar turnos de aseo,
+        marcarlos como cumplidos y realizar el llamado a lista de la ficha.
+        Este rol no crea una cuenta de instructor ni permite acceder a juicios,
+        archivos o configuraciones generales.
+    </p>
+    <div class="alert alert-warning">
+        Solo puede existir un aprendiz administrador por ficha. Al activar uno,
+        cualquier asignación anterior se retira automáticamente.
+    </div>
+
+    <form method="POST" action="{{ url_for('instructor.actualizar_rol_administrativo', ficha_id=ficha.id, aprendiz_id=0) }}" id="rol-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label for="aprendiz-rol">Aprendiz administrador</label>
+            <select id="aprendiz-rol" class="form-control" required>
+                <option value="">Selecciona un aprendiz</option>
+                {% for aprendiz in aprendices_administrables %}
+                <option value="{{ aprendiz.id }}" {% if aprendiz.rol_administrativo %}selected{% endif %}>
+                    {{ aprendiz.nombre_completo }} — {{ aprendiz.estado|etiqueta_estado }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar aprendiz administrador</button>
+    </form>
+
+    {% if administrador %}
+    <form method="POST" action="{{ url_for('instructor.actualizar_rol_administrativo', ficha_id=ficha.id, aprendiz_id=administrador.id) }}" style="margin-top: 1rem;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="accion" value="desactivar">
+        <button type="submit" class="btn btn-outline">Retirar el rol de {{ administrador.nombre_completo }}</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <h2>Permisos incluidos</h2>
+    <ul>
+        <li>Generar turnos nuevos en un rango de fechas.</li>
+        <li>Cambiar la pareja asignada a un día y dejar observación.</li>
+        <li>Marcar los turnos de aseo como cumplidos.</li>
+        <li>Registrar y corregir el llamado a lista de todos los aprendices habilitados.</li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const select = document.getElementById('aprendiz-rol');
+    const form = document.getElementById('rol-form');
+    if (!select || !form) return;
+    form.addEventListener('submit', function (event) {
+        if (!select.value) {
+            event.preventDefault();
+            select.focus();
+            return;
+        }
+        form.action = form.action.replace(/\/0\/rol-administrativo$/, '/' + select.value + '/rol-administrativo');
+    });
+}());
+</script>
+{% endblock %}

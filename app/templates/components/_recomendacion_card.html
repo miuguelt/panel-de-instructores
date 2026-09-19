@@ -1,0 +1,60 @@
+{# Componente unificado para renderizar recomendaciones pedagógicas y operativas #}
+
+{% macro render_banner_recomendacion(rec) %}
+{% if rec %}
+<div class="strategic-alert-banner strategic-alert-banner--{{ rec.severidad }}" id="rec-{{ rec.id }}">
+    <span class="strategic-alert-icon" aria-hidden="true">{{ rec.icono }}</span>
+    <div class="strategic-alert-body">
+        <div class="strategic-alert-header">
+            <strong>{{ rec.titulo }}</strong>
+            {% if rec.metrica_destacada %}
+            <span class="rec-chip-metric rec-chip--{{ rec.severidad }}">{{ rec.metrica_destacada }}</span>
+            {% endif %}
+        </div>
+        <p>{{ rec.mensaje }}</p>
+        {% if rec.accion_texto and rec.accion_url %}
+        <div class="strategic-alert-actions">
+            <a href="{{ rec.accion_url }}" class="rec-action-link rec-action-link--{{ rec.severidad }}">
+                {{ rec.accion_texto }} &rarr;
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro render_card_recomendacion(rec) %}
+{% if rec %}
+<article class="recommendation-card recommendation-card--{{ rec.severidad }}" id="rec-card-{{ rec.id }}">
+    <div class="recommendation-card-icon" aria-hidden="true">{{ rec.icono }}</div>
+    <div class="recommendation-card-content">
+        <div class="recommendation-card-top">
+            <span class="recommendation-badge recommendation-badge--{{ rec.severidad }}">
+                {% if rec.severidad == 'critica' %}
+                🔴 Atención Inmediata
+                {% elif rec.severidad == 'preventiva' %}
+                🟡 Preventiva
+                {% elif rec.severidad == 'positiva' %}
+                🟢 Logro / Ritmo Óptimo
+                {% else %}
+                🔵 Sugerencia Pedagógica
+                {% endif %}
+            </span>
+            {% if rec.metrica_destacada %}
+            <span class="recommendation-metric">{{ rec.metrica_destacada }}</span>
+            {% endif %}
+        </div>
+        <h4 class="recommendation-card-title">{{ rec.titulo }}</h4>
+        <p class="recommendation-card-text">{{ rec.mensaje }}</p>
+        {% if rec.accion_texto and rec.accion_url %}
+        <div class="recommendation-card-footer">
+            <a href="{{ rec.accion_url }}" class="btn btn-sm btn-recommendation btn-recommendation--{{ rec.severidad }}">
+                {{ rec.accion_texto }} &rarr;
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</article>
+{% endif %}
+{% endmacro %}

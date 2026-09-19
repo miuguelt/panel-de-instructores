@@ -2,6 +2,11 @@ services:
   app:
     build: .
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     environment:
       # Las variables sensibles se pasan por nombre, sin interpolarlas en
       # Compose. Así los caracteres '$', '@', ':' y '/' de las credenciales
@@ -51,6 +56,11 @@ services:
   worker:
     build: .
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     environment:
       - PROCESS_TYPE=worker
       - RUN_MIGRATIONS=false

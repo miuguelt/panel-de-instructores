@@ -1,0 +1,10 @@
+{% macro barra(etiqueta, porcentaje, tono='aprobados') %}
+<div class="tyt-meter tyt-meter--{{ tono }}">
+    <div class="tyt-meter-heading"><span>{{ etiqueta }}</span><strong>{{ ('%.1f'|format(porcentaje)).replace('.', ',') }}<small>%</small></strong></div>
+    <div class="tyt-track" role="progressbar" aria-label="{{ etiqueta }}; meta 70 %" aria-valuenow="{{ porcentaje }}" aria-valuemin="0" aria-valuemax="100">
+        <span class="tyt-fill" style="--tyt-value: {{ porcentaje }}%"></span>
+        <span class="tyt-target" aria-hidden="true"></span>
+    </div>
+    <div class="tyt-scale" aria-hidden="true"><span>0%</span><strong>Meta 70%</strong><span>100%</span></div>
+</div>
+{% endmacro %}

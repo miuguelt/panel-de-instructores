@@ -15,6 +15,7 @@ from werkzeug.datastructures import FileStorage
 from app.models import ArchivoFichaVersion, ImportacionJob, Ficha
 from app.services.alertas import actualizar_alertas_ficha
 from app.services.importacion_ficha import importar_archivo
+from app.services.permisos import configurar_rol_aprendiz
 from app.services.ranking import actualizar_participacion_ficha
 from app.services.archivos import resolver_archivo_subido
 from app import db
@@ -107,6 +108,10 @@ def _procesar(job_id):
             with open(job.archivo_path, 'rb') as stream:
                 archivo = FileStorage(stream=stream, filename=job.nombre_archivo)
                 resultado = importar_archivo(archivo, ficha, job.instructor_id)
+            if job.aprendiz_administrativo_id:
+                configurar_rol_aprendiz(
+                    ficha.id, job.aprendiz_administrativo_id, True
+                )
 
             # Este commit confirma los datos académicos antes de recalcular
             # módulos secundarios. Si estos fallan, la importación permanece.
@@ -155,7 +160,17 @@ def main():
         os.getpid(), _redis_destino(), queue_name,
         WORKER_BLPOP_TIMEOUT, WORKER_SOCKET_TIMEOUT,
     )
+    ultima_revision_tyt = -300
     while True:
+        if time.monotonic() - ultima_revision_tyt >= 300:
+            from app.tyt.revision import revisar_hitos
+            with app.app_context():
+                try:
+                    revisar_hitos()
+                except Exception:
+                    db.session.rollback()
+                    log.exception('No se pudo ejecutar la revisión periódica TyT.')
+            ultima_revision_tyt = time.monotonic()
         try:
             _nombre, job_id = (
                 redis_client.blpop(queue_name, timeout=WORKER_BLPOP_TIMEOUT)

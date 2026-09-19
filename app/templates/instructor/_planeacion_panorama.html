@@ -138,6 +138,74 @@
     {% endif %}
 </div>
 
+{# Control explícito de fase: tiempo esperado frente a RAP evaluados. #}
+{% if seguimiento_fases %}
+{% set fase_esperada = seguimiento_fases.fase_esperada %}
+{% set fase_real = seguimiento_fases.fase_real %}
+{% set resultado_tono = 'danger' if seguimiento_fases.estado == 'atrasado' else ('success' if seguimiento_fases.estado in ('al_dia', 'adelantado', 'completado') else 'info') %}
+<section class="pl-card pl-phase-control pl-tone-{{ resultado_tono }}" id="seccion-seguimiento-fases">
+    <div class="pl-card-head">
+        <h2>¿En qué fase debería ir el proyecto formativo?</h2>
+        <p>El sistema cruza la ventana temporal de la Planeación Pedagógica GFPI-F-134 con los resultados de aprendizaje que ya tienen juicio en el reporte cargado.</p>
+    </div>
+
+    <div class="pl-phase-answer pl-tone-{{ resultado_tono }}">
+        <div class="pl-phase-answer-icon" aria-hidden="true">{{ '⏰' if seguimiento_fases.estado == 'atrasado' else ('✅' if seguimiento_fases.estado in ('al_dia', 'completado') else '🚀') }}</div>
+        <div>
+            <strong>
+                {% if seguimiento_fases.estado == 'completado' %}
+                Todos los resultados de aprendizaje están cerrados.
+                {% elif fase_esperada and fase_real and fase_real.nombre != fase_esperada.nombre %}
+                Debería estar en {{ fase_esperada.nombre }}; la fase real está en {{ fase_real.nombre }}.
+                {% elif fase_esperada %}
+                La fase esperada y la fase real son {{ fase_esperada.nombre }}.
+                {% else %}
+                No hay una fase calculable con los documentos disponibles.
+                {% endif %}
+            </strong>
+            <p>
+                A la fecha {{ seguimiento_fases.hoy.strftime('%d/%m/%Y') }}, se han evaluado
+                <strong>{{ seguimiento_fases.resultados.evaluados }} de {{ seguimiento_fases.resultados.total }} RAPs</strong>;
+                por calendario deberían estar evaluados aproximadamente
+                <strong>{{ seguimiento_fases.resultados.esperados }}</strong>.
+                {% if seguimiento_fases.resultados.brecha < 0 %}
+                Faltan {{ -seguimiento_fases.resultados.brecha }} RAPs frente al ritmo esperado.
+                {% elif seguimiento_fases.resultados.brecha > 0 %}
+                Hay {{ seguimiento_fases.resultados.brecha }} RAPs evaluados por encima del ritmo esperado.
+                {% else %}
+                El conteo de RAPs evaluados coincide con el ritmo esperado.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="pl-phase-control-kpis">
+        <div><span>RAPs evaluados</span><strong>{{ seguimiento_fases.resultados.evaluados }}/{{ seguimiento_fases.resultados.total }}</strong><small>{{ seguimiento_fases.resultados.porcentaje_evaluados }}% con juicio registrado</small></div>
+        <div><span>RAPs cerrados</span><strong>{{ seguimiento_fases.resultados.aprobados }}/{{ seguimiento_fases.resultados.total }}</strong><small>Umbral de cierre: 80% de aprendices vigentes</small></div>
+        <div><span>RAPs esperados al corte</span><strong>{{ seguimiento_fases.resultados.esperados }}</strong><small>{{ seguimiento_fases.resultados.esperados_decimal }} RAPs según tiempo transcurrido</small></div>
+        <div><span>Proyección de todos los RAPs</span><strong>{{ seguimiento_fases.proyeccion.fecha_cierre.strftime('%d/%m/%Y') if seguimiento_fases.proyeccion.fecha_cierre else 'Sin datos' }}</strong><small>{% if seguimiento_fases.proyeccion.estado == 'en_riesgo' %}No alcanzaría la fecha fin del programa{% elif seguimiento_fases.proyeccion.estado == 'viable' %}Fecha dentro del plazo del programa{% elif seguimiento_fases.proyeccion.estado == 'completado' %}Ya no hay RAPs pendientes{% else %}Se requieren más evaluaciones fechadas{% endif %}</small></div>
+    </div>
+
+    <div class="pl-phase-track" aria-label="Fases del proyecto formativo">
+        {% for fase in seguimiento_fases.fases if fase.orden < 4 %}
+        {% set es_esperada = fase_esperada and fase.nombre == fase_esperada.nombre %}
+        {% set es_real = fase_real and fase.nombre == fase_real.nombre %}
+        {% set tono_fase = 'danger' if fase.estado_ritmo == 'atrasado' else ('success' if fase.estado_ritmo in ('al_dia', 'adelantado') else ('neutral' if fase.estado_ritmo == 'futura' else 'info')) %}
+        <article class="pl-phase-track-item pl-tone-{{ tono_fase }} {{ 'is-expected' if es_esperada else '' }} {{ 'is-real' if es_real else '' }}">
+            <div class="pl-phase-track-head">
+                <span class="pl-phase-track-icon">{{ fase.icono }}</span>
+                <div><strong>{{ fase.nombre }}</strong><small>{% if es_esperada %}Debería estar aquí{% elif es_real %}Fase real{% elif fase.estado_tiempo == 'cumplida' %}Cerrada{% elif fase.estado_tiempo == 'futura' %}Futura{% else %}En seguimiento{% endif %}</small></div>
+            </div>
+            <div class="pl-phase-track-count"><strong>{{ fase.resultados_evaluados }}/{{ fase.resultados_total }}</strong> evaluados</div>
+            <div class="pl-progress-wrap"><div class="pl-progress-bar" style="width: {{ fase.porcentaje_evaluados }}%;"></div></div>
+            <small class="pl-phase-track-note">{{ fase.resultados_aprobados }} cerrados · {{ fase.resultados_esperados }} esperados · {% if fase.brecha_resultados < 0 %}{{ -fase.brecha_resultados }} pendientes de ritmo{% elif fase.brecha_resultados > 0 %}+{{ fase.brecha_resultados }} adelantados{% else %}al ritmo{% endif %}</small>
+        </article>
+        {% endfor %}
+    </div>
+    <p class="pl-note pl-phase-method"><strong>Cómo se calcula:</strong> un RAP cuenta como evaluado cuando el reporte registra un juicio emitido; las filas “POR EVALUAR” no cuentan. Cuenta como cerrado cuando llega al 80% de aprendices vigentes. El RAP esperado avanza proporcionalmente entre su inicio y fin planeados. La proyección usa los RAP evaluados con fecha en los últimos 180 días y se compara con el fin de la ficha.</p>
+</section>
+{% endif %}
+
 {# 1. Curva S de Avance con Pronóstico y Abanico de Incertidumbre #}
 {% if proyeccion.curva and curva_svg %}
 <section class="pl-card" id="seccion-curva-s">

@@ -1,3 +1,4 @@
+import socket
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
@@ -51,6 +52,7 @@ from app.services.importacion_ficha import (
     validar_reporte_ficha,
 )
 from app.services.permisos import (
+    configurar_rol_aprendiz,
     puede_gestionar_ficha,
     puede_gestionar_corte,
     puede_gestionar_tarea,
@@ -68,14 +70,20 @@ from app.services.archivos import (
     resolver_archivo_subido,
 )
 from app.services.cronograma import obtener_cronograma
+from app.services.fases_dashboard import obtener_seguimiento_fases_dashboard
 from app.services.tareas import (
     DatosTareaInvalidos,
     agrupar_tareas_por_corte_e_instructor,
+    conceder_prorroga_tarea,
     eliminar_tarea_con_archivos,
     guardar_material_apoyo,
     leer_datos_tarea,
+    obtener_planes_de_tarea,
+    obtener_prorrogas_tarea,
     obtener_tarea_gestionable,
+    revocar_prorroga_tarea,
 )
+from app.models.observador import NotaObservador, TIPO_NEGATIVA
 from app.models.ficha_instructor import FichaInstructor
 from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor, FichaCompetenciaSeleccionada
 from app.models.material import MaterialFicha
@@ -95,6 +103,19 @@ instructor_bp = Blueprint('instructor', __name__, template_folder='../templates/
 
 ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
 MAX_LONGITUD_CALIFICACION = 10
+
+
+def _obtener_ip_local():
+    """Obtiene la dirección IP de red local para facilitar el escaneo QR desde dispositivos móviles en el aula."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.1)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return '127.0.0.1'
 
 
 def _validar_calificacion(valor, obligatoria=False):
@@ -230,9 +251,15 @@ def obtener_fichas():
     ).distinct().order_by(Ficha.codigo).all()
 
 
+from app.services.resumen_ficha import obtener_resumen_ficha_360
+
+
 @instructor_bp.route('/')
 @login_required
 def dashboard():
+    ficha_id = request.args.get('ficha_id', type=int)
+    if ficha_id:
+        return redirect(url_for('instructor.vision_general', ficha_id=ficha_id))
     try:
         return _dashboard_inner()
     except Exception:
@@ -240,7 +267,9 @@ def dashboard():
         current_app.logger.exception('Error cargando el dashboard del instructor.')
         flash('Hubo un problema al cargar el panel. Intenta de nuevo.', 'error')
         return render_template('dashboard.html', fichas=[], cronogramas={},
-                               estadisticas_fichas={}, estadisticas_extra={})
+                               estadisticas_fichas={}, estadisticas_extra={},
+                               fases_fichas={}, tyt_fichas={},
+                               recomendaciones_fichas={})
 
 
 def _dashboard_inner():
@@ -470,9 +499,44 @@ def _dashboard_inner():
 
     fichas.sort(key=lambda f: get_order(cronogramas[f.id]['fase']))
 
+    fases_fichas = {
+        ficha.id: obtener_seguimiento_fases_dashboard(ficha, cronogramas[ficha.id], hoy=now.date())
+        for ficha in fichas
+    }
+
+    from app.services.recomendaciones import obtener_recomendaciones_ficha
+
+    recomendaciones_fichas = {}
+    for ficha in fichas:
+        fid = ficha.id
+        extra = estadisticas_extra.get(fid, {})
+        ctx_recom = {
+            'fases_data': fases_fichas.get(fid, {}),
+            'cronograma': cronogramas.get(fid, {}),
+            'extra': {'top_competencias': extra.get('top_competencias', [])},
+        }
+        recoms = obtener_recomendaciones_ficha(
+            fid,
+            instructor_id=current_user.id if getattr(current_user, 'is_authenticated', False) else None,
+            ahora=now,
+            contexto_precalculado=ctx_recom,
+        )
+        recomendaciones_fichas[fid] = recoms
+
+    tyt_fichas = {}
+    try:
+        from app.tyt.vistas import progreso_tyt
+        for f in fichas:
+            tyt_fichas[f.id] = progreso_tyt(f)
+    except Exception:
+        current_app.logger.exception('No se pudo precargar seguimiento TyT en dashboard.')
+
     return render_template('dashboard.html', fichas=fichas, cronogramas=cronogramas,
                            estadisticas_fichas=estadisticas_fichas,
-                           estadisticas_extra=estadisticas_extra)
+                           estadisticas_extra=estadisticas_extra,
+                           fases_fichas=fases_fichas,
+                           tyt_fichas=tyt_fichas,
+                           recomendaciones_fichas=recomendaciones_fichas)
 
 
 @instructor_bp.route('/fichas', methods=['GET', 'POST'])
@@ -630,6 +694,34 @@ def importar_reporte_ficha():
     return redirect(url_for('instructor.fichas'))
 
 
+@instructor_bp.route('/fichas/<int:ficha_id>')
+@instructor_bp.route('/fichas/<int:ficha_id>/resumen')
+@login_required
+def vision_general(ficha_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not ficha or not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada o sin permisos de acceso.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    corte_id = request.args.get('corte_id', type=int)
+    corte_sel = corte_visible(ficha.id, corte_id) if corte_id else corte_actual(ficha.id)
+
+    resumen = obtener_resumen_ficha_360(
+        ficha,
+        instructor_id=current_user.id,
+        corte_id=corte_sel.id if corte_sel else None,
+    )
+    cortes = cortes_visibles(ficha.id)
+
+    return render_template(
+        'vision_general.html',
+        ficha=ficha,
+        resumen=resumen,
+        cortes=cortes,
+        corte_actual=corte_sel,
+    )
+
+
 @instructor_bp.route('/fichas/<int:ficha_id>/aprendices')
 @login_required
 def aprendices(ficha_id):
@@ -662,30 +754,141 @@ def aprendices(ficha_id):
     lista_aprendices = consulta.order_by(Aprendiz.apellidos, Aprendiz.nombre).all()
     aprendiz_ids = [a.id for a in lista_aprendices]
 
-    # Estadísticas de juicios por aprendiz
+    # Estadísticas de juicios por aprendiz y acumulados globales
     stats_map = {}
+    total_juicios_ficha = 0
+    total_aprobados_ficha = 0
+    al_dia_count = 0
+    en_proceso_count = 0
+    en_riesgo_count = 0
+
     if aprendiz_ids:
         juicios = JuicioEvaluativo.query.filter(
             JuicioEvaluativo.ficha_id == ficha_id,
             JuicioEvaluativo.aprendiz_id.in_(aprendiz_ids),
         ).all()
         from collections import defaultdict
-        tmp = defaultdict(lambda: {'total': 0, 'aprobados': 0})
+        tmp = defaultdict(lambda: {'total': 0, 'aprobados': 0, 'pct': 0})
         for j in juicios:
             tmp[j.aprendiz_id]['total'] += 1
             if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper():
                 tmp[j.aprendiz_id]['aprobados'] += 1
+
+        for a_id in aprendiz_ids:
+            s = tmp[a_id]
+            t = s['total']
+            ap = s['aprobados']
+            pct = round(ap / t * 100) if t > 0 else 0
+            s['pct'] = pct
+            total_juicios_ficha += t
+            total_aprobados_ficha += ap
+            if pct >= 80:
+                al_dia_count += 1
+            elif pct >= 50:
+                en_proceso_count += 1
+            else:
+                en_riesgo_count += 1
+
         stats_map = dict(tmp)
+
+    pct_global = (
+        round(total_aprobados_ficha / total_juicios_ficha * 100)
+        if total_juicios_ficha > 0
+        else 0
+    )
+
+    aprendices_administrables = (
+        Aprendiz.query_llamado_lista(ficha_id)
+        .order_by(Aprendiz.apellidos, Aprendiz.nombre)
+        .all()
+    )
+
+    ip_local = _obtener_ip_local()
+    puerto = request.host.split(':')[1] if ':' in request.host else ('443' if request.is_secure else '80')
+    scheme = request.scheme
+    url_red_local = f"{scheme}://{ip_local}:{puerto}/aprendiz/{ficha.id}" if ip_local and ip_local != '127.0.0.1' else None
 
     return render_template(
         'aprendices.html',
         ficha=ficha,
         aprendices=lista_aprendices,
+        aprendices_administrables=aprendices_administrables,
         juicios_stats=stats_map,
         estados_disponibles=estados_disponibles,
         total_aprendices=total_aprendices,
         estado_seleccionado=estado_seleccionado,
+        pct_global=pct_global,
+        total_juicios_ficha=total_juicios_ficha,
+        total_aprobados_ficha=total_aprobados_ficha,
+        al_dia_count=al_dia_count,
+        en_proceso_count=en_proceso_count,
+        en_riesgo_count=en_riesgo_count,
+        ip_local=ip_local,
+        url_red_local=url_red_local,
     )
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/aprendices/configuracion')
+@login_required
+def configuracion_aprendices(ficha_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    aprendices_administrables = (
+        Aprendiz.query_llamado_lista(ficha_id)
+        .order_by(Aprendiz.apellidos, Aprendiz.nombre)
+        .all()
+    )
+    administrador = Aprendiz.query.filter_by(
+        ficha_id=ficha_id, rol_administrativo=True
+    ).first()
+
+    return render_template(
+        'aprendices_configuracion.html',
+        ficha=ficha,
+        aprendices_administrables=aprendices_administrables,
+        administrador=administrador,
+    )
+
+
+@instructor_bp.route(
+    '/fichas/<int:ficha_id>/aprendices/<int:aprendiz_id>/rol-administrativo',
+    methods=['POST'],
+)
+@login_required
+def actualizar_rol_administrativo(ficha_id, aprendiz_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    accion = (request.form.get('accion') or 'activar').strip().lower()
+    habilitar = accion != 'desactivar'
+
+    try:
+        aprendiz = configurar_rol_aprendiz(ficha_id, aprendiz_id, habilitar=habilitar)
+        db.session.commit()
+        if habilitar:
+            flash(
+                f'{aprendiz.nombre_completo} ahora tiene el rol administrativo de la ficha.',
+                'success',
+            )
+        else:
+            flash(
+                f'Se retiró el rol administrativo a {aprendiz.nombre_completo}.',
+                'info',
+            )
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'error')
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Error al actualizar rol administrativo del aprendiz')
+        flash('Ocurrió un error al actualizar el rol administrativo.', 'error')
+
+    return redirect(url_for('instructor.configuracion_aprendices', ficha_id=ficha_id))
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/aprendices/<int:aprendiz_id>/historial')
@@ -1048,6 +1251,7 @@ def cargar_excel(ficha_id):
     version = None
     version_path = None
     volver_planeacion = request.form.get('retorno') == 'planeacion'
+    aprendiz_admin_id = request.form.get('aprendiz_administrativo_id', type=int)
     try:
         metadata_reporte = leer_metadata_archivo(archivo)
         validar_reporte_ficha(ficha, metadata_reporte)
@@ -1077,6 +1281,7 @@ def cargar_excel(ficha_id):
                 archivo_path=ruta,
                 nombre_archivo=nombre_archivo,
                 estado='encolado',
+                aprendiz_administrativo_id=aprendiz_admin_id,
             )
             db.session.add(job)
             db.session.commit()
@@ -1115,6 +1320,11 @@ def cargar_excel(ficha_id):
         else:
             resultado = importar_archivo(archivo, ficha, current_user.id)
             ficha = resultado['ficha']
+            if aprendiz_admin_id:
+                try:
+                    configurar_rol_aprendiz(ficha.id, aprendiz_admin_id, True)
+                except ValueError as err:
+                    flash(f'No se pudo asignar el rol administrativo: {err}', 'warning')
             actualizar_estado(version, 'procesado', detalle=_resumen_importacion(resultado))
             db.session.commit()
             actualizar_alertas_ficha(ficha.id)
@@ -1263,11 +1473,8 @@ def asistencia(ficha_id):
             tareas_secundarias_fallidas = []
 
             try:
-                # Los turnos de aseo pertenecen al histórico general de la
-                # ficha; un corte nuevo no debe modificar ni reutilizar ese
-                # calendario secundario.
-                if corte_id is None:
-                    turno_aseo = ajustar_turno_por_asistencia(ficha_id, fecha)
+                # Ajusta el turno de aseo de la fecha (reemplaza ausentes y recalcula)
+                turno_aseo = ajustar_turno_por_asistencia(ficha_id, fecha)
                 db.session.commit()
             except Exception:
                 db.session.rollback()
@@ -1596,6 +1803,10 @@ def tareas(ficha_id):
 
     cortes_editables = [c for c in cortes_lista if puede_gestionar_corte(c)] if modo_todos else []
 
+    from app.services.recomendaciones import obtener_recomendaciones_ficha, CAT_TAREAS
+    recoms = obtener_recomendaciones_ficha(ficha_id, instructor_id=current_user.id)
+    recomendaciones_tareas = [r for r in recoms if r.categoria == CAT_TAREAS]
+
     return render_template(
         'tareas.html',
         ficha=ficha,
@@ -1609,6 +1820,7 @@ def tareas(ficha_id):
         puede_editar_corte=(corte is None or puede_gestionar_corte(corte)),
         filtro_instructor=filtro_instructor,
         instructores_ficha=instructores_ficha,
+        recomendaciones_tareas=recomendaciones_tareas,
     )
 
 
@@ -1830,11 +2042,98 @@ def ver_entregas(tarea_id):
     for ot in otorgamientos:
         insignias_map[ot.aprendiz_id].append(ot.insignia)
 
+    prorrogas_map = obtener_prorrogas_tarea(tarea.id)
+    planes_map = obtener_planes_de_tarea(tarea.id)
+
     return render_template('entregas.html', tarea=tarea, ficha=ficha,
                            aprendices=aprendices, entregas_map=entregas_map,
                            insignias_map=insignias_map,
+                           prorrogas_map=prorrogas_map,
+                           planes_map=planes_map,
                            corte_actual=tarea.corte,
                            puede_editar_tarea=puede_gestionar_tarea(tarea))
+
+
+@instructor_bp.route('/tareas/<int:tarea_id>/aprendices/<int:aprendiz_id>/prorroga', methods=['POST'])
+@login_required
+def gestionar_prorroga_tarea(tarea_id, aprendiz_id):
+    tarea = db.session.get(Tarea, tarea_id)
+    aprendiz = db.session.get(Aprendiz, aprendiz_id)
+    if not tarea or not aprendiz or aprendiz.ficha_id != tarea.ficha_id:
+        flash('Tarea o aprendiz no válidos.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    ficha = tarea.ficha
+    if not puede_gestionar_ficha(ficha) or not puede_gestionar_tarea(tarea):
+        flash('No tienes permiso para gestionar prórrogas en esta tarea.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea_id))
+
+    accion = request.form.get('accion', 'guardar')
+    if accion == 'revocar':
+        revocar_prorroga_tarea(tarea.id, aprendiz.id)
+        flash(f'Prórroga revocada para {aprendiz.nombre_completo}.', 'info')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea_id))
+
+    nueva_fecha_str = request.form.get('nueva_fecha_limite', '').strip()
+    motivo = request.form.get('motivo', '').strip() or None
+    if not nueva_fecha_str:
+        flash('Debes indicar una nueva fecha límite para la prórroga.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea_id))
+
+    try:
+        if 'T' in nueva_fecha_str:
+            nueva_fecha = datetime.strptime(nueva_fecha_str, '%Y-%m-%dT%H:%M')
+        else:
+            nueva_fecha = datetime.strptime(nueva_fecha_str, '%Y-%m-%d')
+    except ValueError:
+        flash('Formato de fecha inválido para la prórroga.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea_id))
+
+    conceder_prorroga_tarea(
+        tarea_id=tarea.id,
+        aprendiz_id=aprendiz.id,
+        instructor_id=current_user.id,
+        nueva_fecha_limite=nueva_fecha,
+        motivo=motivo,
+    )
+    flash(f'Prórroga concedida a {aprendiz.nombre_completo} hasta el {nueva_fecha.strftime("%d/%m/%Y %H:%M")}.', 'success')
+    return redirect(url_for('instructor.ver_entregas', tarea_id=tarea_id))
+
+
+@instructor_bp.route('/tareas/<int:tarea_id>/aprendices/<int:aprendiz_id>/anotar-observador', methods=['POST'])
+@login_required
+def anotar_observador_tarea(tarea_id, aprendiz_id):
+    tarea = db.session.get(Tarea, tarea_id)
+    aprendiz = db.session.get(Aprendiz, aprendiz_id)
+    if not tarea or not aprendiz or aprendiz.ficha_id != tarea.ficha_id:
+        flash('Tarea o aprendiz no válidos.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    ficha = tarea.ficha
+    if not puede_gestionar_ficha(ficha) or not puede_gestionar_tarea(tarea):
+        flash('No tienes permiso para registrar llamados de atención en esta ficha.', 'error')
+        return redirect(url_for('instructor.ver_entregas', tarea_id=tarea_id))
+
+    descripcion = request.form.get('descripcion', '').strip()
+    if not descripcion:
+        descripcion = f'Incumplimiento en la entrega oportuna de la evidencia "{tarea.titulo}". No se registra entrega ni justificación en la fecha límite acordada.'
+
+    categoria = request.form.get('categoria', 'compromiso')
+    nota = NotaObservador(
+        ficha_id=ficha.id,
+        aprendiz_id=aprendiz.id,
+        instructor_id=current_user.id,
+        tipo=TIPO_NEGATIVA,
+        categoria=categoria,
+        descripcion=descripcion,
+        fecha=date.today(),
+        creada_en=datetime.utcnow(),
+    )
+    db.session.add(nota)
+    db.session.commit()
+    actualizar_alertas_ficha(ficha.id)
+    flash(f'Se registró un llamado de atención en el Observador de {aprendiz.nombre_completo} por incumplimiento de evidencia.', 'warning')
+    return redirect(url_for('instructor.ver_entregas', tarea_id=tarea_id))
 
 
 @instructor_bp.route('/entregas/<int:entrega_id>/archivo')
@@ -2718,6 +3017,10 @@ def juicios(ficha_id):
 
     instructores_ordenados = sorted(instructores_resumen.items(), key=lambda x: x[1]['total'], reverse=True)
 
+    from app.services.recomendaciones import obtener_recomendaciones_ficha, CAT_FASES, CAT_JUICIOS
+    recoms = obtener_recomendaciones_ficha(ficha_id, instructor_id=current_user.id)
+    recomendaciones_juicios = [r for r in recoms if r.categoria in (CAT_FASES, CAT_JUICIOS)]
+
     return render_template('juicios.html', ficha=ficha, estadisticas=estadisticas, 
                            aprendices_stats=aprendices_stats, cronograma=obtener_cronograma(ficha),
                            pct_global_juicios=pct_global_juicios,
@@ -2725,7 +3028,8 @@ def juicios(ficha_id):
                            instructores_resumen=instructores_ordenados,
                            rango_aprobacion=rango_aprobacion,
                            primera_evaluacion=primera_evaluacion,
-                           ultima_evaluacion=ultima_evaluacion)
+                           ultima_evaluacion=ultima_evaluacion,
+                           recomendaciones_juicios=recomendaciones_juicios)
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/competencias/toggle', methods=['POST'])

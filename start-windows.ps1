@@ -48,7 +48,12 @@ Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
 # Inyectar credenciales desde WCM (requiere PowerShell 7+)
 if ($PSVersionTable.PSVersion.Major -ge 7) {
     $wcmInjector = "$PSScriptRoot\..\..\_infrastructure\devbraind\scripts\Import-ProjectCredentials.ps1"
-    if (Test-Path $wcmInjector) { . $wcmInjector -Project adso }
+    if (Test-Path $wcmInjector) {
+        try {
+            . $wcmInjector
+            Import-ProjectCredentials -Project adso
+        } catch {}
+    }
 } else {
     Write-Verbose "[WARN] PowerShell 7+ requerido para importar credenciales WCM. Usando vars .env por defecto."
 }

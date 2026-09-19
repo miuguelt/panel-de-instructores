@@ -42,11 +42,22 @@
             {% for semana in semanas %}
                 {% for dia in semana %}
                 {% set turno = turnos_por_fecha.get(dia) %}
-                <article class="calendar-day {% if dia.month != mes.month %}outside{% endif %} {% if dia == hoy %}today{% endif %} {% if dia in sesiones_mes %}has-session{% endif %}">
+                {% set festivo_nombre = festivos_mes.get(dia) if festivos_mes else none %}
+                <article class="calendar-day {% if dia.month != mes.month %}outside{% endif %} {% if dia == hoy %}today{% endif %} {% if dia in sesiones_mes %}has-session{% endif %} {% if festivo_nombre %}is-holiday{% endif %}">
                     <div class="calendar-day-number">
                         <span>{{ dia.day }}</span>
-                        {% if dia in sesiones_mes %}<span class="session-dot" title="Día de clase"></span>{% endif %}
+                        {% if festivo_nombre %}
+                        <span class="holiday-dot" title="Festivo: {{ festivo_nombre }}"></span>
+                        {% elif dia in sesiones_mes %}
+                        <span class="session-dot" title="Día de clase"></span>
+                        {% endif %}
                     </div>
+                    {% if festivo_nombre %}
+                    <div class="calendar-holiday" title="{{ festivo_nombre }}">
+                        <span class="badge badge-festivo">🇨🇴 Festivo</span>
+                        <strong>{{ festivo_nombre }}</strong>
+                    </div>
+                    {% endif %}
                     {% if turno %}
                     <div class="calendar-assignment state-{{ turno.estado }}">
                         <span class="badge badge-{{ 'success' if turno.estado == 'cumplido' else 'warning' }}">{{ turno.estado }}</span>
@@ -68,7 +79,7 @@
                         <small>{{ 'Automático' if turno.generado_por == 'sistema' else 'Ajuste manual' }}</small>
                         {% endif %}
                     </div>
-                    {% elif dia in sesiones_mes %}
+                    {% elif dia in sesiones_mes and not festivo_nombre %}
                     <span class="calendar-unassigned">Sin asignar</span>
                     {% endif %}
                 </article>
@@ -81,6 +92,7 @@
         <span><i class="legend-block programmed"></i> Programado</span>
         <span><i class="legend-block done"></i> Cumplido</span>
         <span><i class="legend-absent"></i> Ausente (no suma al contador)</span>
+        <span><i class="legend-block holiday"></i> Festivo</span>
     </div>
 </section>
 

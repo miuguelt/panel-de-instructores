@@ -3,17 +3,23 @@ from datetime import date, datetime, timedelta
 
 from app import create_app, db
 from app.models import (
+    Alerta,
     Aprendiz,
     ConfiguracionRanking,
+    Corte,
     Entrega,
     Ficha,
     Insignia,
     InsigniaOtorgada,
     Instructor,
+    JuicioEvaluativo,
+    NotaObservador,
+    ProrrogaTarea,
     PuntajeHistorico,
     RegistroAsistencia,
     SesionAsistencia,
     Tarea,
+    TurnoAseo,
 )
 from app.services.ranking import actualizar_participacion_ficha, calcular_ranking
 
@@ -155,6 +161,182 @@ class RankingTestCase(unittest.TestCase):
                 self.assertEqual(cliente.get(ruta, follow_redirects=True).status_code, 200)
 
         self.assertEqual(Insignia.query.filter_by(ficha_id=self.ficha.id).count(), 9)
+
+    def test_ranking_expone_estructura_mobile_first_accesible(self):
+        actualizar_participacion_ficha(self.ficha.id)
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['_user_id'] = str(self.instructor.id)
+            sesion['_fresh'] = True
+
+        respuesta = cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/ranking',
+            follow_redirects=True,
+        )
+        contenido = respuesta.get_data(as_text=True)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('css/ranking.css', contenido)
+        self.assertIn(
+            'class="ranking-overview-card ranking-overview-period"',
+            contenido,
+        )
+        self.assertIn('class="ranking-podium-grid" tabindex="0"', contenido)
+        self.assertIn('id="ranking-loading"', contenido)
+        self.assertIn('id="ranking-error"', contenido)
+        self.assertLess(
+            contenido.index('class="ranking-detail-heading"'),
+            contenido.index('class="ranking-mobile"'),
+        )
+        self.assertNotIn('style="max-width: 480px;"', contenido)
+
+    def test_prorroga_tarea_se_respeta_en_ranking(self):
+        # Tarea vencida ayer
+        tarea = Tarea(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            titulo='Actividad Especial',
+            fecha_limite=datetime.utcnow() - timedelta(days=1),
+        )
+        db.session.add(tarea)
+        db.session.flush()
+
+        # Ana recibe prórroga hasta mañana y entrega hoy
+        db.session.add(ProrrogaTarea(
+            tarea_id=tarea.id,
+            aprendiz_id=self.ana.id,
+            instructor_id=self.instructor.id,
+            nueva_fecha_limite=datetime.utcnow() + timedelta(days=1),
+        ))
+        db.session.add(Entrega(
+            tarea_id=tarea.id,
+            aprendiz_id=self.ana.id,
+            fecha_entrega=datetime.utcnow(),
+            estado_revision='aprobada',
+        ))
+        # Bruno entrega tarde sin prórroga
+        db.session.add(Entrega(
+            tarea_id=tarea.id,
+            aprendiz_id=self.bruno.id,
+            fecha_entrega=datetime.utcnow(),
+            estado_revision='aprobada',
+        ))
+        db.session.commit()
+
+        filas, _ = calcular_ranking(self.ficha.id)
+        por_id = {f['aprendiz'].id: f for f in filas}
+
+        # Ana entregó a tiempo gracias a su prórroga
+        self.assertEqual(por_id[self.ana.id]['entregadas_a_tiempo'], 1)
+        self.assertEqual(por_id[self.ana.id]['porcentaje_evidencias'], 100.0)
+        # Bruno entregó con retraso pero aprobada -> recibe crédito parcial del 75%
+        self.assertEqual(por_id[self.bruno.id]['entregadas_a_tiempo'], 0)
+        self.assertEqual(por_id[self.bruno.id]['porcentaje_evidencias'], 75.0)
+
+    def test_tardanzas_se_ponderan_justamente(self):
+        # 1 sesión asistida puntual, 1 sesión con tardanza
+        self._sesion(1, [(self.ana, 'ASISTE'), (self.bruno, 'ASISTE')])
+        self._sesion(0, [(self.ana, 'TARDANZA'), (self.bruno, 'ASISTE')])
+        db.session.commit()
+
+        filas, _ = calcular_ranking(self.ficha.id)
+        por_id = {f['aprendiz'].id: f for f in filas}
+
+        # Bruno: 2 puntuales = 100%
+        self.assertEqual(por_id[self.bruno.id]['porcentaje_asistencia'], 100.0)
+        # Ana: (1.0 + 0.8) / 2 = 90.0%
+        self.assertEqual(por_id[self.ana.id]['porcentaje_asistencia'], 90.0)
+        self.assertEqual(por_id[self.ana.id]['tardanzas'], 1)
+
+    def test_rebalanceo_dinamico_corte_sin_tareas(self):
+        corte_vacio = Corte(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            nombre='Corte Inicial Vacío',
+            fecha_inicio=datetime.utcnow(),
+        )
+        db.session.add(corte_vacio)
+        db.session.flush()
+
+        # Juicios evaluativos en la ficha
+        db.session.add(JuicioEvaluativo(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.ana.id,
+            competencia='Competencia 1',
+            juicio='APROBADO',
+            huella='H1',
+        ))
+        db.session.add(JuicioEvaluativo(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.bruno.id,
+            competencia='Competencia 1',
+            juicio='POR EVALUAR',
+            huella='H2',
+        ))
+        db.session.commit()
+
+        filas, cfg = calcular_ranking(self.ficha.id, corte_id=corte_vacio.id)
+        por_id = {f['aprendiz'].id: f for f in filas}
+
+        self.assertTrue(getattr(cfg, 'fase_inicial', False))
+        # En fase inicial sin tareas ni sesiones, los juicios evaluativos son el 100% de la base académica
+        self.assertEqual(por_id[self.ana.id]['porcentaje_aprobados'], 100.0)
+        self.assertEqual(por_id[self.ana.id]['puntaje_total'], 100.0)
+        self.assertEqual(por_id[self.bruno.id]['porcentaje_aprobados'], 0.0)
+        self.assertEqual(por_id[self.bruno.id]['puntaje_total'], 0.0)
+
+    def test_merito_formativo_aseo_y_observador(self):
+        # Ana cumple un turno de aseo y tiene una nota positiva en el observador
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=date.today(),
+            aprendiz_1_id=self.ana.id,
+            aprendiz_2_id=self.bruno.id,
+            estado='cumplido',
+            completado_1=True,
+            completado_2=False,
+        )
+        db.session.add(turno)
+        db.session.add(NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.ana.id,
+            instructor_id=self.instructor.id,
+            tipo='positiva',
+            categoria='compromiso',
+            descripcion='Excelente trabajo en equipo y liderazgo.',
+            fecha=date.today(),
+        ))
+        db.session.commit()
+
+        filas, _ = calcular_ranking(self.ficha.id)
+        por_id = {f['aprendiz'].id: f for f in filas}
+
+        # Aseo cumplido (1.5) + Reconocimiento (2.0) = 3.5 puntos de mérito
+        self.assertGreater(por_id[self.ana.id]['merito_formativo'], 3.0)
+        self.assertEqual(por_id[self.ana.id]['turnos_aseo_cumplidos'], 1)
+        self.assertEqual(por_id[self.ana.id]['reconocimientos'], 1)
+
+    def test_corte_id_se_preserva_en_htmx(self):
+        corte = Corte(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            nombre='Corte 2026',
+            fecha_inicio=datetime.utcnow(),
+        )
+        db.session.add(corte)
+        db.session.commit()
+
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['_user_id'] = str(self.instructor.id)
+            sesion['_fresh'] = True
+
+        res = cliente.get(f'/instructor/fichas/{self.ficha.id}/ranking?corte_id={corte.id}')
+        html = res.get_data(as_text=True)
+
+        self.assertEqual(res.status_code, 200)
+        # Verifica que las URLs de htmx incluyan corte_id
+        self.assertIn(f'corte_id={corte.id}', html)
 
 
 if __name__ == '__main__':

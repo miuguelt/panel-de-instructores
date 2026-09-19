@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% from 'tyt/_barra.html' import barra %}
+{% block title %}Seguimiento Saber TyT · {{ ficha.codigo }}{% endblock %}
+{% block content %}
+<div class="tyt-page">
+    <header class="tyt-page-heading"><div><span class="eyebrow">Ficha {{ ficha.codigo }}</span><h1>Seguimiento Saber TyT</h1><p>{{ ficha.nombre_programa }}</p></div><a class="btn btn-outline" href="{{ url_for('instructor.dashboard') }}">Volver al inicio</a></header>
+    <p class="tyt-intro">Compara el hito del 70% de la etapa lectiva con los resultados de cada aprendiz. Este seguimiento apoya la preparación de Saber TyT; confirma la inscripción con coordinación académica.</p>
+    {% include 'tyt/_tarjeta.html' %}
+    {% if tyt and not tyt.error %}
+    <section class="card tyt-detail" aria-labelledby="tyt-detail-title">
+        <h2 id="tyt-detail-title">Avance por aprendiz</h2>
+        {% if tyt.total_resultados %}<p>La meta de cada aprendiz es tener al menos {{ tyt.meta_resultados }} de {{ tyt.total_resultados }} resultados evaluados. Un promedio alto del grupo no reemplaza esta meta individual.</p>
+        {% else %}<p>Actualiza el reporte de juicios evaluativos para calcular la meta y los resultados pendientes de cada aprendiz.</p>{% endif %}
+        <div class="tyt-filters"><label>Buscar aprendiz<input id="tyt-search" type="search" placeholder="Nombre o apellido" autocomplete="off"></label><label>Mostrar<select id="tyt-filter" title="Filtrar por avance de evaluación"><option value="todos">Todos los aprendices</option><option value="pendiente">Pendientes del 70% evaluado</option><option value="listo">Con el 70% evaluado</option></select></label></div>
+        <p id="tyt-results-count" role="status">{{ tyt.total_aprendices }} aprendices activos</p>
+        <div class="tyt-table-wrap" tabindex="0" role="region" aria-label="Tabla de progreso por aprendiz">
+        <table class="tyt-table"><thead><tr><th scope="col">Aprendiz</th><th scope="col">Aprobados</th><th scope="col">Evaluados</th><th scope="col">Faltan por evaluar<br><small>para el 70%</small></th><th scope="col">Faltan por aprobar<br><small>para el 70%</small></th><th scope="col">Estado</th></tr></thead><tbody>
+        {% for fila in tyt.aprendices %}
+        <tr data-tyt-row data-name="{{ fila.nombre }}" data-status="{{ 'listo' if fila.cumple_evaluacion else 'pendiente' }}">
+            <th scope="row">{{ fila.nombre }}</th>
+            <td>{% if fila.total %}{{ barra('Aprobación de ' ~ fila.nombre, fila.porcentaje_aprobados) }}<small>{{ fila.aprobados }} de {{ fila.total }}</small>{% else %}Sin datos{% endif %}</td>
+            <td>{% if fila.total %}<strong>{{ ('%.1f'|format(fila.porcentaje_evaluados)).replace('.', ',') }}%</strong><br><small>{{ fila.evaluados }} de {{ fila.total }}</small>{% else %}Sin datos{% endif %}</td>
+            <td class="tyt-deficit">{{ fila.faltan_evaluar if fila.total else '—' }}</td><td>{{ fila.faltan_aprobar if fila.total else '—' }}</td>
+            <td><span class="tyt-pill">{{ '✓ Meta evaluada' if fila.cumple_evaluacion else ('Pendiente' if fila.total else 'Sin reporte') }}</span>{% if fila.sin_registro %}<small>{{ fila.sin_registro }} sin registro</small>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody></table></div>
+        <p id="tyt-no-results" {% if tyt.aprendices %}hidden{% endif %}>No hay aprendices que coincidan con esta consulta.</p>
+        <a class="tyt-action" href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}">Consultar los juicios evaluativos <span aria-hidden="true">→</span></a>
+    </section>
+    {% endif %}
+</div>
+<script src="{{ url_for('static', filename='js/tyt.js') }}" defer></script>
+{% endblock %}

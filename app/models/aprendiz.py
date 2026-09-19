@@ -96,6 +96,11 @@ class Aprendiz(db.Model):
     tipo_documento = db.Column(db.String(5), default='CC')
     correo = db.Column(db.String(150), nullable=True)
     estado = db.Column(db.String(20), default='EN_FORMACION')
+    # Este rol es deliberadamente independiente del usuario instructor. Solo
+    # habilita operaciones operativas acotadas dentro de la ficha.
+    rol_administrativo = db.Column(
+        db.Boolean, nullable=False, default=False, server_default=db.false()
+    )
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
 
     registros_asistencia = db.relationship('RegistroAsistencia', backref='aprendiz',
@@ -127,6 +132,11 @@ class Aprendiz(db.Model):
     @property
     def en_formacion(self):
         return self.estado in ESTADOS_EN_FORMACION
+
+    @property
+    def es_aprendiz_administrador(self):
+        """Indica si el aprendiz tiene herramientas operativas delegadas."""
+        return bool(self.rol_administrativo)
 
     @property
     def estado_normalizado(self):

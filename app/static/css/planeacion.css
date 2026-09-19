@@ -2197,6 +2197,80 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 
 /* --- Pipeline de Avance por Fases --- */
+.pl-phase-control {
+    border-top: 4px solid var(--pl-tone, var(--accent-primary));
+}
+.pl-phase-answer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.8rem;
+    align-items: center;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--pl-tone, var(--border-subtle));
+    border-left-width: 4px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--pl-tone, var(--accent-primary)) 8%, var(--bg-surface));
+}
+.pl-phase-answer-icon { font-size: 1.5rem; line-height: 1; }
+.pl-phase-answer strong { display: block; color: var(--text-strong); font-size: 0.96rem; line-height: 1.35; }
+.pl-phase-answer p { margin: 0.3rem 0 0; color: var(--text-main); font-size: 0.78rem; line-height: 1.5; }
+.pl-phase-control-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.6rem;
+    margin: 0.75rem 0;
+}
+.pl-phase-control-kpis > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+}
+.pl-phase-control-kpis span { color: var(--text-muted); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+.pl-phase-control-kpis strong { color: var(--text-strong); font-size: 1.05rem; line-height: 1.2; }
+.pl-phase-control-kpis small { color: var(--text-muted); font-size: 0.68rem; line-height: 1.4; }
+.pl-phase-track {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+.pl-phase-track-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-top: 3px solid var(--pl-tone, var(--border-divider));
+    border-radius: 10px;
+}
+.pl-phase-track-item.is-expected { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 35%, transparent); }
+.pl-phase-track-item.is-real::after {
+    content: 'REAL';
+    position: absolute;
+    top: 0.45rem;
+    right: 0.5rem;
+    color: var(--accent-primary);
+    font-size: 0.58rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+.pl-phase-track-head { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.pl-phase-track-icon { font-size: 1.15rem; line-height: 1; }
+.pl-phase-track-head div { display: flex; flex-direction: column; min-width: 0; }
+.pl-phase-track-head strong { color: var(--text-strong); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-phase-track-head small { color: var(--pl-tone, var(--text-muted)); font-size: 0.65rem; font-weight: 700; }
+.pl-phase-track-count { color: var(--text-main); font-size: 0.72rem; }
+.pl-phase-track-count strong { color: var(--text-strong); font-size: 0.9rem; }
+.pl-phase-track-item .pl-progress-wrap { margin-top: 0.1rem; height: 6px; }
+.pl-phase-track-item .pl-progress-bar { background: var(--pl-tone, var(--accent-primary)); }
+.pl-phase-track-note { color: var(--text-muted); font-size: 0.67rem; line-height: 1.4; }
+.pl-phase-method { margin: 0.8rem 0 0; padding-top: 0.7rem; border-top: 1px dashed var(--border-divider); }
+
 .pl-fases-pipeline {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
@@ -2243,6 +2317,15 @@ details.pl-collapsible-section > .pl-collapsible-body {
     font-size: 0.7rem;
     color: var(--text-muted);
     margin-top: 0.25rem;
+}
+
+@media (max-width: 900px) {
+    .pl-phase-track { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+    .pl-phase-answer { grid-template-columns: 1fr; }
+    .pl-phase-track { grid-template-columns: 1fr; }
 }
 
 /* --- Interactividad CFD y Radar --- */

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Gestionar aseo - {{ ficha.codigo }}{% endblock %}
+{% block body_class %}has-learner-bottom-nav{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back">&larr; Mi panel</a>
+        <div>
+            <span class="eyebrow">Aprendiz administrador · {{ ficha.codigo }}</span>
+            <h1>Gestionar turnos de aseo</h1>
+        </div>
+    </div>
+    <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-outline">Ver transparencia</a>
+</div>
+
+<div class="card">
+    <p class="text-muted" style="margin: 0;">
+        Estás gestionando la operación de aseo como <strong>{{ actor.nombre_completo }}</strong>.
+        Los cambios quedan registrados con tu rol y se conservan al recalcular el calendario.
+    </p>
+</div>
+
+<div class="card form-card">
+    <h2>Generar nuevos turnos</h2>
+    <p class="text-muted">El sistema reparte los turnos entre aprendices en formación en días hábiles, evitando automáticamente días festivos y fines de semana.</p>
+    <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="fecha-inicio">Desde</label>
+                <input id="fecha-inicio" name="fecha_inicio" type="date" value="{{ fecha_inicio_default.isoformat() }}" required>
+            </div>
+            <div class="form-group">
+                <label for="fecha-fin">Hasta</label>
+                <input id="fecha-fin" name="fecha_fin" type="date" value="{{ fecha_fin_default.isoformat() }}" required>
+            </div>
+            <label class="checkbox-label">
+                <input type="checkbox" name="recalcular" checked>
+                Recalcular turnos pendientes
+            </label>
+            <button type="submit" class="btn btn-primary">Generar turnos</button>
+        </div>
+    </form>
+</div>
+
+<div class="card form-card">
+    <h2>Asignar turno manual para una fecha</h2>
+    <p class="text-muted">Asigna directamente a dos aprendices para un día específico (los días festivos y fines de semana se rechazan automáticamente).</p>
+    <form method="POST" action="{{ url_for('aseo_aprendiz.asignar_como_aprendiz', ficha_id=ficha.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="fecha-asignar">Fecha</label>
+                <input id="fecha-asignar" name="fecha" type="date" value="{{ hoy.isoformat() }}" required>
+            </div>
+            <div class="form-group">
+                <label for="aprendiz-1">Primer aprendiz</label>
+                <select id="aprendiz-1" name="aprendiz_1_id" required>
+                    <option value="">Seleccionar aprendiz...</option>
+                    {% for aprendiz in aprendices %}
+                    <option value="{{ aprendiz.id }}">{{ aprendiz.nombre_completo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="aprendiz-2">Segundo aprendiz</label>
+                <select id="aprendiz-2" name="aprendiz_2_id" required>
+                    <option value="">Seleccionar aprendiz...</option>
+                    {% for aprendiz in aprendices %}
+                    <option value="{{ aprendiz.id }}">{{ aprendiz.nombre_completo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row" style="margin-top: 10px; align-items: center;">
+            <div class="form-group" style="flex: 1;">
+                <input name="observacion" type="text" placeholder="Observación o motivo (opcional)">
+            </div>
+            <button type="submit" class="btn btn-outline">Asignar turno</button>
+        </div>
+    </form>
+</div>
+
+{% if festivos_mes %}
+<div class="alert alert-info" style="margin-bottom: 1.5rem;">
+    <strong>Festivos de este mes (sin programación de aseo):</strong>
+    {% for f, nom in festivos_mes.items() %}
+    <span class="badge badge-secondary" style="margin: 2px 4px;">{{ f.strftime('%d/%m') }}: {{ nom }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="section-header">
+    <h2>Calendario · {{ nombre_mes }}</h2>
+    <div class="header-actions">
+        <a class="btn btn-sm btn-outline" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_anterior) }}">&larr; Anterior</a>
+        <a class="btn btn-sm btn-outline" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_siguiente) }}">Siguiente &rarr;</a>
+    </div>
+</div>
+
+{% if turnos %}
+<div class="table-container">
+    <div class="table-responsive" tabindex="0">
+        <table class="table table-sena">
+            <caption class="sr-only">Turnos de aseo de {{ nombre_mes }}</caption>
+            <thead>
+                <tr><th>Fecha</th><th>Aprendices</th><th>Estado</th><th>Acciones</th></tr>
+            </thead>
+            <tbody>
+            {% for turno in turnos %}
+                <tr>
+                    <td data-label="Fecha"><strong>{{ turno.fecha.strftime('%d/%m/%Y') }}</strong></td>
+                    <td data-label="Aprendices">
+                        <form method="POST" action="{{ url_for('aseo_aprendiz.editar_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" class="turno-edicion-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="form-row">
+                                <select name="aprendiz_1_id" aria-label="Primer aprendiz del {{ turno.fecha.strftime('%d/%m/%Y') }}" required>
+                                    {% for aprendiz in aprendices %}<option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_1_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}</option>{% endfor %}
+                                </select>
+                                <select name="aprendiz_2_id" aria-label="Segundo aprendiz del {{ turno.fecha.strftime('%d/%m/%Y') }}" required>
+                                    {% for aprendiz in aprendices %}<option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_2_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <input name="observacion" type="text" value="{{ turno.observacion or '' }}" placeholder="Observación opcional">
+                            <button type="submit" class="btn btn-sm btn-outline">Guardar cambio</button>
+                        </form>
+                    </td>
+                    <td data-label="Estado"><span class="badge">{{ 'Cumplido' if turno.estado == 'cumplido' else 'Programado' }}</span></td>
+                    <td data-label="Acciones">
+                        {% if turno.estado != 'cumplido' %}
+                        <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-primary">Marcar hecho</button>
+                        </form>
+                        {% else %}<span class="text-muted">Listo</span>{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state"><div class="empty-icon">🧹</div><h3>No hay turnos en este mes</h3><p>Usa el formulario de arriba para generar el calendario.</p></div>
+{% endif %}
+{% endblock %}

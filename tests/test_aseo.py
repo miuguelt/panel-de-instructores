@@ -15,11 +15,17 @@ from app.models import (
     SesionAsistencia,
     TurnoAseo,
 )
+from app.models.corte import Corte
 from app.services.aseo import (
     aceptar_intercambio,
+    asignar_o_actualizar_turno,
     completar_turno,
     generar_turnos,
     reemplazar_aprendices,
+)
+from app.services.festivos import (
+    es_festivo_colombia,
+    obtener_festivos_colombia,
 )
 
 
@@ -707,6 +713,193 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertNotIn(self.aprendices[1].id, asignados_futuros)
         # Los 4 restantes (Carmen, Diego, Elena, Felipe) ocupan exactamente los 4 cupos
         self.assertEqual(asignados_futuros, {a.id for a in self.aprendices[2:]})
+
+    def test_evita_programar_turnos_en_dias_festivos_colombia(self):
+        festivos_2026 = obtener_festivos_colombia(2026)
+        fecha_festivo = date(2026, 7, 20)  # Día de la Independencia
+        fecha_habil = date(2026, 7, 21)    # Martes hábil
+
+        self.assertIn(fecha_festivo, festivos_2026)
+        self.assertTrue(es_festivo_colombia(fecha_festivo))
+        self.assertFalse(es_festivo_colombia(fecha_habil))
+
+        self._crear_sesion(fecha_festivo)
+        self._crear_sesion(fecha_habil)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_festivo,
+            fecha_habil,
+            rng=random.Random(1),
+        )
+        db.session.commit()
+
+        # Solo debe haberse creado el turno para el día hábil
+        fechas_creadas = [t.fecha for t in resultado['creados']]
+        self.assertNotIn(fecha_festivo, fechas_creadas)
+        self.assertIn(fecha_habil, fechas_creadas)
+
+        turno_festivo = TurnoAseo.query.filter_by(
+            ficha_id=self.ficha.id, fecha=fecha_festivo
+        ).first()
+        self.assertIsNone(turno_festivo)
+
+        # Intentar asignación manual en día festivo debe ser rechazada con ValueError
+        with self.assertRaises(ValueError) as ctx:
+            asignar_o_actualizar_turno(
+                ficha_id=self.ficha.id,
+                fecha=fecha_festivo,
+                aprendiz_1_id=self.aprendices[0].id,
+                aprendiz_2_id=self.aprendices[1].id,
+            )
+        self.assertIn('días festivos', str(ctx.exception))
+
+    def test_inasistencia_con_corte_activo_reemplaza_y_reprograma_automaticamente(self):
+        # 1. Crear corte activo para la ficha y el instructor
+        corte = Corte(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            nombre='Corte 1 - Activo',
+            estado=Corte.ESTADO_ACTIVO,
+            fecha_inicio=date.today(),
+        )
+        db.session.add(corte)
+        db.session.commit()
+
+        fecha_hoy = date.today()
+        # Creamos turno hoy con Ana (0) y Bruno (1)
+        turno_hoy = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_hoy,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_hoy)
+        db.session.commit()
+
+        # 2. El instructor registra asistencia: Ana FALTA, los demás ASISTE
+        cliente = self._cliente_instructor()
+        datos_form = {
+            'fecha': fecha_hoy.isoformat(),
+            'corte_id': str(corte.id),
+        }
+        for ap in self.aprendices:
+            if ap.id == self.aprendices[0].id:
+                datos_form[f'asistencia_{ap.id}'] = 'FALTA'
+            else:
+                datos_form[f'asistencia_{ap.id}'] = 'ASISTE'
+
+        resp = cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/asistencia',
+            data=datos_form,
+            follow_redirects=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # 3. Verificar que Ana fue sustituida automáticamente por un compañero presente
+        turno_actualizado = db.session.get(TurnoAseo, turno_hoy.id)
+        self.assertFalse(turno_actualizado.incluye(self.aprendices[0].id))
+        self.assertTrue(turno_actualizado.incluye(self.aprendices[1].id))
+        # El reemplazo debe ser uno de los que asistieron (Carmen, Diego, Elena o Felipe)
+        suplente_id = (
+            turno_actualizado.aprendiz_1_id
+            if turno_actualizado.aprendiz_2_id == self.aprendices[1].id
+            else turno_actualizado.aprendiz_2_id
+        )
+        self.assertIn(suplente_id, [a.id for a in self.aprendices[2:]])
+
+        # 4. Verificar que se le programó reposición a Ana para una fecha futura
+        reposicion = TurnoAseo.query.filter(
+            TurnoAseo.ficha_id == self.ficha.id,
+            TurnoAseo.fecha > fecha_hoy,
+            TurnoAseo.estado.in_(['programado', 'pendiente']),
+            db.or_(
+                TurnoAseo.aprendiz_1_id == self.aprendices[0].id,
+                TurnoAseo.aprendiz_2_id == self.aprendices[0].id,
+            ),
+        ).first()
+        self.assertIsNotNone(reposicion)
+        self.assertTrue(reposicion.incluye(self.aprendices[0].id))
+
+    def test_aprendiz_administrador_marcar_cumplido_desde_panel_y_asignar_manual(self):
+        admin = self.aprendices[0]
+        no_admin = self.aprendices[1]
+        admin.rol_administrativo = True
+        db.session.commit()
+
+        fecha_hoy = date.today()
+        self._crear_sesion(fecha_hoy)
+        turno_hoy = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_hoy,
+            aprendiz_1_id=admin.id,
+            aprendiz_2_id=no_admin.id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_hoy)
+        db.session.commit()
+
+        # 1. Aprendiz administrador marca turno cumplido desde el panel (con origen=panel)
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as s:
+            s['aprendiz_documento'] = admin.documento
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        resp_panel = cliente.get(f'/aprendiz/{self.ficha.id}/panel')
+        self.assertEqual(resp_panel.status_code, 200)
+        self.assertIn('Marcar aseo de hoy hecho'.encode(), resp_panel.data)
+
+        resp_cumplir = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno_hoy.id}/cumplir',
+            data={'origen': 'panel'},
+            follow_redirects=False,
+        )
+        self.assertEqual(resp_cumplir.status_code, 302)
+        self.assertIn(f'/aprendiz/{self.ficha.id}/panel', resp_cumplir.headers['Location'])
+
+        turno_bd = db.session.get(TurnoAseo, turno_hoy.id)
+        self.assertEqual(turno_bd.estado, 'cumplido')
+
+        # 2. Aprendiz administrador asigna un turno manual en fecha futura
+        fecha_manual = fecha_hoy + timedelta(days=5)
+        while es_festivo_colombia(fecha_manual):
+            fecha_manual += timedelta(days=1)
+
+        resp_asignar = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/asignar',
+            data={
+                'fecha': fecha_manual.isoformat(),
+                'aprendiz_1_id': self.aprendices[2].id,
+                'aprendiz_2_id': self.aprendices[3].id,
+                'observacion': 'Asignado por aprendiz administrador para evento',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp_asignar.status_code, 200)
+
+        turno_manual = TurnoAseo.query.filter_by(
+            ficha_id=self.ficha.id, fecha=fecha_manual
+        ).first()
+        self.assertIsNotNone(turno_manual)
+        self.assertEqual(turno_manual.generado_por, 'aprendiz_admin')
+        self.assertTrue(turno_manual.incluye(self.aprendices[2].id))
+        self.assertTrue(turno_manual.incluye(self.aprendices[3].id))
+
+        # 3. Aprendiz sin rol administrativo no tiene permiso para gestionar o asignar
+        cliente_no_admin = self.app.test_client()
+        with cliente_no_admin.session_transaction() as s:
+            s['aprendiz_documento'] = no_admin.documento
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        resp_denegado = cliente_no_admin.get(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar',
+            follow_redirects=True,
+        )
+        self.assertIn('solo está disponible para el aprendiz administrador'.encode(), resp_denegado.data)
 
 
 if __name__ == '__main__':

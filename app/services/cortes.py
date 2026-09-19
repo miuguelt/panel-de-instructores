@@ -11,7 +11,7 @@ from app.models.ficha_instructor import FichaInstructor
 def cortes_visibles(ficha_id):
     """Consulta los cortes propios y los que el responsable decidió compartir."""
     consulta = Corte.query.filter_by(ficha_id=ficha_id)
-    if current_user.es_admin:
+    if not getattr(current_user, 'is_authenticated', False) or getattr(current_user, 'es_admin', False):
         return consulta
     return consulta.filter(
         or_(
@@ -41,7 +41,7 @@ def corte_actual(ficha_id, corte_id=None):
         return corte_visible(ficha_id, corte_id)
 
     propios = cortes_visibles(ficha_id)
-    if not current_user.es_admin:
+    if getattr(current_user, 'is_authenticated', False) and not getattr(current_user, 'es_admin', False):
         propios = propios.filter(Corte.instructor_id == current_user.id)
         propio_activo = propios.filter(Corte.estado == Corte.ESTADO_ACTIVO).order_by(
             Corte.fecha_inicio.desc(), Corte.id.desc()

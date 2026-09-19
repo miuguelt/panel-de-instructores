@@ -193,4 +193,59 @@ debug_*
 venv_win/
 logs/
 test-results/
+docker-compose.override.yml
+node_modules/
 # --- end DevBrain repo hygiene ---
+
+# --- DevBrain: rastros de agentes IA (bloque gestionado) ---
+# Estado local de agentes (lo regenera Sync-DevBrainIdeIntegration)
+.claude/
+.codex/
+.cursor/
+.windsurf/
+.opencode/
+.antigravity/
+.gemini/
+.continue/
+.roo/
+.kilocode/
+.trae/
+.serena/
+.taskmaster/
+.specify/
+.zed/
+.junie/
+.crush/
+.qoder/
+.entire/
+.srclight/
+.devbrain/
+.playwright-mcp/
+.agents/
+
+# Reglas SSoT por IDE
+.cursorrules
+.codexrules
+.windsurfrules
+.opencoderules
+.antigravityrules
+.clinerules
+.roomodes
+.aiderignore
+
+# Briefs y manifiestos de agente
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+QWEN.md
+WARP.md
+PROJECT_GENOME.md
+.github/copilot-instructions.md
+
+# Artefactos de sesion
+.mcp.json
+.aider*
+*.aider.chat.history.md
+conversations/
+memory-bank/
+# --- end DevBrain rastros de agentes IA ---

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
 {% block title %}Inicio - SENA Control{% endblock %}
 
 {% block content %}
@@ -79,6 +80,9 @@
                     <h2 class="card-title">{{ ficha.nombre_programa|trim('.') }}</h2>
                 </div>
                 <div class="ficha-header-actions">
+                    <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-ficha-planeacion btn-ficha-vision-general" style="background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600;" title="Abrir Centro de Control y Visión General de la ficha">
+                        <span>🌟 Visión General</span> <span aria-hidden="true">&rarr;</span>
+                    </a>
                     <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn-ficha-planeacion" title="Ver análisis pedagógico detallado, horas y competencias">
                         <span>Planeación & Juicios</span> <span aria-hidden="true">↗</span>
                     </a>
@@ -372,9 +376,20 @@
                 </div>
 
                 <!-- 3. FOCO ESTRATÉGICO Y ALERTAS ESENCIALES (SOLO SI APLICA) -->
-                {% if extra.top_competencias or (fases_data and fases_data.desfase_fases > 0) %}
+                {% set recs_ficha = recomendaciones_fichas.get(ficha.id, []) if recomendaciones_fichas is defined else [] %}
+                {% set top_rec = recs_ficha[0] if recs_ficha else None %}
+                {% if top_rec or extra.top_competencias or (fases_data and fases_data.desfase_fases > 0) %}
                 <div class="ficha-strategic-focus">
-                    {% if fases_data and fases_data.desfase_fases > 0 %}
+                    {% if top_rec %}
+                        {{ render_banner_recomendacion(top_rec) }}
+                        {% if recs_ficha|length > 1 %}
+                        <div class="more-recommendations-cue">
+                            <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}#centro-recomendaciones" class="more-recommendations-link">
+                                🔔 {{ recs_ficha|length - 1 }} recomendación{{ 'es' if (recs_ficha|length - 1) > 1 else '' }} adicional{{ 'es' if (recs_ficha|length - 1) > 1 else '' }} en Visión General &rarr;
+                            </a>
+                        </div>
+                        {% endif %}
+                    {% elif fases_data and fases_data.desfase_fases > 0 %}
                     <div class="strategic-alert-banner">
                         <span class="strategic-alert-icon" aria-hidden="true">⏰</span>
                         <div class="strategic-alert-body">
@@ -475,7 +490,7 @@
                             <span class="expand-icon" aria-hidden="true">▾</span>
                         </summary>
                         <div class="secondary-details-content">
-                            {% set tyt = progreso_tyt(ficha, none) %}
+                            {% set tyt = (tyt_fichas.get(ficha.id) if tyt_fichas is defined and tyt_fichas else none) or progreso_tyt(ficha, none) %}
                             <div class="secondary-details-grid">
                                 {% if tyt and not tyt.error %}
                                 {% set tyt_pct_eval = ((tyt.meta_resultados / tyt.total_resultados) * 100)|round(1) if (tyt.total_resultados and tyt.total_resultados > 0) else (tyt.promedio_evaluados if tyt.promedio_evaluados is not none else 0) %}
