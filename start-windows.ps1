@@ -19,16 +19,16 @@ function Get-ListeningPidsOnPort($TargetPort) {
 }
 
 if ($Stop) {
-    Write-Host "Deteniendo SENA Control Academico (:8009)..." -ForegroundColor Yellow
+    Write-Host "Deteniendo Panel de Instructores (:8158)..." -ForegroundColor Yellow
     $detenidos = 0
-    foreach ($ownerPid in (Get-ListeningPidsOnPort 8009)) {
+    foreach ($ownerPid in (Get-ListeningPidsOnPort 8158)) {
         if ($ownerPid -gt 4) {
             try { Stop-Process -Id $ownerPid -Force -ErrorAction Stop; $detenidos++ } catch {
                 Write-Warning "No se pudo detener el proceso $ownerPid."
             }
         }
     }
-    Write-Host "Detenido(s): $detenidos proceso(s) en el puerto 8009." -ForegroundColor Green
+    Write-Host "Detenido(s): $detenidos proceso(s) en el puerto 8158." -ForegroundColor Green
     return
 }
 
@@ -58,8 +58,8 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
     Write-Verbose "[WARN] PowerShell 7+ requerido para importar credenciales WCM. Usando vars .env por defecto."
 }
 
-Write-Host "Limpiando procesos fantasma en el puerto 8009..." -ForegroundColor Yellow
-$port = 8009
+Write-Host "Limpiando procesos fantasma en el puerto 8158..." -ForegroundColor Yellow
+$port = 8158
 
 function Get-PortPids($p) {
     if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
@@ -133,5 +133,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "=== Iniciando servidor en http://127.0.0.1:8009 ===" -ForegroundColor Green
+$env:PORT = '8158'
+Write-Host "=== Iniciando servidor en http://127.0.0.1:8158 ===" -ForegroundColor Green
 python wsgi.py

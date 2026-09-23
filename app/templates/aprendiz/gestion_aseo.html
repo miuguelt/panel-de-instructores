@@ -11,7 +11,10 @@
             <h1>Gestionar turnos de aseo</h1>
         </div>
     </div>
-    <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-outline">Ver transparencia</a>
+    <div class="header-actions">
+        <a href="{{ url_for('aprendiz.asistencia_admin', ficha_id=ficha.id) }}" class="btn btn-primary">Registrar llamado a lista</a>
+        <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-outline">Ver transparencia</a>
+    </div>
 </div>
 
 <div class="card">
@@ -21,8 +24,27 @@
     </p>
 </div>
 
-<div class="card form-card">
-    <h2>Generar nuevos turnos</h2>
+<section class="cleaning-admin-summary" id="gestion-aseo-resumen" aria-labelledby="gestion-aseo-resumen-title">
+    <div class="cleaning-admin-summary-copy">
+        <span class="eyebrow">Centro de operación</span>
+        <h2 id="gestion-aseo-resumen-title">Organiza el aseo de la ficha</h2>
+        <p class="text-muted">Genera el periodo, ajusta una asignación puntual, marca los turnos cumplidos y registra el llamado a lista desde accesos directos.</p>
+    </div>
+    <div class="cleaning-admin-metrics" aria-label="Resumen del mes">
+        <div><strong>{{ total_turnos }}</strong><span>turnos del mes</span></div>
+        <div><strong>{{ total_programados }}</strong><span>programados</span></div>
+        <div><strong>{{ total_cumplidos }}</strong><span>cumplidos</span></div>
+    </div>
+    <nav class="cleaning-admin-actions" aria-label="Acciones del aprendiz administrador">
+        <a href="#form-generar-turnos">Generar periodo</a>
+        <a href="#form-asignar-turno">Asignar fecha</a>
+        <a href="#calendario-turnos">Marcar turnos hechos</a>
+        <a href="{{ url_for('aprendiz.asistencia_admin', ficha_id=ficha.id) }}">Hacer llamado a lista</a>
+    </nav>
+</section>
+
+<section class="card form-card" id="form-generar-turnos" aria-labelledby="form-generar-turnos-title">
+    <h2 id="form-generar-turnos-title"><span class="cleaning-step-number">1</span> Generar turnos por periodo</h2>
     <p class="text-muted">El sistema reparte los turnos entre aprendices en formación en días hábiles, evitando automáticamente días festivos y fines de semana.</p>
     <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -42,10 +64,10 @@
             <button type="submit" class="btn btn-primary">Generar turnos</button>
         </div>
     </form>
-</div>
+</section>
 
-<div class="card form-card">
-    <h2>Asignar turno manual para una fecha</h2>
+<section class="card form-card" id="form-asignar-turno" aria-labelledby="form-asignar-turno-title">
+    <h2 id="form-asignar-turno-title"><span class="cleaning-step-number">2</span> Asignar turno manual para una fecha</h2>
     <p class="text-muted">Asigna directamente a dos aprendices para un día específico (los días festivos y fines de semana se rechazan automáticamente).</p>
     <form method="POST" action="{{ url_for('aseo_aprendiz.asignar_como_aprendiz', ficha_id=ficha.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -80,7 +102,7 @@
             <button type="submit" class="btn btn-outline">Asignar turno</button>
         </div>
     </form>
-</div>
+</section>
 
 {% if festivos_mes %}
 <div class="alert alert-info" style="margin-bottom: 1.5rem;">
@@ -91,8 +113,11 @@
 </div>
 {% endif %}
 
-<div class="section-header">
-    <h2>Calendario · {{ nombre_mes }}</h2>
+<div class="section-header" id="calendario-turnos">
+    <div>
+        <span class="eyebrow">Seguimiento operativo</span>
+        <h2><span class="cleaning-step-number">3</span> Calendario · {{ nombre_mes }}</h2>
+    </div>
     <div class="header-actions">
         <a class="btn btn-sm btn-outline" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_anterior) }}">&larr; Anterior</a>
         <a class="btn btn-sm btn-outline" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_siguiente) }}">Siguiente &rarr;</a>
@@ -131,7 +156,7 @@
                         {% if turno.estado != 'cumplido' %}
                         <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-sm btn-primary">Marcar hecho</button>
+                            <button type="submit" class="btn btn-sm btn-primary" aria-label="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como hecho">Marcar turno hecho</button>
                         </form>
                         {% else %}<span class="text-muted">Listo</span>{% endif %}
                     </td>

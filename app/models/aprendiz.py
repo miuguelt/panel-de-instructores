@@ -110,6 +110,7 @@ class Aprendiz(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('documento', 'ficha_id', name='uq_aprendiz_documento_ficha'),
+        db.Index('ix_aprendices_ficha_estado', 'ficha_id', 'estado'),
     )
 
     @classmethod

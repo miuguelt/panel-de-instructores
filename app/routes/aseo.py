@@ -382,6 +382,11 @@ def gestionar(ficha_id):
     ).order_by(TurnoAseo.fecha).all()
     festivos_dict = obtener_festivos_colombia(mes.year)
     festivos_mes = {f: nom for f, nom in festivos_dict.items() if mes <= f <= fin_mes}
+    total_turnos = len(turnos)
+    total_cumplidos = sum(1 for turno in turnos if turno.estado == 'cumplido')
+    total_programados = sum(
+        1 for turno in turnos if turno.estado in ESTADOS_PENDIENTES
+    )
 
     return render_template(
         'aprendiz/gestion_aseo.html',
@@ -397,6 +402,9 @@ def gestionar(ficha_id):
         fecha_inicio_default=mes,
         fecha_fin_default=fin_mes,
         festivos_mes=festivos_mes,
+        total_turnos=total_turnos,
+        total_cumplidos=total_cumplidos,
+        total_programados=total_programados,
     )
 
 

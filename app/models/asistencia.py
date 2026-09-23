@@ -34,6 +34,7 @@ class SesionAsistencia(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('corte_id', 'fecha', name='uq_sesion_corte_fecha'),
+        db.Index('ix_sesiones_ficha_fecha', 'ficha_id', 'fecha'),
     )
 
     def __repr__(self):

@@ -92,14 +92,13 @@ class Config:
     SECRET_KEY = _secret_key
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    # El pool es por proceso worker. Con gunicorn en modo gthread cada worker
-    # atiende GUNICORN_THREADS peticiones a la vez, asi que pool_size debe
-    # cubrir esos hilos o los ultimos se quedan esperando hasta pool_timeout.
-    # Techo de conexiones = WEB_CONCURRENCY * (pool_size + max_overflow);
-    # mantenerlo por debajo de max_connections de PostgreSQL.
+    # El pool es por proceso worker. Los valores por defecto están pensados para
+    # una instancia pequeña de Coolify: 2 procesos x 4 hilos y hasta 6
+    # conexiones por proceso (12 en total). Se pueden ampliar por entorno si
+    # PostgreSQL tiene capacidad suficiente.
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': _env_int('DB_POOL_SIZE', 8, minimum=1),
-        'max_overflow': _env_int('DB_MAX_OVERFLOW', 4, minimum=0),
+        'pool_size': _env_int('DB_POOL_SIZE', 4, minimum=1),
+        'max_overflow': _env_int('DB_MAX_OVERFLOW', 2, minimum=0),
         'pool_recycle': 300,
         'pool_pre_ping': True,
         'pool_timeout': 10,

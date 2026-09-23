@@ -25,6 +25,10 @@ class JuicioEvaluativo(db.Model):
     instructores = db.relationship('JuicioEvaluativoInstructor', back_populates='juicio',
                                     lazy='dynamic', cascade='all, delete-orphan')
 
+    __table_args__ = (
+        db.Index('ix_juicios_ficha_aprendiz', 'ficha_id', 'aprendiz_id'),
+    )
+
 
 class JuicioEvaluativoInstructor(db.Model):
     __tablename__ = 'juicios_evaluativos_instructores'

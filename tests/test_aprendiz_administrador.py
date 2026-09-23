@@ -205,6 +205,10 @@ class AprendizAdministradorTestCase(unittest.TestCase):
         self.assertEqual(gestion_aseo.status_code, 200)
         self.assertEqual(llamado.status_code, 200)
         self.assertIn(b'Guardar llamado a lista', llamado.data)
+        self.assertIn(b'id="gestion-aseo-resumen"', gestion_aseo.data)
+        self.assertIn(b'id="form-generar-turnos"', gestion_aseo.data)
+        self.assertIn(b'id="form-asignar-turno"', gestion_aseo.data)
+        self.assertIn(b'Registrar llamado a lista', gestion_aseo.data)
 
     def test_no_se_puede_delegar_el_rol_a_un_aprendiz_retirado(self):
         self.aprendices[2].estado = 'RETIRADO'

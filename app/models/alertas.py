@@ -72,6 +72,10 @@ class Alerta(db.Model):
     aprendiz = db.relationship('Aprendiz', backref=db.backref('alertas', lazy='dynamic'))
     ficha = db.relationship('Ficha', backref=db.backref('alertas', lazy='dynamic'))
 
+    __table_args__ = (
+        db.Index('ix_alertas_ficha_estado', 'ficha_id', 'estado'),
+    )
+
 
 class Notificacion(db.Model):
     __tablename__ = 'notificaciones'
@@ -93,6 +97,10 @@ class Notificacion(db.Model):
     __table_args__ = (
         db.UniqueConstraint('destinatario_tipo', 'destinatario_id', 'clave',
                             name='uq_notificacion_destinatario_clave'),
+        db.Index(
+            'ix_notificaciones_destinatario_leida',
+            'destinatario_tipo', 'destinatario_id', 'leida',
+        ),
     )
 
 

@@ -28,7 +28,7 @@ class ConfigEnvironmentTestCase(unittest.TestCase):
             check=False,
         )
         self.assertEqual(resultado.returncode, 0, resultado.stderr)
-        self.assertTrue(resultado.stdout.rstrip().endswith('8\n587'))
+        self.assertTrue(resultado.stdout.rstrip().endswith('4\n587'))
         self.assertIn('LOG_LEVEL llegó vacío', resultado.stderr)
 
 

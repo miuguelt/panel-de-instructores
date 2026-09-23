@@ -133,6 +133,21 @@ class CompetenciasSeleccionadasTestCase(unittest.TestCase):
         data = res.get_json()
         self.assertFalse(data['success'])
 
+    def test_juicios_header_in_navbar(self):
+        self._autenticar(self.inst1)
+        res = self.client.get(f'/instructor/fichas/{self.ficha.id}/juicios')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        # Verificar que la barra contextual aparece en el navbar
+        self.assertIn('nav-context-slot', html)
+        self.assertIn('nav-context-bar', html)
+        self.assertIn('nav-context-btn-back', html)
+        self.assertIn('Juicios de Evaluación', html)
+        self.assertIn('Analizar planeación', html)
+        # Verificar que el header antiguo no duplica el contenido dentro de juicios-container
+        self.assertNotIn('<div class="page-header">\n        <div class="page-title-cluster">', html)
+
 
 if __name__ == '__main__':
     unittest.main()
+

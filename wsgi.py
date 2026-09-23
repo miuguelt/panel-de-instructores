@@ -48,10 +48,9 @@ if __name__ == '__main__':
         '*__pycache__*',
     )
     app.run(
-        # Listen on IPv6 so http://localhost:8009 does not wait for the
-        # IPv6-to-IPv4 fallback before reaching the development server.
+        # Escucha en IPv6 para que localhost no dependa del fallback IPv4.
         host='::',
-        port=8009,
+        port=int(os.getenv('PORT', '8009')),
         debug=debug,
         use_reloader=debug,
         reloader_type='stat',

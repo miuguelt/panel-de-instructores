@@ -96,125 +96,90 @@
             </div>
             {% endif %}
 
-            {% if aseo.turno_propio %}
             <div class="quick-ribbon-item">
-                <span class="ribbon-label">🧹 Próximo Aseo</span>
-                <span class="ribbon-value">
-                    {% if aseo.turno_propio.fecha == aseo.hoy %}
-                    <span class="badge badge-solid-danger">¡Hoy!</span>
-                    {% elif resumen_rapido and resumen_rapido.dias_proximo_aseo is not none and resumen_rapido.dias_proximo_aseo >= 0 %}
-                    En {{ resumen_rapido.dias_proximo_aseo }}d
-                    {% else %}
-                    {{ aseo.turno_propio.fecha.strftime('%d/%m') }}
-                    {% endif %}
+                <span class="ribbon-label">Alertas</span>
+                <span class="ribbon-value {% if alertas_activas %}text-danger{% else %}text-success{% endif %}">
+                    {{ alertas_activas|length }}
                 </span>
-                <span class="ribbon-sub">{{ aseo.contador.veces_aseo }} cumplidos</span>
+                <span class="ribbon-sub">{% if alertas_activas %}por revisar{% else %}sin novedades{% endif %}</span>
             </div>
-            {% endif %}
         </div>
     </header>
 
     <!-- ============================================================ -->
-    <!-- CENTRO DE ACCIÓN PRIORITARIO ("MI DÍA Y PRÓXIMOS PASOS")     -->
+    <!-- RESUMEN PRIORIZADO: ASEO, RENDIMIENTO Y ALERTAS              -->
     <!-- ============================================================ -->
-    <section class="learner-action-center" aria-label="Centro de acción y tareas prioritarias">
-        <!-- Card 1: Lo más urgente / Próxima evidencia -->
-        <div class="action-card action-card-urgent">
-            <div class="action-card-header">
-                <span class="action-card-icon">⚡</span>
-                <span class="action-card-badge">Prioridad del día</span>
+    <section class="learner-priority-dashboard" aria-labelledby="priority-dashboard-title">
+        <div class="priority-dashboard-heading">
+            <div>
+                <span class="eyebrow">Lectura rápida de tu ficha</span>
+                <h2 id="priority-dashboard-title">Lo más importante para hoy</h2>
+                <p class="text-muted">Consulta primero tu turno de aseo, tu avance y cualquier novedad que requiera atención.</p>
             </div>
-            <div class="action-card-body">
-                {% if resumen_rapido and resumen_rapido.proxima_tarea %}
-                    {% set pt = resumen_rapido.proxima_tarea %}
-                    <h3 class="action-card-title">{{ pt.tarea.titulo }}</h3>
-                    <p class="action-card-meta">
-                        {% if pt.estado == 'vencida' %}
-                            <span class="badge badge-danger">⚠️ Plazo vencido · Entrega extemporánea permitida</span>
-                        {% elif pt.limite_efectivo %}
-                            <span class="badge badge-info">🕒 Límite: {{ pt.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}</span>
-                        {% else %}
-                            <span class="badge badge-secondary">Sin fecha límite estricta</span>
-                        {% endif %}
-                    </p>
-                    {% if pt.tarea.descripcion %}
-                    <p class="action-card-desc">
-                        {{ pt.tarea.descripcion[:100] }}{% if pt.tarea.descripcion|length > 100 %}...{% endif %}
-                    </p>
-                    {% endif %}
-                    <button type="button" class="btn btn-sm btn-primary action-jump-btn" data-jump-tab="evidencias" data-jump-task="task-item-{{ pt.tarea.id }}">
-                        📤 Ir a entregar evidencia
-                    </button>
-                {% else %}
-                    <h3 class="action-card-title">¡Todo al día en evidencias!</h3>
-                    <p class="action-card-desc">No tienes tareas pendientes urgentes por entregar en este momento. ¡Excelente gestión!</p>
-                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="evidencias">
-                        📋 Consultar histórico de tareas
-                    </button>
-                {% endif %}
-            </div>
+            <span class="priority-dashboard-note">Aseo · Rendimiento · Alertas</span>
         </div>
 
-        <!-- Card 2: Convivencia y turno de aseo -->
-        <div class="action-card action-card-community">
-            <div class="action-card-header">
-                <span class="action-card-icon">🧹</span>
-                <span class="action-card-badge">Aula y Convivencia</span>
-            </div>
-            <div class="action-card-body">
+        <div class="priority-dashboard-grid">
+            <article class="priority-card priority-card-cleaning" aria-labelledby="priority-cleaning-title">
+                <div class="priority-card-topline">
+                    <span class="priority-kicker"><span class="priority-index">01</span> Turnos de aseo</span>
+                    <span class="priority-status priority-status-success">{{ aseo.contador.veces_aseo }} cumplido{{ '' if aseo.contador.veces_aseo == 1 else 's' }}</span>
+                </div>
+                <h3 id="priority-cleaning-title">{% if aseo.turno_propio %}Tu próximo turno{% else %}Estado de tu turno{% endif %}</h3>
                 {% if aseo.turno_propio %}
-                    <h3 class="action-card-title">
-                        {% if aseo.turno_propio.fecha == aseo.hoy %}
-                        ¡Hoy te corresponde turno!
-                        {% else %}
-                        Turno programado: {{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}
-                        {% endif %}
-                    </h3>
-                    <p class="action-card-desc">
-                        Compañero asignado: <strong>{{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</strong>
-                    </p>
-                    <div class="action-card-buttons">
-                        <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="convivencia">
-                            🤝 Ver turno y opciones de cambio
-                        </button>
+                    <div class="priority-date">{% if aseo.turno_propio.fecha == aseo.hoy %}Hoy{% else %}{{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}{% endif %}</div>
+                    <p class="priority-card-copy">Con <strong>{{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</strong></p>
+                    <p class="priority-card-meta">Estado: <strong>{{ 'Intercambiado' if aseo.turno_propio.estado == 'intercambiado' else 'Programado' }}</strong>. Revisa la fecha antes de iniciar la jornada.</p>
+                    <button type="button" class="btn btn-sm btn-primary priority-action action-jump-btn" data-jump-tab="convivencia">Ver detalle del turno</button>
+                {% else %}
+                    <div class="priority-date priority-date-neutral">Sin turno asignado</div>
+                    <p class="priority-card-copy">No tienes un turno pendiente en las próximas fechas disponibles.</p>
+                    {% if aseo.siguientes %}
+                    <div class="priority-mini-list" aria-label="Próximos turnos del grupo">
+                        {% for turno in aseo.siguientes[:2] %}
+                        <div><time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time><span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span></div>
+                        {% endfor %}
                     </div>
-                {% else %}
-                    <h3 class="action-card-title">Aseo sin pendientes</h3>
-                    <p class="action-card-desc">Has completado <strong>{{ aseo.contador.veces_aseo }}</strong> turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }}. El promedio de la ficha es {{ '%.1f'|format(aseo.promedio) }}.</p>
-                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="convivencia">
-                        🔍 Ver equidad del grupo
-                    </button>
+                    {% endif %}
+                    <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline priority-action">Ver calendario de turnos</a>
                 {% endif %}
-            </div>
-        </div>
+            </article>
 
-        <!-- Card 3: Participación y Logros -->
-        <div class="action-card action-card-growth">
-            <div class="action-card-header">
-                <span class="action-card-icon">🏆</span>
-                <span class="action-card-badge">Motivación y Metas</span>
-            </div>
-            <div class="action-card-body">
-                {% if fila_propia %}
-                    <h3 class="action-card-title">Puesto #{{ fila_propia.posicion }} en participación</h3>
-                    <p class="action-card-desc">
-                        Puntaje: <strong>{{ '%.1f'|format(fila_propia.puntaje_total) }} pts</strong>
-                        {% if punto_siguiente %}
-                        · Estás a <strong>{{ '%.1f'|format(punto_siguiente) }} pts</strong> del puesto #{{ fila_propia.posicion - 1 }}.
-                        {% endif %}
-                    </p>
-                    <p class="action-card-subdesc">"{{ mensaje_ranking }}"</p>
-                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="rendimiento">
-                        🏅 Ver ranking e insignias
-                    </button>
+            <article class="priority-card priority-card-performance" aria-labelledby="priority-performance-title">
+                <div class="priority-card-topline">
+                    <span class="priority-kicker"><span class="priority-index">02</span> Rendimiento académico</span>
+                    {% if fila_propia %}<span class="priority-status priority-status-info">Puesto #{{ fila_propia.posicion }}</span>{% endif %}
+                </div>
+                <h3 id="priority-performance-title">Tu avance en cifras</h3>
+                <div class="priority-metric-grid">
+                    <div><strong>{{ stats_juicios.pct_total }}%</strong><span>RAPs aprobados</span></div>
+                    <div><strong>{{ '%.0f'|format(pct_asistencia) }}%</strong><span>Asistencia</span></div>
+                    <div><strong>{% if fila_propia %}{{ '%.1f'|format(fila_propia.puntaje_total) }}{% else %}—{% endif %}</strong><span>Puntos</span></div>
+                </div>
+                <div class="priority-progress" role="progressbar" aria-label="RAPs aprobados" aria-valuenow="{{ stats_juicios.pct_total }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ stats_juicios.pct_total }}%;"></span></div>
+                <p class="priority-card-meta">{{ stats_juicios.aprobados }} de {{ stats_juicios.total }} resultados aprobados · {{ resumen_rapido.tareas_pendientes_count }} evidencia{{ '' if resumen_rapido.tareas_pendientes_count == 1 else 's' }} pendiente{{ '' if resumen_rapido.tareas_pendientes_count == 1 else 's' }}.</p>
+                <button type="button" class="btn btn-sm btn-outline priority-action" data-jump-tab="rendimiento">Ver rendimiento y logros</button>
+            </article>
+
+            <article class="priority-card priority-card-alerts {% if alertas_activas %}has-alerts{% endif %}" aria-labelledby="priority-alerts-title">
+                <div class="priority-card-topline">
+                    <span class="priority-kicker"><span class="priority-index">03</span> Alertas y atención</span>
+                    <span class="priority-status {% if alertas_activas %}priority-status-warning{% else %}priority-status-success{% endif %}">{{ alertas_activas|length }} activa{{ '' if alertas_activas|length == 1 else 's' }}</span>
+                </div>
+                <h3 id="priority-alerts-title">{% if alertas_activas %}Tienes novedades para revisar{% else %}Sin alertas activas{% endif %}</h3>
+                {% if alertas_activas %}
+                    <div class="priority-alert-detail">
+                        <strong>{{ alertas_activas[0].titulo }}</strong>
+                        <p>{{ alertas_activas[0].mensaje }}</p>
+                    </div>
+                    {% if alertas_activas|length > 1 %}<p class="priority-card-meta">Además tienes {{ alertas_activas|length - 1 }} alerta{{ '' if alertas_activas|length == 2 else 's' }} activa{{ '' if alertas_activas|length == 2 else 's' }}.</p>{% endif %}
+                    <button type="button" class="btn btn-sm btn-primary priority-action" data-jump-tab="resumen" data-jump-target-id="seccion-alertas">Revisar alertas</button>
                 {% else %}
-                    <h3 class="action-card-title">Participación Activa</h3>
-                    <p class="action-card-desc">Asiste puntualmente y sube tus actividades a tiempo para destacar en la ficha.</p>
-                    <button type="button" class="btn btn-sm btn-outline action-jump-btn" data-jump-tab="rendimiento">
-                        🌟 Conocer catálogo de insignias
-                    </button>
+                    <p class="priority-card-copy">No hay novedades académicas o de asistencia que requieran tu atención.</p>
+                    <p class="priority-card-meta">Tu estado actual es <strong>{{ resumen_rapido.estado_academico|lower }}</strong>.</p>
+                    <button type="button" class="btn btn-sm btn-outline priority-action" data-jump-tab="resumen">Ver resumen de la ficha</button>
                 {% endif %}
-            </div>
+            </article>
         </div>
     </section>
 
@@ -654,7 +619,7 @@
                 <span class="eyebrow">Responsabilidad compartida</span>
                 <h2>Turno de aseo</h2>
             </div>
-            <span class="cleaning-balance-pill">{{ aseo.contador.veces_aseo }} cumplido{{ '' if aseo.contador.veces_aseo == 1 else 's' }}</span>
+            <span class="cleaning-balance-pill">{{ aseo.contador.veces_aseo }} turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }} cumplido{{ '' if aseo.contador.veces_aseo == 1 else 's' }}</span>
         </div>
         <p class="text-muted cleaning-card-link">
             <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver calendario completo y tabla de equidad</a>
@@ -680,7 +645,7 @@
                 </div>
             </div>
             {% else %}
-            <p class="text-muted">Aún no hay turnos próximos programados.</p>
+            <p class="text-muted">No hay turnos de aseo asignados para las próximas fechas. Consulta el calendario completo para ver cuándo se programen.</p>
             {% endif %}
         </div>
 
@@ -717,7 +682,7 @@
         </div>
 
         <div class="cleaning-balance">
-            <strong>Has hecho aseo {{ aseo.contador.veces_aseo }} veces</strong>
+            <strong>Has cumplido {{ aseo.contador.veces_aseo }} turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }} de aseo</strong>
             <span>El promedio del grupo es {{ '%.1f'|format(aseo.promedio) }}.</span>
         </div>
 
@@ -793,7 +758,7 @@
     {% endif %}
 
     {% if alertas_activas %}
-    <div data-learner-tab="resumen">
+    <div id="seccion-alertas" data-learner-tab="resumen">
         <div class="active-alerts-label">
             <span class="badge badge-solid-danger">{{ alertas_activas|length }} alerta{% if alertas_activas|length != 1 %}s{% endif %} activa{% if alertas_activas|length != 1 %}s{% endif %}</span>
         </div>
@@ -2620,6 +2585,218 @@
             font-size: 1.45rem;
         }
     }
+
+    /* Resumen priorizado: el aprendiz identifica primero aseo, rendimiento y alertas. */
+    .learner-priority-dashboard {
+        padding: 1.5rem;
+        border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+        border-radius: 16px;
+        background: var(--bg-surface, #ffffff);
+        box-shadow: 0 4px 18px -4px rgba(15, 23, 42, 0.08);
+    }
+
+    .priority-dashboard-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.1rem;
+    }
+
+    .priority-dashboard-heading h2 {
+        margin: 0.2rem 0 0.35rem;
+        font-size: 1.35rem;
+        color: var(--text-strong, #172033);
+    }
+
+    .priority-dashboard-heading p {
+        margin: 0;
+        max-width: 680px;
+        font-size: 0.9rem;
+    }
+
+    .priority-dashboard-note {
+        padding: 0.4rem 0.7rem;
+        border: 1px solid var(--border-color, #dbe3ed);
+        border-radius: 999px;
+        color: var(--text-muted, #64748b);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .priority-dashboard-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .priority-card {
+        display: flex;
+        min-width: 0;
+        min-height: 260px;
+        flex-direction: column;
+        padding: 1.2rem;
+        border: 1px solid var(--border-color, #dbe3ed);
+        border-top: 4px solid var(--learner-custom-accent);
+        border-radius: 12px;
+        background: var(--bg-surface, #ffffff);
+    }
+
+    .priority-card-cleaning { border-top-color: var(--accent-primary, #39a900); }
+    .priority-card-performance { border-top-color: var(--info, #2563eb); }
+    .priority-card-alerts { border-top-color: var(--success, #16a34a); }
+    .priority-card-alerts.has-alerts { border-top-color: var(--warning, #d97706); }
+
+    .priority-card-topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .priority-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--text-muted, #64748b);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .priority-index {
+        display: inline-grid;
+        width: 1.55rem;
+        height: 1.55rem;
+        place-items: center;
+        border-radius: 50%;
+        color: #ffffff;
+        background: var(--learner-custom-accent);
+        font-size: 0.68rem;
+        letter-spacing: 0;
+    }
+
+    .priority-status {
+        padding: 0.25rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .priority-status-success { color: var(--success, #15803d); background: var(--sena-green-light, #eaf7e5); }
+    .priority-status-info { color: var(--info, #1d4ed8); background: rgba(37, 99, 235, 0.1); }
+    .priority-status-warning { color: var(--warning-text, #92400e); background: var(--sena-yellow-light, #fff4d6); }
+
+    .priority-card h3 {
+        margin: 0 0 0.7rem;
+        color: var(--text-strong, #172033);
+        font-size: 1.05rem;
+        line-height: 1.3;
+    }
+
+    .priority-date {
+        margin-bottom: 0.35rem;
+        color: var(--accent-hover, #2d8600);
+        font-size: clamp(1.55rem, 2.2vw, 2rem);
+        font-weight: 900;
+        line-height: 1.05;
+    }
+
+    .priority-date-neutral { color: var(--text-strong, #172033); font-size: 1.45rem; }
+
+    .priority-card-copy {
+        margin: 0 0 0.65rem;
+        color: var(--text-main, #334155);
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+
+    .priority-card-meta {
+        margin: 0 0 0.8rem;
+        color: var(--text-muted, #64748b);
+        font-size: 0.77rem;
+        line-height: 1.45;
+    }
+
+    .priority-action { align-self: flex-start; margin-top: auto; }
+
+    .priority-mini-list {
+        display: grid;
+        gap: 0.35rem;
+        margin: 0 0 0.85rem;
+    }
+
+    .priority-mini-list > div {
+        display: grid;
+        grid-template-columns: 3.2rem minmax(0, 1fr);
+        gap: 0.5rem;
+        padding: 0.45rem 0.55rem;
+        border-radius: 7px;
+        background: var(--bg-surface-secondary, #f8fafc);
+        font-size: 0.74rem;
+    }
+
+    .priority-mini-list time { color: var(--text-strong, #172033); font-weight: 800; }
+    .priority-mini-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .priority-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.45rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .priority-metric-grid > div {
+        padding: 0.55rem 0.45rem;
+        border: 1px solid var(--border-color, #e2e8f0);
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .priority-metric-grid strong,
+    .priority-metric-grid span { display: block; }
+    .priority-metric-grid strong { color: var(--text-strong, #172033); font-size: 1.2rem; line-height: 1.1; }
+    .priority-metric-grid span { margin-top: 0.25rem; color: var(--text-muted, #64748b); font-size: 0.67rem; line-height: 1.15; }
+
+    .priority-progress {
+        height: 0.5rem;
+        margin-bottom: 0.65rem;
+        overflow: hidden;
+        border-radius: 999px;
+        background: var(--bg-surface-secondary, #e2e8f0);
+    }
+
+    .priority-progress span { display: block; height: 100%; border-radius: inherit; background: var(--info, #2563eb); }
+
+    .priority-alert-detail {
+        padding: 0.75rem;
+        margin-bottom: 0.65rem;
+        border-left: 3px solid var(--warning, #d97706);
+        border-radius: 0 8px 8px 0;
+        background: var(--sena-yellow-light, #fff4d6);
+    }
+
+    .priority-alert-detail strong { display: block; color: var(--text-strong, #172033); font-size: 0.86rem; }
+    .priority-alert-detail p { margin: 0.25rem 0 0; color: var(--text-main, #334155); font-size: 0.78rem; line-height: 1.4; }
+
+    @media (max-width: 960px) {
+        .priority-dashboard-grid { grid-template-columns: 1fr 1fr; }
+        .priority-card-cleaning { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 640px) {
+        .learner-priority-dashboard { padding: 1rem; }
+        .priority-dashboard-heading { flex-direction: column; }
+        .priority-dashboard-grid { grid-template-columns: 1fr; }
+        .priority-card-cleaning { grid-column: auto; }
+        .priority-card { min-height: 0; }
+    }
     </style>
 
     <!-- ============================================================ -->
@@ -2873,7 +3050,9 @@
             btn.addEventListener('click', () => {
                 const target = btn.dataset.jumpTab;
                 activateTab(target, true);
-                const firstEl = document.querySelector(`[data-learner-tab="${target}"]`);
+                const firstEl = btn.dataset.jumpTargetId
+                    ? document.getElementById(btn.dataset.jumpTargetId)
+                    : document.querySelector(`[data-learner-tab="${target}"]`);
                 if (firstEl) {
                     firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }

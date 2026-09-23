@@ -2,6 +2,24 @@
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
 {% block title %}Juicios Evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
 
+{% block nav_center %}
+<div class="nav-context-slot">
+    <div class="nav-context-bar" role="region" aria-label="Contexto de la vista de Juicios">
+        <a href="{{ url_for('instructor.fichas') }}" class="nav-context-btn-back" title="Volver a Fichas">&larr; Volver</a>
+        <span class="nav-context-divider" aria-hidden="true"></span>
+        <h1 class="nav-context-title">
+            <span class="nav-context-icon" aria-hidden="true">🎓</span>
+            <span class="nav-context-text">Juicios de Evaluación<span class="nav-context-title-ext"> Oficiales</span></span>
+        </h1>
+        <span class="nav-context-divider" aria-hidden="true"></span>
+        <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="nav-context-btn-action" title="Analizar planeación pedagógica">
+            <span class="nav-context-btn-icon" aria-hidden="true">🧭</span>
+            <span>Analizar planeación</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 
 <style>
@@ -210,17 +228,6 @@
 </style>
 
 <div class="juicios-container">
-    <!-- Header -->
-    <div class="page-header">
-        <div class="page-title-cluster">
-            <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-            <h1>🎓 Juicios de Evaluación Oficiales</h1>
-        </div>
-        <div class="page-header-actions">
-            <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">🧭 Analizar planeación</a>
-        </div>
-    </div>
-
     {% if recomendaciones_juicios %}
     <div class="juicios-recommendations-banner">
         {% for rec in recomendaciones_juicios[:2] %}

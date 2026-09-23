@@ -137,13 +137,15 @@ normalize_positive_int() {
   fi
 }
 
-GUNICORN_WORKERS="$(normalize_positive_int "${WEB_CONCURRENCY:-}" 3)"
-GUNICORN_THREADS="$(normalize_positive_int "${GUNICORN_THREADS:-}" 8)"
-if [ "${WEB_CONCURRENCY:-}" != "$GUNICORN_WORKERS" ]; then
-  echo "[WARNING] WEB_CONCURRENCY='${WEB_CONCURRENCY:-}' no es válido; se usará ${GUNICORN_WORKERS}."
+RAW_WEB_CONCURRENCY="${WEB_CONCURRENCY:-}"
+RAW_GUNICORN_THREADS="${GUNICORN_THREADS:-}"
+GUNICORN_WORKERS="$(normalize_positive_int "$RAW_WEB_CONCURRENCY" 2)"
+GUNICORN_THREADS="$(normalize_positive_int "$RAW_GUNICORN_THREADS" 4)"
+if [ "$RAW_WEB_CONCURRENCY" != "$GUNICORN_WORKERS" ] && [ -n "$RAW_WEB_CONCURRENCY" ]; then
+  echo "[WARNING] WEB_CONCURRENCY='$RAW_WEB_CONCURRENCY' no es válido; se usará ${GUNICORN_WORKERS}."
 fi
-if [ "${GUNICORN_THREADS:-}" != "$GUNICORN_THREADS" ]; then
-  echo "[WARNING] GUNICORN_THREADS='${GUNICORN_THREADS:-}' no es válido; se usarán ${GUNICORN_THREADS}."
+if [ "$RAW_GUNICORN_THREADS" != "$GUNICORN_THREADS" ] && [ -n "$RAW_GUNICORN_THREADS" ]; then
+  echo "[WARNING] GUNICORN_THREADS='$RAW_GUNICORN_THREADS' no es válido; se usarán ${GUNICORN_THREADS}."
 fi
 # Gunicorn convierte WEB_CONCURRENCY durante su importación, así que también
 # hay que exportar el valor normalizado antes de invocar el binario.

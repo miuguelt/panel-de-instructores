@@ -41,6 +41,10 @@ class Tarea(db.Model):
         backref=db.backref('tareas_creadas', lazy='dynamic'),
     )
 
+    __table_args__ = (
+        db.Index('ix_tareas_ficha_instructor', 'ficha_id', 'instructor_id'),
+    )
+
     @property
     def es_actividad_clase(self):
         """La actividad se aprueba en el aula y no admite entregas del aprendiz."""

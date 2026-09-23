@@ -178,6 +178,40 @@ class CacheEstaticosTestCase(BaseRendimiento):
         self.assertIn('/static/css/styles.css?v=', html)
         self.assertIn('/static/js/table-filters.js?v=', html)
 
+    def test_dependencias_externas_no_bloquean_la_primera_pintura(self):
+        html = self.cliente.get('/instructor/fichas').get_data(as_text=True)
+        self.assertIn('rel="preload"', html)
+        self.assertIn('fonts.googleapis.com/css2', html)
+        self.assertIn('onload="this.onload=null;this.rel=\'stylesheet\'"', html)
+        self.assertIn('src="https://unpkg.com/htmx.org@2.0.4" defer', html)
+
+    def test_html_se_entrega_comprimido_para_navegadores_compatibles(self):
+        respuesta = self.cliente.get(
+            '/instructor/fichas', headers={'Accept-Encoding': 'gzip'}
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.headers.get('Content-Encoding'), 'gzip')
+        self.assertIn('Accept-Encoding', respuesta.headers.get('Vary', ''))
+
+    def test_indices_compuestos_cubren_consultas_de_navegacion(self):
+        esperados = {
+            'ix_alertas_ficha_estado': ('ficha_id', 'estado'),
+            'ix_notificaciones_destinatario_leida': (
+                'destinatario_tipo', 'destinatario_id', 'leida'
+            ),
+            'ix_aprendices_ficha_estado': ('ficha_id', 'estado'),
+            'ix_juicios_ficha_aprendiz': ('ficha_id', 'aprendiz_id'),
+            'ix_tareas_ficha_instructor': ('ficha_id', 'instructor_id'),
+            'ix_sesiones_ficha_fecha': ('ficha_id', 'fecha'),
+        }
+        encontrados = {
+            indice.name: tuple(columna.name for columna in indice.columns)
+            for tabla in db.metadata.tables.values()
+            for indice in tabla.indexes
+        }
+        for nombre, columnas in esperados.items():
+            self.assertEqual(encontrados.get(nombre), columnas, nombre)
+
     def test_las_descargas_no_heredan_la_caducidad_larga(self):
         # Solo el endpoint 'static' se cachea: los reportes generados y los
         # archivos subidos deben seguir revalidando en cada descarga.

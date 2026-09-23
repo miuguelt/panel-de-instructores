@@ -636,7 +636,7 @@
                 htmlRes += `
                     <div class="pl-pedagogico-card">
                         <div class="pl-rap-head">
-                            <strong>${highlightText(r.rap || 'Sin denominación', query)}</strong>
+                            <strong class="pl-rap-title">${highlightText(r.rap || 'Sin denominación', query)}</strong>
                             ${r.rap_codigo ? `<span class="pl-chip pl-tone-neutral">RAP: ${highlightText(r.rap_codigo, query)}</span>` : ''}
                         </div>
                         <div class="pl-pedagogico-meta" style="margin-top:.5rem; margin-bottom:.3rem;">

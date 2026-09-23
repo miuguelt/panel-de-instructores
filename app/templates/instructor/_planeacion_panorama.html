@@ -3,7 +3,7 @@
 <section class="pl-verdict pl-tone-{{ veredicto.tono }}" id="seccion-resumen">
     <span class="pl-verdict-icon" aria-hidden="true">{{ veredicto.icono }}</span>
     <div>
-        <strong>{{ veredicto.titulo }}</strong>
+        <strong class="pl-verdict-title">{{ veredicto.titulo }}</strong>
         <p>{{ veredicto.detalle }}</p>
     </div>
 </section>
@@ -152,7 +152,7 @@
     <div class="pl-phase-answer pl-tone-{{ resultado_tono }}">
         <div class="pl-phase-answer-icon" aria-hidden="true">{{ '⏰' if seguimiento_fases.estado == 'atrasado' else ('✅' if seguimiento_fases.estado in ('al_dia', 'completado') else '🚀') }}</div>
         <div>
-            <strong>
+            <strong class="pl-phase-answer-title">
                 {% if seguimiento_fases.estado == 'completado' %}
                 Todos los resultados de aprendizaje están cerrados.
                 {% elif fase_esperada and fase_real and fase_real.nombre != fase_esperada.nombre %}
@@ -164,10 +164,8 @@
                 {% endif %}
             </strong>
             <p>
-                A la fecha {{ seguimiento_fases.hoy.strftime('%d/%m/%Y') }}, se han evaluado
-                <strong>{{ seguimiento_fases.resultados.evaluados }} de {{ seguimiento_fases.resultados.total }} RAPs</strong>;
-                por calendario deberían estar evaluados aproximadamente
-                <strong>{{ seguimiento_fases.resultados.esperados }}</strong>.
+                A la fecha {{ seguimiento_fases.hoy.strftime('%d/%m/%Y') }}, se han evaluado <strong>{{ seguimiento_fases.resultados.evaluados }} de {{ seguimiento_fases.resultados.total }} RAPs</strong>;
+                por calendario deberían estar evaluados aproximadamente <strong>{{ seguimiento_fases.resultados.esperados }}</strong>.
                 {% if seguimiento_fases.resultados.brecha < 0 %}
                 Faltan {{ -seguimiento_fases.resultados.brecha }} RAPs frente al ritmo esperado.
                 {% elif seguimiento_fases.resultados.brecha > 0 %}
@@ -198,7 +196,7 @@
             </div>
             <div class="pl-phase-track-count"><strong>{{ fase.resultados_evaluados }}/{{ fase.resultados_total }}</strong> evaluados</div>
             <div class="pl-progress-wrap"><div class="pl-progress-bar" style="width: {{ fase.porcentaje_evaluados }}%;"></div></div>
-            <small class="pl-phase-track-note">{{ fase.resultados_aprobados }} cerrados · {{ fase.resultados_esperados }} esperados · {% if fase.brecha_resultados < 0 %}{{ -fase.brecha_resultados }} pendientes de ritmo{% elif fase.brecha_resultados > 0 %}+{{ fase.brecha_resultados }} adelantados{% else %}al ritmo{% endif %}</small>
+            <small class="pl-phase-track-note">{{ fase.resultados_aprobados }} cerrado{{'' if fase.resultados_aprobados == 1 else 's'}} · {{ fase.resultados_esperados }} esperado{{'' if fase.resultados_esperados == 1 else 's'}} · {% if fase.brecha_resultados < 0 %}{{ -fase.brecha_resultados }} pendiente{{'' if -fase.brecha_resultados == 1 else 's'}} de ritmo{% elif fase.brecha_resultados > 0 %}+{{ fase.brecha_resultados }} adelantado{{'' if fase.brecha_resultados == 1 else 's'}}{% else %}al ritmo{% endif %}</small>
         </article>
         {% endfor %}
     </div>

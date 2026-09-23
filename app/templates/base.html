@@ -9,10 +9,11 @@
     <title>{% block title %}SENA Control Académico{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"></noscript>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tyt.css') }}">
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
     {% block head %}{% endblock %}
     <script>
         (function() {
@@ -55,6 +56,8 @@
                        class="nav-link {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}is-active{% endif %}"
                        {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}aria-current="page"{% endif %}>Fichas</a>
                 </div>
+
+                {% block nav_center %}{% endblock %}
 
                 <div class="nav-user">
                     <span class="nav-identity">
