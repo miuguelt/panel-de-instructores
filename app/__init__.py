@@ -242,6 +242,15 @@ def create_app(test_config=None):
     # sees the complete Jinja environment, including during app initialization.
     app.add_template_filter(strip_document_id, 'strip_document_id')
 
+    # SQLite (ej. SQLiteDialect_pysqlite/StaticPool en tests) no acepta pool_size,
+    # max_overflow ni pool_timeout en create_engine().
+    db_uri = str(app.config.get('SQLALCHEMY_DATABASE_URI') or '')
+    if db_uri.startswith('sqlite'):
+        engine_opts = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS') or {})
+        for invalid_key in ('pool_size', 'max_overflow', 'pool_timeout'):
+            engine_opts.pop(invalid_key, None)
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_opts
+
     db.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'

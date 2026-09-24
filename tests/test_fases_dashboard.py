@@ -18,12 +18,19 @@ from app.services.fases_dashboard import (
 
 class FasesDashboardTestCase(unittest.TestCase):
     def setUp(self):
-        self.app = create_app()
-        self.app.config['TESTING'] = True
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+            'SQLALCHEMY_ENGINE_OPTIONS': {},
+            'WTF_CSRF_ENABLED': False,
+        })
         self.app_context = self.app.app_context()
         self.app_context.push()
+        db.create_all()
 
     def tearDown(self):
+        db.session.remove()
+        db.drop_all()
         self.app_context.pop()
 
     def test_umbrales_cubren_ciclo_completo(self):
