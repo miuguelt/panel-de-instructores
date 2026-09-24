@@ -1,0 +1,62 @@
+name: DevBrain CI - GitFlow Continuous Integration (Panel de Instructores)
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+      - 'release/**'
+      - 'hotfix/**'
+      - 'bugfix/**'
+      - 'support/**'
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - 'feature/**'
+      - 'release/**'
+      - 'hotfix/**'
+      - 'bugfix/**'
+      - 'support/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-panel-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-suite:
+    name: Flask Test Suite (Panel de Instructores)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install pytest pytest-cov
+
+      - name: Run Tests
+        env:
+          FLASK_ENV: testing
+          DATABASE_URL: "sqlite:///:memory:"
+        run: |
+          echo "Ejecutando suite de pruebas en Panel de Instructores..."
+          python -m pytest tests/ -v --tb=short
+
+      - name: Report Summary
+        if: always()
+        run: |
+          echo "### 📋 Panel de Instructores CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Estado**: ${{ job.status == 'success' && '✅ Aprobado' || '❌ Fallido' }}" >> $GITHUB_STEP_SUMMARY
