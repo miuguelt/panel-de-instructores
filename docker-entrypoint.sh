@@ -162,5 +162,6 @@ exec gunicorn wsgi:app \
   --graceful-timeout 30 \
   --keep-alive 5 \
   --access-logfile - \
+  --access-logformat '%(m)s %(U)s %(s)s %(D)s' \
   --error-logfile - \
   --log-level info

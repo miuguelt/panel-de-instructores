@@ -23,6 +23,7 @@ from app.models import (
     Instructor,
     NotaObservador,
     Notificacion,
+    ProrrogaTarea,
     RegistroAsistencia,
     SesionAsistencia,
     Tarea,
@@ -176,6 +177,111 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertIn(b'class="card card-ficha', dashboard)
         self.assertNotIn(b'<a class="card card-ficha', dashboard)
         self.assertIn('Navegación principal'.encode(), dashboard)
+
+    def test_evidencias_faltantes_resume_estado_y_prorrogas_por_aprendiz(self):
+        ahora = datetime.utcnow()
+        tarea_vencida = Tarea(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            titulo='Informe vencido',
+            fecha_limite=ahora - timedelta(days=2),
+        )
+        tarea_con_prorroga = Tarea(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            titulo='Informe con prórroga',
+            fecha_limite=ahora - timedelta(days=2),
+        )
+        actividad_clase = Tarea(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            titulo='Actividad en clase',
+            modalidad='clase',
+        )
+        carlos = Aprendiz(
+            documento='1000003',
+            nombre='Carlos',
+            apellidos='Completo',
+            ficha_id=self.ficha.id,
+        )
+        db.session.add_all([tarea_vencida, tarea_con_prorroga, actividad_clase, carlos])
+        db.session.flush()
+
+        db.session.add_all([
+            Entrega(
+                tarea_id=tarea_vencida.id,
+                aprendiz_id=self.aprendiz.id,
+                estado_revision='rechazada',
+            ),
+            ProrrogaTarea(
+                tarea_id=tarea_con_prorroga.id,
+                aprendiz_id=self.aprendiz.id,
+                instructor_id=self.instructor.id,
+                nueva_fecha_limite=ahora + timedelta(days=2),
+                motivo='Entrega acordada',
+            ),
+        ])
+        tareas = [self.tarea, tarea_vencida, tarea_con_prorroga, actividad_clase]
+        db.session.add_all([
+            Entrega(
+                tarea_id=tarea.id,
+                aprendiz_id=carlos.id,
+                estado_revision='aprobada',
+                registrada_por_instructor=(tarea.id == actividad_clase.id),
+            )
+            for tarea in tareas
+        ])
+        db.session.add(Entrega(
+            tarea_id=actividad_clase.id,
+            aprendiz_id=self.aprendiz.id,
+            estado_revision='aprobada',
+            registrada_por_instructor=True,
+        ))
+        db.session.commit()
+
+        respuesta = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/evidencias-faltantes'
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(b'6 / 12', respuesta.data)
+        self.assertIn(b'50%', respuesta.data)
+        self.assertIn('Todo completo'.encode(), respuesta.data)
+        self.assertIn('Corrección solicitada'.encode(), respuesta.data)
+        self.assertIn('Prórroga vigente'.encode(), respuesta.data)
+        self.assertIn('Actividad pendiente en clase'.encode(), respuesta.data)
+        self.assertIn('Vencida'.encode(), respuesta.data)
+        self.assertIn('Entregó y completó todas las tareas asignadas.', respuesta.get_data(as_text=True))
+
+    def test_evidencias_faltantes_distingue_ficha_sin_tareas(self):
+        db.session.delete(self.tarea)
+        db.session.commit()
+
+        respuesta = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/evidencias-faltantes'
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.get_data(as_text=True)
+        self.assertIn('No hay tareas asignadas para esta ficha.', html)
+        self.assertIn('Sin tareas', html)
+        self.assertNotIn('Todo completo', html)
+        self.assertNotIn('aria-valuenow=', html)
+
+    def test_evidencias_faltantes_no_calcula_porcentaje_sin_aprendices_activos(self):
+        self.aprendiz.estado = 'CERTIFICADO'
+        self.otro_aprendiz.estado = 'CERTIFICADO'
+        db.session.commit()
+
+        respuesta = self.cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/evidencias-faltantes'
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.get_data(as_text=True)
+        self.assertIn('no hay aprendices activos en formación.', html)
+        self.assertIn('No hay aprendices activos en formación para mostrar.', html)
+        self.assertNotIn('aria-valuenow=', html)
 
     def test_login_logout_y_redireccion_son_seguros(self):
         cliente = self.app.test_client()
@@ -1243,6 +1349,338 @@ class FlujosWebTestCase(unittest.TestCase):
         respuesta = self.cliente.get('/ruta-que-no-existe')
         self.assertEqual(respuesta.status_code, 404)
         self.assertIn('Página no encontrada'.encode(), respuesta.data)
+
+    def test_filtros_raiz_modelos_y_servicios_que_faltaban(self):
+        from datetime import date
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from app.helpers import obtener_tamanos_materiales
+        from app.models.aseo import TurnoAseo
+        from app.models.atencion import TurnoAtencion
+        from app.models.corte import Corte
+        from app.models.material import MaterialFicha
+        from app.models.observador import NotaObservador
+        from app.services.alertas import ContextoFicha, obtener_config_asistencia
+        from app.services.analisis_planeacion import _es_juicio_evaluado, _fecha_texto
+        from app.services.archivos import ArchivoService
+        from app.services.cortes import siguiente_nombre_corte
+        from app.services.festivos import es_dia_habil, nombre_festivo_colombia
+        from app.services.graficos_planeacion import _formato_mes_anio
+        from app.services.ranking import _alias_aprendiz
+        from app.services.recomendaciones import LogroAprendiz, Recomendacion
+        from app.services.seguimiento_fases import FASES_PROYECTO, _fase_orden
+        from app.services.versiones_archivos import ruta_version
+
+        self.assertEqual(self.cliente.get('/').status_code, 302)
+        self.assertEqual(self.app.jinja_env.filters['tipo_competencia']('Competencia técnica'), 'tecnica')
+        self.assertEqual(self.app.jinja_env.filters['format_size'](1536), '1.5 KB')
+
+        self.aprendiz.rol_administrativo = True
+        self.assertTrue(self.aprendiz.es_aprendiz_administrador)
+        self.assertTrue(self.aprendiz.incluido_en_planeacion)
+        self.assertIn('Aprendiz', repr(self.aprendiz))
+        self.assertIn('Instructor', repr(self.instructor))
+        self.assertIn('Ficha', repr(self.ficha))
+        self.assertIn('Sesion', repr(self.sesion))
+        self.assertIn('Tarea', repr(self.tarea))
+        self.assertIn('ProrrogaTarea', repr(ProrrogaTarea(
+            tarea_id=self.tarea.id,
+            aprendiz_id=self.aprendiz.id,
+            instructor_id=self.instructor.id,
+            nueva_fecha_limite=datetime.utcnow(),
+        )))
+        self.assertIn('NotaObservador', repr(NotaObservador(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            instructor_id=self.instructor.id,
+            tipo='positiva',
+            categoria='compromiso',
+            descripcion='Buen trabajo',
+        )))
+        self.assertIn('MaterialFicha', repr(MaterialFicha(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            nombre_archivo='guia.pdf',
+            url_archivo='materiales/guia.pdf',
+        )))
+        corte = Corte(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            nombre='Corte temporal',
+            estado='cerrado',
+        )
+        self.assertTrue(corte.es_consultable)
+        self.assertIn('Corte temporal', repr(corte))
+        self.assertEqual(siguiente_nombre_corte(self.ficha.id, self.instructor.id), 'Corte 1')
+
+        turno_aseo = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=date.today(),
+            aprendiz_1=self.aprendiz,
+            aprendiz_2=self.otro_aprendiz,
+        )
+        self.assertEqual(turno_aseo.aprendices, (self.aprendiz, self.otro_aprendiz))
+        self.assertIn('TurnoAtencion', repr(TurnoAtencion(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz.id,
+            estado='esperando',
+        )))
+
+        self.tarea.fecha_limite = datetime.utcnow() - timedelta(days=1)
+        self.entrega.fecha_entrega = datetime.utcnow()
+        self.assertTrue(self.entrega.entregada_con_retraso)
+        self.entrega.registrada_por_instructor = True
+        self.assertFalse(self.entrega.entregada_con_retraso)
+
+        contexto = ContextoFicha(self.ficha.id)
+        self.assertIsNotNone(contexto.config_correo())
+        self.assertIsNotNone(obtener_config_asistencia(self.ficha.id))
+        self.assertEqual(_fecha_texto(date(2026, 9, 28)), '28/09/2026')
+        self.assertTrue(_es_juicio_evaluado('APROBADO'))
+        self.assertFalse(_es_juicio_evaluado('POR EVALUAR'))
+        self.assertEqual(_formato_mes_anio(date(2026, 1, 1)), 'Ene 26')
+        self.assertEqual(_alias_aprendiz(SimpleNamespace(id=7)), 'Aprendiz 007')
+        self.assertEqual(_fase_orden(FASES_PROYECTO[0][0]), 0)
+        self.assertEqual(nombre_festivo_colombia(date(2026, 1, 1)), 'Año Nuevo')
+        self.assertFalse(es_dia_habil(date(2026, 1, 1)))
+        self.assertTrue(es_dia_habil(date(2026, 1, 2)))
+        self.assertEqual(Recomendacion('a', 'b', 'c', 'd', 'e', 'f').to_dict()['id'], 'a')
+        self.assertEqual(LogroAprendiz('a', 'b', 'c', 'd', 'e', 'bronce', False, 0, 1, 0).to_dict()['codigo'], 'a')
+
+        ruta = os.path.join(self.uploads.name, 'cobertura.txt')
+        with open(ruta, 'wb') as archivo:
+            archivo.write(b'prueba')
+        self.assertEqual(ArchivoService.obtener_tamano('cobertura.txt'), 6)
+        self.assertTrue(ArchivoService.existe('cobertura.txt'))
+        self.assertEqual(ArchivoService.ruta_absoluta('cobertura.txt'), ruta)
+        self.assertEqual(ruta_version(SimpleNamespace(ruta_archivo='cobertura.txt'))[1], Path('cobertura.txt'))
+
+        obtener_config_asistencia(self.ficha.id)
+        materiales = [SimpleNamespace(id=12, url_archivo='a.pdf')]
+        with patch('app.helpers.ArchivoService.obtener_tamano', return_value=42) as obtener_tamano:
+            self.assertEqual(obtener_tamanos_materiales(materiales, self.uploads.name), {12: 42})
+            obtener_tamano.assert_called_once_with('a.pdf')
+
+    def test_rutas_de_tareas_turnos_ranking_y_seguimiento_pendientes(self):
+        from unittest.mock import patch
+
+        from app.models.insignia import Insignia, InsigniaOtorgada
+        from app.models.alertas import Notificacion
+        from app.models.asistencia import RegistroAsistencia
+
+        ficha_id = self.ficha.id
+        aprendiz_id = self.aprendiz.id
+
+        lista = self.cliente.get(f'/instructor/fichas/{ficha_id}/ranking/lista')
+        self.assertEqual(lista.status_code, 200)
+        self.assertEqual(lista.headers['Cache-Control'], 'no-store, no-cache, must-revalidate, max-age=0')
+        respuesta = self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/ranking/configuracion',
+            data={'peso_asistencia': '30', 'peso_evidencias': '40', 'peso_juicios': '30'},
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/insignias/crear',
+            data={'nombre': 'Constancia', 'descripcion': 'Cumplió su meta'},
+        ).status_code, 302)
+        insignia = Insignia.query.filter_by(ficha_id=ficha_id, nombre='Constancia').one()
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/insignias/otorgar',
+            data={'aprendiz_id': str(aprendiz_id), 'insignia_id': str(insignia.id)},
+        ).status_code, 302)
+        self.assertIsNotNone(InsigniaOtorgada.query.filter_by(
+            aprendiz_id=aprendiz_id, insignia_id=insignia.id,
+        ).first())
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/insignias/{insignia.id}/estado',
+        ).status_code, 302)
+
+        estado = self.cliente.get(f'/instructor/fichas/{ficha_id}/importaciones/999999')
+        self.assertEqual(estado.status_code, 404)
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/materiales/999999/eliminar',
+        ).status_code, 302)
+        self.assertEqual(self.cliente.get(
+            f'/instructor/fichas/{ficha_id}/fila-atencion/estado-actual',
+        ).status_code, 200)
+
+        self.assertEqual(self.cliente.get(
+            f'/aprendiz/{ficha_id}/descargar-reporte?documento={self.aprendiz.documento}',
+        ).mimetype, 'application/pdf')
+        registro = RegistroAsistencia.query.first()
+        self.assertEqual(self.cliente.get(
+            f'/aprendiz/descargar-soporte/{registro.id}',
+        ).status_code, 404)
+        with self.cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = self.aprendiz.documento
+        self.assertEqual(self.cliente.post(
+            f'/aprendiz/{ficha_id}/pedir-turno', data={'motivo': 'Consulta'},
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/aprendiz/{ficha_id}/cancelar-turno',
+        ).status_code, 302)
+
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/turnos-aseo/999999/editar',
+            data={
+                'aprendiz_1_id': str(aprendiz_id),
+                'aprendiz_2_id': str(self.otro_aprendiz.id),
+            },
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/turnos-aseo/config',
+            data={'aviso_horas': '36', 'excluir_ausentes': 'on'},
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/turnos-aseo/exclusion/999999',
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/aprendiz/{ficha_id}/turnos-aseo/999999/intercambiar',
+            data={'documento': self.aprendiz.documento, 'aprendiz_recibe_id': str(self.otro_aprendiz.id)},
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/aprendiz/{ficha_id}/intercambios/999999/responder',
+            data={'documento': self.aprendiz.documento, 'accion': 'rechazar'},
+        ).status_code, 302)
+
+        notificacion = Notificacion(
+            destinatario_tipo='instructor', destinatario_id=self.instructor.id,
+            ficha_id=ficha_id, mensaje='Aviso', tipo='general', clave='test-route-coverage',
+        )
+        db.session.add(notificacion)
+        db.session.commit()
+        self.assertEqual(self.cliente.post(
+            f'/instructor/notificaciones/{notificacion.id}/leer?redirect_url=/instructor/notificaciones',
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post('/instructor/notificaciones/leer-todas').status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/alertas/config-comite',
+            data={'umbral_fallas_consecutivas': '4', 'porcentaje_minimo_asistencia': '80'},
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/alertas/999999/observacion',
+            data={'observaciones': 'Revisado'},
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/instructor/fichas/{ficha_id}/alertas/999999/escalar',
+        ).status_code, 302)
+        with patch('app.routes.seguimiento.actualizar_alertas_ficha') as actualizar:
+            self.assertEqual(self.cliente.post(
+                f'/instructor/fichas/{ficha_id}/alertas/auto-evaluar',
+            ).status_code, 302)
+            actualizar.assert_called_once_with(ficha_id)
+
+        self.assertEqual(self.cliente.post(
+            f'/aprendiz/{ficha_id}/notificaciones/{notificacion.id}/leer',
+            data={'documento': self.aprendiz.documento},
+        ).status_code, 302)
+        self.assertEqual(self.cliente.post(
+            f'/aprendiz/{ficha_id}/notificaciones/leer-todas',
+            data={'documento': self.aprendiz.documento},
+        ).status_code, 302)
+
+    def test_registro_y_manejador_de_caida_de_redis(self):
+        from redis.exceptions import RedisError
+
+        with self.cliente.session_transaction() as sesion:
+            sesion.clear()
+        respuesta = self.cliente.post('/registro', data={})
+        self.assertEqual(respuesta.status_code, 200)
+
+        intentos = {'total': 0}
+
+        def falla_una_vez():
+            intentos['total'] += 1
+            if intentos['total'] == 1:
+                raise RedisError('redis intermitente')
+            return 'recuperado'
+
+        runtime_app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+            'SQLALCHEMY_ENGINE_OPTIONS': {},
+            'UPLOAD_FOLDER': self.uploads.name,
+            'WTF_CSRF_ENABLED': False,
+            'RATELIMIT_ENABLED': False,
+        })
+        runtime_app.add_url_rule('/test/redis-runtime', 'test_redis_runtime', falla_una_vez)
+        respuesta = runtime_app.test_client().get('/test/redis-runtime')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.get_data(as_text=True), 'recuperado')
+        self.assertEqual(intentos['total'], 2)
+
+    def test_servicios_de_importacion_y_fases_que_faltaban(self):
+        from datetime import date
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        from app.services.importacion_jobs import encolar_importacion
+        from app.services.fases_dashboard import (
+            _calcular_con_planeacion,
+            _obtener_planeacion_parseada,
+        )
+
+        cliente = Mock()
+        with patch('app.services.importacion_jobs._cliente_redis', return_value=cliente):
+            encolar_importacion(73, 'fichas')
+        cliente.rpush.assert_called_once_with('fichas', '73')
+        cliente.close.assert_called_once_with()
+
+        version = SimpleNamespace(
+            id=987654321,
+            tamano_bytes=1,
+            hash_sha256='sin-archivo',
+            ruta_archivo='archivo-inexistente.xlsx',
+        )
+        self.assertIsNone(_obtener_planeacion_parseada(version))
+
+        seguimiento = {
+            'fases': [{'orden': 0, 'nombre': 'Análisis'}],
+            'fase_esperada': {'orden': 1, 'nombre': 'Planeación'},
+            'fase_real': {'orden': 0, 'nombre': 'Análisis'},
+            'estado': 'en_riesgo',
+            'resultados': {'total': 4, 'aprobados': 2, 'evaluados': 3, 'pendientes': 1, 'porcentaje_aprobados': 50},
+        }
+        analisis = {'resumen': {'aprendices_analizados': 2}, 'items': []}
+        with (
+            patch('app.services.fases_dashboard.ultima_version', return_value=None),
+            patch('app.services.fases_dashboard.construir_analisis', return_value=analisis),
+            patch('app.services.fases_dashboard.construir_calendario', return_value=[]),
+            patch('app.services.fases_dashboard.construir_linea_tiempo', return_value=[]),
+            patch('app.services.fases_dashboard.construir_seguimiento_fases', return_value=seguimiento),
+        ):
+            resultado = _calcular_con_planeacion(
+                self.ficha,
+                version,
+                {'planeacion': []},
+                date.today(),
+            )
+        self.assertEqual(resultado['desfase_fases'], 1)
+        self.assertEqual(resultado['resumen_raps']['pendientes'], 1)
+        self.assertIn('Retraso de 1 fase', resultado['mensaje_veredicto'])
+
+    def test_registro_de_blueprints_y_cache_de_ip_local(self):
+        from unittest.mock import Mock, patch
+
+        from app.routes import registrar_rutas
+        from app.routes import instructor as instructor_routes
+
+        app_falso = Mock()
+        app_falso.config = {'STARTUP_ERRORS': []}
+        registrar_rutas(app_falso)
+        self.assertEqual(app_falso.register_blueprint.call_count, 13)
+        self.assertEqual(app_falso.config['STARTUP_ERRORS'], [])
+
+        socket_falso = Mock()
+        socket_falso.getsockname.return_value = ('192.168.1.20', 12345)
+        with patch.object(instructor_routes, '_ip_local_cache', None), patch.object(
+            instructor_routes.socket, 'socket', return_value=socket_falso
+        ) as crear_socket:
+            self.assertEqual(instructor_routes._obtener_ip_local(), '192.168.1.20')
+            self.assertEqual(instructor_routes._obtener_ip_local(), '192.168.1.20')
+            crear_socket.assert_called_once()
+        socket_falso.connect.assert_called_once_with(('8.8.8.8', 80))
 
 
 if __name__ == '__main__':

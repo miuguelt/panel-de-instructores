@@ -19,9 +19,11 @@ services:
       - ADSO_ADMIN_PASSWORD
       - ADSO_ADMIN_NOMBRE
       - SMTP_HOST
+      - SMTP_PORT
       - SMTP_USER
       - SMTP_PASSWORD
       - SMTP_FROM
+      - PUBLIC_BASE_URL
       - WTF_CSRF_TIME_LIMIT
       - LOG_LEVEL
       - DB_POOL_SIZE
@@ -71,6 +73,7 @@ services:
       - ADSO_ADMIN_PASSWORD
       - ADSO_ADMIN_NOMBRE
       - SMTP_HOST
+      - SMTP_PORT
       - SMTP_USER
       - SMTP_PASSWORD
       - SMTP_FROM

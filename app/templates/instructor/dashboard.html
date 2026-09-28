@@ -1178,6 +1178,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var resultCount = document.getElementById('dashboard-result-count');
     var cards = Array.prototype.slice.call(document.querySelectorAll('.card-ficha'));
     var rows = Array.prototype.slice.call(document.querySelectorAll('.compact-ficha-row'));
+    var cardSearchText = null;
+    var rowSearchText = null;
 
     function setViewMode(mode) {
         if (mode === 'compact') {
@@ -1219,14 +1221,25 @@ document.addEventListener('DOMContentLoaded', function() {
         var visibleCards = 0;
         var visibleRows = 0;
 
-        cards.forEach(function(card) {
-            var matches = q === '' || card.textContent.toLowerCase().indexOf(q) !== -1;
+        // Las tarjetas incluyen texto y acciones extensos. Léelos una sola vez
+        // al iniciar una búsqueda, no en cada pulsación.
+        if (q !== '' && cardSearchText === null) {
+            cardSearchText = cards.map(function(card) {
+                return card.textContent.toLowerCase();
+            });
+            rowSearchText = rows.map(function(row) {
+                return row.textContent.toLowerCase();
+            });
+        }
+
+        cards.forEach(function(card, index) {
+            var matches = q === '' || cardSearchText[index].indexOf(q) !== -1;
             card.style.display = matches ? '' : 'none';
             if (matches) visibleCards++;
         });
 
-        rows.forEach(function(row) {
-            var matches = q === '' || row.textContent.toLowerCase().indexOf(q) !== -1;
+        rows.forEach(function(row, index) {
+            var matches = q === '' || rowSearchText[index].indexOf(q) !== -1;
             row.style.display = matches ? '' : 'none';
             if (matches) visibleRows++;
         });

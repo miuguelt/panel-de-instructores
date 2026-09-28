@@ -11,16 +11,18 @@ from app.tyt.consulta import obtener_seguimiento
 def _guardar(tipo, destinatario, ficha_id, clave, mensaje, url, existentes):
     identidad = dict(destinatario_tipo=tipo, destinatario_id=destinatario, clave=clave)
     if (tipo, destinatario) in existentes:
-        return
+        return False
     try:
         with db.session.begin_nested():
             db.session.add(Notificacion(**identidad, ficha_id=ficha_id,
                                         mensaje=mensaje, url=url, tipo='tyt'))
             db.session.flush()
+        return True
     except IntegrityError:
         # A concurrent review can insert the same recipient/key first.
         if not Notificacion.query.filter_by(**identidad).first():
             raise
+        return False
 
 
 def _mensaje_personal(fila):
@@ -35,10 +37,11 @@ def _mensaje_personal(fila):
 
 
 def actualizar_avisos(ficha, seguimiento=None, ahora=None):
+    """Crea los avisos TyT faltantes y señala si hubo nuevas notificaciones."""
     seguimiento = seguimiento or obtener_seguimiento(ficha, ahora)
     tiempo = seguimiento['tiempo']
     if not tiempo['alcanzado']:
-        return
+        return False
     clave = f"tyt:{ficha.id}:lectiva70:{tiempo['fecha_hito'].isoformat()}"
     existentes = set(Notificacion.query.with_entities(
         Notificacion.destinatario_tipo, Notificacion.destinatario_id,
@@ -50,9 +53,15 @@ def actualizar_avisos(ficha, seguimiento=None, ahora=None):
                'Revisa el avance individual y coordina la preparación de Saber TyT.')
     instructores = {ficha.instructor_id}
     instructores.update(v.instructor_id for v in FichaInstructor.query.filter_by(ficha_id=ficha.id))
+    creadas = 0
     for instructor_id in instructores:
-        _guardar('instructor', instructor_id, ficha.id, clave, mensaje,
-                 f'/instructor/fichas/{ficha.id}/seguimiento-tyt', existentes)
+        creadas += _guardar(
+            'instructor', instructor_id, ficha.id, clave, mensaje,
+            f'/instructor/fichas/{ficha.id}/seguimiento-tyt', existentes,
+        )
     for fila in seguimiento['aprendices']:
-        _guardar('aprendiz', fila['id'], ficha.id, clave, prefijo + _mensaje_personal(fila),
-                 f'/aprendiz/{ficha.id}/panel#seguimiento-tyt-{ficha.id}', existentes)
+        creadas += _guardar(
+            'aprendiz', fila['id'], ficha.id, clave, prefijo + _mensaje_personal(fila),
+            f'/aprendiz/{ficha.id}/panel#seguimiento-tyt-{ficha.id}', existentes,
+        )
+    return creadas > 0

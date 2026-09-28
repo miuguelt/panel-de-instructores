@@ -1,482 +1,659 @@
 {% extends "base.html" %}
-{% block title %}Gestión de Grupos - {{ ficha.codigo }}{% endblock %}
+{% block title %}Gestión de Grupos - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block head %}
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu" crossorigin="anonymous"></script>
 <style>
     :root {
-        --bento-radius: 24px;
-        --card-radius: 16px;
-        --primary-glow: rgba(57, 169, 0, 0.15);
+        --bento-radius: 20px;
+        --card-radius: 14px;
+        --primary-glow: rgba(57, 169, 0, 0.16);
     }
     [data-theme="dark"], [data-theme="ocean"] {
-        --primary-glow: rgba(57, 169, 0, 0.25);
+        --primary-glow: rgba(34, 211, 238, 0.2);
     }
 
-    /* Paleta de identidad por grupo (8 colores, cicla) */
-    .ga-0 { --ga: #39A900; --ga-bg: rgba(57,169,0,0.09);    --ga-text: #1e5c00; }
-    .ga-1 { --ga: #6366f1; --ga-bg: rgba(99,102,241,0.09);  --ga-text: #3730a3; }
-    .ga-2 { --ga: #f59e0b; --ga-bg: rgba(245,158,11,0.09);  --ga-text: #92400e; }
-    .ga-3 { --ga: #ec4899; --ga-bg: rgba(236,72,153,0.09);  --ga-text: #9d174d; }
-    .ga-4 { --ga: #06b6d4; --ga-bg: rgba(6,182,212,0.09);   --ga-text: #155e75; }
-    .ga-5 { --ga: #8b5cf6; --ga-bg: rgba(139,92,246,0.09);  --ga-text: #5b21b6; }
-    .ga-6 { --ga: #ef4444; --ga-bg: rgba(239,68,68,0.09);   --ga-text: #991b1b; }
-    .ga-7 { --ga: #14b8a6; --ga-bg: rgba(20,184,166,0.09);  --ga-text: #134e4a; }
+    /* Paleta cromática adaptativa por grupo (8 acentos dinámicos) */
+    .ga-0 { --ga: #10b981; --ga-bg: rgba(16, 185, 129, 0.1);  --ga-border: rgba(16, 185, 129, 0.25); --ga-text: #047857; }
+    .ga-1 { --ga: #6366f1; --ga-bg: rgba(99, 102, 241, 0.1);  --ga-border: rgba(99, 102, 241, 0.25); --ga-text: #4338ca; }
+    .ga-2 { --ga: #f59e0b; --ga-bg: rgba(245, 158, 11, 0.1);  --ga-border: rgba(245, 158, 11, 0.25); --ga-text: #b45309; }
+    .ga-3 { --ga: #ec4899; --ga-bg: rgba(236, 72, 153, 0.1);  --ga-border: rgba(236, 72, 153, 0.25); --ga-text: #be185d; }
+    .ga-4 { --ga: #06b6d4; --ga-bg: rgba(6, 182, 212, 0.1);   --ga-border: rgba(6, 182, 212, 0.25);  --ga-text: #0e7490; }
+    .ga-5 { --ga: #8b5cf6; --ga-bg: rgba(139, 92, 246, 0.1);  --ga-border: rgba(139, 92, 246, 0.25); --ga-text: #6d28d9; }
+    .ga-6 { --ga: #f43f5e; --ga-bg: rgba(244, 63, 94, 0.1);   --ga-border: rgba(244, 63, 94, 0.25);  --ga-text: #be123c; }
+    .ga-7 { --ga: #14b8a6; --ga-bg: rgba(20, 184, 166, 0.1);  --ga-border: rgba(20, 184, 166, 0.25); --ga-text: #0f766e; }
 
-    [data-theme="dark"]  .ga-0, [data-theme="ocean"] .ga-0 { --ga-text: #6fe040; }
-    [data-theme="dark"]  .ga-1, [data-theme="ocean"] .ga-1 { --ga-text: #a5b4fc; }
-    [data-theme="dark"]  .ga-2, [data-theme="ocean"] .ga-2 { --ga-text: #fcd34d; }
-    [data-theme="dark"]  .ga-3, [data-theme="ocean"] .ga-3 { --ga-text: #f9a8d4; }
-    [data-theme="dark"]  .ga-4, [data-theme="ocean"] .ga-4 { --ga-text: #67e8f9; }
-    [data-theme="dark"]  .ga-5, [data-theme="ocean"] .ga-5 { --ga-text: #c4b5fd; }
-    [data-theme="dark"]  .ga-6, [data-theme="ocean"] .ga-6 { --ga-text: #fca5a5; }
-    [data-theme="dark"]  .ga-7, [data-theme="ocean"] .ga-7 { --ga-text: #5eead4; }
+    [data-theme="dark"] .ga-0, [data-theme="ocean"] .ga-0 { --ga-text: #34d399; }
+    [data-theme="dark"] .ga-1, [data-theme="ocean"] .ga-1 { --ga-text: #a5b4fc; }
+    [data-theme="dark"] .ga-2, [data-theme="ocean"] .ga-2 { --ga-text: #fbbf24; }
+    [data-theme="dark"] .ga-3, [data-theme="ocean"] .ga-3 { --ga-text: #f472b6; }
+    [data-theme="dark"] .ga-4, [data-theme="ocean"] .ga-4 { --ga-text: #38bdf8; }
+    [data-theme="dark"] .ga-5, [data-theme="ocean"] .ga-5 { --ga-text: #c084fc; }
+    [data-theme="dark"] .ga-6, [data-theme="ocean"] .ga-6 { --ga-text: #fb7185; }
+    [data-theme="dark"] .ga-7, [data-theme="ocean"] .ga-7 { --ga-text: #2dd4bf; }
 
-    /* Bento card */
-    .bento-card {
-        background: var(--bg-card);
-        border-radius: var(--bento-radius);
+    /* Header del módulo */
+    .grupos-header {
+        background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-card) 100%);
         border: 1px solid var(--border-subtle);
+        border-radius: var(--bento-radius);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+    }
+    .grupos-header-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .grupos-header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: var(--accent-primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px var(--primary-glow);
+        flex-shrink: 0;
+    }
+    .grupos-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    /* Layout principal */
+    .grupos-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 1.5rem;
+        align-items: start;
+    }
+    @media (max-width: 1024px) {
+        .grupos-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Bento Panel */
+    .bento-sidebar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--bento-radius);
         box-shadow: 0 4px 20px rgba(0,0,0,0.03);
         overflow: hidden;
-        transition: box-shadow .3s;
+        display: flex;
+        flex-column: column;
     }
-    .bento-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.07); }
+    .sidebar-section {
+        padding: 1.15rem 1.25rem;
+        border-bottom: 1px solid var(--border-divider);
+    }
+    .sidebar-label {
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 0.75rem;
+        display: block;
+    }
 
-    /* Grupo card */
+    /* Input personalizado y segmented control */
+    .input-pill-group {
+        display: flex;
+        align-items: center;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        border-radius: 10px;
+        padding: 4px 10px;
+        gap: 8px;
+        transition: border-color .2s, box-shadow .2s;
+    }
+    .input-pill-group:focus-within {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+    .input-pill-group input {
+        border: none;
+        background: transparent;
+        color: var(--text-strong, inherit);
+        font-size: 0.95rem;
+        font-weight: 600;
+        width: 100%;
+        outline: none;
+    }
+
+    .segmented-control {
+        display: flex;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        border-radius: 10px;
+        padding: 3px;
+        gap: 3px;
+        margin-top: 0.6rem;
+    }
+    .segmented-btn {
+        flex: 1;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-weight: 700;
+        font-size: 0.85rem;
+        border-radius: 7px;
+        padding: 6px 0;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .segmented-btn.active, .segmented-btn:hover {
+        background: var(--bg-card);
+        color: var(--accent-primary);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    /* Lista seleccionable de aprendices */
+    .aprendices-picker-box {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        border-radius: 12px;
+        padding: 6px;
+        max-height: 290px;
+        overflow-y: auto;
+    }
+    .aprendices-picker-box::-webkit-scrollbar {
+        width: 5px;
+    }
+    .aprendices-picker-box::-webkit-scrollbar-thumb {
+        background: var(--border-subtle);
+        border-radius: 10px;
+    }
+    .aprendiz-pick-row {
+        display: flex;
+        align-items: center;
+        padding: 7px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s;
+        gap: 10px;
+        margin-bottom: 2px;
+    }
+    .aprendiz-pick-row:hover {
+        background: var(--bg-card);
+    }
+    .aprendiz-pick-row.selected {
+        background: rgba(57, 169, 0, 0.08);
+    }
+    [data-theme="dark"] .aprendiz-pick-row.selected,
+    [data-theme="ocean"] .aprendiz-pick-row.selected {
+        background: rgba(34, 211, 238, 0.12);
+    }
+    .custom-check-box {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        border: 1.5px solid var(--border-subtle);
+        background: var(--bg-card);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+    }
+    .aprendiz-pick-row input:checked + .custom-check-box {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: white;
+    }
+    .custom-check-box svg {
+        opacity: 0;
+        transform: scale(0.6);
+        transition: all 0.15s ease;
+    }
+    .aprendiz-pick-row input:checked + .custom-check-box svg {
+        opacity: 1;
+        transform: scale(1);
+    }
+    .aprendiz-pick-name {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-strong, inherit);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Botón mágico generador */
+    .btn-generate-groups {
+        background: linear-gradient(135deg, var(--accent-primary) 0%, color-mix(in srgb, var(--accent-primary) 70%, black) 100%);
+        color: white !important;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 18px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        width: 100%;
+        box-shadow: 0 4px 14px var(--primary-glow);
+        transition: transform .18s, box-shadow .18s;
+    }
+    .btn-generate-groups:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 22px var(--primary-glow);
+    }
+    .btn-generate-groups:active {
+        transform: translateY(0);
+    }
+
+    /* Grid de grupos formados */
+    .grupos-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 1.25rem;
+    }
+
+    /* Card de cada grupo */
     .grupo-card {
         background: var(--bg-card);
-        border-radius: var(--card-radius);
         border: 1px solid var(--border-subtle);
+        border-radius: var(--card-radius);
         overflow: hidden;
-        transition: transform .22s, box-shadow .22s, border-color .22s;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.03);
+        transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s, border-color 0.22s;
+        display: flex;
+        flex-direction: column;
     }
     .grupo-card:hover {
         transform: translateY(-4px);
-        box-shadow: 0 12px 30px rgba(0,0,0,0.09);
-        border-color: var(--ga, var(--accent-primary));
+        box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+        border-color: var(--ga);
     }
-
     .grupo-card-header {
-        background: var(--ga-bg, var(--bg-surface));
-        padding: 15px 18px;
+        background: var(--ga-bg);
+        border-bottom: 1px solid var(--ga-border);
+        padding: 12px 16px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid var(--border-divider);
+        gap: 8px;
     }
-    .grupo-name  { font-size: .95rem; font-weight: 700; color: var(--ga-text, var(--accent-primary)); margin: 0; }
-    .grupo-date  { font-size: .73rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 3px; }
-
-    .member-count-badge {
-        background: var(--ga-bg, rgba(0,0,0,.05));
-        color: var(--ga-text, var(--text-muted));
-        border: 1px solid color-mix(in srgb, var(--ga, var(--border-subtle)) 40%, transparent);
+    .grupo-title {
+        font-size: 1rem;
         font-weight: 700;
-        font-size: .72rem;
-        border-radius: 20px;
-        padding: 3px 10px;
-        white-space: nowrap;
+        color: var(--ga-text);
+        margin: 0;
     }
-
-    .btn-medal {
-        background: transparent;
-        border: 1.5px solid var(--border-subtle);
-        border-radius: 50%;
-        width: 34px; height: 34px;
-        display: flex; align-items: center; justify-content: center;
+    .grupo-meta {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 2px;
+    }
+    .btn-medal-award {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
         color: #f59e0b;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        transition: all .2s;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        transition: transform .2s, border-color .2s, background .2s;
         flex-shrink: 0;
     }
-    .btn-medal:hover { background: rgba(245,158,11,.12); border-color: #f59e0b; transform: scale(1.1); }
+    .btn-medal-award:hover {
+        transform: scale(1.12);
+        border-color: #f59e0b;
+        background: rgba(245, 158, 11, 0.1);
+    }
 
-    /* Miembros */
-    .member-row {
+    .grupo-members-list {
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex-grow: 1;
+    }
+    .grupo-member-item {
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 8px 12px;
-        border-radius: 10px;
+        padding: 8px 10px;
+        border-radius: 9px;
         background: var(--bg-surface);
         border: 1px solid var(--border-divider);
         transition: background .15s;
     }
-    .member-row:hover { background: var(--bg-base, var(--bg-surface)); }
-
+    .grupo-member-item:hover {
+        background: var(--bg-base);
+    }
     .member-avatar {
-        width: 34px; height: 34px;
+        width: 30px;
+        height: 30px;
         border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-weight: 700; font-size: .8rem;
+        background: var(--ga-bg);
+        color: var(--ga-text);
+        border: 1.5px solid var(--ga-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 700;
         flex-shrink: 0;
-        border: 2px solid var(--bg-card);
-        box-shadow: 0 1px 5px rgba(0,0,0,.12);
-        background: var(--ga-bg, var(--bg-surface));
-        color: var(--ga-text, var(--accent-primary));
     }
     .member-name {
-        font-size: .88rem; font-weight: 500;
-        color: var(--text-color, inherit);
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        font-size: 0.86rem;
+        font-weight: 500;
+        color: var(--text-strong, inherit);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
-    /* Sidebar */
-    .sidebar-section   { padding: 20px; border-bottom: 1px solid var(--border-divider); }
-    .sidebar-label     { font-size: .74rem; font-weight: 700; text-transform: uppercase;
-                         letter-spacing: .08em; color: var(--text-muted); margin-bottom: 12px; display: block; }
-
-    /* Inputs */
-    .premium-input-group {
-        display: flex; align-items: center;
-        background: var(--bg-surface); border-radius: 12px;
-        padding: 4px; border: 2px solid transparent; transition: all .2s;
-    }
-    .premium-input-group:focus-within {
-        border-color: var(--accent-primary);
-        box-shadow: 0 0 0 4px var(--primary-glow);
+    /* Estado vacío */
+    .empty-grupos-card {
         background: var(--bg-card);
+        border: 2px dashed var(--border-subtle);
+        border-radius: var(--bento-radius);
+        padding: 3.5rem 2rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
     }
-    .premium-input-group input,
-    .premium-input-group select {
-        border: none !important; background: transparent !important;
-        box-shadow: none !important; font-weight: 500;
-        color: var(--text-color, inherit);
-    }
-    .premium-input-group .icon-wrap {
-        padding: 0 10px; color: var(--text-muted);
-        display: flex; align-items: center;
-    }
-
-    /* Segmented control */
-    .segmented-control  { display: flex; background: var(--bg-surface); border-radius: 12px; padding: 4px; gap: 4px; }
-    .segmented-btn {
-        flex: 1; border: none; background: transparent;
-        color: var(--text-muted); font-weight: 600; border-radius: 8px;
-        padding: 7px 0; transition: all .2s; cursor: pointer;
-    }
-    .segmented-btn.active, .segmented-btn:hover {
-        background: var(--bg-card);
-        box-shadow: 0 2px 8px rgba(0,0,0,.08);
-        color: var(--accent-primary);
+    .empty-grupos-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.25rem;
+        color: var(--text-muted);
     }
 
-    /* Aprendiz list */
-    .aprendiz-list-wrap {
-        background: var(--bg-surface); border-radius: 12px; padding: 6px;
-        height: 300px; overflow-y: auto; border: 1px solid var(--border-divider);
+    /* Podio Button */
+    .btn-podio {
+        background: linear-gradient(135deg, #ffd700 0%, #f59e0b 100%);
+        color: #451a03 !important;
+        font-weight: 700;
+        border: none;
+        border-radius: 50px;
+        padding: 8px 16px;
+        font-size: 0.86rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 3px 10px rgba(245, 158, 11, 0.25);
+        transition: transform .2s, box-shadow .2s;
+        text-decoration: none;
     }
-    .aprendiz-list-wrap::-webkit-scrollbar { width: 4px; }
-    .aprendiz-list-wrap::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
-
-    .aprendiz-item-row {
-        display: flex; align-items: center; padding: 9px 12px;
-        border-radius: 10px; cursor: pointer; transition: all .15s; margin-bottom: 2px;
-    }
-    .aprendiz-item-row:hover   { background: var(--bg-card); }
-    .aprendiz-item-row.selected { background: rgba(57,169,0,.07); }
-
-    .custom-checkbox {
-        width: 20px; height: 20px; border-radius: 6px;
-        border: 2px solid var(--border-subtle);
-        display: flex; align-items: center; justify-content: center;
-        transition: all .2s; background: var(--bg-card); flex-shrink: 0;
-    }
-    .aprendiz-item-row input:checked + .custom-checkbox { background: var(--accent-primary); border-color: var(--accent-primary); }
-    .custom-checkbox i { color: white; opacity: 0; width: 14px; height: 14px; transform: scale(.5); transition: all .2s cubic-bezier(.175,.885,.32,1.275); }
-    .aprendiz-item-row input:checked + .custom-checkbox i { opacity: 1; transform: scale(1); }
-
-    /* Botón generar */
-    .btn-magic {
-        background: linear-gradient(135deg, var(--accent-primary) 0%, color-mix(in srgb, var(--accent-primary) 65%, black) 100%);
-        color: white; border: none; border-radius: 14px;
-        font-weight: 700; font-size: .95rem; padding: 13px 18px;
-        box-shadow: 0 6px 18px var(--primary-glow); transition: all .3s;
-        display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer;
-    }
-    .btn-magic:hover { transform: translateY(-2px); box-shadow: 0 10px 25px var(--primary-glow); color: white; }
-    .btn-magic:active { transform: translateY(1px); }
-
-    /* Page header */
-    .page-header-premium {
-        background: linear-gradient(to right, var(--primary-glow), transparent);
-        border-radius: var(--bento-radius); padding: 20px 26px;
-        border: 1px solid var(--border-subtle); margin-bottom: 24px;
-    }
-
-    /* Empty state */
-    .empty-state-icon {
-        width: 76px; height: 76px; border-radius: 50%;
-        background: var(--bg-surface); display: flex; align-items: center; justify-content: center;
-        margin: 0 auto 20px; border: 2px dashed var(--border-subtle);
+    .btn-podio:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="grupos-module" style="padding: 1.25rem 0;">
 
-    <!-- ═══ Header ═══ -->
-    <div class="page-header-premium d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle shadow-sm d-flex align-items-center justify-content-center"
-                 style="width:46px;height:46px;background:var(--accent-primary);flex-shrink:0;">
-                <i data-lucide="users" style="width:22px;height:22px;color:white;"></i>
+    <!-- ═══ 1. Cabecera Principal ═══ -->
+    <header class="grupos-header">
+        <div class="grupos-header-info">
+            <div class="grupos-header-icon" aria-hidden="true">
+                <i data-lucide="users" style="width:24px;height:24px;"></i>
             </div>
             <div>
-                <h2 class="mb-0 fw-bold" style="color:var(--text-strong,inherit);">Gestión de Grupos</h2>
-                <p class="mb-0 mt-1" style="font-size:.88rem;color:var(--text-muted);">
+                <h1 style="font-size:1.4rem;font-weight:800;margin:0;color:var(--text-strong,inherit);">
+                    Gestión de Grupos
+                </h1>
+                <p style="font-size:0.86rem;color:var(--text-muted);margin:0.2rem 0 0 0;">
                     Ficha <strong style="color:var(--accent-primary);">{{ ficha.codigo }}</strong>
                     &middot; {{ ficha.nombre_programa }}
                 </p>
             </div>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
-            <a href="{{ url_for('instructor.fichas') }}"
-               class="btn btn-sm rounded-pill px-4 fw-medium"
-               style="background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-color,inherit);">
-                <i data-lucide="arrow-left" class="me-1" style="width:15px;height:15px;"></i> Volver
+        <div class="grupos-header-actions">
+            <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn btn-secondary btn-sm" style="border-radius:50px;">
+                <i data-lucide="arrow-left" style="width:14px;height:14px;margin-right:4px;"></i> Volver a la Ficha
             </a>
-            <a href="{{ url_for('grupos.podio_grupos', ficha_id=ficha.id) }}"
-               class="btn btn-sm rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
-               style="background:linear-gradient(135deg,#FFD700 0%,#FFA500 100%);border:none;color:#5a3c00;">
+            <a href="{{ url_for('grupos.podio_grupos', ficha_id=ficha.id) }}" class="btn-podio">
                 <i data-lucide="award" style="width:16px;height:16px;"></i> Podio de Grupos
             </a>
         </div>
-    </div>
+    </header>
 
-    <div class="row g-4">
+    <!-- ═══ 2. Grid de Trabajo: Generador + Equipos ═══ -->
+    <div class="grupos-layout">
 
-        <!-- ═══ Panel izquierdo: Generador ═══ -->
-        <div class="col-lg-4 col-xl-3">
-            <div class="bento-card h-100 d-flex flex-column">
+        <!-- Sidebar Izquierda: Generador -->
+        <aside class="bento-sidebar">
+            <div class="sidebar-section" style="display:flex;align-items:center;gap:8px;">
+                <i data-lucide="sparkles" style="width:18px;height:18px;color:var(--accent-primary);"></i>
+                <h2 style="font-size:1rem;font-weight:700;margin:0;color:var(--text-strong,inherit);">
+                    Generador Aleatorio
+                </h2>
+            </div>
 
-                <div class="sidebar-section d-flex align-items-center gap-2">
-                    <i data-lucide="settings-2" style="width:17px;height:17px;color:var(--accent-primary);"></i>
-                    <h5 class="fw-bold mb-0" style="color:var(--text-strong,inherit);">Generador</h5>
+            <form action="{{ url_for('grupos.generar_grupos', ficha_id=ficha.id) }}" method="POST" id="form-grupos" style="display:flex;flex-direction:column;flex-grow:1;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <!-- Selector de Tamaño -->
+                <div class="sidebar-section">
+                    <span class="sidebar-label">Tamaño del Equipo</span>
+                    <div class="input-pill-group">
+                        <i data-lucide="users-2" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                        <input type="number" id="inputTamanoGrupo" name="tamano_grupo" min="2" max="50" value="3" required aria-label="Cantidad de aprendices por grupo">
+                        <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted);white-space:nowrap;">aprendices</span>
+                    </div>
+                    <div class="segmented-control" role="group" aria-label="Tamaño rápido de grupo">
+                        <button type="button" class="segmented-btn" onclick="setTamano(2, this)">2</button>
+                        <button type="button" class="segmented-btn active" onclick="setTamano(3, this)">3</button>
+                        <button type="button" class="segmented-btn" onclick="setTamano(4, this)">4</button>
+                        <button type="button" class="segmented-btn" onclick="setTamano(5, this)">5</button>
+                        <button type="button" class="segmented-btn" onclick="setTamano(6, this)">6</button>
+                    </div>
                 </div>
 
-                <form action="{{ url_for('grupos.generar_grupos', ficha_id=ficha.id) }}" method="POST"
-                      id="form-grupos" class="flex-grow-1 d-flex flex-column">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-                    <!-- Tamaño -->
-                    <div class="sidebar-section">
-                        <span class="sidebar-label">Tamaño del equipo</span>
-                        <div class="premium-input-group mb-3">
-                            <span class="icon-wrap"><i data-lucide="user-plus" style="width:15px;height:15px;"></i></span>
-                            <input type="number" id="inputTamanoGrupo" name="tamano_grupo"
-                                   class="form-control" min="2" max="50" value="3" required>
-                            <span class="pe-3" style="color:var(--text-muted);font-size:.82rem;font-weight:600;">aprendices</span>
-                        </div>
-                        <div class="segmented-control">
-                            <button type="button" class="segmented-btn" onclick="setTamano(2,this)">2</button>
-                            <button type="button" class="segmented-btn active" onclick="setTamano(3,this)">3</button>
-                            <button type="button" class="segmented-btn" onclick="setTamano(4,this)">4</button>
-                            <button type="button" class="segmented-btn" onclick="setTamano(5,this)">5</button>
-                            <button type="button" class="segmented-btn" onclick="setTamano(6,this)">6</button>
-                        </div>
+                <!-- Selección de Aprendices -->
+                <div class="sidebar-section" style="border-bottom:none;flex-grow:1;display:flex;flex-direction:column;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+                        <span class="sidebar-label" style="margin-bottom:0;">Aprendices Habilitados</span>
+                        <span id="contadorSeleccionados" class="badge" style="background:var(--accent-primary);color:white;border-radius:20px;font-size:0.75rem;padding:3px 9px;">
+                            {{ aprendices|length }} / {{ aprendices|length }}
+                        </span>
                     </div>
 
-                    <!-- Aprendices -->
-                    <div class="sidebar-section flex-grow-1 d-flex flex-column" style="border-bottom:none;">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="sidebar-label mb-0">Aprendices a incluir</span>
-                            <span id="contadorSeleccionados" class="badge rounded-pill px-3 py-1"
-                                  style="background:var(--accent-primary);color:white;font-size:.72rem;">
-                                {{ aprendices|length }} / {{ aprendices|length }}
-                            </span>
-                        </div>
-
-                        <div class="premium-input-group mb-2" style="padding:2px;">
-                            <span class="icon-wrap"><i data-lucide="search" style="width:14px;height:14px;"></i></span>
-                            <input type="text" id="buscadorAprendices"
-                                   class="form-control form-control-sm" placeholder="Buscar aprendiz...">
-                        </div>
-
-                        <div class="d-flex gap-2 mb-2">
-                            <button type="button" onclick="setSeleccionados(true)"
-                                    class="btn btn-sm flex-fill rounded-pill"
-                                    style="background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-color,inherit);font-size:.78rem;">
-                                Todos
-                            </button>
-                            <button type="button" onclick="setSeleccionados(false)"
-                                    class="btn btn-sm flex-fill rounded-pill"
-                                    style="background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-muted);font-size:.78rem;">
-                                Ninguno
-                            </button>
-                        </div>
-
-                        <div class="aprendiz-list-wrap flex-grow-1">
-                            {% for aprendiz in aprendices %}
-                            <label class="aprendiz-item-row selected" id="row-{{ aprendiz.id }}">
-                                <input type="checkbox" class="d-none chk-aprendiz"
-                                       name="aprendices_ids[]" value="{{ aprendiz.id }}" checked
-                                       onchange="toggleItem(this,'row-{{ aprendiz.id }}')">
-                                <div class="custom-checkbox me-2 shadow-sm">
-                                    <i data-lucide="check"></i>
-                                </div>
-                                <span class="fw-medium aprendiz-nombre text-truncate"
-                                      style="font-size:.86rem;color:var(--text-color,inherit);">
-                                    {{ aprendiz.nombre }} {{ aprendiz.apellidos }}
-                                </span>
-                            </label>
-                            {% endfor %}
-                        </div>
+                    <!-- Buscador en tiempo real -->
+                    <div class="input-pill-group" style="margin-bottom:0.5rem;padding:3px 8px;">
+                        <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                        <input type="text" id="buscadorAprendices" placeholder="Buscar aprendiz..." style="font-size:0.82rem;" aria-label="Filtrar aprendices">
                     </div>
 
-                    <div class="p-4 mt-auto">
-                        <button type="submit" class="btn-magic w-100"
-                                onclick="return confirm('¿Generar nuevos grupos? Esto reemplazará la distribución actual.');">
-                            <i data-lucide="wand-2" style="width:19px;height:19px;"></i>
-                            Generar Grupos
+                    <!-- Botones de Acción Rápida -->
+                    <div style="display:flex;gap:6px;margin-bottom:0.6rem;">
+                        <button type="button" onclick="setSeleccionados(true)" class="btn btn-secondary btn-sm" style="flex:1;padding:4px 8px;font-size:0.75rem;border-radius:6px;">
+                            Todos
+                        </button>
+                        <button type="button" onclick="setSeleccionados(false)" class="btn btn-secondary btn-sm" style="flex:1;padding:4px 8px;font-size:0.75rem;border-radius:6px;">
+                            Ninguno
                         </button>
                     </div>
-                </form>
-            </div>
-        </div>
 
-        <!-- ═══ Panel derecho: Grupos ═══ -->
-        <div class="col-lg-8 col-xl-9">
-            <div class="d-flex justify-content-between align-items-center mb-4 px-1">
-                <h4 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color:var(--text-strong,inherit);">
-                    <i data-lucide="layout-grid" style="color:var(--accent-primary);"></i> Grupos Formados
-                </h4>
-                {% if grupos %}
-                <span class="badge rounded-pill px-3 py-2"
-                      style="background:rgba(57,169,0,.12);color:var(--accent-primary);border:1px solid rgba(57,169,0,.25);font-size:.82rem;font-weight:700;">
-                    {{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }} activo{{ 's' if grupos|length != 1 else '' }}
-                </span>
-                {% endif %}
+                    <!-- Lista con checkboxes personalizados -->
+                    <div class="aprendices-picker-box">
+                        {% for aprendiz in aprendices %}
+                        <label class="aprendiz-pick-row selected" id="row-{{ aprendiz.id }}">
+                            <input type="checkbox" class="chk-aprendiz" name="aprendices_ids[]" value="{{ aprendiz.id }}" checked onchange="toggleItem(this, 'row-{{ aprendiz.id }}')" style="position:absolute;opacity:0;pointer-events:none;">
+                            <div class="custom-check-box" aria-hidden="true">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </div>
+                            <span class="aprendiz-pick-name">
+                                {{ aprendiz.nombre }} {{ aprendiz.apellidos }}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Botón de Generación -->
+                <div style="padding:1.25rem;margin-top:auto;">
+                    <button type="submit" class="btn-generate-groups" onclick="return confirm('¿Generar nuevos grupos? Esto archivará la distribución anterior de esta ficha.');">
+                        <i data-lucide="dices" style="width:18px;height:18px;"></i>
+                        <span>Generar Equipos</span>
+                    </button>
+                </div>
+            </form>
+        </aside>
+
+        <!-- Área Principal Derecha: Tarjetas de Grupos Formados -->
+        <main>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <h2 style="font-size:1.15rem;font-weight:700;margin:0;color:var(--text-strong,inherit);">
+                        Equipos Activos
+                    </h2>
+                    {% if grupos %}
+                    <span class="badge" style="background:rgba(57,169,0,0.12);color:var(--accent-primary);border:1px solid rgba(57,169,0,0.25);border-radius:20px;font-size:0.78rem;font-weight:700;padding:3px 10px;">
+                        {{ grupos|length }} {{ 'equipo' if grupos|length == 1 else 'equipos' }}
+                    </span>
+                    {% endif %}
+                </div>
             </div>
 
             {% if grupos %}
-            <div class="row row-cols-1 row-cols-md-2 row-cols-xxl-3 g-4">
+            <div class="grupos-grid">
                 {% for grupo in grupos %}
                 {% set gi = loop.index0 % 8 %}
-                <div class="col">
-                    <div class="grupo-card h-100 ga-{{ gi }}">
-
-                        <!-- Cabecera -->
-                        <div class="grupo-card-header">
-                            <div class="overflow-hidden">
-                                <h5 class="grupo-name">{{ grupo.nombre }}</h5>
-                                <div class="grupo-date">
-                                    <i data-lucide="calendar" style="width:11px;height:11px;"></i>
-                                    {{ grupo.creado_en.strftime('%d/%m/%Y') }}
-                                </div>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 ms-2">
-                                <span class="member-count-badge">
-                                    {{ grupo.aprendices|length }}
-                                    miembro{{ 's' if grupo.aprendices|length != 1 else '' }}
-                                </span>
-                                <button type="button" class="btn-medal"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalInsignia{{ grupo.id }}"
-                                        title="Otorgar medalla al grupo">
-                                    <i data-lucide="medal" style="width:16px;height:16px;"></i>
-                                </button>
+                <article class="grupo-card ga-{{ gi }}">
+                    <!-- Header de la Card del Grupo -->
+                    <div class="grupo-card-header">
+                        <div>
+                            <h3 class="grupo-title">{{ grupo.nombre }}</h3>
+                            <div class="grupo-meta">
+                                <i data-lucide="calendar" style="width:11px;height:11px;"></i>
+                                {{ grupo.creado_en.strftime('%d/%m/%Y') }} &middot; {{ grupo.aprendices|length }} aprendices
                             </div>
                         </div>
+                        <button type="button" class="btn-medal-award" onclick="abrirModalInsignia('{{ grupo.id }}', '{{ grupo.nombre|escape }}')" title="Otorgar medalla a este equipo" aria-label="Otorgar medalla a {{ grupo.nombre }}">
+                            <i data-lucide="medal" style="width:16px;height:16px;"></i>
+                        </button>
+                    </div>
 
-                        <!-- Miembros -->
-                        <div class="p-3 d-flex flex-column gap-2">
-                            {% for aprendiz in grupo.aprendices %}
-                            <div class="member-row">
-                                <div class="member-avatar">
-                                    {{ aprendiz.nombre[0] }}{{ aprendiz.apellidos[0] if aprendiz.apellidos else '' }}
-                                </div>
-                                <span class="member-name">{{ aprendiz.nombre }} {{ aprendiz.apellidos }}</span>
+                    <!-- Miembros del Grupo -->
+                    <div class="grupo-members-list">
+                        {% for aprendiz in grupo.aprendices %}
+                        <div class="grupo-member-item">
+                            <div class="member-avatar">
+                                {{ aprendiz.nombre[0] }}{{ aprendiz.apellidos[0] if aprendiz.apellidos else '' }}
                             </div>
-                            {% endfor %}
+                            <span class="member-name">{{ aprendiz.nombre }} {{ aprendiz.apellidos }}</span>
                         </div>
+                        {% endfor %}
                     </div>
-                </div>
-
-                <!-- Modal medalla -->
-                <div class="modal fade" id="modalInsignia{{ grupo.id }}" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <form action="{{ url_for('grupos.otorgar_insignia_grupo', ficha_id=ficha.id) }}" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="grupo_id" value="{{ grupo.id }}">
-                            <div class="modal-content bento-card border-0">
-                                <div class="modal-header border-bottom-0 p-4" style="background:var(--bg-surface);">
-                                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2"
-                                        style="color:var(--text-strong,inherit);">
-                                        <i data-lucide="award" style="color:#f59e0b;"></i> Otorgar Medalla
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body p-4 pt-2">
-                                    <p class="mb-4" style="color:var(--text-muted);">
-                                        Reconocimiento al grupo
-                                        <strong style="color:var(--text-strong,inherit);">{{ grupo.nombre }}</strong>.
-                                    </p>
-                                    <span class="sidebar-label">Seleccionar Insignia</span>
-                                    <div class="premium-input-group mb-4" style="padding:6px;">
-                                        <span class="icon-wrap"><i data-lucide="star"></i></span>
-                                        <select name="insignia_id"
-                                                class="form-select border-0 shadow-none bg-transparent fw-medium"
-                                                required>
-                                            <option value="">Selecciona una insignia...</option>
-                                            {% for ins in insignias %}
-                                            <option value="{{ ins.id }}">{{ ins.icono }} {{ ins.nombre }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="d-flex gap-3 p-3 rounded-3"
-                                         style="background:var(--bg-surface);border:1px solid var(--border-divider);">
-                                        <i data-lucide="info"
-                                           style="color:var(--accent-primary);min-width:17px;margin-top:2px;"></i>
-                                        <small style="color:var(--text-muted);line-height:1.5;">
-                                            Esta acción otorgará la medalla de forma individual a cada miembro
-                                            en su portafolio y sumará puntos al podio global.
-                                        </small>
-                                    </div>
-                                </div>
-                                <div class="modal-footer border-top-0 p-4 pt-3" style="background:var(--bg-surface);">
-                                    <button type="button" class="btn rounded-pill px-4"
-                                            style="background:var(--border-divider);color:var(--text-color,inherit);"
-                                            data-bs-dismiss="modal">Cancelar</button>
-                                    <button type="submit" class="btn fw-bold rounded-pill px-4 shadow-sm"
-                                            style="background:linear-gradient(135deg,#FFD700 0%,#FFA500 100%);border:none;color:#5a3c00;">
-                                        <i data-lucide="award" style="width:15px;height:15px;margin-right:5px;"></i>
-                                        Otorgar Medalla
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                </article>
                 {% endfor %}
             </div>
 
             {% else %}
-            <!-- Estado vacío -->
-            <div class="bento-card d-flex flex-column align-items-center justify-content-center text-center p-5"
-                 style="min-height:440px;border-style:dashed;border-width:2px;">
-                <div class="empty-state-icon">
-                    <i data-lucide="users" style="width:34px;height:34px;color:var(--text-muted);opacity:.45;"></i>
+            <!-- Estado vacío con orientación pedagógica -->
+            <div class="empty-grupos-card">
+                <div class="empty-grupos-icon" aria-hidden="true">
+                    <i data-lucide="users" style="width:36px;height:36px;"></i>
                 </div>
-                <h3 class="fw-bold mb-2" style="color:var(--text-strong,inherit);">Sin grupos formados</h3>
-                <p class="mb-4" style="max-width:360px;font-size:.95rem;line-height:1.65;color:var(--text-muted);">
-                    Configura el tamaño del equipo y selecciona los aprendices en el panel izquierdo.
-                    El sistema generará combinaciones aleatorias de forma equitativa.
+                <h3 style="font-size:1.15rem;font-weight:700;color:var(--text-strong,inherit);margin-bottom:0.5rem;">
+                    No hay equipos activos en esta ficha
+                </h3>
+                <p style="max-width:400px;font-size:0.9rem;line-height:1.55;color:var(--text-muted);margin-bottom:1.5rem;">
+                    Utiliza el generador de la izquierda para seleccionar el número de aprendices por equipo y distribuirlos aleatoriamente de forma equitativa.
                 </p>
-                <button type="button"
-                        class="btn rounded-pill px-5 py-2 fw-bold shadow-sm"
-                        style="background:var(--accent-primary);color:white;"
-                        onclick="document.getElementById('inputTamanoGrupo').focus()">
-                    <i data-lucide="arrow-left" class="me-2" style="width:15px;height:15px;"></i>
-                    Empezar a generar
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('inputTamanoGrupo').focus()" style="border-radius:50px;padding:8px 24px;">
+                    <i data-lucide="sparkles" style="width:15px;height:15px;margin-right:6px;"></i>
+                    Comenzar distribución
                 </button>
             </div>
             {% endif %}
-        </div>
+        </main>
     </div>
 </div>
+
+<!-- ═══ 3. Modal Nativo para Otorgar Medalla (Usando sistema app-modal-overlay) ═══ -->
+<dialog id="modalInsignia" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalInsigniaTitulo">
+    <div class="app-modal-content app-modal-content--compact">
+        <form action="{{ url_for('grupos.otorgar_insignia_grupo', ficha_id=ficha.id) }}" method="POST" class="app-modal-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="grupo_id" id="modalGrupoId" value="">
+
+            <header class="app-modal-header">
+                <div class="app-modal-header-copy">
+                    <span class="app-modal-eyebrow">Dinamización y Gamificación</span>
+                    <h2 id="modalInsigniaTitulo" style="display:flex;align-items:center;gap:8px;">
+                        <span style="color:#f59e0b;">🏅</span> Otorgar Medalla
+                    </h2>
+                </div>
+                <button type="button" class="app-modal-close" onclick="cerrarModal('modalInsignia')" aria-label="Cerrar modal">&times;</button>
+            </header>
+
+            <div class="app-modal-body">
+                <p style="color:var(--text-muted);margin-bottom:1rem;font-size:0.92rem;">
+                    Reconocimiento especial para el equipo <strong id="modalGrupoNombre" style="color:var(--text-strong);"></strong>.
+                </p>
+
+                <div style="margin-bottom:1.25rem;">
+                    <label for="selectInsignia" style="display:block;font-size:0.84rem;font-weight:700;color:var(--text-strong);margin-bottom:6px;">
+                        Selecciona la Medalla o Insignia
+                    </label>
+                    <select name="insignia_id" id="selectInsignia" class="form-select" required style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-color);">
+                        <option value="">-- Elige una medalla --</option>
+                        {% for ins in insignias %}
+                        <option value="{{ ins.id }}">{{ ins.icono }} {{ ins.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="display:flex;gap:12px;padding:12px;border-radius:10px;background:var(--bg-surface);border:1px solid var(--border-divider);">
+                    <i data-lucide="info" style="width:20px;height:20px;color:var(--accent-primary);flex-shrink:0;margin-top:2px;"></i>
+                    <small style="color:var(--text-muted);line-height:1.45;">
+                        Esta medalla se computará en el podio de grupos y se registrará en el Portafolio de Evidencias de cada aprendiz integrante.
+                    </small>
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:1.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalInsignia')">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn" style="background:linear-gradient(135deg,#ffd700 0%,#f59e0b 100%);color:#451a03;font-weight:700;border:none;border-radius:8px;padding:8px 18px;">
+                        <i data-lucide="award" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;"></i>
+                        Otorgar al Equipo
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</dialog>
 
 <script>
 lucide.createIcons();
@@ -495,14 +672,17 @@ document.getElementById('inputTamanoGrupo').addEventListener('input', function (
 });
 
 function toggleItem(checkbox, rowId) {
-    document.getElementById(rowId).classList.toggle('selected', checkbox.checked);
+    const row = document.getElementById(rowId);
+    if (row) {
+        row.classList.toggle('selected', checkbox.checked);
+    }
     actualizarContador();
 }
 
 function setSeleccionados(valor) {
     document.querySelectorAll('.chk-aprendiz').forEach(c => {
-        const row = c.closest('.aprendiz-item-row');
-        if (row.style.display !== 'none') {
+        const row = c.closest('.aprendiz-pick-row');
+        if (row && row.style.display !== 'none') {
             c.checked = valor;
             row.classList.toggle('selected', valor);
         }
@@ -513,7 +693,8 @@ function setSeleccionados(valor) {
 function actualizarContador() {
     let visibles = 0, activos = 0;
     document.querySelectorAll('.chk-aprendiz').forEach(c => {
-        if (c.closest('.aprendiz-item-row').style.display !== 'none') {
+        const row = c.closest('.aprendiz-pick-row');
+        if (row && row.style.display !== 'none') {
             visibles++;
             if (c.checked) activos++;
         }
@@ -521,7 +702,20 @@ function actualizarContador() {
     const badge = document.getElementById('contadorSeleccionados');
     if (!badge) return;
     badge.textContent = `${activos} / ${visibles}`;
-    badge.style.background = activos === 0 ? '#ef4444' : activos < 2 ? '#f59e0b' : 'var(--accent-primary)';
+    if (activos === 0) {
+        badge.style.background = '#ef4444';
+    } else if (activos < 2) {
+        badge.style.background = '#f59e0b';
+    } else {
+        badge.style.background = 'var(--accent-primary)';
+    }
+}
+
+function abrirModalInsignia(grupoId, grupoNombre) {
+    document.getElementById('modalGrupoId').value = grupoId;
+    document.getElementById('modalGrupoNombre').textContent = grupoNombre;
+    abrirModal('modalInsignia');
+    lucide.createIcons();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -530,9 +724,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (buscador) {
         buscador.addEventListener('input', function () {
             const term = this.value.toLowerCase().trim();
-            document.querySelectorAll('.aprendiz-item-row').forEach(item => {
-                const match = item.querySelector('.aprendiz-nombre').textContent.toLowerCase().includes(term);
-                item.style.display = match ? 'flex' : 'none';
+            document.querySelectorAll('.aprendiz-pick-row').forEach(item => {
+                const nombre = item.querySelector('.aprendiz-pick-name').textContent.toLowerCase();
+                item.style.display = nombre.includes(term) ? 'flex' : 'none';
             });
             actualizarContador();
         });

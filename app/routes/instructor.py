@@ -1,7 +1,7 @@
 import socket
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import joinedload
 from app import db
@@ -15,6 +15,7 @@ from app.models.tarea import (
     MODALIDADES_TAREA,
     Tarea,
     Entrega,
+    ProrrogaTarea,
 )
 from app.models.alertas import Alerta, ConfiguracionAlertas, PlanMejoramiento
 from app.models.observador import (
@@ -92,6 +93,7 @@ from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_REPORTE_JUICIOS
 from app.services.importacion_jobs import encolar_importacion, ColaImportacionesNoDisponible
 from app.services.versiones_archivos import actualizar_estado, crear_version
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 from app.helpers import utc_now
 import json
 import os
@@ -104,6 +106,7 @@ instructor_bp = Blueprint('instructor', __name__, template_folder='../templates/
 
 ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
 MAX_LONGITUD_CALIFICACION = 10
+ZONA_HORARIA_BOGOTA = ZoneInfo('America/Bogota')
 
 
 _ip_local_cache = None
@@ -366,22 +369,10 @@ def _dashboard_inner():
             .group_by(Alerta.ficha_id).all()
         )
 
-        # --- Juicios evaluativos ---
+        # --- Juicios evaluativos y avance de certificación ---
+        # Un solo agregado por aprendiz alimenta el resumen global y el conteo
+        # de certificados, evitando recorrer de nuevo toda la tabla de juicios.
         juicios_por_ficha = {}
-        juicios_data = db.session.query(
-            JuicioEvaluativo.ficha_id, JuicioEvaluativo.juicio, func.count(JuicioEvaluativo.id)
-        ).join(Aprendiz).filter(
-            JuicioEvaluativo.ficha_id.in_(ficha_ids),
-            Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
-        ).group_by(JuicioEvaluativo.ficha_id, JuicioEvaluativo.juicio).all()
-        for fid, juicio, cnt in juicios_data:
-            if fid not in juicios_por_ficha:
-                juicios_por_ficha[fid] = {'total': 0, 'aprobados': 0}
-            juicios_por_ficha[fid]['total'] += cnt
-            if juicio and 'APROBADO' in juicio.upper() and 'AUN NO' not in juicio.upper():
-                juicios_por_ficha[fid]['aprobados'] += cnt
-
-        # --- Avance de Certificación (100% Aprobados por Aprendiz) ---
         es_aprobado_sql = (
             func.upper(JuicioEvaluativo.juicio).like('%APROBADO%') &
             ~func.upper(JuicioEvaluativo.juicio).like('%AUN NO%')
@@ -400,6 +391,11 @@ def _dashboard_inner():
         for fid, aid, total_cnt, aprobados_cnt in juicios_aprendices_data:
             total_cnt = total_cnt or 0
             aprobados_cnt = aprobados_cnt or 0
+            resumen = juicios_por_ficha.setdefault(
+                fid, {'total': 0, 'aprobados': 0},
+            )
+            resumen['total'] += total_cnt
+            resumen['aprobados'] += aprobados_cnt
             if total_cnt > 0 and total_cnt == aprobados_cnt:
                 certificados_por_ficha[fid] += 1
 
@@ -981,12 +977,14 @@ def historial_aprendiz(ficha_id, aprendiz_id):
     from app.models.grupo import GrupoAprendiz
 
     # Buscar insignias individuales y grupales
-    subquery_grupos = db.session.query(GrupoAprendiz.grupo_id).filter_by(aprendiz_id=aprendiz.id).subquery()
+    grupos_aprendiz = select(GrupoAprendiz.grupo_id).where(
+        GrupoAprendiz.aprendiz_id == aprendiz.id
+    )
     
     otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
         or_(
             InsigniaOtorgada.aprendiz_id == aprendiz.id,
-            InsigniaOtorgada.grupo_id.in_(subquery_grupos)
+            InsigniaOtorgada.grupo_id.in_(grupos_aprendiz)
         ),
         Insignia.ficha_id == ficha_id,
     ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
@@ -2034,56 +2032,120 @@ def evidencias_faltantes(ficha_id):
     ).all()
     tareas = tareas_visibles(ficha_id).order_by(Tarea.fecha_limite.desc()).all()
     
-    ahora = utc_now()
+    ahora = datetime.now(ZONA_HORARIA_BOGOTA).replace(tzinfo=None)
     
-    if tareas:
-        entregas_query = Entrega.query.filter(
-            Entrega.tarea_id.in_([t.id for t in tareas])
+    ids_tareas = [tarea.id for tarea in tareas]
+    if ids_tareas:
+        entregas_query = (
+            Entrega.query
+            .filter(Entrega.tarea_id.in_(ids_tareas))
+            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
+            .all()
+        )
+        prorrogas_query = ProrrogaTarea.query.filter(
+            ProrrogaTarea.tarea_id.in_(ids_tareas)
         ).all()
     else:
         entregas_query = []
-        
+        prorrogas_query = []
+
     entregas_map = {}
     for e in entregas_query:
         key = (e.tarea_id, e.aprendiz_id)
-        prev = entregas_map.get(key)
-        if prev is None:
-            entregas_map[key] = e
-        elif e.fecha_entrega and (not prev.fecha_entrega or e.fecha_entrega > prev.fecha_entrega):
-            entregas_map[key] = e
+        entregas_map.setdefault(key, e)
+
+    prorrogas_map = {
+        (prorroga.tarea_id, prorroga.aprendiz_id): prorroga
+        for prorroga in prorrogas_query
+    }
 
     datos_aprendices = []
     for ap in aprendices_list:
         faltantes = []
+        entregadas = 0
         for tarea in tareas:
             entrega = entregas_map.get((tarea.id, ap.id))
-            estado = 'pendiente'
+            prorroga = prorrogas_map.get((tarea.id, ap.id))
+            fecha_limite = (
+                prorroga.nueva_fecha_limite if prorroga else tarea.fecha_limite
+            )
             if entrega:
                 if entrega.estado_revision == 'rechazada':
                     estado = 'correccion'
                 else:
-                    estado = 'entregada'
-            elif tarea.fecha_limite and tarea.fecha_limite < ahora:
-                estado = 'vencida'
-                
-            if estado in ('pendiente', 'vencida', 'correccion'):
+                    entregadas += 1
+                    continue
+            else:
+                vencida = bool(fecha_limite and fecha_limite < ahora)
+                if tarea.modalidad == MODALIDAD_CLASE:
+                    estado = 'actividad_vencida' if vencida else 'actividad'
+                else:
+                    estado = 'vencida' if vencida else 'pendiente'
+
+            if estado in ('pendiente', 'vencida', 'correccion', 'actividad', 'actividad_vencida'):
                 faltantes.append({
                     'tarea': tarea,
-                    'estado': estado
+                    'estado': estado,
+                    'fecha_limite': (
+                        fecha_limite.replace(tzinfo=ZONA_HORARIA_BOGOTA)
+                        if fecha_limite and fecha_limite.tzinfo is None
+                        else fecha_limite.astimezone(ZONA_HORARIA_BOGOTA)
+                        if fecha_limite else None
+                    ),
+                    'tiene_prorroga': bool(prorroga),
+                    'prorroga_vigente': bool(
+                        prorroga and prorroga.nueva_fecha_limite >= ahora
+                    ),
                 })
-                
+
+        total_tareas = len(tareas)
+        cantidad_faltante = len(faltantes)
+        estado_general = (
+            'sin_tareas' if total_tareas == 0
+            else 'completo' if cantidad_faltante == 0
+            else 'pendiente'
+        )
         datos_aprendices.append({
             'aprendiz': ap,
             'faltantes': faltantes,
-            'cantidad': len(faltantes)
+            'cantidad': cantidad_faltante,
+            'entregadas': entregadas,
+            'total_tareas': total_tareas,
+            'porcentaje': round(entregadas / total_tareas * 100) if total_tareas else None,
+            'estado_general': estado_general,
         })
 
-    datos_aprendices.sort(key=lambda x: x['cantidad'], reverse=True)
+    datos_aprendices.sort(
+        key=lambda item: (
+            item['estado_general'] != 'pendiente',
+            -item['cantidad'],
+            item['aprendiz'].apellidos.casefold(),
+            item['aprendiz'].nombre.casefold(),
+        )
+    )
+    total_asignaciones = len(aprendices_list) * len(tareas)
+    total_entregadas = sum(item['entregadas'] for item in datos_aprendices)
+    resumen = {
+        'total_tareas': len(tareas),
+        'total_aprendices': len(aprendices_list),
+        'total_asignaciones': total_asignaciones,
+        'entregadas': total_entregadas,
+        'pendientes': total_asignaciones - total_entregadas,
+        'aprendices_completos': sum(
+            item['estado_general'] == 'completo' for item in datos_aprendices
+        ),
+        'aprendices_pendientes': sum(
+            item['estado_general'] == 'pendiente' for item in datos_aprendices
+        ),
+        'porcentaje': round(total_entregadas / total_asignaciones * 100)
+        if total_asignaciones else None,
+    }
 
     return render_template(
         'instructor/evidencias_faltantes.html',
         ficha=ficha,
         datos=datos_aprendices,
+        resumen=resumen,
         corte_actual=corte_actual(ficha_id)
     )
 

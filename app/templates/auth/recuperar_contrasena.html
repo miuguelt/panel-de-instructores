@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Recuperar contraseña - SENA Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="auth-page">
+<div class="auth-container">
+    <main class="auth-card">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages" aria-live="polite">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" role="status">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        <div class="auth-header">
+            <div class="auth-logo" aria-hidden="true">S</div>
+            <h1>Recuperar contraseña</h1>
+            <p>Si tu cuenta y el correo están habilitados, recibirás un enlace para cambiarla.</p>
+        </div>
+
+        <form method="POST" class="auth-form" autocomplete="on">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="correo">Correo institucional</label>
+                <input type="email" id="correo" name="correo" maxlength="150"
+                       placeholder="tu.correo@sena.edu.co" autocomplete="email" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Enviar enlace</button>
+        </form>
+
+        <div class="auth-footer">
+            <a href="{{ url_for('auth.login') }}" class="btn btn-outline btn-full">Volver a iniciar sesión</a>
+        </div>
+    </main>
+</div>
+</body>
+</html>

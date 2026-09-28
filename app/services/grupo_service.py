@@ -14,10 +14,20 @@ def crear_grupos_aleatorios(ficha_id, aprendiz_ids, tamano_grupo, prefijo_nombre
     if not aprendiz_ids or tamano_grupo <= 0:
         return []
 
-    # Validar que los aprendices existan y pertenezcan a la ficha (opcional pero recomendado)
-    aprendices = Aprendiz.query.filter(Aprendiz.id.in_(aprendiz_ids)).all()
-    if not aprendices:
-        return []
+    try:
+        ids_seleccionados = [int(aprendiz_id) for aprendiz_id in aprendiz_ids]
+    except (TypeError, ValueError) as exc:
+        raise ValueError('La selección de aprendices no es válida.') from exc
+    ids_unicos = set(ids_seleccionados)
+    if len(ids_unicos) != len(ids_seleccionados):
+        raise ValueError('Cada aprendiz solo puede asignarse a un grupo.')
+
+    aprendices = Aprendiz.query.filter(
+        Aprendiz.ficha_id == ficha_id,
+        Aprendiz.id.in_(ids_unicos),
+    ).all()
+    if len(aprendices) != len(ids_unicos):
+        raise ValueError('Todos los aprendices deben pertenecer a la ficha seleccionada.')
 
     # Mezclar aleatoriamente
     random.shuffle(aprendices)

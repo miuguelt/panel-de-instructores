@@ -1,93 +1,424 @@
 {% extends "base.html" %}
-{% block title %}Podio de Grupos - {{ ficha.codigo }}{% endblock %}
+{% block title %}Podio de Grupos - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block head %}
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu" crossorigin="anonymous"></script>
+<style>
+    :root {
+        --bento-radius: 20px;
+        --card-radius: 14px;
+        --gold-glow: rgba(245, 158, 11, 0.25);
+    }
+
+    .podio-header {
+        background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-card) 100%);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--bento-radius);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.75rem;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+    }
+    .podio-header-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .podio-header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #ffd700 0%, #f59e0b 100%);
+        color: #451a03;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 14px var(--gold-glow);
+        flex-shrink: 0;
+    }
+
+    /* Contenedor del podio visual */
+    .podio-stage-wrapper {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--bento-radius);
+        padding: 2.5rem 1.5rem 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    }
+    .podio-stage {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 1rem;
+        max-width: 720px;
+        margin: 0 auto;
+        padding-top: 1rem;
+    }
+    @media (max-width: 640px) {
+        .podio-stage {
+            gap: 0.5rem;
+        }
+    }
+
+    .podio-pillar-col {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .podio-team-name {
+        font-weight: 800;
+        font-size: 1rem;
+        color: var(--text-strong, inherit);
+        margin-bottom: 4px;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .podio-medal-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+        margin-bottom: 12px;
+    }
+
+    /* Pilares 3D del podio */
+    .podio-pillar {
+        width: 100%;
+        border-radius: 14px 14px 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        transition: transform .25s ease;
+    }
+    .podio-pillar:hover {
+        transform: translateY(-4px);
+    }
+    .podio-pillar-num {
+        font-size: 2.2rem;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    /* 1er Lugar - ORO */
+    .pillar-gold {
+        background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+        height: 160px;
+        color: #451a03;
+        box-shadow: 0 -4px 20px rgba(245, 158, 11, 0.35);
+        border: 2px solid #fde68a;
+        border-bottom: none;
+    }
+    .pillar-gold .podio-pillar-num {
+        color: #78350f;
+    }
+    .badge-gold {
+        background: rgba(245, 158, 11, 0.15);
+        color: #b45309;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    [data-theme="dark"] .badge-gold,
+    [data-theme="ocean"] .badge-gold {
+        color: #fbbf24;
+    }
+
+    /* 2do Lugar - PLATA */
+    .pillar-silver {
+        background: linear-gradient(180deg, #cbd5e1 0%, #64748b 100%);
+        height: 120px;
+        color: #0f172a;
+        box-shadow: 0 -4px 16px rgba(100, 116, 139, 0.2);
+        border: 2px solid #f1f5f9;
+        border-bottom: none;
+    }
+    .pillar-silver .podio-pillar-num {
+        color: #334155;
+    }
+    .badge-silver {
+        background: rgba(148, 163, 184, 0.15);
+        color: #475569;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    [data-theme="dark"] .badge-silver,
+    [data-theme="ocean"] .badge-silver {
+        color: #cbd5e1;
+    }
+
+    /* 3er Lugar - BRONCE */
+    .pillar-bronze {
+        background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
+        height: 90px;
+        color: #fef3c7;
+        box-shadow: 0 -4px 14px rgba(180, 83, 9, 0.2);
+        border: 2px solid #fed7aa;
+        border-bottom: none;
+    }
+    .pillar-bronze .podio-pillar-num {
+        color: #451a03;
+    }
+    .badge-bronze {
+        background: rgba(180, 83, 9, 0.12);
+        color: #92400e;
+        border: 1px solid rgba(180, 83, 9, 0.25);
+    }
+    [data-theme="dark"] .badge-bronze,
+    [data-theme="ocean"] .badge-bronze {
+        color: #fcd34d;
+    }
+
+    /* Tabla de clasificación completa */
+    .leaderboard-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--bento-radius);
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    }
+    .leaderboard-header {
+        padding: 1.15rem 1.5rem;
+        border-bottom: 1px solid var(--border-divider);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+    .leaderboard-table th {
+        background: var(--bg-surface);
+        padding: 12px 18px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border-divider);
+    }
+    .leaderboard-table td {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border-divider);
+        font-size: 0.9rem;
+        color: var(--text-color, inherit);
+        vertical-align: middle;
+    }
+    .leaderboard-table tbody tr:hover {
+        background: var(--bg-surface);
+    }
+    .leaderboard-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .rank-pill {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 0.9rem;
+    }
+
+    .members-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .member-tag {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 0.8rem;
+        color: var(--text-strong, inherit);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🏆 Podio de Grupos - {{ ficha.codigo }}</h2>
-        <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-secondary">Volver a Grupos</a>
-    </div>
+<div class="podio-module" style="padding: 1.25rem 0;">
 
-    {% if ranking_grupos %}
-        <div class="row justify-content-center mb-5">
-            <!-- Podio Visual -->
-            <div class="col-md-8 text-center d-flex align-items-end justify-content-center" style="min-height: 200px; gap: 10px;">
-                
-                {% if ranking_grupos|length > 1 %}
-                    {% set plata = ranking_grupos[1] %}
-                    <!-- Plata (Segundo lugar) -->
-                    <div class="d-flex flex-column" style="width: 30%;">
-                        <div class="fw-bold fs-5 text-truncate px-2">{{ plata.Grupo.nombre }}</div>
-                        <div class="badge bg-secondary mb-2 fs-6">{{ plata.total_insignias }} Medallas</div>
-                        <div class="bg-secondary rounded-top d-flex align-items-center justify-content-center text-white fw-bold" style="height: 120px; font-size: 2rem;">2</div>
-                    </div>
-                {% endif %}
-
-                {% if ranking_grupos|length > 0 %}
-                    {% set oro = ranking_grupos[0] %}
-                    <!-- Oro (Primer lugar) -->
-                    <div class="d-flex flex-column" style="width: 35%;">
-                        <div class="fw-bold fs-4 text-warning text-truncate px-2">{{ oro.Grupo.nombre }}</div>
-                        <div class="badge bg-warning text-dark mb-2 fs-5">{{ oro.total_insignias }} Medallas</div>
-                        <div class="bg-warning rounded-top d-flex align-items-center justify-content-center text-dark fw-bold" style="height: 160px; font-size: 3rem; box-shadow: 0 -5px 15px rgba(255,193,7,0.5);">1</div>
-                    </div>
-                {% endif %}
-
-                {% if ranking_grupos|length > 2 %}
-                    {% set bronce = ranking_grupos[2] %}
-                    <!-- Bronce (Tercer lugar) -->
-                    <div class="d-flex flex-column" style="width: 30%;">
-                        <div class="fw-bold fs-5 text-truncate px-2" style="color: #cd7f32;">{{ bronce.Grupo.nombre }}</div>
-                        <div class="badge mb-2 fs-6" style="background-color: #cd7f32; color: white;">{{ bronce.total_insignias }} Medallas</div>
-                        <div class="rounded-top d-flex align-items-center justify-content-center text-white fw-bold" style="background-color: #cd7f32; height: 90px; font-size: 2rem;">3</div>
-                    </div>
-                {% endif %}
+    <!-- ═══ 1. Cabecera ═══ -->
+    <header class="podio-header">
+        <div class="podio-header-info">
+            <div class="podio-header-icon" aria-hidden="true">
+                <i data-lucide="trophy" style="width:26px;height:26px;"></i>
+            </div>
+            <div>
+                <h1 style="font-size:1.4rem;font-weight:800;margin:0;color:var(--text-strong,inherit);">
+                    Podio y Clasificación de Equipos
+                </h1>
+                <p style="font-size:0.86rem;color:var(--text-muted);margin:0.2rem 0 0 0;">
+                    Ficha <strong style="color:var(--accent-primary);">{{ ficha.codigo }}</strong>
+                    &middot; {{ ficha.nombre_programa }}
+                </p>
             </div>
         </div>
+        <div>
+            <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-secondary btn-sm" style="border-radius:50px;">
+                <i data-lucide="arrow-left" style="width:14px;height:14px;margin-right:4px;"></i> Volver a Grupos
+            </a>
+        </div>
+    </header>
 
-        <!-- Tabla completa -->
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0">Clasificación Completa</h5>
+    {% if ranking_grupos %}
+        <!-- ═══ 2. Podio Visual Olímpico (Top 3) ═══ -->
+        <section class="podio-stage-wrapper" aria-label="Podio de Honor">
+            <div style="text-align:center;margin-bottom:1.5rem;">
+                <span class="eyebrow" style="color:var(--accent-primary);">Cuadro de Honor</span>
+                <h2 style="font-size:1.25rem;font-weight:800;margin:0.25rem 0 0;color:var(--text-strong,inherit);">
+                    Equipos más Galardonados
+                </h2>
             </div>
-            <div class="card-body p-0">
-                <table class="table table-hover table-striped mb-0">
-                    <thead class="table-light">
+
+            <div class="podio-stage">
+                <!-- 2do Lugar (Plata) -->
+                {% if ranking_grupos|length > 1 %}
+                {% set plata = ranking_grupos[1] %}
+                <div class="podio-pillar-col">
+                    <span style="font-size:1.5rem;margin-bottom:4px;" aria-hidden="true">🥈</span>
+                    <div class="podio-team-name" title="{{ plata.Grupo.nombre }}">{{ plata.Grupo.nombre }}</div>
+                    <span class="podio-medal-badge badge-silver">
+                        <i data-lucide="medal" style="width:12px;height:12px;"></i> {{ plata.total_insignias }} medallas
+                    </span>
+                    <div class="podio-pillar pillar-silver">
+                        <span class="podio-pillar-num">2</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 1er Lugar (Oro) -->
+                {% if ranking_grupos|length > 0 %}
+                {% set oro = ranking_grupos[0] %}
+                <div class="podio-pillar-col">
+                    <span style="font-size:1.8rem;margin-bottom:4px;" aria-hidden="true">👑 🥇</span>
+                    <div class="podio-team-name" style="font-size:1.15rem;color:var(--accent-primary);" title="{{ oro.Grupo.nombre }}">{{ oro.Grupo.nombre }}</div>
+                    <span class="podio-medal-badge badge-gold">
+                        <i data-lucide="award" style="width:12px;height:12px;"></i> {{ oro.total_insignias }} medallas
+                    </span>
+                    <div class="podio-pillar pillar-gold">
+                        <span class="podio-pillar-num">1</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 3er Lugar (Bronce) -->
+                {% if ranking_grupos|length > 2 %}
+                {% set bronce = ranking_grupos[2] %}
+                <div class="podio-pillar-col">
+                    <span style="font-size:1.4rem;margin-bottom:4px;" aria-hidden="true">🥉</span>
+                    <div class="podio-team-name" title="{{ bronce.Grupo.nombre }}">{{ bronce.Grupo.nombre }}</div>
+                    <span class="podio-medal-badge badge-bronze">
+                        <i data-lucide="medal" style="width:12px;height:12px;"></i> {{ bronce.total_insignias }} medallas
+                    </span>
+                    <div class="podio-pillar pillar-bronze">
+                        <span class="podio-pillar-num">3</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- ═══ 3. Tabla Completa de Clasificación ═══ -->
+        <section class="leaderboard-card" aria-label="Tabla de Posiciones">
+            <header class="leaderboard-header">
+                <div>
+                    <h3 style="font-size:1.05rem;font-weight:700;margin:0;color:var(--text-strong,inherit);">
+                        Clasificación General
+                    </h3>
+                    <small style="color:var(--text-muted);">Basado en medallas otorgadas a cada equipo en la ficha</small>
+                </div>
+                <span class="badge" style="background:var(--bg-surface);border:1px solid var(--border-divider);color:var(--text-muted);border-radius:20px;padding:4px 10px;">
+                    {{ ranking_grupos|length }} equipos registrados
+                </span>
+            </header>
+
+            <div style="overflow-x:auto;">
+                <table class="leaderboard-table">
+                    <thead>
                         <tr>
-                            <th class="text-center" style="width: 80px;">Puesto</th>
-                            <th>Grupo</th>
+                            <th style="width:70px;text-align:center;">Pos.</th>
+                            <th style="width:220px;">Equipo</th>
                             <th>Integrantes</th>
-                            <th class="text-center">Total Medallas</th>
+                            <th style="width:140px;text-align:center;">Medallas</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in ranking_grupos %}
                         <tr>
-                            <td class="text-center fw-bold align-middle">
-                                {% if loop.index == 1 %}🥇
-                                {% elif loop.index == 2 %}🥈
-                                {% elif loop.index == 3 %}🥉
-                                {% else %}{{ loop.index }}{% endif %}
+                            <td style="text-align:center;">
+                                {% if loop.index == 1 %}
+                                <span class="rank-pill" style="background:#fef3c7;color:#92400e;">🥇</span>
+                                {% elif loop.index == 2 %}
+                                <span class="rank-pill" style="background:#f1f5f9;color:#475569;">🥈</span>
+                                {% elif loop.index == 3 %}
+                                <span class="rank-pill" style="background:#ffedd5;color:#9a3412;">🥉</span>
+                                {% else %}
+                                <span class="rank-pill" style="background:var(--bg-surface);color:var(--text-muted);">{{ loop.index }}</span>
+                                {% endif %}
                             </td>
-                            <td class="align-middle fw-semibold">{{ item.Grupo.nombre }}</td>
                             <td>
-                                <ul class="list-unstyled mb-0" style="font-size: 0.9em;">
-                                    {% for aprendiz in item.Grupo.aprendices %}
-                                    <li>• {{ aprendiz.nombre }} {{ aprendiz.apellidos }}</li>
-                                    {% endfor %}
-                                </ul>
+                                <strong style="color:var(--text-strong,inherit);font-size:0.95rem;">
+                                    {{ item.Grupo.nombre }}
+                                </strong>
                             </td>
-                            <td class="text-center align-middle fs-5">
-                                <span class="badge bg-primary rounded-pill">{{ item.total_insignias }}</span>
+                            <td>
+                                <div class="members-tags">
+                                    {% for aprendiz in item.Grupo.aprendices %}
+                                    <span class="member-tag">
+                                        {{ aprendiz.nombre }} {{ aprendiz.apellidos }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td style="text-align:center;">
+                                <span class="badge" style="background:linear-gradient(135deg,#ffd700 0%,#f59e0b 100%);color:#451a03;font-weight:800;border-radius:20px;padding:4px 12px;font-size:0.86rem;display:inline-flex;align-items:center;gap:4px;">
+                                    <i data-lucide="award" style="width:13px;height:13px;"></i>
+                                    {{ item.total_insignias }}
+                                </span>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
+
     {% else %}
-        <div class="alert alert-info">Aún no hay medallas otorgadas a grupos o no hay grupos creados.</div>
+        <!-- Estado vacío -->
+        <div class="leaderboard-card" style="padding:3.5rem 1.5rem;text-align:center;">
+            <div style="width:64px;height:64px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;color:var(--text-muted);">
+                <i data-lucide="award" style="width:32px;height:32px;"></i>
+            </div>
+            <h3 style="font-size:1.15rem;font-weight:700;color:var(--text-strong,inherit);margin-bottom:0.5rem;">
+                Aún no hay medallas otorgadas
+            </h3>
+            <p style="max-width:380px;font-size:0.9rem;line-height:1.55;color:var(--text-muted);margin:0 auto 1.5rem;">
+                Crea equipos y otórgales medallas por retos, participación o logros académicos para habilitar el podio de grupos.
+            </p>
+            <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-primary" style="border-radius:50px;padding:8px 24px;">
+                <i data-lucide="users" style="width:15px;height:15px;margin-right:6px;"></i> Ir a Gestión de Grupos
+            </a>
+        </div>
     {% endif %}
 </div>
+
+<script>
+lucide.createIcons();
+</script>
 {% endblock %}

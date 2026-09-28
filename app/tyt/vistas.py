@@ -1,6 +1,15 @@
 """Authorized group view and private template projection for learner panels."""
 
-from flask import Blueprint, abort, current_app, render_template, request, session
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    g,
+    has_request_context,
+    render_template,
+    request,
+    session,
+)
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
@@ -16,6 +25,35 @@ from app.tyt.consulta import obtener_seguimiento
 tyt_bp = Blueprint('tyt', __name__)
 
 
+_SEGUIMIENTO_TYT_AUSENTE = object()
+
+
+def _obtener_seguimiento_solicitud(ficha):
+    """Comparte el informe TyT entre el aviso previo y el render de la página."""
+    if not has_request_context():
+        return obtener_seguimiento(ficha)
+
+    seguimientos = getattr(g, '_seguimientos_tyt', None)
+    if seguimientos is None:
+        seguimientos = {}
+        g._seguimientos_tyt = seguimientos
+
+    seguimiento = seguimientos.get(ficha.id, _SEGUIMIENTO_TYT_AUSENTE)
+    if seguimiento is _SEGUIMIENTO_TYT_AUSENTE:
+        try:
+            seguimiento = obtener_seguimiento(ficha)
+        except Exception as exc:
+            # Evita repetir la misma consulta pesada si también se intenta
+            # dibujar la tarjeta después de que el cálculo haya fallado.
+            seguimientos[ficha.id] = exc
+            raise
+        seguimientos[ficha.id] = seguimiento
+
+    if isinstance(seguimiento, Exception):
+        raise seguimiento
+    return seguimiento
+
+
 @tyt_bp.before_app_request
 def revisar_avisos_al_entrar():
     if request.method != 'GET' or request.endpoint not in (
@@ -25,10 +63,15 @@ def revisar_avisos_al_entrar():
         return
     try:
         fichas = _fichas_autorizadas()
+        hubo_cambios = False
         for ficha in fichas:
-            actualizar_avisos(ficha)
-        # Commit before the route loads its ORM objects, never while rendering.
-        if fichas:
+            seguimiento = _obtener_seguimiento_solicitud(ficha)
+            hubo_cambios = actualizar_avisos(
+                ficha, seguimiento=seguimiento,
+            ) or hubo_cambios
+        # Confirma antes de que la ruta cargue sus objetos ORM, solo si hubo
+        # avisos nuevos; las visitas sin cambios no necesitan una escritura.
+        if hubo_cambios:
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -66,7 +109,7 @@ def progreso_tyt(ficha, aprendiz=None):
     if not autorizado:
         return None
     try:
-        seguimiento = obtener_seguimiento(ficha)
+        seguimiento = _obtener_seguimiento_solicitud(ficha)
     except Exception:
         db.session.rollback()
         current_app.logger.exception('No se pudo cargar el seguimiento TyT de la ficha %s.', ficha.id)

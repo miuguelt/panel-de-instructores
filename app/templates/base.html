@@ -81,7 +81,7 @@
             </div>
         </nav>
 
-        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion') %}
+        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion', 'grupos') %}
         <div class="ficha-toolbar">
             <div class="ficha-toolbar-inner">
                 <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
@@ -128,6 +128,8 @@
                        class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}" title="Materiales de apoyo"{% if request.endpoint == 'instructor.materiales' %} aria-current="page"{% endif %}>📂 Materiales</a>
                     <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
                        class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}" title="Ranking de participación"{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %} aria-current="page"{% endif %}>🏆 Ranking</a>
+                    <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}"
+                       class="{% if request.blueprint == 'grupos' %}is-active{% endif %}" title="Gestión de grupos y equipos"{% if request.blueprint == 'grupos' %} aria-current="page"{% endif %}>👥 Grupos</a>
                 </nav>
             </div>
         </div>
@@ -209,9 +211,12 @@
             });
         })();
 
-        // 3. Pre-carga instantánea al pasar el cursor (navegación con 0ms percibidos)
+        // 3. Pre-carga después de confirmar intención de navegación
         (function() {
             const prefetched = new Set();
+            let prefetchTimer = null;
+            let pendingLink = null;
+
             function prefetch(url) {
                 if (!url || prefetched.has(url) || url.startsWith('#') || url.startsWith('javascript:')) return;
                 if (url.includes('/descargar') || url.includes('/logout') || url.includes('/exportar') || url.includes('/plantilla')) return;
@@ -225,12 +230,30 @@
                 } catch (e) {}
             }
 
+            function cancelPendingPrefetch() {
+                if (prefetchTimer !== null) window.clearTimeout(prefetchTimer);
+                prefetchTimer = null;
+                pendingLink = null;
+            }
+
             document.addEventListener('pointerover', function(e) {
+                if (e.pointerType && e.pointerType !== 'mouse') return;
                 const a = e.target.closest('a');
                 if (!a || !a.href) return;
-                if (a.origin === window.location.origin && !a.hasAttribute('download') && a.target !== '_blank' && a.getAttribute('hx-boost') !== 'false') {
-                    prefetch(a.href);
-                }
+                if (a.origin !== window.location.origin || a.hasAttribute('download') || a.target === '_blank' || a.getAttribute('hx-boost') === 'false') return;
+                if (pendingLink === a) return;
+
+                cancelPendingPrefetch();
+                pendingLink = a;
+                prefetchTimer = window.setTimeout(function() {
+                    if (pendingLink === a && a.matches(':hover')) prefetch(a.href);
+                    cancelPendingPrefetch();
+                }, 180);
+            }, { passive: true });
+
+            document.addEventListener('pointerout', function(e) {
+                const a = e.target.closest('a');
+                if (a && !a.contains(e.relatedTarget) && pendingLink === a) cancelPendingPrefetch();
             }, { passive: true });
         })();
     </script>

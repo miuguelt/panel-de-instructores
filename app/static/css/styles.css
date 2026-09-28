@@ -10033,12 +10033,16 @@ select optgroup {
 }
 
 .vision-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 16px;
-    flex-wrap: wrap;
     margin-bottom: 0;
+}
+@media (min-width: 768px) {
+    .vision-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: flex-start;
+    }
 }
 
 .vision-title-wrap {
