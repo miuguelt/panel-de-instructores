@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, text
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REVISION_MERGE = 'e025798e7b92'
+REVISION_HEAD = 'f016a2b9c421'
 RAMA_GRUPOS = 'dfe8ae6bc6d3'
 RAMA_RECUPERACION = 'n37passwordreset'
 
@@ -29,10 +30,14 @@ class MigrationHeadsTestCase(unittest.TestCase):
     def test_todas_las_ramas_terminan_en_un_solo_head(self):
         scripts = _script_directory()
 
-        self.assertEqual(scripts.get_heads(), [REVISION_MERGE])
+        self.assertEqual(scripts.get_heads(), [REVISION_HEAD])
         self.assertEqual(
             set(scripts.get_revision(REVISION_MERGE).down_revision),
             {RAMA_GRUPOS, RAMA_RECUPERACION},
+        )
+        self.assertEqual(
+            scripts.get_revision(REVISION_HEAD).down_revision,
+            REVISION_MERGE,
         )
 
     def test_merge_no_modifica_ni_el_esquema_ni_los_datos_existentes(self):
