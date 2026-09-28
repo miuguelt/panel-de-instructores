@@ -1838,14 +1838,126 @@ select optgroup {
 .timeline-finished { border-color: rgba(251, 191, 36, 0.3); background: var(--sena-orange-light); }
 
 .empty-state {
-    text-align: center; padding: clamp(24px, 6vw, 48px);
-    background: var(--bg-glass);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius); box-shadow: var(--shadow);
+    text-align: center;
+    padding: clamp(32px, 5vw, 52px) clamp(20px, 4vw, 40px);
+    background: var(--bg-card);
+    border: 1.5px solid var(--border-divider);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    max-width: 860px;
+    margin: 24px auto 0;
 }
-.empty-icon { font-size: 48px; margin-bottom: 12px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); }
-.empty-state h3 { font-size: clamp(16px, 4vw, 20px); margin-bottom: 8px; color: var(--text-strong); }
-.empty-state p { color: var(--text-muted); margin-bottom: 16px; }
+.empty-state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 14px;
+    border-radius: 9999px;
+    background: rgba(57, 169, 0, 0.12);
+    color: var(--color-sena-green-dark, #2d8500);
+    margin-bottom: 16px;
+}
+.empty-state-icon-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(57, 169, 0, 0.18), rgba(57, 169, 0, 0.06));
+    border: 1.5px solid rgba(57, 169, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    color: var(--color-sena-green, #39A900);
+}
+.empty-state h3 {
+    font-size: clamp(20px, 3.5vw, 24px);
+    font-weight: 800;
+    color: var(--text-strong);
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+}
+.empty-state-lead {
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 560px;
+    margin: 0 auto 28px;
+    line-height: 1.6;
+}
+.empty-state-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+    text-align: left;
+    margin-bottom: 24px;
+}
+.empty-state-card {
+    background: var(--bg-surface, var(--color-gray-50));
+    border: 1.5px solid var(--border-divider);
+    border-radius: 16px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.empty-state-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+    border-color: var(--color-sena-green);
+}
+.empty-state-card-featured {
+    border-color: rgba(57, 169, 0, 0.4);
+    background: linear-gradient(180deg, rgba(57, 169, 0, 0.05) 0%, var(--bg-surface, var(--color-gray-50)) 100%);
+}
+.empty-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.empty-card-icon {
+    font-size: 26px;
+}
+.empty-card-badge {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(57, 169, 0, 0.15);
+    color: var(--color-sena-green-dark, #2d8500);
+}
+.empty-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-strong);
+    margin-bottom: 6px;
+}
+.empty-card-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin-bottom: 20px;
+    flex-grow: 1;
+}
+.empty-state-tip {
+    font-size: 13px;
+    color: var(--text-muted);
+    background: var(--bg-surface, var(--color-gray-50));
+    border: 1px dashed var(--border-divider);
+    border-radius: 12px;
+    padding: 12px 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 620px;
+    line-height: 1.45;
+}
 
 .auth-page { background: var(--bg-base); min-height: 100vh; }
 .auth-container {
@@ -7061,14 +7173,25 @@ select optgroup {
 .page-header,
 .page-header-row,
 .module-header,
-.cleaning-page-header {
+.cleaning-page-header,
+.pl-header,
+.vision-header {
     margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 12px;
     width: 100%;
-    flex-wrap: wrap;
+}
+@media (min-width: 768px) {
+    .page-header,
+    .page-header-row,
+    .module-header,
+    .cleaning-page-header,
+    .pl-header,
+    .vision-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
 }
 
 .page-title-cluster {
@@ -7149,9 +7272,10 @@ select optgroup {
     .page-header,
     .page-header-row,
     .module-header,
-    .cleaning-page-header {
-        flex-direction: column;
-        align-items: flex-start;
+    .cleaning-page-header,
+    .pl-header,
+    .vision-header {
+        align-items: stretch;
         gap: 10px;
     }
     .page-title-cluster,
@@ -11100,3 +11224,93 @@ select optgroup {
     .cleaning-admin-summary { grid-template-columns: 1fr; }
     .cleaning-admin-actions { grid-column: auto; }
 }
+
+/* ==========================================================================
+   ⚡ FLUIDEZ Y RENDIMIENTO UX (Progress Bar, View Transitions, Containment)
+   ========================================================================== */
+
+/* Barra de progreso de navegación ultra-rápida (feedback visual inmediato) */
+.app-progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 3px;
+    background: linear-gradient(90deg, #39A900 0%, #00324D 50%, #50e3c2 100%);
+    background-size: 200% 100%;
+    z-index: 999999;
+    opacity: 0;
+    pointer-events: none;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.app-progress-bar.is-loading {
+    opacity: 1;
+    width: 75%;
+    animation: app-progress-shimmer 1.4s infinite linear;
+}
+
+.app-progress-bar.is-finishing {
+    opacity: 1;
+    width: 100%;
+    transition: width 0.12s ease-out;
+}
+
+@keyframes app-progress-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Transiciones fluidas de página y animaciones aceleradas por GPU */
+@view-transition {
+    navigation: auto;
+}
+
+main#contenido-principal {
+    animation: fadeInPage 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+}
+
+@keyframes fadeInPage {
+    from {
+        opacity: 0.88;
+        transform: translateY(3px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Optimización de presupuesto de renderizado (content-visibility) para listas largas */
+.table-responsive tbody tr:nth-child(n+25),
+.dashboard-cards .card-ficha:nth-child(n+12),
+.observador-timeline .timeline-item:nth-child(n+15),
+.ranking-table tbody tr:nth-child(n+25) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 52px;
+}
+
+/* Micro-interacciones táctiles suaves (sensación nativa y reactiva) */
+.nav-link,
+.ficha-nav a,
+.btn,
+.urgent-card,
+.card-ficha {
+    transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.15s ease,
+                background-color 0.15s ease,
+                border-color 0.15s ease,
+                color 0.15s ease;
+}
+
+.btn:active,
+.nav-link:active,
+.ficha-nav a:active {
+    transform: scale(0.975);
+}
+
+.card-ficha:hover {
+    transform: translateY(-2px);
+}
+

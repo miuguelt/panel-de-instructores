@@ -287,26 +287,6 @@
 <script>
 var materialAEliminar = null;
 
-function abrirModal(id) {
-  var m = document.getElementById(id);
-  if (m) {
-    m.showModal();
-    document.body.classList.add('modal-open');
-  }
-}
-function cerrarModal(id) {
-  var m = document.getElementById(id);
-  if (m && m.open) m.close();
-  document.body.classList.remove('modal-open');
-}
-
-document.querySelectorAll('.app-modal-overlay').forEach(function(m) {
-  m.addEventListener('click', function(e) {
-    if (e.target === m && m.open && !m.classList.contains('is-loading')) m.close();
-  });
-  m.addEventListener('close', function() { document.body.classList.remove('modal-open'); });
-});
-
 var formSubir = document.getElementById('formSubir');
 if (formSubir) {
   formSubir.addEventListener('submit', function() {

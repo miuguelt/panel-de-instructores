@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import re
+import zipfile
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
@@ -146,7 +147,10 @@ def mimetype_de(extension: str) -> str:
     como `application/octet-stream` y algunos navegadores móviles se negaban a
     abrir el archivo descargado.
     """
-    esperados = MIME_POR_EXTENSION.get((extension or '').lower())
+    extension = (extension or '').lower()
+    if extension == 'zip':
+        return 'application/zip'
+    esperados = MIME_POR_EXTENSION.get(extension)
     if not esperados:
         return 'application/octet-stream'
     return sorted(esperados)[0]
@@ -249,25 +253,54 @@ class ArchivoService:
         Raises:
             ErrorMimeType: Si el MIME no coincide.
         """
-        if not archivo.content_type:
+        mime_recibido = (archivo.content_type or '').split(';', 1)[0].strip().lower()
+        if not mime_recibido:
             return
-        esperados = MIME_POR_EXTENSION.get(extension)
-        if esperados and archivo.content_type not in esperados:
+        esperados = {
+            tipo.lower()
+            for tipo in MIME_POR_EXTENSION.get(extension, set())
+        }
+        if extension == 'zip':
+            # Algunos navegadores y sistemas declaran ZIP como binario genérico.
+            # La estructura real del ZIP se comprueba abajo con zipfile, así que
+            # este alias no permite que otro contenido pase la validación.
+            esperados.update({
+                'application/octet-stream',
+                'application/x-zip',
+                'multipart/x-zip',
+            })
+        if esperados and mime_recibido not in esperados:
             raise ErrorMimeType(
-                f'El tipo de contenido ({archivo.content_type}) no coincide '
+                f'El tipo de contenido ({mime_recibido}) no coincide '
                 f'con la extensión .{extension}.'
             )
 
     @staticmethod
     def validar_magic_bytes(archivo: FileStorage, extension: str) -> None:
-        """Valida la cabecera real del archivo contra la extensión.
+        """Valida la firma real del archivo contra la extensión.
 
-        Lee hasta 32 bytes del stream y los compara contra firmas conocidas.
+        Para ZIP verifica también su directorio central. Esto reconoce archivos
+        autoextraíbles válidos y rechaza ZIP truncados con solo la firma inicial.
         Resetea el stream después de la lectura.
 
         Raises:
             ErrorArchivo: Si los magic bytes no coinciden.
         """
+        if extension == 'zip':
+            try:
+                archivo.stream.seek(0)
+                zip_valido = zipfile.is_zipfile(archivo.stream)
+            except (OSError, ValueError, zipfile.BadZipFile):
+                zip_valido = False
+            finally:
+                archivo.stream.seek(0)
+            if not zip_valido:
+                raise ErrorArchivo(
+                    'El archivo .zip está dañado o incompleto. Vuelve a comprimir '
+                    'la carpeta y selecciona nuevamente el archivo generado.'
+                )
+            return
+
         archivo.stream.seek(0)
         contenido = archivo.stream.read(_MAX_MAGIC_READ)
         archivo.stream.seek(0)
@@ -366,7 +399,7 @@ class ArchivoService:
             ErrorArchivoVacio: Si no hay archivo o llegó vacío.
             ErrorExtension: Extensión no permitida.
             ErrorMimeType: Content-Type no coincide.
-            ErrorTamano: El archivo supera MAX_CONTENT_LENGTH.
+            ErrorTamano: El archivo supera MAX_UPLOAD_BYTES.
             ErrorArchivo: Magic bytes no coinciden / fallo de escritura.
         """
         ext = ArchivoService.validar(archivo, check_mime=check_mime, check_magic=check_magic)
@@ -390,7 +423,11 @@ class ArchivoService:
 
         ruta_completa = os.path.join(directorio, nombre_archivo)
         ruta_parcial = f'{ruta_completa}.part'
-        limite = current_app.config.get('MAX_CONTENT_LENGTH') or 0
+        limite = (
+            current_app.config.get('MAX_UPLOAD_BYTES')
+            or current_app.config.get('MAX_CONTENT_LENGTH')
+            or 0
+        )
 
         try:
             archivo.stream.seek(0)
@@ -403,8 +440,8 @@ class ArchivoService:
                 )
             if limite and tamano > limite:
                 raise ErrorTamano(
-                    f'El archivo pesa {tamano // (1024 * 1024)} MB y el máximo '
-                    f'permitido es {limite // (1024 * 1024)} MB.'
+                    f'El archivo pesa {tamano / (1024 * 1024):.1f} MiB y el máximo '
+                    f'permitido es {limite / (1024 * 1024):.1f} MiB.'
                 )
             os.replace(ruta_parcial, ruta_completa)
         except ErrorArchivo:

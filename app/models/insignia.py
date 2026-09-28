@@ -33,7 +33,8 @@ class InsigniaOtorgada(db.Model):
     __tablename__ = 'insignias_otorgadas'
 
     id = db.Column(db.Integer, primary_key=True)
-    aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
+    aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=True, index=True)
+    grupo_id = db.Column(db.Integer, db.ForeignKey('grupos.id'), nullable=True, index=True)
     insignia_id = db.Column(db.Integer, db.ForeignKey('insignias.id'), nullable=False, index=True)
     fecha_obtencion = db.Column(db.DateTime, nullable=False, default=utc_now)
     otorgada_por = db.Column(db.String(30), nullable=False, default='sistema')
@@ -44,8 +45,17 @@ class InsigniaOtorgada(db.Model):
         'Aprendiz',
         backref=db.backref('insignias_otorgadas', cascade='all, delete-orphan'),
     )
+    grupo = db.relationship(
+        'Grupo',
+        backref=db.backref('insignias_otorgadas', cascade='all, delete-orphan'),
+    )
     instructor = db.relationship('Instructor')
 
     __table_args__ = (
         db.UniqueConstraint('aprendiz_id', 'insignia_id', name='uq_aprendiz_insignia'),
+        db.UniqueConstraint('grupo_id', 'insignia_id', name='uq_grupo_insignia'),
+        db.CheckConstraint(
+            '(aprendiz_id IS NOT NULL AND grupo_id IS NULL) OR (aprendiz_id IS NULL AND grupo_id IS NOT NULL)',
+            name='chk_insignia_owner'
+        ),
     )

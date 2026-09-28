@@ -9,6 +9,8 @@ def registrar_rutas(app):
         ('instructor', 'instructor_bp', '/instructor'),
         ('planeacion', 'planeacion_bp', '/instructor'),
         ('ranking', 'ranking_bp', '/instructor'), ('aseo', 'aseo_bp', '/instructor'),
+        ('grupos', 'grupos_bp', '/instructor'),
+        ('atencion', 'atencion_bp', '/instructor'),
         ('seguimiento', 'seguimiento_bp', '/instructor'),
         ('aprendiz', 'aprendiz_bp', '/aprendiz'),
         ('aseo', 'aseo_aprendiz_bp', '/aprendiz'),

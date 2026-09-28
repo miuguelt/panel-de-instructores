@@ -551,24 +551,7 @@ function abrirModalCompetencia(rowEl) {
     document.body.classList.add('modal-open');
 }
 
-function cerrarModal(id) {
-    const modal = document.getElementById(id);
-    if(modal) {
-        if (modal.open) modal.close();
-        document.body.classList.remove('modal-open');
-    }
-}
-
-// Cerrar al hacer clic por fuera
-document.addEventListener('click', function(event) {
-    const dialogs = document.querySelectorAll('.app-modal-overlay');
-    dialogs.forEach(dialog => {
-        if (event.target === dialog && dialog.open) {
-            dialog.close();
-            document.body.classList.remove('modal-open');
-        }
-    });
-});
+// Modales manejados por funciones globales en base.html
 
 document.getElementById('modalCompetencia')?.addEventListener('close', () => {
     document.body.classList.remove('modal-open');

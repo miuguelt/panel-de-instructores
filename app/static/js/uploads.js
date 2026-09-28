@@ -170,6 +170,7 @@
     var xhr = new XMLHttpRequest();
     xhr.open(form.method || 'POST', form.action, true);
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.timeout = 15 * 60 * 1000;
 
     xhr.upload.addEventListener('progress', function (evt) {
       if (!evt.lengthComputable) {
@@ -213,7 +214,7 @@
       } else if (xhr.status === 429) {
         mostrarError(form, 'Demasiados intentos seguidos. Espera un minuto y vuelve a enviarlo.');
       } else if (xhr.status === 502) {
-        mostrarError(form, 'La conexión con el servidor se interrumpió (502). Comprueba que el archivo pese menos de 50 MB y vuelve a intentarlo.');
+        mostrarError(form, 'La conexión con el servidor se interrumpió (502). Comprueba el tamaño del archivo y vuelve a intentarlo.');
       } else {
         mostrarError(form, 'El servidor rechazó la subida (error ' + xhr.status + '). Inténtalo de nuevo.');
       }
@@ -222,15 +223,28 @@
     xhr.addEventListener('error', function () {
       bloquear(form, false);
       ui.panel.remove();
-      mostrarError(form, 'Se perdió la conexión durante la subida. El archivo no se guardó; vuelve a intentarlo.');
+      mostrarError(form, 'Se perdió la conexión durante la subida y no se confirmó el resultado. Revisa Mis Evidencias antes de volver a enviarlo.');
     });
 
     xhr.addEventListener('abort', function () {
       bloquear(form, false);
       ui.panel.remove();
+      mostrarError(form, 'La subida se canceló. Si no fue intencional, revisa Mis Evidencias e inténtalo de nuevo.');
     });
 
-    xhr.send(new FormData(form));
+    xhr.addEventListener('timeout', function () {
+      bloquear(form, false);
+      ui.panel.remove();
+      mostrarError(form, 'La subida tardó demasiado y no se confirmó el resultado. Revisa Mis Evidencias antes de volver a enviarlo.');
+    });
+
+    try {
+      xhr.send(new FormData(form));
+    } catch (_error) {
+      bloquear(form, false);
+      ui.panel.remove();
+      mostrarError(form, 'No se pudo iniciar la subida. Comprueba el archivo e inténtalo de nuevo.');
+    }
   }
 
   document.addEventListener('submit', function (evento) {

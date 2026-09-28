@@ -292,6 +292,8 @@ def panel(ficha_id):
         .all()
     )
     aseo = resumen_aprendiz(ficha_id, aprendiz)
+    from app.models.grupo import Grupo
+    grupo_actual = aprendiz.grupos_asignados.filter(Grupo.activo == True).first()
     turno_hoy = None
     if aprendiz.rol_administrativo:
         from app.models.aseo import TurnoAseo
@@ -500,9 +502,14 @@ def panel(ficha_id):
         'estado_badge_class': 'badge-success' if nivel_alerta == 'verde' else ('badge-warning' if nivel_alerta == 'amarillo' else 'badge-danger'),
     }
 
+    from app.services.atencion_service import AtencionService
+    turno_actual = AtencionService.obtener_turno_actual_aprendiz(ficha_id, aprendiz.id)
+
     return render_template('panel.html',
                            ficha=ficha,
+                           ficha_id=ficha_id,
                            aprendiz=aprendiz,
+                           turno_actual=turno_actual,
                            resumen_rapido=resumen_rapido,
                            recomendaciones_aprendiz=recomendaciones_aprendiz,
                            resumen_logros=resumen_logros,
@@ -541,7 +548,8 @@ def panel(ficha_id):
                            evaluadores=evaluadores_lista,
                            timeline_aprendiz=timeline_aprendiz_orden,
                            instructores_aprendiz=instructores_aprendiz,
-                           resumen_aprendiz=stats_resumen_aprendiz)
+                           resumen_aprendiz=stats_resumen_aprendiz,
+                           grupo_actual=grupo_actual)
 
 
 def _aprendiz_admin_autorizado(ficha_id):
@@ -1015,6 +1023,9 @@ def subir_evidencia(ficha_id, tarea_id):
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
     archivo_url = None
+    archivo_url_previo = (
+        entrega_existente.archivo_url if entrega_existente else None
+    )
     if tiene_nuevo_archivo:
         try:
             resultado = ArchivoService.guardar(
@@ -1032,56 +1043,82 @@ def subir_evidencia(ficha_id, tarea_id):
         except ErrorArchivo as exc:
             flash(str(exc), 'error')
             return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+        except Exception:
+            current_app.logger.exception(
+                'No se pudo procesar el archivo de evidencia de la tarea %s.',
+                tarea_id,
+            )
+            flash(
+                'No fue posible procesar el archivo. Comprueba que esté completo '
+                'e inténtalo de nuevo.',
+                'error',
+            )
+            return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
     justificacion_retraso = request.form.get('justificacion_retraso', '').strip() or None
 
-    if entrega_existente:
+    def actualizar_entrega(entrega):
         if archivo_url:
-            entrega_existente.archivo_url = archivo_url
+            entrega.archivo_url = archivo_url
         if 'enlace_repositorio' in request.form:
-            entrega_existente.enlace_repositorio = enlace_repo or None
+            entrega.enlace_repositorio = enlace_repo or None
         if justificacion_retraso:
-            entrega_existente.justificacion_retraso = justificacion_retraso
-        entrega_existente.fecha_entrega = datetime.utcnow()
-        entrega_existente.calificada = False
-        entrega_existente.estado_revision = 'pendiente'
-        entrega_existente.revisada_en = None
-    else:
-        entrega = Entrega(
-            tarea_id=tarea_id,
-            aprendiz_id=aprendiz.id,
-            archivo_url=archivo_url,
-            enlace_repositorio=enlace_repo or None,
-            justificacion_retraso=justificacion_retraso,
-        )
-        db.session.add(entrega)
+            entrega.justificacion_retraso = justificacion_retraso
+        entrega.fecha_entrega = datetime.utcnow()
+        entrega.calificada = False
+        entrega.estado_revision = 'pendiente'
+        entrega.revisada_en = None
 
     try:
+        if entrega_existente:
+            actualizar_entrega(entrega_existente)
+        else:
+            db.session.add(Entrega(
+                tarea_id=tarea_id,
+                aprendiz_id=aprendiz.id,
+                archivo_url=archivo_url,
+                enlace_repositorio=enlace_repo or None,
+                justificacion_retraso=justificacion_retraso,
+            ))
         db.session.commit()
     except IntegrityError:
         # La restricción única evita dos entregas para la misma tarea y
         # aprendiz. Si dos solicitudes llegaron al mismo tiempo, actualiza
         # el registro canónico en lugar de dejar datos ambiguos.
         db.session.rollback()
-        entrega_existente = (
-            Entrega.query
-            .filter_by(tarea_id=tarea.id, aprendiz_id=aprendiz.id)
-            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-            .first()
-        )
-        if not entrega_existente:
-            flash('No fue posible guardar la evidencia. Intenta nuevamente.', 'error')
+        try:
+            entrega_existente = (
+                Entrega.query
+                .filter_by(tarea_id=tarea.id, aprendiz_id=aprendiz.id)
+                .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
+                .first()
+            )
+            if not entrega_existente:
+                if archivo_url:
+                    ArchivoService.eliminar(archivo_url)
+                current_app.logger.error(
+                    'No se encontró la entrega canónica después de un conflicto '
+                    'al guardar la tarea %s.', tarea_id,
+                )
+                flash(
+                    'No fue posible guardar la evidencia. Intenta nuevamente.',
+                    'error',
+                )
+                return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+            archivo_url_previo = entrega_existente.archivo_url
+            actualizar_entrega(entrega_existente)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            if archivo_url:
+                ArchivoService.eliminar(archivo_url)
+            current_app.logger.exception(
+                'Falló el segundo intento de persistir la evidencia de la tarea %s.',
+                tarea_id,
+            )
+            flash('No fue posible registrar la evidencia. Intenta nuevamente.', 'error')
             return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
-        if archivo_url:
-            entrega_existente.archivo_url = archivo_url
-        entrega_existente.enlace_repositorio = enlace_repo or None
-        if justificacion_retraso:
-            entrega_existente.justificacion_retraso = justificacion_retraso
-        entrega_existente.fecha_entrega = datetime.utcnow()
-        entrega_existente.calificada = False
-        entrega_existente.estado_revision = 'pendiente'
-        entrega_existente.revisada_en = None
-        db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
         if archivo_url:
@@ -1091,13 +1128,19 @@ def subir_evidencia(ficha_id, tarea_id):
         )
         flash('No fue posible registrar la evidencia. Intenta nuevamente.', 'error')
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    if archivo_url and archivo_url_previo and archivo_url_previo != archivo_url:
+        ArchivoService.eliminar(archivo_url_previo)
+
     # La entrega principal ya está persistida. Las alertas y el ranking son
     # derivados: una caída temporal de cualquiera no debe convertir una
     # subida válida en un 500/502 ni obligar al aprendiz a repetirla.
+    fallo_indicadores = False
     try:
         actualizar_alertas_ficha(ficha_id)
     except Exception:
         db.session.rollback()
+        fallo_indicadores = True
         current_app.logger.exception(
             'La evidencia de la tarea %s quedó guardada, pero falló la actualización de alertas.',
             tarea_id,
@@ -1106,14 +1149,25 @@ def subir_evidencia(ficha_id, tarea_id):
         actualizar_participacion_ficha(ficha_id)
     except Exception:
         db.session.rollback()
+        fallo_indicadores = True
         current_app.logger.exception(
             'La evidencia de la tarea %s quedó guardada, pero falló la actualización del ranking.',
             tarea_id,
         )
-    if tarea.fecha_limite and datetime.utcnow() > tarea.fecha_limite:
+    if fallo_indicadores:
+        flash(
+            'La evidencia quedó guardada, pero no fue posible actualizar todos '
+            'los indicadores. Tu instructor ya puede revisarla; vuelve a cargar '
+            'la página más tarde.',
+            'warning',
+        )
+    elif tarea.fecha_limite and datetime.utcnow() > tarea.fecha_limite:
         flash('Evidencia extemporánea guardada correctamente. Tu justificación ha sido registrada para valoración del instructor.', 'info')
     else:
-        flash('Evidencia guardada correctamente. El sistema actualizará sus indicadores en segundo plano.', 'success')
+        flash(
+            'Evidencia guardada correctamente. Tu instructor ya puede revisarla.',
+            'success',
+        )
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
 
@@ -1358,3 +1412,44 @@ def descargar_soporte(registro_id):
             f'{nombre_original_desde_ruta(registro.soporte_url)}'
         ),
     )
+@aprendiz_bp.route('/<int:ficha_id>/pedir-turno', methods=['POST'])
+@limiter.limit("10 per minute")
+def pedir_turno(ficha_id):
+    documento = session.get('aprendiz_documento', '').strip()
+    if not documento:
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+        
+    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
+    if not aprendiz:
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+        
+    motivo = request.form.get('motivo', '').strip()
+    
+    from app.services.atencion_service import AtencionService
+    turno = AtencionService.solicitar_turno(ficha_id, aprendiz.id, motivo=motivo)
+    
+    if turno.estado == 'esperando':
+        flash('Turno solicitado. Por favor espera a que el instructor te llame.', 'success')
+    else:
+        flash('Ya estás en la fila o estás siendo atendido.', 'info')
+        
+    return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+@aprendiz_bp.route('/<int:ficha_id>/cancelar-turno', methods=['POST'])
+@limiter.limit("10 per minute")
+def cancelar_turno(ficha_id):
+    documento = session.get('aprendiz_documento', '').strip()
+    if not documento:
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+        
+    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
+    if not aprendiz:
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+        
+    from app.services.atencion_service import AtencionService
+    turno = AtencionService.obtener_turno_actual_aprendiz(ficha_id, aprendiz.id)
+    if turno and turno.estado == 'esperando':
+        AtencionService.cambiar_estado(turno.id, 'cancelado')
+        flash('Turno cancelado.', 'success')
+        
+    return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))

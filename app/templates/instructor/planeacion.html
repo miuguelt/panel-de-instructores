@@ -8,7 +8,7 @@
 {% block content %}
 <div class="pl-page">
     <div class="page-header pl-header">
-        <div class="pl-title-cluster">
+        <div class="page-title-cluster pl-title-cluster">
             <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
             <h1>Línea de tiempo de la ficha</h1>
         </div>
@@ -331,7 +331,13 @@
                 if (feedbackMsg) {
                     feedbackMsg.style.display = 'inline-block';
                     feedbackMsg.className = 'pl-carga-msg pl-tone-warning';
-                    feedbackMsg.textContent = 'Selecciona o arrastra al menos un archivo antes de ejecutar el análisis.';
+                    const slotJuiciosListo = formCarga.querySelector('.pl-carga-slot[data-slot="juicios"].is-listo');
+                    const slotPlanListo = formCarga.querySelector('.pl-carga-slot[data-slot="planeacion"].is-listo');
+                    if (slotJuiciosListo && !slotPlanListo) {
+                        feedbackMsg.textContent = 'El reporte de juicios ya está sincronizado. Arrastra o selecciona la Planeación Pedagógica (.xlsx) para ejecutar el análisis completo.';
+                    } else {
+                        feedbackMsg.textContent = 'Selecciona o arrastra al menos un archivo antes de ejecutar el análisis.';
+                    }
                 }
                 return;
             }
@@ -855,7 +861,7 @@
         }
     }
 
-    function abrirModal(targetNombre) {
+    function abrirModalPlaneacion(targetNombre) {
         if (!modal) return;
         let dato = buscarEnCatalogo(targetNombre);
         
@@ -1023,7 +1029,7 @@
         document.body.style.overflow = 'hidden';
     }
 
-    function cerrarModal() {
+    function cerrarModalPlaneacion() {
         modal.classList.remove('is-open');
         modal.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
@@ -1131,21 +1137,21 @@
         if (targetBtn) {
             e.preventDefault();
             const nom = targetBtn.getAttribute('data-pedagogico-target');
-            if (nom) abrirModal(nom);
+            if (nom) abrirModalPlaneacion(nom);
         }
     });
 
     // Cerrar modal
     const closeBtn = document.getElementById('pl-modal-close-btn');
-    if (closeBtn) closeBtn.addEventListener('click', cerrarModal);
+    if (closeBtn) closeBtn.addEventListener('click', cerrarModalPlaneacion);
 
     modal.addEventListener('click', function (e) {
-        if (e.target === modal) cerrarModal();
+        if (e.target === modal) cerrarModalPlaneacion();
     });
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && modal.classList.contains('is-open')) {
-            cerrarModal();
+            cerrarModalPlaneacion();
         }
     });
 
@@ -1477,7 +1483,7 @@
         if (targetBtn && targetBtn.tagName !== 'BUTTON' && targetBtn.tagName !== 'A') {
             e.preventDefault();
             const nom = targetBtn.getAttribute('data-pedagogico-target');
-            if (nom) abrirModal(nom);
+            if (nom) abrirModalPlaneacion(nom);
             return;
         }
         const celdaHeat = e.target.closest('.pl-heatmap-cell');

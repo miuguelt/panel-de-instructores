@@ -347,6 +347,8 @@ def create_app(test_config=None):
     _register('app.routes.aprendiz', 'aprendiz_bp', url_prefix='/aprendiz')
     _register('app.routes.aseo', 'aseo_aprendiz_bp', url_prefix='/aprendiz')
     _register('app.routes.seguimiento', 'aprendiz_seguimiento_bp', url_prefix='/aprendiz')
+    _register('app.routes.grupos', 'grupos_bp', url_prefix='/instructor')
+    _register('app.routes.atencion', 'atencion_bp', url_prefix='/instructor')
     _register('app.tyt.vistas', 'tyt_bp', url_prefix='/instructor')
 
     if app.config['STARTUP_ERRORS']:
@@ -355,39 +357,46 @@ def create_app(test_config=None):
             ' | '.join(app.config['STARTUP_ERRORS']),
         )
 
+    _static_v_cache = {}
+
     @app.context_processor
     def inyectar_notificaciones():
         from datetime import datetime
+        from flask import g
         no_leidas = 0
         if current_user.is_authenticated:
-            # La BD puede estar caida o sin migrar: el contador es accesorio y no
-            # justifica un 500 en cada plantilla renderizada.
+            if hasattr(g, '_notificaciones_no_leidas'):
+                no_leidas = g._notificaciones_no_leidas
+            else:
+                try:
+                    from app.models.alertas import Notificacion
+                    no_leidas = Notificacion.query.filter_by(
+                        destinatario_tipo='instructor',
+                        destinatario_id=current_user.id,
+                        leida=False,
+                    ).count()
+                    g._notificaciones_no_leidas = no_leidas
+                except Exception:
+                    log.warning('No se pudo contar notificaciones; se muestra 0.', exc_info=True)
+                    db.session.rollback()
+
+        # Evita hacer os.stat() a disco en cada render de plantilla
+        static_v = _static_v_cache.get('v')
+        if static_v is None or app.debug:
             try:
-                from app.models.alertas import Notificacion
-                no_leidas = Notificacion.query.filter_by(
-                    destinatario_tipo='instructor',
-                    destinatario_id=current_user.id,
-                    leida=False,
-                ).count()
+                css_file = os.path.join(app.root_path, 'static', 'css', 'styles.css')
+                if os.path.isfile(css_file):
+                    static_v = str(int(os.path.getmtime(css_file)))
+                    _static_v_cache['v'] = static_v
+                else:
+                    static_v = '1.0'
             except Exception:
-                log.warning('No se pudo contar notificaciones; se muestra 0.', exc_info=True)
-                db.session.rollback()
-        # `max_upload_bytes` y no `config.MAX_CONTENT_LENGTH`: varias vistas
-        # pasan a la plantilla una variable local llamada `config` (la
-        # configuracion de alertas, ranking o aseo de la ficha) que tapa el
-        # objeto global de Flask y romperia el render de base.html.
-        static_v = '1.0'
-        try:
-            css_file = os.path.join(app.root_path, 'static', 'css', 'styles.css')
-            if os.path.isfile(css_file):
-                static_v = str(int(os.path.getmtime(css_file)))
-        except Exception:
-            pass
+                static_v = '1.0'
 
         return {
             'notificaciones_no_leidas': no_leidas,
             'datetime': datetime,
-            'max_upload_bytes': app.config.get('MAX_CONTENT_LENGTH') or 0,
+            'max_upload_bytes': app.config.get('MAX_UPLOAD_BYTES') or 0,
             'static_v': static_v,
         }
 
@@ -475,14 +484,35 @@ def create_app(test_config=None):
         Se devuelve al formulario original con un GET, que emite un token nuevo,
         en vez de mostrar un error tecnico al aprendiz.
         """
-        from flask import flash, redirect, request
+        from flask import flash, redirect, request, url_for
         log.info('CSRF rechazado en %s: %s', request.path, error.description)
         flash(
             'La sesión del formulario expiró. Vuelve a intentarlo.',
             'error',
         )
         if request.method == 'POST':
-            return redirect(request.path)
+            if (
+                request.endpoint in {
+                    'aprendiz.subir_evidencia',
+                    'aprendiz.subir_evidencia_plan',
+                    'aprendiz.adjuntar_soporte_inasistencia',
+                }
+                and request.view_args
+                and 'ficha_id' in request.view_args
+            ):
+                return redirect(url_for(
+                    'aprendiz.panel',
+                    ficha_id=request.view_args['ficha_id'],
+                ))
+            # No redirigir una solicitud POST a su misma ruta: el navegador
+            # haría un GET y mostraría un 405 porque el endpoint no admite GET.
+            # Para formularios generales se usa un destino local y confiable.
+            destino = (
+                url_for('instructor.dashboard')
+                if current_user.is_authenticated
+                else url_for('auth.login')
+            )
+            return redirect(destino)
         return render_template(
             'errors/error.html',
             codigo=400,
@@ -492,12 +522,28 @@ def create_app(test_config=None):
 
     @app.errorhandler(413)
     def archivo_demasiado_grande(_error):
-        limite_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+        limite_bytes = app.config.get('MAX_UPLOAD_BYTES') or app.config['MAX_CONTENT_LENGTH']
+        limite_mb = limite_bytes / (1024 * 1024)
+        limite_texto = f'{limite_mb:.1f}'.rstrip('0').rstrip('.')
+        if (
+            request.endpoint == 'aprendiz.subir_evidencia'
+            and request.view_args
+            and 'ficha_id' in request.view_args
+        ):
+            from flask import flash, redirect, url_for
+            flash(
+                f'No se pudo cargar la evidencia: la subida supera el límite '
+                f'de {limite_texto} MiB. Reduce el tamaño del ZIP y vuelve a intentarlo.',
+                'error',
+            )
+            return redirect(url_for(
+                'aprendiz.panel', ficha_id=request.view_args['ficha_id']
+            ))
         return render_template(
             'errors/error.html',
             codigo=413,
             titulo='El archivo es demasiado grande',
-            mensaje=f'El tamaño máximo permitido es de {limite_mb} MB.',
+            mensaje=f'El tamaño máximo permitido es de {limite_texto} MiB.',
         ), 413
 
     @app.errorhandler(500)

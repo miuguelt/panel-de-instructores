@@ -1,0 +1,542 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Grupos - {{ ficha.codigo }}{% endblock %}
+
+{% block head %}
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+    :root {
+        --bento-radius: 24px;
+        --card-radius: 16px;
+        --primary-glow: rgba(57, 169, 0, 0.15);
+    }
+    [data-theme="dark"], [data-theme="ocean"] {
+        --primary-glow: rgba(57, 169, 0, 0.25);
+    }
+
+    /* Paleta de identidad por grupo (8 colores, cicla) */
+    .ga-0 { --ga: #39A900; --ga-bg: rgba(57,169,0,0.09);    --ga-text: #1e5c00; }
+    .ga-1 { --ga: #6366f1; --ga-bg: rgba(99,102,241,0.09);  --ga-text: #3730a3; }
+    .ga-2 { --ga: #f59e0b; --ga-bg: rgba(245,158,11,0.09);  --ga-text: #92400e; }
+    .ga-3 { --ga: #ec4899; --ga-bg: rgba(236,72,153,0.09);  --ga-text: #9d174d; }
+    .ga-4 { --ga: #06b6d4; --ga-bg: rgba(6,182,212,0.09);   --ga-text: #155e75; }
+    .ga-5 { --ga: #8b5cf6; --ga-bg: rgba(139,92,246,0.09);  --ga-text: #5b21b6; }
+    .ga-6 { --ga: #ef4444; --ga-bg: rgba(239,68,68,0.09);   --ga-text: #991b1b; }
+    .ga-7 { --ga: #14b8a6; --ga-bg: rgba(20,184,166,0.09);  --ga-text: #134e4a; }
+
+    [data-theme="dark"]  .ga-0, [data-theme="ocean"] .ga-0 { --ga-text: #6fe040; }
+    [data-theme="dark"]  .ga-1, [data-theme="ocean"] .ga-1 { --ga-text: #a5b4fc; }
+    [data-theme="dark"]  .ga-2, [data-theme="ocean"] .ga-2 { --ga-text: #fcd34d; }
+    [data-theme="dark"]  .ga-3, [data-theme="ocean"] .ga-3 { --ga-text: #f9a8d4; }
+    [data-theme="dark"]  .ga-4, [data-theme="ocean"] .ga-4 { --ga-text: #67e8f9; }
+    [data-theme="dark"]  .ga-5, [data-theme="ocean"] .ga-5 { --ga-text: #c4b5fd; }
+    [data-theme="dark"]  .ga-6, [data-theme="ocean"] .ga-6 { --ga-text: #fca5a5; }
+    [data-theme="dark"]  .ga-7, [data-theme="ocean"] .ga-7 { --ga-text: #5eead4; }
+
+    /* Bento card */
+    .bento-card {
+        background: var(--bg-card);
+        border-radius: var(--bento-radius);
+        border: 1px solid var(--border-subtle);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        overflow: hidden;
+        transition: box-shadow .3s;
+    }
+    .bento-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.07); }
+
+    /* Grupo card */
+    .grupo-card {
+        background: var(--bg-card);
+        border-radius: var(--card-radius);
+        border: 1px solid var(--border-subtle);
+        overflow: hidden;
+        transition: transform .22s, box-shadow .22s, border-color .22s;
+    }
+    .grupo-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.09);
+        border-color: var(--ga, var(--accent-primary));
+    }
+
+    .grupo-card-header {
+        background: var(--ga-bg, var(--bg-surface));
+        padding: 15px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-divider);
+    }
+    .grupo-name  { font-size: .95rem; font-weight: 700; color: var(--ga-text, var(--accent-primary)); margin: 0; }
+    .grupo-date  { font-size: .73rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+
+    .member-count-badge {
+        background: var(--ga-bg, rgba(0,0,0,.05));
+        color: var(--ga-text, var(--text-muted));
+        border: 1px solid color-mix(in srgb, var(--ga, var(--border-subtle)) 40%, transparent);
+        font-weight: 700;
+        font-size: .72rem;
+        border-radius: 20px;
+        padding: 3px 10px;
+        white-space: nowrap;
+    }
+
+    .btn-medal {
+        background: transparent;
+        border: 1.5px solid var(--border-subtle);
+        border-radius: 50%;
+        width: 34px; height: 34px;
+        display: flex; align-items: center; justify-content: center;
+        color: #f59e0b;
+        cursor: pointer;
+        transition: all .2s;
+        flex-shrink: 0;
+    }
+    .btn-medal:hover { background: rgba(245,158,11,.12); border-color: #f59e0b; transform: scale(1.1); }
+
+    /* Miembros */
+    .member-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        transition: background .15s;
+    }
+    .member-row:hover { background: var(--bg-base, var(--bg-surface)); }
+
+    .member-avatar {
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: .8rem;
+        flex-shrink: 0;
+        border: 2px solid var(--bg-card);
+        box-shadow: 0 1px 5px rgba(0,0,0,.12);
+        background: var(--ga-bg, var(--bg-surface));
+        color: var(--ga-text, var(--accent-primary));
+    }
+    .member-name {
+        font-size: .88rem; font-weight: 500;
+        color: var(--text-color, inherit);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Sidebar */
+    .sidebar-section   { padding: 20px; border-bottom: 1px solid var(--border-divider); }
+    .sidebar-label     { font-size: .74rem; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: .08em; color: var(--text-muted); margin-bottom: 12px; display: block; }
+
+    /* Inputs */
+    .premium-input-group {
+        display: flex; align-items: center;
+        background: var(--bg-surface); border-radius: 12px;
+        padding: 4px; border: 2px solid transparent; transition: all .2s;
+    }
+    .premium-input-group:focus-within {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 4px var(--primary-glow);
+        background: var(--bg-card);
+    }
+    .premium-input-group input,
+    .premium-input-group select {
+        border: none !important; background: transparent !important;
+        box-shadow: none !important; font-weight: 500;
+        color: var(--text-color, inherit);
+    }
+    .premium-input-group .icon-wrap {
+        padding: 0 10px; color: var(--text-muted);
+        display: flex; align-items: center;
+    }
+
+    /* Segmented control */
+    .segmented-control  { display: flex; background: var(--bg-surface); border-radius: 12px; padding: 4px; gap: 4px; }
+    .segmented-btn {
+        flex: 1; border: none; background: transparent;
+        color: var(--text-muted); font-weight: 600; border-radius: 8px;
+        padding: 7px 0; transition: all .2s; cursor: pointer;
+    }
+    .segmented-btn.active, .segmented-btn:hover {
+        background: var(--bg-card);
+        box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        color: var(--accent-primary);
+    }
+
+    /* Aprendiz list */
+    .aprendiz-list-wrap {
+        background: var(--bg-surface); border-radius: 12px; padding: 6px;
+        height: 300px; overflow-y: auto; border: 1px solid var(--border-divider);
+    }
+    .aprendiz-list-wrap::-webkit-scrollbar { width: 4px; }
+    .aprendiz-list-wrap::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
+
+    .aprendiz-item-row {
+        display: flex; align-items: center; padding: 9px 12px;
+        border-radius: 10px; cursor: pointer; transition: all .15s; margin-bottom: 2px;
+    }
+    .aprendiz-item-row:hover   { background: var(--bg-card); }
+    .aprendiz-item-row.selected { background: rgba(57,169,0,.07); }
+
+    .custom-checkbox {
+        width: 20px; height: 20px; border-radius: 6px;
+        border: 2px solid var(--border-subtle);
+        display: flex; align-items: center; justify-content: center;
+        transition: all .2s; background: var(--bg-card); flex-shrink: 0;
+    }
+    .aprendiz-item-row input:checked + .custom-checkbox { background: var(--accent-primary); border-color: var(--accent-primary); }
+    .custom-checkbox i { color: white; opacity: 0; width: 14px; height: 14px; transform: scale(.5); transition: all .2s cubic-bezier(.175,.885,.32,1.275); }
+    .aprendiz-item-row input:checked + .custom-checkbox i { opacity: 1; transform: scale(1); }
+
+    /* Botón generar */
+    .btn-magic {
+        background: linear-gradient(135deg, var(--accent-primary) 0%, color-mix(in srgb, var(--accent-primary) 65%, black) 100%);
+        color: white; border: none; border-radius: 14px;
+        font-weight: 700; font-size: .95rem; padding: 13px 18px;
+        box-shadow: 0 6px 18px var(--primary-glow); transition: all .3s;
+        display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer;
+    }
+    .btn-magic:hover { transform: translateY(-2px); box-shadow: 0 10px 25px var(--primary-glow); color: white; }
+    .btn-magic:active { transform: translateY(1px); }
+
+    /* Page header */
+    .page-header-premium {
+        background: linear-gradient(to right, var(--primary-glow), transparent);
+        border-radius: var(--bento-radius); padding: 20px 26px;
+        border: 1px solid var(--border-subtle); margin-bottom: 24px;
+    }
+
+    /* Empty state */
+    .empty-state-icon {
+        width: 76px; height: 76px; border-radius: 50%;
+        background: var(--bg-surface); display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 20px; border: 2px dashed var(--border-subtle);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <!-- ═══ Header ═══ -->
+    <div class="page-header-premium d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle shadow-sm d-flex align-items-center justify-content-center"
+                 style="width:46px;height:46px;background:var(--accent-primary);flex-shrink:0;">
+                <i data-lucide="users" style="width:22px;height:22px;color:white;"></i>
+            </div>
+            <div>
+                <h2 class="mb-0 fw-bold" style="color:var(--text-strong,inherit);">Gestión de Grupos</h2>
+                <p class="mb-0 mt-1" style="font-size:.88rem;color:var(--text-muted);">
+                    Ficha <strong style="color:var(--accent-primary);">{{ ficha.codigo }}</strong>
+                    &middot; {{ ficha.nombre_programa }}
+                </p>
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('instructor.fichas') }}"
+               class="btn btn-sm rounded-pill px-4 fw-medium"
+               style="background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-color,inherit);">
+                <i data-lucide="arrow-left" class="me-1" style="width:15px;height:15px;"></i> Volver
+            </a>
+            <a href="{{ url_for('grupos.podio_grupos', ficha_id=ficha.id) }}"
+               class="btn btn-sm rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
+               style="background:linear-gradient(135deg,#FFD700 0%,#FFA500 100%);border:none;color:#5a3c00;">
+                <i data-lucide="award" style="width:16px;height:16px;"></i> Podio de Grupos
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- ═══ Panel izquierdo: Generador ═══ -->
+        <div class="col-lg-4 col-xl-3">
+            <div class="bento-card h-100 d-flex flex-column">
+
+                <div class="sidebar-section d-flex align-items-center gap-2">
+                    <i data-lucide="settings-2" style="width:17px;height:17px;color:var(--accent-primary);"></i>
+                    <h5 class="fw-bold mb-0" style="color:var(--text-strong,inherit);">Generador</h5>
+                </div>
+
+                <form action="{{ url_for('grupos.generar_grupos', ficha_id=ficha.id) }}" method="POST"
+                      id="form-grupos" class="flex-grow-1 d-flex flex-column">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- Tamaño -->
+                    <div class="sidebar-section">
+                        <span class="sidebar-label">Tamaño del equipo</span>
+                        <div class="premium-input-group mb-3">
+                            <span class="icon-wrap"><i data-lucide="user-plus" style="width:15px;height:15px;"></i></span>
+                            <input type="number" id="inputTamanoGrupo" name="tamano_grupo"
+                                   class="form-control" min="2" max="50" value="3" required>
+                            <span class="pe-3" style="color:var(--text-muted);font-size:.82rem;font-weight:600;">aprendices</span>
+                        </div>
+                        <div class="segmented-control">
+                            <button type="button" class="segmented-btn" onclick="setTamano(2,this)">2</button>
+                            <button type="button" class="segmented-btn active" onclick="setTamano(3,this)">3</button>
+                            <button type="button" class="segmented-btn" onclick="setTamano(4,this)">4</button>
+                            <button type="button" class="segmented-btn" onclick="setTamano(5,this)">5</button>
+                            <button type="button" class="segmented-btn" onclick="setTamano(6,this)">6</button>
+                        </div>
+                    </div>
+
+                    <!-- Aprendices -->
+                    <div class="sidebar-section flex-grow-1 d-flex flex-column" style="border-bottom:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="sidebar-label mb-0">Aprendices a incluir</span>
+                            <span id="contadorSeleccionados" class="badge rounded-pill px-3 py-1"
+                                  style="background:var(--accent-primary);color:white;font-size:.72rem;">
+                                {{ aprendices|length }} / {{ aprendices|length }}
+                            </span>
+                        </div>
+
+                        <div class="premium-input-group mb-2" style="padding:2px;">
+                            <span class="icon-wrap"><i data-lucide="search" style="width:14px;height:14px;"></i></span>
+                            <input type="text" id="buscadorAprendices"
+                                   class="form-control form-control-sm" placeholder="Buscar aprendiz...">
+                        </div>
+
+                        <div class="d-flex gap-2 mb-2">
+                            <button type="button" onclick="setSeleccionados(true)"
+                                    class="btn btn-sm flex-fill rounded-pill"
+                                    style="background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-color,inherit);font-size:.78rem;">
+                                Todos
+                            </button>
+                            <button type="button" onclick="setSeleccionados(false)"
+                                    class="btn btn-sm flex-fill rounded-pill"
+                                    style="background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-muted);font-size:.78rem;">
+                                Ninguno
+                            </button>
+                        </div>
+
+                        <div class="aprendiz-list-wrap flex-grow-1">
+                            {% for aprendiz in aprendices %}
+                            <label class="aprendiz-item-row selected" id="row-{{ aprendiz.id }}">
+                                <input type="checkbox" class="d-none chk-aprendiz"
+                                       name="aprendices_ids[]" value="{{ aprendiz.id }}" checked
+                                       onchange="toggleItem(this,'row-{{ aprendiz.id }}')">
+                                <div class="custom-checkbox me-2 shadow-sm">
+                                    <i data-lucide="check"></i>
+                                </div>
+                                <span class="fw-medium aprendiz-nombre text-truncate"
+                                      style="font-size:.86rem;color:var(--text-color,inherit);">
+                                    {{ aprendiz.nombre }} {{ aprendiz.apellidos }}
+                                </span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="p-4 mt-auto">
+                        <button type="submit" class="btn-magic w-100"
+                                onclick="return confirm('¿Generar nuevos grupos? Esto reemplazará la distribución actual.');">
+                            <i data-lucide="wand-2" style="width:19px;height:19px;"></i>
+                            Generar Grupos
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ═══ Panel derecho: Grupos ═══ -->
+        <div class="col-lg-8 col-xl-9">
+            <div class="d-flex justify-content-between align-items-center mb-4 px-1">
+                <h4 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color:var(--text-strong,inherit);">
+                    <i data-lucide="layout-grid" style="color:var(--accent-primary);"></i> Grupos Formados
+                </h4>
+                {% if grupos %}
+                <span class="badge rounded-pill px-3 py-2"
+                      style="background:rgba(57,169,0,.12);color:var(--accent-primary);border:1px solid rgba(57,169,0,.25);font-size:.82rem;font-weight:700;">
+                    {{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }} activo{{ 's' if grupos|length != 1 else '' }}
+                </span>
+                {% endif %}
+            </div>
+
+            {% if grupos %}
+            <div class="row row-cols-1 row-cols-md-2 row-cols-xxl-3 g-4">
+                {% for grupo in grupos %}
+                {% set gi = loop.index0 % 8 %}
+                <div class="col">
+                    <div class="grupo-card h-100 ga-{{ gi }}">
+
+                        <!-- Cabecera -->
+                        <div class="grupo-card-header">
+                            <div class="overflow-hidden">
+                                <h5 class="grupo-name">{{ grupo.nombre }}</h5>
+                                <div class="grupo-date">
+                                    <i data-lucide="calendar" style="width:11px;height:11px;"></i>
+                                    {{ grupo.creado_en.strftime('%d/%m/%Y') }}
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 ms-2">
+                                <span class="member-count-badge">
+                                    {{ grupo.aprendices|length }}
+                                    miembro{{ 's' if grupo.aprendices|length != 1 else '' }}
+                                </span>
+                                <button type="button" class="btn-medal"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalInsignia{{ grupo.id }}"
+                                        title="Otorgar medalla al grupo">
+                                    <i data-lucide="medal" style="width:16px;height:16px;"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Miembros -->
+                        <div class="p-3 d-flex flex-column gap-2">
+                            {% for aprendiz in grupo.aprendices %}
+                            <div class="member-row">
+                                <div class="member-avatar">
+                                    {{ aprendiz.nombre[0] }}{{ aprendiz.apellidos[0] if aprendiz.apellidos else '' }}
+                                </div>
+                                <span class="member-name">{{ aprendiz.nombre }} {{ aprendiz.apellidos }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal medalla -->
+                <div class="modal fade" id="modalInsignia{{ grupo.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <form action="{{ url_for('grupos.otorgar_insignia_grupo', ficha_id=ficha.id) }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="grupo_id" value="{{ grupo.id }}">
+                            <div class="modal-content bento-card border-0">
+                                <div class="modal-header border-bottom-0 p-4" style="background:var(--bg-surface);">
+                                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2"
+                                        style="color:var(--text-strong,inherit);">
+                                        <i data-lucide="award" style="color:#f59e0b;"></i> Otorgar Medalla
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body p-4 pt-2">
+                                    <p class="mb-4" style="color:var(--text-muted);">
+                                        Reconocimiento al grupo
+                                        <strong style="color:var(--text-strong,inherit);">{{ grupo.nombre }}</strong>.
+                                    </p>
+                                    <span class="sidebar-label">Seleccionar Insignia</span>
+                                    <div class="premium-input-group mb-4" style="padding:6px;">
+                                        <span class="icon-wrap"><i data-lucide="star"></i></span>
+                                        <select name="insignia_id"
+                                                class="form-select border-0 shadow-none bg-transparent fw-medium"
+                                                required>
+                                            <option value="">Selecciona una insignia...</option>
+                                            {% for ins in insignias %}
+                                            <option value="{{ ins.id }}">{{ ins.icono }} {{ ins.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="d-flex gap-3 p-3 rounded-3"
+                                         style="background:var(--bg-surface);border:1px solid var(--border-divider);">
+                                        <i data-lucide="info"
+                                           style="color:var(--accent-primary);min-width:17px;margin-top:2px;"></i>
+                                        <small style="color:var(--text-muted);line-height:1.5;">
+                                            Esta acción otorgará la medalla de forma individual a cada miembro
+                                            en su portafolio y sumará puntos al podio global.
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer border-top-0 p-4 pt-3" style="background:var(--bg-surface);">
+                                    <button type="button" class="btn rounded-pill px-4"
+                                            style="background:var(--border-divider);color:var(--text-color,inherit);"
+                                            data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn fw-bold rounded-pill px-4 shadow-sm"
+                                            style="background:linear-gradient(135deg,#FFD700 0%,#FFA500 100%);border:none;color:#5a3c00;">
+                                        <i data-lucide="award" style="width:15px;height:15px;margin-right:5px;"></i>
+                                        Otorgar Medalla
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% else %}
+            <!-- Estado vacío -->
+            <div class="bento-card d-flex flex-column align-items-center justify-content-center text-center p-5"
+                 style="min-height:440px;border-style:dashed;border-width:2px;">
+                <div class="empty-state-icon">
+                    <i data-lucide="users" style="width:34px;height:34px;color:var(--text-muted);opacity:.45;"></i>
+                </div>
+                <h3 class="fw-bold mb-2" style="color:var(--text-strong,inherit);">Sin grupos formados</h3>
+                <p class="mb-4" style="max-width:360px;font-size:.95rem;line-height:1.65;color:var(--text-muted);">
+                    Configura el tamaño del equipo y selecciona los aprendices en el panel izquierdo.
+                    El sistema generará combinaciones aleatorias de forma equitativa.
+                </p>
+                <button type="button"
+                        class="btn rounded-pill px-5 py-2 fw-bold shadow-sm"
+                        style="background:var(--accent-primary);color:white;"
+                        onclick="document.getElementById('inputTamanoGrupo').focus()">
+                    <i data-lucide="arrow-left" class="me-2" style="width:15px;height:15px;"></i>
+                    Empezar a generar
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+lucide.createIcons();
+
+function setTamano(val, btn) {
+    document.getElementById('inputTamanoGrupo').value = val;
+    document.querySelectorAll('.segmented-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+document.getElementById('inputTamanoGrupo').addEventListener('input', function () {
+    const val = parseInt(this.value);
+    document.querySelectorAll('.segmented-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.textContent) === val);
+    });
+});
+
+function toggleItem(checkbox, rowId) {
+    document.getElementById(rowId).classList.toggle('selected', checkbox.checked);
+    actualizarContador();
+}
+
+function setSeleccionados(valor) {
+    document.querySelectorAll('.chk-aprendiz').forEach(c => {
+        const row = c.closest('.aprendiz-item-row');
+        if (row.style.display !== 'none') {
+            c.checked = valor;
+            row.classList.toggle('selected', valor);
+        }
+    });
+    actualizarContador();
+}
+
+function actualizarContador() {
+    let visibles = 0, activos = 0;
+    document.querySelectorAll('.chk-aprendiz').forEach(c => {
+        if (c.closest('.aprendiz-item-row').style.display !== 'none') {
+            visibles++;
+            if (c.checked) activos++;
+        }
+    });
+    const badge = document.getElementById('contadorSeleccionados');
+    if (!badge) return;
+    badge.textContent = `${activos} / ${visibles}`;
+    badge.style.background = activos === 0 ? '#ef4444' : activos < 2 ? '#f59e0b' : 'var(--accent-primary)';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    actualizarContador();
+    const buscador = document.getElementById('buscadorAprendices');
+    if (buscador) {
+        buscador.addEventListener('input', function () {
+            const term = this.value.toLowerCase().trim();
+            document.querySelectorAll('.aprendiz-item-row').forEach(item => {
+                const match = item.querySelector('.aprendiz-nombre').textContent.toLowerCase().includes(term);
+                item.style.display = match ? 'flex' : 'none';
+            });
+            actualizarContador();
+        });
+    }
+});
+</script>
+{% endblock %}

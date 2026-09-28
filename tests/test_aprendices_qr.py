@@ -56,6 +56,8 @@ class AprendicesQrTestCase(unittest.TestCase):
 
     @patch('app.routes.instructor.socket.socket')
     def test_obtener_ip_local_fallback_en_error(self, mock_socket):
+        import app.routes.instructor as inst_mod
+        inst_mod._ip_local_cache = None
         mock_socket.side_effect = Exception('Network unreachable')
         ip = _obtener_ip_local()
         self.assertEqual(ip, '127.0.0.1')

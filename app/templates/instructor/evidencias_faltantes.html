@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Evidencias Faltantes - {{ ficha.codigo }} - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn-back" title="Volver a Tareas">&larr; Volver</a>
+        <h1>📋 Evidencias Faltantes por Aprendiz</h1>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Resumen de Evidencias Pendientes (Ficha {{ ficha.codigo }})</h2>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th style="width: 30%">Aprendiz</th>
+                    <th style="width: 10%">Cantidad</th>
+                    <th style="width: 60%">Tareas Pendientes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in datos %}
+                <tr>
+                    <td>
+                        <div style="font-weight: 500;">{{ item.aprendiz.nombre_completo }}</div>
+                        <small style="color: var(--text-muted)">{{ item.aprendiz.documento }}</small>
+                    </td>
+                    <td>
+                        {% if item.cantidad > 0 %}
+                            <span class="badge badge-warning" style="font-size: 14px; padding: 4px 8px;">{{ item.cantidad }}</span>
+                        {% else %}
+                            <span class="badge badge-success">Al día</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.cantidad > 0 %}
+                            <ul style="margin: 0; padding-left: 20px; color: var(--text-muted); font-size: 13.5px;">
+                            {% for f in item.faltantes %}
+                                <li style="margin-bottom: 4px;">
+                                    <strong>{{ f.tarea.titulo }}</strong>
+                                    {% if f.estado == 'vencida' %}
+                                        <span class="badge badge-danger" style="margin-left: 5px; font-size: 11px;">Vencida</span>
+                                    {% elif f.estado == 'correccion' %}
+                                        <span class="badge badge-warning" style="margin-left: 5px; font-size: 11px;">Corrección req.</span>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span style="color: var(--text-muted); font-style: italic;">No debe ninguna evidencia.</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="text-center" style="padding: 2rem;">No hay aprendices en formación en esta ficha.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

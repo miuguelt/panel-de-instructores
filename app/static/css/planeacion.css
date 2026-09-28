@@ -17,13 +17,17 @@
 
 /* --- Encabezado Unificado en una Sola Fila ----------------------------- */
 .pl-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 12px;
     width: 100%;
-    margin-bottom: 0.75rem;
-    flex-wrap: wrap;
+}
+@media (min-width: 768px) {
+    .pl-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
 }
 
 .pl-title-cluster {
@@ -88,8 +92,7 @@
 
 @media (max-width: 767px) {
     .pl-header {
-        flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
         gap: 10px;
     }
     .pl-title-cluster {

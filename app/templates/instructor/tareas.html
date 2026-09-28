@@ -141,6 +141,9 @@
         <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
         <h1>📝 Tareas y Evidencias</h1>
     </div>
+    <div class="page-actions" style="margin-left: auto;">
+        <a href="{{ url_for('instructor.evidencias_faltantes', ficha_id=ficha.id) }}" class="btn btn-outline" title="Ver evidencias que hacen falta por aprendiz">📋 Faltantes por Aprendiz</a>
+    </div>
 </div>
 
 {% if recomendaciones_tareas %}

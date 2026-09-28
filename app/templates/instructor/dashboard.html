@@ -1114,10 +1114,51 @@
 
     {% else %}
     <div class="empty-state">
-        <div class="empty-icon">📋</div>
-        <h3>Todavía no tienes fichas registradas</h3>
-        <p>Crea tu primera ficha para empezar a gestionar aprendices, asistencia y tareas.</p>
-        <a href="{{ url_for('instructor.fichas') }}" class="btn btn-primary">Crear mi primera ficha</a>
+        <span class="empty-state-badge">Configuración inicial</span>
+        <div class="empty-state-icon-wrap" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                <path d="M9 14l2 2 4-4"></path>
+            </svg>
+        </div>
+        <h3>Aún no tienes fichas registradas</h3>
+        <p class="empty-state-lead">Para comenzar a gestionar asistencia, seguimiento pedagógico, alertas tempranas y calificaciones, registra tu primera ficha en el sistema.</p>
+
+        <div class="empty-state-cards">
+            <div class="empty-state-card empty-state-card-featured">
+                <div>
+                    <div class="empty-card-header">
+                        <span class="empty-card-icon" aria-hidden="true">📊</span>
+                        <span class="empty-card-badge">Recomendado</span>
+                    </div>
+                    <div class="empty-card-title">Cargar Reporte de Juicios</div>
+                    <div class="empty-card-desc">Sube el archivo Excel descargado de SOFIA Plus (.xlsx o .xls). El sistema creará la ficha, matriculará a los aprendices y registrará sus juicios evaluativos automáticamente.</div>
+                </div>
+                <a href="{{ url_for('instructor.fichas') }}" class="btn btn-primary btn-full">
+                    Subir reporte de SOFIA Plus &rarr;
+                </a>
+            </div>
+
+            <div class="empty-state-card">
+                <div>
+                    <div class="empty-card-header">
+                        <span class="empty-card-icon" aria-hidden="true">✍️</span>
+                        <span class="empty-card-badge">Manual</span>
+                    </div>
+                    <div class="empty-card-title">Crear Ficha Manualmente</div>
+                    <div class="empty-card-desc">Si aún no dispones del reporte oficial de SOFIA Plus, ingresa el código de ficha, programa y fechas para comenzar a usar los módulos de inmediato.</div>
+                </div>
+                <a href="{{ url_for('instructor.fichas') }}" class="btn btn-outline btn-full">
+                    Crear ficha manual &rarr;
+                </a>
+            </div>
+        </div>
+
+        <div class="empty-state-tip">
+            <span aria-hidden="true">💡</span>
+            <span>Descarga el reporte oficial en SOFIA Plus ingresando por: <strong>Gestión de la Formación &gt; Juicios Evaluativos &gt; Reporte de Juicios Evaluativos</strong>.</span>
+        </div>
     </div>
     {% endif %}
 </div>

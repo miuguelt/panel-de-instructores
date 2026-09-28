@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Grupos Aleatorios - {{ ficha.codigo }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Gestión de Grupos - {{ ficha.codigo }}</h2>
+        <div>
+            <a href="{{ url_for('instructor.fichas') }}" class="btn btn-secondary">Volver</a>
+            <a href="{{ url_for('grupos.podio_grupos', ficha_id=ficha.id) }}" class="btn btn-warning">🏆 Podio de Grupos</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Formulario para generar grupos -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Generar Grupos</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('grupos.generar_grupos', ficha_id=ficha.id) }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label d-flex justify-content-between">
+                                <strong>Tamaño de Grupo (n)</strong>
+                                <span class="text-muted small">2, 3, 4 ... n</span>
+                            </label>
+                            <div class="input-group mb-2">
+                                <input type="number" id="inputTamanoGrupo" name="tamano_grupo" class="form-control" min="2" max="50" value="3" required>
+                                <span class="input-group-text">aprendices / grupo</span>
+                            </div>
+                            <div class="btn-group btn-group-sm w-100" role="group">
+                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('inputTamanoGrupo').value=2;">2</button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('inputTamanoGrupo').value=3;">3</button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('inputTamanoGrupo').value=4;">4</button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('inputTamanoGrupo').value=5;">5</button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('inputTamanoGrupo').value=6;">6</button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label m-0"><strong>Aprendices a Incluir</strong></label>
+                                <span id="contadorSeleccionados" class="badge bg-secondary">0 / {{ aprendices|length }}</span>
+                            </div>
+                            <div class="btn-group btn-group-sm w-100 mb-2">
+                                <button type="button" class="btn btn-outline-primary" onclick="setSeleccionados(true)">Todos</button>
+                                <button type="button" class="btn btn-outline-primary" onclick="setSeleccionados(false)">Ninguno</button>
+                                <button type="button" class="btn btn-outline-primary" onclick="invertirSeleccion()">Invertir</button>
+                            </div>
+                            <div class="list-group" style="max-height: 280px; overflow-y: auto;">
+                                {% for aprendiz in aprendices %}
+                                <label class="list-group-item list-group-item-action py-1 px-2 d-flex align-items-center">
+                                    <input class="form-check-input me-2 chk-aprendiz" type="checkbox" name="aprendices_ids[]" value="{{ aprendiz.id }}" checked onchange="actualizarContador()">
+                                    <span class="small">{{ aprendiz.nombre }} {{ aprendiz.apellidos }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100" onclick="return confirm('Esto reemplazará los grupos activos actuales. ¿Continuar?');">
+                            Generar Grupos
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Grupos Actuales -->
+        <div class="col-md-8">
+            <h4 class="mb-3">Grupos Activos</h4>
+            {% if grupos %}
+                <div class="row row-cols-1 row-cols-md-2 g-4">
+                {% for grupo in grupos %}
+                    <div class="col">
+                        <div class="card h-100 border-primary">
+                            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                                <h5 class="mb-0 text-primary">{{ grupo.nombre }}</h5>
+                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#modalInsignia{{ grupo.id }}">
+                                    Dar Medalla
+                                </button>
+                            </div>
+                            <ul class="list-group list-group-flush">
+                                {% for aprendiz in grupo.aprendices %}
+                                <li class="list-group-item">👤 {{ aprendiz.nombre }} {{ aprendiz.apellidos }}</li>
+                                {% endfor %}
+                            </ul>
+                            <div class="card-footer text-muted" style="font-size: 0.8em;">
+                                Creado el: {{ grupo.creado_en.strftime('%Y-%m-%d') }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Insignia -->
+                    <div class="modal fade" id="modalInsignia{{ grupo.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <form action="{{ url_for('grupos.otorgar_insignia_grupo', ficha_id=ficha.id) }}" method="POST">
+                                <input type="hidden" name="grupo_id" value="{{ grupo.id }}">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Otorgar Medalla a {{ grupo.nombre }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Seleccionar Medalla</label>
+                                            <select name="insignia_id" class="form-select" required>
+                                                <option value="">Selecciona una insignia...</option>
+                                                {% for ins in insignias %}
+                                                    <option value="{{ ins.id }}">{{ ins.icono }} {{ ins.nombre }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <p class="text-muted"><small>Todos los integrantes del grupo heredarán esta medalla en su portafolio, y sumará puntos al podio de grupos.</small></p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-warning">Otorgar a todo el Grupo</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">No hay grupos activos en este momento. Utiliza el formulario de la izquierda para generarlos.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function setSeleccionados(valor) {
+    document.querySelectorAll('.chk-aprendiz').forEach(c => c.checked = valor);
+    actualizarContador();
+}
+
+function invertirSeleccion() {
+    document.querySelectorAll('.chk-aprendiz').forEach(c => c.checked = !c.checked);
+    actualizarContador();
+}
+
+function actualizarContador() {
+    const total = document.querySelectorAll('.chk-aprendiz').length;
+    const activos = document.querySelectorAll('.chk-aprendiz:checked').length;
+    const badge = document.getElementById('contadorSeleccionados');
+    if (badge) {
+        badge.textContent = `${activos} / ${total}`;
+        badge.className = activos >= 2 ? 'badge bg-success' : 'badge bg-danger';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', actualizarContador);
+</script>
+{% endblock %}

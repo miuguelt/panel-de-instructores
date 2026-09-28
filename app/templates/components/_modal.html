@@ -1,0 +1,23 @@
+{% macro render_modal(id, title, eyebrow='', form_id='', form_action='', enctype='', compact=false, wide=false, center_body=false) %}
+<dialog id="{{ id }}" class="app-modal-overlay" aria-modal="true" aria-labelledby="{{ id }}Titulo">
+  <div class="app-modal-content{% if compact %} app-modal-content--compact{% elif wide %} app-modal-content--wide{% endif %}">
+    {% if form_id or form_action %}
+    <form method="POST" {% if form_id %}id="{{ form_id }}"{% endif %} action="{{ form_action }}" class="app-modal-form" {% if enctype %}enctype="{{ enctype }}"{% endif %}>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% endif %}
+      <header class="app-modal-header">
+        <div class="app-modal-header-copy">
+          {% if eyebrow %}<span class="app-modal-eyebrow">{{ eyebrow }}</span>{% endif %}
+          <h2 id="{{ id }}Titulo">{{ title }}</h2>
+        </div>
+        <button type="button" class="app-modal-close" onclick="cerrarModal('{{ id }}')" aria-label="Cerrar">&times;</button>
+      </header>
+      <div class="app-modal-body{% if center_body %} app-modal-body--center{% endif %}">
+        {{ caller() }}
+      </div>
+    {% if form_id or form_action %}
+    </form>
+    {% endif %}
+  </div>
+</dialog>
+{% endmacro %}

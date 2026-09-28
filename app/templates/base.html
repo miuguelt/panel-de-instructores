@@ -25,6 +25,7 @@
     </script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
+    <div id="app-progress-bar" class="app-progress-bar" aria-hidden="true"></div>
     <a class="skip-link" href="#contenido-principal">Saltar al contenido principal</a>
     {% block navbar %}
     <header class="app-header">
@@ -71,7 +72,7 @@
                         <span aria-hidden="true">🔔</span>
                         {% if notificaciones_no_leidas %}<span class="notification-count">{{ notificaciones_no_leidas }}</span>{% endif %}
                     </a>
-                    <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form">
+                    <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form" hx-boost="false">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-outline nav-logout">Salir</button>
                     </form>
@@ -163,9 +164,11 @@
     <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_upload_bytes | int }};</script>
     <script src="{{ url_for('static', filename='js/uploads.js') }}"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const toasts = document.querySelectorAll('.flash-messages .alert');
+        // 1. Inicialización de componentes comunes (funciona en carga inicial y navegación HTMX)
+        function inicializarUIBase() {
+            const toasts = document.querySelectorAll('.flash-messages .alert:not([data-toast-init])');
             toasts.forEach((toast, index) => {
+                toast.setAttribute('data-toast-init', 'true');
                 setTimeout(() => {
                     if (document.body.contains(toast)) {
                         toast.classList.add('is-closing');
@@ -179,7 +182,57 @@
             if (activeFichaLink) {
                 activeFichaLink.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             }
-        });
+        }
+        document.addEventListener('DOMContentLoaded', inicializarUIBase);
+        document.addEventListener('htmx:load', inicializarUIBase);
+
+        // 2. Barra de progreso superior reactiva para feedback instantáneo (<16ms)
+        (function() {
+            const bar = document.getElementById('app-progress-bar');
+            if (!bar) return;
+
+            document.addEventListener('htmx:beforeRequest', function() {
+                bar.classList.remove('is-finishing');
+                bar.classList.add('is-loading');
+            });
+
+            document.addEventListener('htmx:afterOnLoad', function() {
+                bar.classList.remove('is-loading');
+                bar.classList.add('is-finishing');
+                setTimeout(() => {
+                    bar.classList.remove('is-finishing');
+                }, 200);
+            });
+
+            document.addEventListener('htmx:requestError', function() {
+                bar.classList.remove('is-loading', 'is-finishing');
+            });
+        })();
+
+        // 3. Pre-carga instantánea al pasar el cursor (navegación con 0ms percibidos)
+        (function() {
+            const prefetched = new Set();
+            function prefetch(url) {
+                if (!url || prefetched.has(url) || url.startsWith('#') || url.startsWith('javascript:')) return;
+                if (url.includes('/descargar') || url.includes('/logout') || url.includes('/exportar') || url.includes('/plantilla')) return;
+                try {
+                    const l = document.createElement('link');
+                    l.rel = 'prefetch';
+                    l.href = url;
+                    l.as = 'document';
+                    document.head.appendChild(l);
+                    prefetched.add(url);
+                } catch (e) {}
+            }
+
+            document.addEventListener('pointerover', function(e) {
+                const a = e.target.closest('a');
+                if (!a || !a.href) return;
+                if (a.origin === window.location.origin && !a.hasAttribute('download') && a.target !== '_blank' && a.getAttribute('hx-boost') !== 'false') {
+                    prefetch(a.href);
+                }
+            }, { passive: true });
+        })();
     </script>
     <script>
         function setTheme(themeName) {
@@ -204,6 +257,34 @@
                 if (el.dataset.themeBtn === t) el.classList.add('is-active');
             });
         })();
+        
+        // 3. Sistema de Modales Global
+        window.abrirModal = function(id) {
+            const m = document.getElementById(id);
+            if (m) {
+                m.showModal();
+                document.body.classList.add('modal-open');
+            }
+        };
+        
+        window.cerrarModal = function(id) {
+            const m = document.getElementById(id);
+            if (m && m.open) m.close();
+            document.body.classList.remove('modal-open');
+        };
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.addEventListener('click', function(e) {
+                if (e.target.classList.contains('app-modal-overlay') && e.target.open && !e.target.classList.contains('is-loading')) {
+                    e.target.close();
+                }
+            });
+            document.body.addEventListener('close', function(e) {
+                if (e.target.classList.contains('app-modal-overlay')) {
+                    document.body.classList.remove('modal-open');
+                }
+            }, true);
+        });
     </script>
 </body>
 </html>

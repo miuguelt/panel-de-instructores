@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Podio de Grupos - {{ ficha.codigo }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🏆 Podio de Grupos - {{ ficha.codigo }}</h2>
+        <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-secondary">Volver a Grupos</a>
+    </div>
+
+    {% if ranking_grupos %}
+        <div class="row justify-content-center mb-5">
+            <!-- Podio Visual -->
+            <div class="col-md-8 text-center d-flex align-items-end justify-content-center" style="min-height: 200px; gap: 10px;">
+                
+                {% if ranking_grupos|length > 1 %}
+                    {% set plata = ranking_grupos[1] %}
+                    <!-- Plata (Segundo lugar) -->
+                    <div class="d-flex flex-column" style="width: 30%;">
+                        <div class="fw-bold fs-5 text-truncate px-2">{{ plata.Grupo.nombre }}</div>
+                        <div class="badge bg-secondary mb-2 fs-6">{{ plata.total_insignias }} Medallas</div>
+                        <div class="bg-secondary rounded-top d-flex align-items-center justify-content-center text-white fw-bold" style="height: 120px; font-size: 2rem;">2</div>
+                    </div>
+                {% endif %}
+
+                {% if ranking_grupos|length > 0 %}
+                    {% set oro = ranking_grupos[0] %}
+                    <!-- Oro (Primer lugar) -->
+                    <div class="d-flex flex-column" style="width: 35%;">
+                        <div class="fw-bold fs-4 text-warning text-truncate px-2">{{ oro.Grupo.nombre }}</div>
+                        <div class="badge bg-warning text-dark mb-2 fs-5">{{ oro.total_insignias }} Medallas</div>
+                        <div class="bg-warning rounded-top d-flex align-items-center justify-content-center text-dark fw-bold" style="height: 160px; font-size: 3rem; box-shadow: 0 -5px 15px rgba(255,193,7,0.5);">1</div>
+                    </div>
+                {% endif %}
+
+                {% if ranking_grupos|length > 2 %}
+                    {% set bronce = ranking_grupos[2] %}
+                    <!-- Bronce (Tercer lugar) -->
+                    <div class="d-flex flex-column" style="width: 30%;">
+                        <div class="fw-bold fs-5 text-truncate px-2" style="color: #cd7f32;">{{ bronce.Grupo.nombre }}</div>
+                        <div class="badge mb-2 fs-6" style="background-color: #cd7f32; color: white;">{{ bronce.total_insignias }} Medallas</div>
+                        <div class="rounded-top d-flex align-items-center justify-content-center text-white fw-bold" style="background-color: #cd7f32; height: 90px; font-size: 2rem;">3</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tabla completa -->
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Clasificación Completa</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-striped mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center" style="width: 80px;">Puesto</th>
+                            <th>Grupo</th>
+                            <th>Integrantes</th>
+                            <th class="text-center">Total Medallas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in ranking_grupos %}
+                        <tr>
+                            <td class="text-center fw-bold align-middle">
+                                {% if loop.index == 1 %}🥇
+                                {% elif loop.index == 2 %}🥈
+                                {% elif loop.index == 3 %}🥉
+                                {% else %}{{ loop.index }}{% endif %}
+                            </td>
+                            <td class="align-middle fw-semibold">{{ item.Grupo.nombre }}</td>
+                            <td>
+                                <ul class="list-unstyled mb-0" style="font-size: 0.9em;">
+                                    {% for aprendiz in item.Grupo.aprendices %}
+                                    <li>• {{ aprendiz.nombre }} {{ aprendiz.apellidos }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                            <td class="text-center align-middle fs-5">
+                                <span class="badge bg-primary rounded-pill">{{ item.total_insignias }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">Aún no hay medallas otorgadas a grupos o no hay grupos creados.</div>
+    {% endif %}
+</div>
+{% endblock %}

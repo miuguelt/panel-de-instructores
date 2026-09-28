@@ -92,6 +92,7 @@ from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_REPORTE_JUICIOS
 from app.services.importacion_jobs import encolar_importacion, ColaImportacionesNoDisponible
 from app.services.versiones_archivos import actualizar_estado, crear_version
 from datetime import datetime, date
+from app.helpers import utc_now
 import json
 import os
 from uuid import uuid4
@@ -105,16 +106,24 @@ ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
 MAX_LONGITUD_CALIFICACION = 10
 
 
+_ip_local_cache = None
+
+
 def _obtener_ip_local():
     """Obtiene la dirección IP de red local para facilitar el escaneo QR desde dispositivos móviles en el aula."""
+    global _ip_local_cache
+    if _ip_local_cache is not None:
+        return _ip_local_cache
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0.1)
         s.connect(('8.8.8.8', 80))
         ip = s.getsockname()[0]
         s.close()
+        _ip_local_cache = ip
         return ip
     except Exception:
+        _ip_local_cache = '127.0.0.1'
         return '127.0.0.1'
 
 
@@ -373,49 +382,55 @@ def _dashboard_inner():
                 juicios_por_ficha[fid]['aprobados'] += cnt
 
         # --- Avance de Certificación (100% Aprobados por Aprendiz) ---
-        estado_juicios_aprendices = {}
+        es_aprobado_sql = (
+            func.upper(JuicioEvaluativo.juicio).like('%APROBADO%') &
+            ~func.upper(JuicioEvaluativo.juicio).like('%AUN NO%')
+        )
         juicios_aprendices_data = db.session.query(
-            JuicioEvaluativo.ficha_id, JuicioEvaluativo.aprendiz_id, JuicioEvaluativo.juicio
+            JuicioEvaluativo.ficha_id,
+            JuicioEvaluativo.aprendiz_id,
+            func.count(JuicioEvaluativo.id),
+            func.sum(db.case((es_aprobado_sql, 1), else_=0)),
         ).join(Aprendiz).filter(
             JuicioEvaluativo.ficha_id.in_(ficha_ids),
-            Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
-        ).all()
-        for fid, aid, juicio in juicios_aprendices_data:
-            if aid not in estado_juicios_aprendices:
-                estado_juicios_aprendices[aid] = {'ficha_id': fid, 'total': 0, 'aprobados': 0}
-            estado_juicios_aprendices[aid]['total'] += 1
-            if juicio and 'APROBADO' in juicio.upper() and 'AUN NO' not in juicio.upper():
-                estado_juicios_aprendices[aid]['aprobados'] += 1
-        
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION),
+        ).group_by(JuicioEvaluativo.ficha_id, JuicioEvaluativo.aprendiz_id).all()
+
         certificados_por_ficha = {fid: 0 for fid in ficha_ids}
-        for aid, data in estado_juicios_aprendices.items():
-            if data['total'] > 0 and data['total'] == data['aprobados']:
-                certificados_por_ficha[data['ficha_id']] += 1
+        for fid, aid, total_cnt, aprobados_cnt in juicios_aprendices_data:
+            total_cnt = total_cnt or 0
+            aprobados_cnt = aprobados_cnt or 0
+            if total_cnt > 0 and total_cnt == aprobados_cnt:
+                certificados_por_ficha[fid] += 1
 
         # --- Resumen de Competencias ---
-        competencias_por_ficha = {}
         comps_data = db.session.query(
-            JuicioEvaluativo.ficha_id, JuicioEvaluativo.competencia, JuicioEvaluativo.juicio
+            JuicioEvaluativo.ficha_id,
+            JuicioEvaluativo.competencia,
+            func.count(JuicioEvaluativo.id),
+            func.sum(db.case((es_aprobado_sql, 1), else_=0)),
         ).join(Aprendiz).filter(
             JuicioEvaluativo.ficha_id.in_(ficha_ids),
-            Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
-        ).all()
-        
-        for fid, comp, juicio in comps_data:
-            if not comp or comp.strip() == '':
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION),
+        ).group_by(JuicioEvaluativo.ficha_id, JuicioEvaluativo.competencia).all()
+
+        competencias_por_ficha = {}
+        for fid, comp, total_cnt, aprobados_cnt in comps_data:
+            if not comp or not comp.strip():
                 continue
+            total_cnt = total_cnt or 0
+            aprobados_cnt = aprobados_cnt or 0
             if fid not in competencias_por_ficha:
                 competencias_por_ficha[fid] = {}
-            if comp not in competencias_por_ficha[fid]:
-                competencias_por_ficha[fid][comp] = {'total': 0, 'aprobados': 0}
-            competencias_por_ficha[fid][comp]['total'] += 1
-            if juicio and 'APROBADO' in juicio.upper() and 'AUN NO' not in juicio.upper():
-                competencias_por_ficha[fid][comp]['aprobados'] += 1
-                
+            competencias_por_ficha[fid][comp] = {
+                'total': total_cnt,
+                'aprobados': aprobados_cnt,
+            }
+
         top_competencias = {}
         for fid, comps in competencias_por_ficha.items():
             sorted_comps = sorted(
-                comps.items(), 
+                comps.items(),
                 key=lambda x: ((x[1]['aprobados'] / x[1]['total']) if x[1]['total'] > 0 else 0, -x[1]['total'])
             )
             top_competencias[fid] = sorted_comps[:2]
@@ -462,12 +477,7 @@ def _dashboard_inner():
             juicios = juicios_por_ficha.get(fid, {})
             pct_juicios = round((juicios.get('aprobados', 0) / juicios.get('total', 1) * 100)) if juicios.get('total') else 0
 
-            total_days = (ficha.fecha_fin - ficha.fecha_inicio).days if (ficha.fecha_inicio and ficha.fecha_fin) else 0
-            if total_days > 0:
-                elapsed = (now.date() - ficha.fecha_inicio).days
-                pct_tiempo = max(0, min(100, int((elapsed / total_days) * 100)))
-            else:
-                pct_tiempo = 0
+            pct_tiempo = int(cronogramas.get(fid, {}).get('porcentaje', 0))
 
             notas_obs = notas_obs_por_ficha.get(fid, {'positiva': 0, 'negativa': 0, 'neutra': 0})
 
@@ -660,6 +670,7 @@ def importar_reporte_ficha():
                 current_user.id,
                 TIPO_REPORTE_JUICIOS,
                 metadata=resultado.get('metadata'),
+                permitir_existente=True,
             )
             actualizar_estado(version, 'procesado', detalle=_resumen_importacion(resultado))
             db.session.commit()
@@ -966,8 +977,17 @@ def historial_aprendiz(ficha_id, aprendiz_id):
 
     # Insignias
     from app.models.insignia import Insignia, InsigniaOtorgada
+    from sqlalchemy import or_
+    from app.models.grupo import GrupoAprendiz
+
+    # Buscar insignias individuales y grupales
+    subquery_grupos = db.session.query(GrupoAprendiz.grupo_id).filter_by(aprendiz_id=aprendiz.id).subquery()
+    
     otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
-        InsigniaOtorgada.aprendiz_id == aprendiz.id,
+        or_(
+            InsigniaOtorgada.aprendiz_id == aprendiz.id,
+            InsigniaOtorgada.grupo_id.in_(subquery_grupos)
+        ),
         Insignia.ficha_id == ficha_id,
     ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
 
@@ -1261,6 +1281,7 @@ def cargar_excel(ficha_id):
             current_user.id,
             TIPO_REPORTE_JUICIOS,
             metadata=metadata_reporte,
+            permitir_existente=True,
         )
         version_path = version.ruta_archivo
         if current_app.config.get('IMPORTACIONES_ASINCRONAS'):
@@ -1998,6 +2019,73 @@ def registrar_actividad_clase(tarea_id):
             'warning',
         )
     return redirect(url_for('instructor.ver_entregas', tarea_id=tarea.id))
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/evidencias-faltantes')
+@login_required
+def evidencias_faltantes(ficha_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    aprendices_list = Aprendiz.query_en_formacion(ficha.id).order_by(
+        Aprendiz.apellidos, Aprendiz.nombre
+    ).all()
+    tareas = tareas_visibles(ficha_id).order_by(Tarea.fecha_limite.desc()).all()
+    
+    ahora = utc_now()
+    
+    if tareas:
+        entregas_query = Entrega.query.filter(
+            Entrega.tarea_id.in_([t.id for t in tareas])
+        ).all()
+    else:
+        entregas_query = []
+        
+    entregas_map = {}
+    for e in entregas_query:
+        key = (e.tarea_id, e.aprendiz_id)
+        prev = entregas_map.get(key)
+        if prev is None:
+            entregas_map[key] = e
+        elif e.fecha_entrega and (not prev.fecha_entrega or e.fecha_entrega > prev.fecha_entrega):
+            entregas_map[key] = e
+
+    datos_aprendices = []
+    for ap in aprendices_list:
+        faltantes = []
+        for tarea in tareas:
+            entrega = entregas_map.get((tarea.id, ap.id))
+            estado = 'pendiente'
+            if entrega:
+                if entrega.estado_revision == 'rechazada':
+                    estado = 'correccion'
+                else:
+                    estado = 'entregada'
+            elif tarea.fecha_limite and tarea.fecha_limite < ahora:
+                estado = 'vencida'
+                
+            if estado in ('pendiente', 'vencida', 'correccion'):
+                faltantes.append({
+                    'tarea': tarea,
+                    'estado': estado
+                })
+                
+        datos_aprendices.append({
+            'aprendiz': ap,
+            'faltantes': faltantes,
+            'cantidad': len(faltantes)
+        })
+
+    datos_aprendices.sort(key=lambda x: x['cantidad'], reverse=True)
+
+    return render_template(
+        'instructor/evidencias_faltantes.html',
+        ficha=ficha,
+        datos=datos_aprendices,
+        corte_actual=corte_actual(ficha_id)
+    )
 
 
 @instructor_bp.route('/tareas/<int:tarea_id>/entregas')

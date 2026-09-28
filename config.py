@@ -109,7 +109,13 @@ class Config:
         if os.path.isabs(_upload_folder)
         else os.path.join(BASE_DIR, _upload_folder)
     )
-    MAX_CONTENT_LENGTH = _env_int('MAX_CONTENT_LENGTH', 50 * 1024 * 1024, minimum=1)
+    # `MAX_CONTENT_LENGTH` conserva su contrato de despliegue como límite por
+    # archivo. Flask limita el cuerpo multipart completo, que incluye campos y
+    # separadores además del archivo, por eso se reserva 1 MiB adicional.
+    MAX_UPLOAD_BYTES = _env_int(
+        'MAX_CONTENT_LENGTH', 50 * 1024 * 1024, minimum=1
+    )
+    MAX_CONTENT_LENGTH = MAX_UPLOAD_BYTES + 1024 * 1024
     ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'zip', 'rar', 'xlsx', 'xls', 'doc', 'docx', 'pptx'}
     SMTP_HOST = os.getenv('SMTP_HOST')
     SMTP_PORT = _env_int('SMTP_PORT', 587, minimum=1, maximum=65535)

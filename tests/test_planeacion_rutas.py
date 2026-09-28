@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 import openpyxl
 
 from app import create_app, db
-from app.models import ArchivoFichaVersion, Ficha, Instructor
+from app.models import Aprendiz, ArchivoFichaVersion, Ficha, Instructor, JuicioEvaluativo
 from tests.apoyo_planeacion import crear_planeacion_xlsx
 from tests.apoyo_programa import crear_programa_pdf
 
@@ -334,6 +334,69 @@ class PlaneacionRouteTestCase(unittest.TestCase):
         self.assertEqual(resp_zip.status_code, 200)
         self.assertEqual(resp_zip.mimetype, 'application/zip')
         self.assertIn(f'fuentes_ficha_{self.ficha.codigo}.zip', resp_zip.headers.get('Content-Disposition', ''))
+
+    def test_ficha_con_juicios_muestra_reporte_cargado_y_permite_cargar_planeacion_o_todos(self):
+        # Simular una ficha que ya tiene aprendices y juicios evaluativos al crearse
+        aprendiz = Aprendiz(
+            documento='101010',
+            nombre='Carlos',
+            apellidos='Gomez',
+            ficha_id=self.ficha.id,
+            estado='EN_FORMACION',
+        )
+        db.session.add(aprendiz)
+        db.session.flush()
+
+        juicio = JuicioEvaluativo(
+            ficha_id=self.ficha.id,
+            aprendiz_id=aprendiz.id,
+            competencia='Competencia 1',
+            resultado_aprendizaje='Resultado 1',
+            juicio='APROBADO',
+            fecha_juicio=date(2026, 3, 1),
+            funcionario_registro='Instructor Evaluador',
+            huella='huella_test_12345678901234567890',
+        )
+        db.session.add(juicio)
+        db.session.commit()
+
+        cliente = self.app.test_client()
+        cliente.post('/login', data={'correo': self.instructor.correo, 'password': 'x'})
+
+        # 1. Al consultar la vista de planeación, el reporte ya figura como cargado (1 de 3)
+        pagina = cliente.get(f'/instructor/fichas/{self.ficha.id}/planeacion')
+        self.assertEqual(pagina.status_code, 200)
+        cuerpo = pagina.get_data(as_text=True)
+        self.assertIn('1 de 3 archivos', cuerpo)
+        self.assertIn('v1 · Cargado', cuerpo)
+        self.assertIn('Descargar', cuerpo)
+
+        # 2. El reporte se puede descargar
+        version_rep = ArchivoFichaVersion.query.filter_by(
+            ficha_id=self.ficha.id, tipo='reporte_juicios'
+        ).first()
+        self.assertIsNotNone(version_rep)
+        descarga = cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/planeacion/archivos/{version_rep.id}/descargar'
+        )
+        self.assertEqual(descarga.status_code, 200)
+        descarga.close()
+
+        # 3. Desde esta misma vista, se puede cargar la planeación pedagógica sin necesidad
+        # de volver a subir el reporte de juicios que ya se tiene
+        ruta_plan = crear_planeacion_xlsx(self.uploads.name)
+        with ruta_plan.open('rb') as s_plan:
+            resp_carga = cliente.post(
+                f'/instructor/fichas/{self.ficha.id}/planeacion/cargar-todo',
+                data={'archivo_planeacion': (s_plan, ruta_plan.name)},
+                content_type='multipart/form-data',
+                follow_redirects=True,
+            )
+        self.assertEqual(resp_carga.status_code, 200)
+        cuerpo_post = resp_carga.get_data(as_text=True)
+        # Ahora se contrastan las fuentes y se genera el análisis
+        self.assertIn('Línea de tiempo de la ficha', cuerpo_post)
+        self.assertIn('2 de 3 archivos', cuerpo_post)
 
 
 if __name__ == '__main__':

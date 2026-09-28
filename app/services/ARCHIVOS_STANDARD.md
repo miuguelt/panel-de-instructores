@@ -123,7 +123,7 @@ porque hay PDF válidos con bytes previos a `%PDF`. Cubre PDF, PNG, JPEG, ZIP
 (incluidos los contenedores vacíos `PK\x05\x06`), RAR y OLE (doc/xls/ppt).
 
 ### 4. Tamaño
-- Global, a nivel Flask: `MAX_CONTENT_LENGTH = 50MB` en `config.py`. El error 413 tiene template propio en `app/__init__.py`.
+- Límite por archivo: `MAX_UPLOAD_BYTES` en `config.py` (se configura con `MAX_CONTENT_LENGTH`, por compatibilidad con el entorno). Flask suma 1 MiB para los campos y separadores multipart; el error 413 muestra el límite y devuelve al panel del aprendiz cuando falla una evidencia.
 - Por archivo, tras escribirlo: 0 bytes → `ErrorArchivoVacio`; por encima del límite → `ErrorTamano`. En ambos casos el `.part` se borra y nada llega a la BD.
 
 ## Frontend

@@ -216,20 +216,25 @@ def _calcular_estimado_por_juicios(
     raps_aprobados_set = set()
     total_juicios = len(juicios_query)
     total_aprobados = 0
+    total_evaluados = 0
 
     for juicio_val, rap_val in juicios_query:
         rap_limpio = (rap_val or '').strip()
         if rap_limpio:
             raps_unicos.add(rap_limpio)
-        es_aprobado = bool(juicio_val and 'APROBADO' in juicio_val.upper() and 'AUN NO' not in juicio_val.upper())
+        j_upper = (juicio_val or '').upper()
+        es_aprobado = bool(juicio_val and 'APROBADO' in j_upper and 'AUN NO' not in j_upper)
+        es_evaluado = bool(juicio_val and ('APROBADO' in j_upper or 'NO APROBADO' in j_upper or j_upper in ('A', 'NA')))
         if es_aprobado:
             total_aprobados += 1
             if rap_limpio:
                 raps_aprobados_set.add(rap_limpio)
+        if es_evaluado:
+            total_evaluados += 1
 
     total_raps = len(raps_unicos) or (round(total_juicios / 25) if total_juicios else 0)
     pct_aprobados = round((total_aprobados / total_juicios * 100), 1) if total_juicios else 0.0
-    aprobados_raps = round(total_raps * (pct_aprobados / 100)) if total_raps else 0
+    pct_evaluados = round((total_evaluados / total_juicios * 100), 1) if total_juicios else 0.0
 
     # Ubicar fase esperada por tiempo
     fase_esperada_nombre = 'ANÁLISIS'
@@ -280,6 +285,7 @@ def _calcular_estimado_por_juicios(
 
     # Fases estimadas
     fases_formateadas = []
+    acum_totales = 0
     for idx, (fase_nom, icono, min_pct, max_pct) in enumerate(UMBRALES_ESTANDAR_FASES):
         rango = max_pct - min_pct
         if pct_tiempo >= max_pct:
@@ -294,13 +300,21 @@ def _calcular_estimado_por_juicios(
 
         if pct_aprobados >= max_pct:
             rap_pct = 100
+            rap_ratio = 1.0
         elif pct_aprobados >= min_pct:
-            rap_pct = round((pct_aprobados - min_pct) / rango * 100)
+            rap_ratio = (pct_aprobados - min_pct) / rango
+            rap_pct = round(rap_ratio * 100)
         else:
             rap_pct = 0
+            rap_ratio = 0.0
 
-        raps_fase_total = max(round(total_raps * (rango / 100)), 1) if total_raps else 0
-        raps_fase_aprobados = min(round(raps_fase_total * (rap_pct / 100)), raps_fase_total)
+        if idx == len(UMBRALES_ESTANDAR_FASES) - 1:
+            raps_fase_total = max(total_raps - acum_totales, 0)
+        else:
+            raps_fase_total = max(round(total_raps * (rango / 100)), 1) if total_raps else 0
+            acum_totales += raps_fase_total
+
+        raps_fase_aprobados = min(round(raps_fase_total * rap_ratio), raps_fase_total)
 
         fases_formateadas.append({
             'orden': idx,
@@ -315,6 +329,9 @@ def _calcular_estimado_por_juicios(
             'estado_ritmo': 'al_dia' if rap_pct >= t_pct else 'atrasado',
             'horas': 0,
         })
+
+    aprobados_raps = sum(f['resultados_aprobados'] for f in fases_formateadas) if total_raps else 0
+    evaluados_raps = max(round(total_raps * (pct_evaluados / 100)), aprobados_raps) if total_raps else 0
 
     return {
         'disponible': True,
@@ -341,7 +358,7 @@ def _calcular_estimado_por_juicios(
         'resumen_raps': {
             'total': total_raps,
             'aprobados': aprobados_raps,
-            'evaluados': total_aprobados,
+            'evaluados': evaluados_raps,
             'pendientes': max(total_raps - aprobados_raps, 0),
             'porcentaje_aprobados': round(pct_aprobados, 1),
         },

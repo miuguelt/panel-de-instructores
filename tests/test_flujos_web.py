@@ -1,12 +1,13 @@
 import os
 import tempfile
 import unittest
+import zipfile
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from unittest.mock import patch
 
 from flask import g
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app import create_app, db
 from app.models import (
@@ -151,6 +152,7 @@ class FlujosWebTestCase(unittest.TestCase):
             f'/instructor/fichas/{self.ficha.id}/aprendices/{self.aprendiz.id}/historial',
             f'/instructor/fichas/{self.ficha.id}/asistencia',
             f'/instructor/fichas/{self.ficha.id}/tareas',
+            f'/instructor/fichas/{self.ficha.id}/evidencias-faltantes',
             f'/instructor/tareas/{self.tarea.id}/entregas',
             f'/instructor/fichas/{self.ficha.id}/alertas',
             f'/instructor/fichas/{self.ficha.id}/casos-seguimiento',
@@ -937,13 +939,186 @@ class FlujosWebTestCase(unittest.TestCase):
                     ),
                 },
                 content_type='multipart/form-data',
+                follow_redirects=True,
             )
-        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(
+            'La evidencia quedó guardada, pero no fue posible actualizar todos los indicadores'.encode('utf-8'),
+            respuesta.data,
+        )
         entrega = Entrega.query.filter_by(
             tarea_id=self.tarea.id, aprendiz_id=self.aprendiz.id
         ).one()
         self.assertTrue(entrega.archivo_url)
         self.assertTrue(os.path.isfile(os.path.join(self.uploads.name, entrega.archivo_url)))
+
+    def test_aprendiz_puede_subir_zip_con_mime_generico_y_reemplazarlo(self):
+        cliente_aprendiz = self.app.test_client()
+        cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}',
+            data={'documento': self.aprendiz.documento},
+        )
+        contenido = BytesIO()
+        with zipfile.ZipFile(contenido, 'w', zipfile.ZIP_DEFLATED) as paquete:
+            paquete.writestr('src/Aplicacion.java', 'class Aplicacion {}')
+        zip_valido = contenido.getvalue()
+
+        primera = cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
+            data={
+                'archivo_evidencia': (
+                    BytesIO(b'%PDF-1.4\n evidencia inicial\n%%EOF'),
+                    'inicial.pdf',
+                ),
+            },
+            content_type='multipart/form-data',
+        )
+        self.assertEqual(primera.status_code, 302)
+        entrega = Entrega.query.filter_by(
+            tarea_id=self.tarea.id, aprendiz_id=self.aprendiz.id
+        ).one()
+        ruta_anterior = os.path.join(self.uploads.name, entrega.archivo_url)
+        self.assertTrue(os.path.isfile(ruta_anterior))
+
+        respuesta = cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
+            data={
+                'archivo_evidencia': (
+                    BytesIO(zip_valido),
+                    'proyecto.zip',
+                    'application/octet-stream',
+                ),
+            },
+            content_type='multipart/form-data',
+            follow_redirects=True,
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('Evidencia guardada correctamente'.encode('utf-8'), respuesta.data)
+        db.session.refresh(entrega)
+        ruta_zip = os.path.join(self.uploads.name, entrega.archivo_url)
+        self.assertTrue(os.path.isfile(ruta_zip))
+        self.assertFalse(os.path.exists(ruta_anterior))
+        with open(ruta_zip, 'rb') as archivo_guardado:
+            self.assertEqual(archivo_guardado.read(), zip_valido)
+
+        descarga = cliente_aprendiz.get(
+            f'/aprendiz/descargar-evidencia/{entrega.id}'
+        )
+        try:
+            self.assertEqual(descarga.status_code, 200)
+            self.assertEqual(descarga.mimetype, 'application/zip')
+            self.assertIn('attachment', descarga.headers['Content-Disposition'])
+            self.assertEqual(descarga.data, zip_valido)
+        finally:
+            descarga.close()
+
+    def test_zip_danado_muestra_error_y_no_crea_entrega(self):
+        cliente_aprendiz = self.app.test_client()
+        cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}',
+            data={'documento': self.aprendiz.documento},
+        )
+        respuesta = cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
+            data={
+                'archivo_evidencia': (
+                    BytesIO(b'PK\x03\x04archivo truncado'),
+                    'proyecto.zip',
+                    'application/octet-stream',
+                ),
+            },
+            content_type='multipart/form-data',
+            follow_redirects=True,
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('El archivo .zip está dañado o incompleto'.encode('utf-8'), respuesta.data)
+        db.session.refresh(self.entrega)
+        self.assertIsNone(self.entrega.archivo_url)
+        self.assertFalse(any(archivos for _, _, archivos in os.walk(self.uploads.name)))
+
+    def test_fallo_al_persistir_limpia_archivo_y_muestra_mensaje(self):
+        cliente_aprendiz = self.app.test_client()
+        cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}',
+            data={'documento': self.aprendiz.documento},
+        )
+        with patch(
+            'app.routes.aprendiz.db.session.commit',
+            side_effect=SQLAlchemyError('fallo de base de datos'),
+        ):
+            respuesta = cliente_aprendiz.post(
+                f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
+                data={
+                    'archivo_evidencia': (
+                        BytesIO(b'%PDF-1.4\n evidencia\n%%EOF'),
+                        'evidencia.pdf',
+                    ),
+                },
+                content_type='multipart/form-data',
+            )
+
+        self.assertEqual(respuesta.status_code, 302)
+        respuesta = cliente_aprendiz.get(respuesta.headers['Location'])
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('No fue posible registrar la evidencia'.encode('utf-8'), respuesta.data)
+        db.session.refresh(self.entrega)
+        self.assertIsNone(self.entrega.archivo_url)
+        self.assertFalse(any(archivos for _, _, archivos in os.walk(self.uploads.name)))
+
+    def test_http_413_devuelve_al_panel_con_limite_y_mensaje(self):
+        cliente_aprendiz = self.app.test_client()
+        cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}',
+            data={'documento': self.aprendiz.documento},
+        )
+        self.app.config['MAX_UPLOAD_BYTES'] = 1024 * 1024
+        self.app.config['MAX_CONTENT_LENGTH'] = 256
+
+        respuesta = cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
+            data={
+                'archivo_evidencia': (
+                    BytesIO(b'%PDF-1.4\n evidencia\n%%EOF'),
+                    'evidencia.pdf',
+                ),
+            },
+            content_type='multipart/form-data',
+            follow_redirects=True,
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('la subida supera el límite de 1 MiB'.encode('utf-8'), respuesta.data)
+        db.session.refresh(self.entrega)
+        self.assertIsNone(self.entrega.archivo_url)
+        self.assertFalse(any(archivos for _, _, archivos in os.walk(self.uploads.name)))
+
+    def test_csrf_expirado_en_subida_vuelve_al_panel_con_mensaje(self):
+        cliente_aprendiz = self.app.test_client()
+        cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}',
+            data={'documento': self.aprendiz.documento},
+        )
+        self.app.config['WTF_CSRF_ENABLED'] = True
+
+        respuesta = cliente_aprendiz.post(
+            f'/aprendiz/{self.ficha.id}/subir-evidencia/{self.tarea.id}',
+            data={
+                'archivo_evidencia': (
+                    BytesIO(b'%PDF-1.4\n evidencia\n%%EOF'),
+                    'evidencia.pdf',
+                ),
+            },
+            content_type='multipart/form-data',
+            follow_redirects=True,
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('La sesión del formulario expiró'.encode('utf-8'), respuesta.data)
+        db.session.refresh(self.entrega)
+        self.assertIsNone(self.entrega.archivo_url)
+        self.assertFalse(any(archivos for _, _, archivos in os.walk(self.uploads.name)))
 
     def test_evaluacion_masiva_actualiza_entregas_seleccionadas(self):
         entrega_bruno = Entrega(

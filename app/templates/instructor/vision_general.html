@@ -54,6 +54,12 @@
             <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-secondary btn-sm">
                 📝 Nueva tarea
             </a>
+            <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-info btn-sm text-white">
+                👥 Grupos Aleatorios
+            </a>
+            <a href="{{ url_for('atencion.fila_atencion', ficha_id=ficha.id) }}" class="btn btn-warning btn-sm text-dark">
+                🙋‍♂️ Fila de Atención
+            </a>
         </div>
     </header>
 

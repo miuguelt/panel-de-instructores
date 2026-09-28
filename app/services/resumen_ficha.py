@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 from sqlalchemy import func, or_
+from sqlalchemy.orm import joinedload
 
 from app import db
 from app.models.ficha import Ficha
@@ -190,12 +191,12 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
             Aprendiz.estado.in_(ESTADOS_EN_FORMACION),
         )
     )
-    if instructor_id and not getattr(ficha, 'es_admin', False):
-        # Si no es admin, priorizamos las tareas donde es responsable
-        pass
+    num_entregas_pendientes = entregas_pendientes_query.count()
     entregas_pendientes = (
         entregas_pendientes_query
+        .options(joinedload(Entrega.tarea), joinedload(Entrega.aprendiz))
         .order_by(Entrega.fecha_entrega.asc())
+        .limit(10)
         .all()
     )
 
@@ -238,17 +239,25 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
 
     # 9. Turno de aseo de hoy
     turno_aseo_hoy = (
-        TurnoAseo.query.filter_by(ficha_id=ficha.id, fecha=hoy)
+        TurnoAseo.query
+        .options(joinedload(TurnoAseo.aprendiz_1), joinedload(TurnoAseo.aprendiz_2))
+        .filter_by(ficha_id=ficha.id, fecha=hoy)
         .first()
     )
 
-    # 10. Juicios Evaluativos y RAPs (Consolidado)
-    juicios_query = (
-        JuicioEvaluativo.query.filter_by(ficha_id=ficha.id)
+    # 10. Juicios Evaluativos y RAPs (Consolidado ligero)
+    juicios = (
+        JuicioEvaluativo.query.with_entities(
+            JuicioEvaluativo.aprendiz_id,
+            JuicioEvaluativo.competencia,
+            JuicioEvaluativo.tipo_competencia,
+            JuicioEvaluativo.juicio,
+        )
+        .filter_by(ficha_id=ficha.id)
         .join(Aprendiz, JuicioEvaluativo.aprendiz_id == Aprendiz.id)
         .filter(Aprendiz.estado.in_(ESTADOS_EN_FORMACION))
+        .all()
     )
-    juicios = juicios_query.all()
     juicios_totales = len(juicios)
     juicios_aprobados = sum(
         1 for j in juicios
@@ -330,7 +339,7 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
         'aprendices_riesgo_amarillo': aprendices_amarillo,
         'aprendices_riesgo_verde': aprendices_verde,
         'entregas_pendientes': entregas_pendientes,
-        'num_entregas_pendientes': len(entregas_pendientes),
+        'num_entregas_pendientes': num_entregas_pendientes,
         'alertas_activas': alertas_activas,
         'planes_pendientes': planes_pendientes,
         'turno_aseo_hoy': turno_aseo_hoy,

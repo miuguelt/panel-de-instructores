@@ -87,7 +87,7 @@
                 {% endif %}
                 <div class="pl-dropzone" data-input-target="input-planeacion">
                     <span class="pl-dropzone-icon">📁</span>
-                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo .xlsx o haz clic' if version_planeacion else 'Arrastra tu archivo .xlsx o haz clic' }}</span>
+                    <span class="pl-dropzone-text">{{ 'Arrastra aquí una nueva planeación o haz clic para actualizar' if version_planeacion else 'Arrastra tu archivo .xlsx o haz clic' }}</span>
                     <input type="file" id="input-planeacion" name="archivo_planeacion" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
                     <div class="pl-file-preview" style="display:none;"></div>
                 </div>
@@ -109,9 +109,10 @@
                 {% if doc_reporte %}
                 <div class="pl-doc-meta-badge">
                     <div class="pl-doc-meta-info" title="{{ doc_reporte.nombre_archivo }}">
-                        <strong class="pl-doc-meta-title">📊 {{ doc_reporte.nombre_archivo }}</strong>
+                        <strong class="pl-doc-meta-title">📋 {{ doc_reporte.nombre_archivo }}</strong>
                         <small class="pl-doc-meta-sub">
                             v{{ doc_reporte.version }} · {{ (doc_reporte.tamano_bytes / 1024)|round(1) }} KB · {{ doc_reporte.creado_en.strftime('%d/%m/%Y') }}
+                            {%- if doc_reporte.detalle %} · {{ doc_reporte.detalle }}{% endif %}
                             {%- if doc_reporte.estado != 'procesado' %} · Estado: {{ doc_reporte.estado }}{% endif %}
                         </small>
                     </div>
@@ -122,7 +123,7 @@
                 {% endif %}
                 <div class="pl-dropzone" data-input-target="input-juicios">
                     <span class="pl-dropzone-icon">📁</span>
-                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo reporte o haz clic' if version_reporte else 'Arrastra tu archivo .xls/.xlsx o haz clic' }}</span>
+                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo reporte o haz clic para actualizar' if version_reporte else 'Arrastra tu archivo .xls/.xlsx o haz clic' }}</span>
                     <input type="file" id="input-juicios" name="archivo_juicios" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
                     <div class="pl-file-preview" style="display:none;"></div>
                 </div>
@@ -157,7 +158,7 @@
                 {% endif %}
                 <div class="pl-dropzone" data-input-target="input-programa">
                     <span class="pl-dropzone-icon">📁</span>
-                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo .pdf o haz clic' if version_programa else 'Arrastra tu diseño curricular .pdf o haz clic' }}</span>
+                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo diseño curricular o haz clic para actualizar' if version_programa else 'Arrastra tu diseño curricular .pdf o haz clic' }}</span>
                     <input type="file" id="input-programa" name="archivo_programa" accept=".pdf,application/pdf" class="pl-file-input">
                     <div class="pl-file-preview" style="display:none;"></div>
                 </div>

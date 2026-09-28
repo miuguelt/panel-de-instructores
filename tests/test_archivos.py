@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+import zipfile
 from datetime import date, timedelta
 from io import BytesIO
 
@@ -17,6 +18,7 @@ from app.services.archivos import (
     ArchivoService,
     ErrorArchivo,
     ErrorArchivoVacio,
+    ErrorMimeType,
     TiposCarpeta,
     mimetype_de,
     nombre_original_desde_ruta,
@@ -24,6 +26,15 @@ from app.services.archivos import (
 
 PDF = b'%PDF-1.4\n' + b'contenido de prueba ' * 40 + b'\n%%EOF'
 DOCX = b'PK\x03\x04' + b'documento word simulado ' * 20
+
+
+def crear_zip(archivos=None):
+    """Crea un ZIP pequeño y completo para las pruebas de validación."""
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as paquete:
+        for nombre, contenido in (archivos or {'README.txt': 'Evidencia de prueba'}).items():
+            paquete.writestr(nombre, contenido)
+    return buffer.getvalue()
 
 
 class ArchivosTestCase(unittest.TestCase):
@@ -133,6 +144,99 @@ class ArchivosTestCase(unittest.TestCase):
                 carpeta=TiposCarpeta.MATERIALES_FICHA,
             )
 
+    def test_zip_valido_acepta_mime_generico_y_conserva_el_archivo(self):
+        from werkzeug.datastructures import FileStorage
+        contenido = crear_zip({'src/Aplicacion.java': 'class Aplicacion {}'})
+        subido = FileStorage(
+            stream=BytesIO(contenido),
+            filename='proyecto.zip',
+            content_type='application/octet-stream',
+        )
+
+        resultado = ArchivoService.guardar(
+            archivo=subido,
+            carpeta=TiposCarpeta.ENTREGAS,
+        )
+
+        with open(resultado.ruta, 'rb') as archivo_guardado:
+            self.assertEqual(archivo_guardado.read(), contenido)
+        self.assertEqual(resultado.tamano, len(contenido))
+
+    def test_zip_autoextraible_y_zip_vacio_son_validos(self):
+        from werkzeug.datastructures import FileStorage
+        zip_autoextraible = b'MZ-prefijo-' + crear_zip()
+        vacio = BytesIO()
+        with zipfile.ZipFile(vacio, 'w'):
+            pass
+
+        for nombre, contenido in (
+            ('instalador.zip', zip_autoextraible),
+            ('sin_archivos.zip', vacio.getvalue()),
+        ):
+            with self.subTest(nombre=nombre):
+                resultado = ArchivoService.guardar(
+                    archivo=FileStorage(
+                        stream=BytesIO(contenido),
+                        filename=nombre,
+                        content_type='application/x-zip-compressed',
+                    ),
+                    carpeta=TiposCarpeta.ENTREGAS,
+                )
+                self.assertEqual(os.path.getsize(resultado.ruta), len(contenido))
+
+    def test_zip_incompleto_tiene_error_accionable(self):
+        from werkzeug.datastructures import FileStorage
+        with self.assertRaisesRegex(ErrorArchivo, 'está dañado o incompleto'):
+            ArchivoService.guardar(
+                archivo=FileStorage(
+                    stream=BytesIO(b'PK\x03\x04contenido truncado'),
+                    filename='proyecto.zip',
+                    content_type='application/octet-stream',
+                ),
+                carpeta=TiposCarpeta.ENTREGAS,
+            )
+        self.assertEqual(self._listar_uploads(), [])
+
+    def test_zip_con_mime_incompatible_se_rechaza(self):
+        from werkzeug.datastructures import FileStorage
+        with self.assertRaises(ErrorMimeType):
+            ArchivoService.guardar(
+                archivo=FileStorage(
+                    stream=BytesIO(crear_zip()),
+                    filename='proyecto.zip',
+                    content_type='text/plain',
+                ),
+                carpeta=TiposCarpeta.ENTREGAS,
+            )
+        self.assertEqual(self._listar_uploads(), [])
+
+    def test_zip_respeta_limite_por_archivo_sin_dejar_parciales(self):
+        from werkzeug.datastructures import FileStorage
+        contenido = crear_zip()
+        self.app.config['MAX_UPLOAD_BYTES'] = len(contenido) - 1
+        with self.assertRaisesRegex(ErrorArchivo, 'máximo permitido'):
+            ArchivoService.guardar(
+                archivo=FileStorage(
+                    stream=BytesIO(contenido),
+                    filename='proyecto.zip',
+                    content_type='application/zip',
+                ),
+                carpeta=TiposCarpeta.ENTREGAS,
+            )
+        self.assertEqual(self._listar_uploads(), [])
+
+    def test_mime_generico_no_se_acepta_para_otras_extensiones(self):
+        from werkzeug.datastructures import FileStorage
+        with self.assertRaises(ErrorMimeType):
+            ArchivoService.guardar(
+                archivo=FileStorage(
+                    stream=BytesIO(PDF),
+                    filename='evidencia.pdf',
+                    content_type='application/octet-stream',
+                ),
+                carpeta=TiposCarpeta.ENTREGAS,
+            )
+
     # ------------------------------------------------------------------
     # Descarga
     # ------------------------------------------------------------------
@@ -213,6 +317,12 @@ class ArchivosTestCase(unittest.TestCase):
         datos = self.cliente.get('/health?uploads=1').get_json()
         self.assertTrue(datos['uploads']['escribible'])
         self.assertIn('archivos', datos['uploads'])
+
+    def test_limite_de_solicitud_reserva_espacio_para_multipart(self):
+        self.assertEqual(
+            self.app.config['MAX_CONTENT_LENGTH'],
+            self.app.config['MAX_UPLOAD_BYTES'] + 1024 * 1024,
+        )
 
     # ------------------------------------------------------------------
     def _listar_uploads(self):
