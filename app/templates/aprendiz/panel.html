@@ -193,18 +193,42 @@
                     <div class="priority-date">{% if aseo.turno_propio.fecha == aseo.hoy %}Hoy{% else %}{{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}{% endif %}</div>
                     <p class="priority-card-copy">Con <strong>{{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</strong></p>
                     <p class="priority-card-meta">Estado: <strong>{{ 'Intercambiado' if aseo.turno_propio.estado == 'intercambiado' else 'Programado' }}</strong>. Revisa la fecha antes de iniciar la jornada.</p>
-                    <button type="button" class="btn btn-sm btn-primary priority-action action-jump-btn" data-jump-tab="convivencia">Ver detalle del turno</button>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-sm btn-primary priority-action action-jump-btn" data-jump-tab="convivencia">Ver detalle del turno</button>
+                        {% if aseo.turno_propio.fecha <= aseo.hoy and aseo.turno_propio.estado != 'cumplido' %}
+                        <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=aseo.turno_propio.id) }}" style="margin: 0; display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="origen" value="panel">
+                            <button type="submit" class="btn btn-sm btn-success" title="Marcar tu turno de aseo como cumplido">✓ Marcar cumplido</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 {% else %}
                     <div class="priority-date priority-date-neutral">Sin turno asignado</div>
                     <p class="priority-card-copy">No tienes un turno pendiente en las próximas fechas disponibles.</p>
                     {% if aseo.siguientes %}
                     <div class="priority-mini-list" aria-label="Próximos turnos del grupo">
                         {% for turno in aseo.siguientes[:2] %}
-                        <div><time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time><span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                            <div>
+                                <time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time>
+                                <span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span>
+                            </div>
+                            {% if turno.fecha <= aseo.hoy and turno.estado != 'cumplido' %}
+                            <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0; display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="origen" value="panel">
+                                <button type="submit" class="btn btn-xs btn-outline-success" style="font-size: 0.72rem; padding: 2px 6px;" title="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como cumplido">✓ Marcar hecho</button>
+                            </form>
+                            {% endif %}
+                        </div>
                         {% endfor %}
                     </div>
                     {% endif %}
-                    <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline priority-action">Ver calendario de turnos</a>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                        <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline priority-action">Ver calendario de turnos</a>
+                        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary priority-action" title="Generar nuevos turnos con cola justa">⚙️ Generar turnos</a>
+                    </div>
                 {% endif %}
             </article>
 
@@ -325,6 +349,32 @@
             {% endif %}
         </div>
         {% endif %}
+    </section>
+    {% endif %}
+
+    {% if not aprendiz.rol_administrativo and turno_hoy %}
+    <section class="card" aria-label="Turno de aseo de hoy" data-learner-tab="resumen" style="margin-bottom: 1rem;">
+        <div class="cleaning-today-banner" style="padding: 0.85rem 1rem; background: var(--surface-secondary, rgba(255,255,255,0.04)); border: 1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🧹 Turno de aseo de hoy ({{ turno_hoy.fecha.strftime('%d/%m/%Y') }})</div>
+                <div style="font-weight: 600; margin-top: 2px;">
+                    {{ turno_hoy.aprendiz_1.nombre_completo }} y {{ turno_hoy.aprendiz_2.nombre_completo }}
+                    <span class="badge badge-{{ 'success' if turno_hoy.estado == 'cumplido' else 'warning' }}" style="margin-left: 6px;">{{ turno_hoy.estado|capitalize }}</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                {% if turno_hoy.estado != 'cumplido' %}
+                <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno_hoy.id) }}" style="margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="origen" value="panel">
+                    <button type="submit" class="btn btn-sm btn-primary">✓ Marcar aseo de hoy hecho</button>
+                </form>
+                {% else %}
+                <span class="text-muted" style="font-size: 0.88rem; font-weight: 500;">✓ Aseo cumplido hoy</span>
+                {% endif %}
+                <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Gestionar turnos</a>
+            </div>
+        </div>
     </section>
     {% endif %}
 
@@ -866,9 +916,7 @@
         </div>
         <p class="text-muted cleaning-card-link" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver calendario completo y tabla de equidad</a>
-            {% if aprendiz.rol_administrativo %}
             <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">🛠️ Gestionar y asignar turnos de aseo</a>
-            {% endif %}
         </p>
 
         {% if aseo.turno_propio and aseo.aviso_visible %}
@@ -883,15 +931,27 @@
             <h3>Hoy / próximo turno</h3>
             {% if aseo.siguientes %}
             {% set proximo = aseo.siguientes[0] %}
-            <div class="next-cleaning-feature">
-                <time datetime="{{ proximo.fecha.isoformat() }}">{{ proximo.fecha.strftime('%d/%m') }}</time>
-                <div>
-                    <strong>{{ proximo.aprendiz_1.nombre_completo }}</strong>
-                    <span>y {{ proximo.aprendiz_2.nombre_completo }}</span>
+            <div class="next-cleaning-feature" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <time datetime="{{ proximo.fecha.isoformat() }}">{{ proximo.fecha.strftime('%d/%m') }}</time>
+                    <div>
+                        <strong>{{ proximo.aprendiz_1.nombre_completo }}</strong>
+                        <span>y {{ proximo.aprendiz_2.nombre_completo }}</span>
+                    </div>
                 </div>
+                {% if proximo.estado != 'cumplido' and proximo.fecha <= aseo.hoy %}
+                <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=proximo.id) }}" style="margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="origen" value="panel">
+                    <button type="submit" class="btn btn-sm btn-primary" title="Marcar este turno como cumplido">✓ Marcar como cumplido</button>
+                </form>
+                {% elif proximo.estado == 'cumplido' %}
+                <span class="badge badge-success">✓ Cumplido</span>
+                {% endif %}
             </div>
             {% else %}
-            <p class="text-muted">No hay turnos de aseo asignados para las próximas fechas. Consulta el calendario completo para ver cuándo se programen.</p>
+            <p class="text-muted">No hay turnos de aseo asignados para las próximas fechas. Puedes generar nuevos turnos para tu grupo.</p>
+            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">Generar nuevos turnos</a>
             {% endif %}
         </div>
 
@@ -916,10 +976,19 @@
             <h3>Siguientes en la fila</h3>
             <div class="upcoming-cleaning-list">
                 {% for turno in aseo.siguientes %}
-                <div class="upcoming-cleaning-row {% if turno.incluye(aprendiz.id) %}is-me{% endif %}">
-                    <time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time>
-                    <span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span>
-                    {% if turno.incluye(aprendiz.id) %}<strong>Tú</strong>{% endif %}
+                <div class="upcoming-cleaning-row {% if turno.incluye(aprendiz.id) %}is-me{% endif %}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time>
+                        <span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span>
+                        {% if turno.incluye(aprendiz.id) %}<strong>(Tú)</strong>{% endif %}
+                    </div>
+                    {% if turno.estado != 'cumplido' and turno.fecha <= aseo.hoy %}
+                    <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="origen" value="panel">
+                        <button type="submit" class="btn btn-xs btn-outline-success" style="font-size: 0.75rem; padding: 2px 8px;" title="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como cumplido">✓ Cumplido</button>
+                    </form>
+                    {% endif %}
                 </div>
                 {% else %}
                 <p class="text-muted">Sin fechas próximas.</p>
@@ -931,6 +1000,30 @@
             <strong>Has cumplido {{ aseo.contador.veces_aseo }} turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }} de aseo</strong>
             <span>El promedio del grupo es {{ '%.1f'|format(aseo.promedio) }}.</span>
         </div>
+
+        <details class="learner-generate-inline" style="margin-top: 1rem; padding: 0.85rem 1rem; background: var(--surface-secondary, rgba(255,255,255,0.03)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius: 8px;">
+            <summary style="font-weight: 600; cursor: pointer; color: var(--accent, #00324D);">✨ Generar nuevos turnos por periodo</summary>
+            <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}" style="margin-top: 0.75rem;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="origen" value="panel">
+                <p class="text-muted small">El sistema calcula la rotación justa entre aprendices activos en formación, evitando programar en días festivos de Colombia.</p>
+                <div class="form-row" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="panel-gen-inicio" class="small text-muted">Fecha inicial</label>
+                        <input id="panel-gen-inicio" name="fecha_inicio" type="date" value="{{ fecha_inicio_default.isoformat() if fecha_inicio_default else aseo.hoy.isoformat() }}" required style="font-size: 0.88rem; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="panel-gen-fin" class="small text-muted">Fecha final</label>
+                        <input id="panel-gen-fin" name="fecha_fin" type="date" value="{{ fecha_fin_default.isoformat() if fecha_fin_default else aseo.hoy.isoformat() }}" required style="font-size: 0.88rem; padding: 4px 8px;">
+                    </div>
+                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
+                        <input type="checkbox" name="recalcular" checked>
+                        Recalcular pendientes
+                    </label>
+                    <button type="submit" class="btn btn-sm btn-primary">Generar turnos</button>
+                </div>
+            </form>
+        </details>
 
         {% if aseo.turno_propio %}
         <details class="learner-audit">

@@ -161,20 +161,56 @@ class AprendizAdministradorTestCase(unittest.TestCase):
             3,
         )
 
-    def test_aprendiz_sin_rol_no_puede_modificar_aseo_ni_asistencia(self):
-        self._sesion_aprendiz()
+    def test_aprendiz_sin_rol_puede_generar_y_cumplir_aseo_pero_no_asistencia(self):
+        self._sesion_aprendiz(self.aprendices[1])
         fecha = date.today() + timedelta(days=1)
+        from app.services.festivos import es_festivo_colombia
+        while es_festivo_colombia(fecha):
+            fecha += timedelta(days=1)
 
+        # 1. Puede generar turnos de aseo
         respuesta = self.cliente.post(
             f'/aprendiz/{self.ficha.id}/turnos-aseo/generar',
             data={
                 'fecha_inicio': fecha.isoformat(),
                 'fecha_fin': fecha.isoformat(),
             },
+            follow_redirects=True,
         )
+        self.assertEqual(respuesta.status_code, 200)
+        turno = TurnoAseo.query.filter_by(ficha_id=self.ficha.id, fecha=fecha).first()
+        self.assertIsNotNone(turno)
+        self.assertEqual(turno.estado, 'programado')
 
-        self.assertEqual(respuesta.status_code, 302)
-        self.assertEqual(TurnoAseo.query.count(), 0)
+        # 2. Puede marcar el turno como cumplido
+        resp_cumplir = self.cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno.id}/cumplir',
+            follow_redirects=True,
+        )
+        self.assertEqual(resp_cumplir.status_code, 200)
+        db.session.refresh(turno)
+        self.assertEqual(turno.estado, 'cumplido')
+
+        # 3. Asistencia / llamado a lista sigue estrictamente protegido para el aprendiz administrador
+        fecha_asistencia = date.today() + timedelta(days=2)
+        resp_asistencia = self.cliente.post(
+            f'/aprendiz/{self.ficha.id}/asistencia/gestionar',
+            data={'fecha': fecha_asistencia.isoformat()},
+            follow_redirects=True,
+        )
+        self.assertIn('solo está disponible para el aprendiz administrador'.encode(), resp_asistencia.data)
+
+    def test_usuario_no_autorizado_no_puede_generar_turnos(self):
+        with self.cliente.session_transaction() as s:
+            s.clear()
+
+        fecha = date.today() + timedelta(days=1)
+        resp = self.cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/generar',
+            data={'fecha_inicio': fecha.isoformat(), 'fecha_fin': fecha.isoformat()},
+            follow_redirects=True,
+        )
+        self.assertIn('No tienes permiso para generar turnos de aseo'.encode(), resp.data)
 
     def test_las_interfaces_delegadas_quedan_visibles_para_cada_rol(self):
         self._sesion_instructor()

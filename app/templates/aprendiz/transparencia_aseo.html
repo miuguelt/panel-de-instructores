@@ -7,6 +7,9 @@
         <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) if documento else url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn-back" title="Volver">&larr; Volver</a>
         <h1>🧹 Turnos de aseo</h1>
     </div>
+    <div class="header-actions">
+        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-sm btn-primary">🛠️ Generar y gestionar turnos</a>
+    </div>
 </div>
 
 <div class="cleaning-summary-grid">
@@ -77,6 +80,13 @@
                         </small>
                         {% else %}
                         <small>{{ 'Automático' if turno.generado_por == 'sistema' else 'Ajuste manual' }}</small>
+                        {% endif %}
+                        {% if turno.estado != 'cumplido' and dia <= hoy %}
+                        <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin-top: 4px;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="origen" value="transparencia">
+                            <button type="submit" class="btn btn-xs btn-outline-success" style="font-size: 0.72rem; padding: 1px 6px;" title="Marcar turno como cumplido">✓ Cumplido</button>
+                        </form>
                         {% endif %}
                     </div>
                     {% elif dia in sesiones_mes and not festivo_nombre %}

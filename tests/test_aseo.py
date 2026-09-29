@@ -889,17 +889,41 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertTrue(turno_manual.incluye(self.aprendices[2].id))
         self.assertTrue(turno_manual.incluye(self.aprendices[3].id))
 
-        # 3. Aprendiz sin rol administrativo no tiene permiso para gestionar o asignar
+        # 3. Aprendiz regular (sin rol administrativo) sí puede gestionar y marcar turnos cumplidos
         cliente_no_admin = self.app.test_client()
         with cliente_no_admin.session_transaction() as s:
             s['aprendiz_documento'] = no_admin.documento
             s['aprendiz_ficha_id'] = self.ficha.id
 
-        resp_denegado = cliente_no_admin.get(
+        resp_permitido = cliente_no_admin.get(
             f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar',
             follow_redirects=True,
         )
-        self.assertIn('solo está disponible para el aprendiz administrador'.encode(), resp_denegado.data)
+        self.assertEqual(resp_permitido.status_code, 200)
+        self.assertIn('Gestionar turnos de aseo'.encode(), resp_permitido.data)
+
+        # Puede marcar turno como cumplido
+        resp_cumplir_regular = cliente_no_admin.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno_manual.id}/cumplir',
+            data={'origen': 'panel'},
+            follow_redirects=False,
+        )
+        self.assertEqual(resp_cumplir_regular.status_code, 302)
+        turno_manual_bd = db.session.get(TurnoAseo, turno_manual.id)
+        self.assertEqual(turno_manual_bd.estado, 'cumplido')
+
+        # 4. Usuario no autenticado o de otra ficha no puede gestionar
+        cliente_ajeno = self.app.test_client()
+        with cliente_ajeno.session_transaction() as s:
+            s['aprendiz_documento'] = '9999999999'
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        resp_ajeno = cliente_ajeno.get(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar',
+            follow_redirects=True,
+        )
+        self.assertIn('Debes pertenecer a esta ficha para gestionar los turnos de aseo'.encode(), resp_ajeno.data)
+
 
 
 if __name__ == '__main__':

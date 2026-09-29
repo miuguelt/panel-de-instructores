@@ -69,6 +69,20 @@ def _aprendiz_admin_autorizado(ficha_id):
     return aprendiz_de_sesion(ficha_id)
 
 
+def _aprendiz_autorizado(ficha_id):
+    """Devuelve el aprendiz de sesión si pertenece y está activo en la ficha."""
+    aprendiz = aprendiz_de_sesion(ficha_id)
+    if not aprendiz:
+        doc = (request.form.get('documento') or request.args.get('documento') or '').strip()
+        if doc:
+            aprendiz = Aprendiz.query.filter_by(
+                ficha_id=ficha_id, documento=doc
+            ).first()
+    if not aprendiz or aprendiz.estado not in ESTADOS_ACTIVOS:
+        return None
+    return aprendiz
+
+
 def _volver_al_panel_aprendiz(ficha_id):
     if session.get('aprendiz_ficha_id') == ficha_id:
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
@@ -368,10 +382,10 @@ def excluir(ficha_id, aprendiz_id):
 @aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo/gestionar')
 @limiter.limit('60 per minute')
 def gestionar(ficha_id):
-    actor = _aprendiz_admin_autorizado(ficha_id)
+    actor = _aprendiz_autorizado(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha or not actor:
-        flash('Esta herramienta solo está disponible para el aprendiz administrador.', 'error')
+        flash('Debes pertenecer a esta ficha para gestionar los turnos de aseo.', 'error')
         return _volver_al_panel_aprendiz(ficha_id)
 
     mes = _mes_consulta(request.args.get('mes'))
@@ -412,19 +426,20 @@ def gestionar(ficha_id):
 @aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo/generar', methods=['POST'])
 @limiter.limit('20 per minute')
 def generar_como_aprendiz(ficha_id):
-    actor = _aprendiz_admin_autorizado(ficha_id)
+    actor = _aprendiz_autorizado(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha or not actor:
-        flash('No tienes permiso para generar turnos de aseo.', 'error')
+        flash('No tienes permiso para generar turnos de aseo en esta ficha.', 'error')
         return _volver_al_panel_aprendiz(ficha_id)
     try:
         inicio = _fecha_formulario(request.form.get('fecha_inicio'), 'fecha inicial')
         fin = _fecha_formulario(request.form.get('fecha_fin'), 'fecha final')
+        origen_generacion = 'aprendiz_admin' if actor.rol_administrativo else 'aprendiz'
         resultado = generar_turnos(
             ficha_id,
             inicio,
             fin,
-            generado_por='aprendiz_admin',
+            generado_por=origen_generacion,
             recalcular_existentes=request.form.get('recalcular', 'on') in ('on', 'true', '1'),
             respetar_manuales=True,
         )
@@ -439,6 +454,10 @@ def generar_como_aprendiz(ficha_id):
         flash(f'Se generaron o actualizaron {total} turno(s) de aseo (omitiendo festivos).', 'success')
     else:
         flash('No hubo cambios en los turnos del rango seleccionado.', 'info')
+    
+    origen = request.form.get('origen') or request.args.get('origen')
+    if origen == 'panel':
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
     return redirect(url_for(
         'aseo_aprendiz.gestionar', ficha_id=ficha_id, mes=inicio.strftime('%Y-%m')
     ))
@@ -449,7 +468,7 @@ def generar_como_aprendiz(ficha_id):
 )
 @limiter.limit('30 per minute')
 def cumplir_como_aprendiz(ficha_id, turno_id):
-    actor = _aprendiz_admin_autorizado(ficha_id)
+    actor = _aprendiz_autorizado(ficha_id)
     turno = db.session.get(TurnoAseo, turno_id)
     if not actor or not turno or turno.ficha_id != ficha_id:
         flash('No tienes permiso para marcar ese turno.', 'error')
@@ -468,6 +487,10 @@ def cumplir_como_aprendiz(ficha_id, turno_id):
     origen = request.form.get('origen') or request.args.get('origen')
     if origen == 'panel':
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+    if origen == 'transparencia':
+        return redirect(url_for(
+            'aseo_aprendiz.transparencia', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m')
+        ))
     return redirect(url_for(
         'aseo_aprendiz.gestionar', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m')
     ))
@@ -478,7 +501,7 @@ def cumplir_como_aprendiz(ficha_id, turno_id):
 )
 @limiter.limit('30 per minute')
 def editar_como_aprendiz(ficha_id, turno_id):
-    actor = _aprendiz_admin_autorizado(ficha_id)
+    actor = _aprendiz_autorizado(ficha_id)
     turno = db.session.get(TurnoAseo, turno_id)
     aprendiz_1 = Aprendiz.query.filter_by(
         id=request.form.get('aprendiz_1_id', type=int), ficha_id=ficha_id
@@ -493,13 +516,19 @@ def editar_como_aprendiz(ficha_id, turno_id):
         flash('Selecciona dos aprendices válidos de esta ficha.', 'error')
         return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
     try:
+        actor_label = (
+            f'el aprendiz administrador {actor.nombre_completo}'
+            if actor.rol_administrativo
+            else f'el aprendiz {actor.nombre_completo}'
+        )
+        origen_edicion = 'aprendiz_admin' if actor.rol_administrativo else 'aprendiz'
         reemplazar_aprendices(
             turno,
             aprendiz_1,
             aprendiz_2,
             request.form.get('observacion', '').strip(),
-            origen='aprendiz_admin',
-            actor_label=f'el aprendiz administrador {actor.nombre_completo}',
+            origen=origen_edicion,
+            actor_label=actor_label,
         )
         db.session.commit()
         flash('La asignación del turno fue actualizada.', 'success')
@@ -514,7 +543,7 @@ def editar_como_aprendiz(ficha_id, turno_id):
 @aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo/asignar', methods=['POST'])
 @limiter.limit('30 per minute')
 def asignar_como_aprendiz(ficha_id):
-    actor = _aprendiz_admin_autorizado(ficha_id)
+    actor = _aprendiz_autorizado(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha or not actor:
         flash('No tienes permiso para asignar turnos de aseo.', 'error')
@@ -525,14 +554,20 @@ def asignar_como_aprendiz(ficha_id):
         aprendiz_1_id = request.form.get('aprendiz_1_id', type=int)
         aprendiz_2_id = request.form.get('aprendiz_2_id', type=int)
         observacion = request.form.get('observacion', '').strip()
+        actor_label = (
+            f'el aprendiz administrador {actor.nombre_completo}'
+            if actor.rol_administrativo
+            else f'el aprendiz {actor.nombre_completo}'
+        )
+        origen_asignacion = 'aprendiz_admin' if actor.rol_administrativo else 'aprendiz'
         asignar_o_actualizar_turno(
             ficha_id=ficha_id,
             fecha=fecha,
             aprendiz_1_id=aprendiz_1_id,
             aprendiz_2_id=aprendiz_2_id,
             observacion=observacion,
-            origen='aprendiz_admin',
-            actor_label=f'el aprendiz administrador {actor.nombre_completo}',
+            origen=origen_asignacion,
+            actor_label=actor_label,
         )
         db.session.commit()
         flash(f'Turno asignado para el {fecha.strftime("%d/%m/%Y")}.', 'success')

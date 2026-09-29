@@ -356,12 +356,15 @@ def panel(ficha_id):
         Grupo.activo.is_(True), Grupo.ficha_id == ficha_id
     ).first()
     trabajos_grupo = obtener_trabajos_grupales(aprendiz)
-    turno_hoy = None
-    if aprendiz.rol_administrativo:
-        from app.models.aseo import TurnoAseo
-        turno_hoy = TurnoAseo.query.filter_by(
-            ficha_id=ficha_id, fecha=date.today()
-        ).first()
+    from app.models.aseo import TurnoAseo
+    turno_hoy = TurnoAseo.query.filter_by(
+        ficha_id=ficha_id, fecha=date.today()
+    ).first()
+
+    import calendar as cal
+    fecha_inicio_default = date.today()
+    ultimo_dia_mes = cal.monthrange(fecha_inicio_default.year, fecha_inicio_default.month)[1]
+    fecha_fin_default = fecha_inicio_default.replace(day=ultimo_dia_mes)
 
     # El aprendiz solo recibe sus propios registros; el mismo mapa de estados
     # que usa el modal del instructor evita colores distintos entre roles.
@@ -628,6 +631,8 @@ def panel(ficha_id):
                            cronograma=cronograma,
                            aseo=aseo,
                            turno_hoy=turno_hoy,
+                           fecha_inicio_default=fecha_inicio_default,
+                           fecha_fin_default=fecha_fin_default,
                            stats_juicios=stats_juicios,
                            juicios_pendientes=juicios_pendientes,
                            juicios_aprobados=juicios_aprobados,

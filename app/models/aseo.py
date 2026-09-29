@@ -4,7 +4,7 @@ from app import db
 
 
 ESTADOS_TURNO_ASEO = ('programado', 'cumplido', 'intercambiado')
-ORIGENES_TURNO_ASEO = ('sistema', 'instructor', 'aprendiz_admin')
+ORIGENES_TURNO_ASEO = ('sistema', 'instructor', 'aprendiz_admin', 'aprendiz')
 ESTADOS_INTERCAMBIO_ASEO = ('pendiente', 'aceptado', 'rechazado')
 
 
