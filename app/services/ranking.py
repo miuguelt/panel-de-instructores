@@ -693,7 +693,11 @@ class _DatosInsignias:
 
 def _cumple_puntualidad_mes(aprendiz_id, datos, minimo=4):
     estados = datos.registros_mes.get(aprendiz_id, [])
-    return len(estados) >= minimo and all(estado != 'TARDANZA' for estado in estados)
+    if len(estados) < minimo:
+        return False
+    if any(estado in ('TARDANZA', 'FALTA', 'FALTA_JUSTIFICADA') for estado in estados):
+        return False
+    return sum(1 for e in estados if e == 'ASISTE') >= minimo
 
 
 def _fue_primero_en_entregar(aprendiz_id, datos):
@@ -720,7 +724,7 @@ def _cumple_constancia(aprendiz_id, datos):
     ultimos = list(por_mes.values())[-3:]
     return len(ultimos) == 3 and all(
         actual >= anterior for anterior, actual in zip(ultimos, ultimos[1:])
-    )
+    ) and ultimos[-1] >= 70
 
 
 def evaluar_insignias(ficha_id, filas, ahora=None):
@@ -752,7 +756,7 @@ def evaluar_insignias(ficha_id, filas, ahora=None):
             fila['puntaje_asistencia'],
             25,
             15,
-        ):
+        ) and fila['puntaje_asistencia'] >= 60:
             _otorgar(aprendiz_id, catalogo.get('REGRESO_TRIUNFAL'), nuevas, otorgadas)
         if _historial_mejora(
             aprendiz_id,

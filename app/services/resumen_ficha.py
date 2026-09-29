@@ -24,6 +24,7 @@ from app.services.cronograma import obtener_cronograma
 from app.services.fases_dashboard import obtener_seguimiento_fases_dashboard
 from app.services.permisos import tareas_visibles
 from app.services.asistencia import contar_sesiones_registradas
+from app.services.trabajos_grupales import obtener_destinatarios_y_entregas_grupales
 
 
 ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
@@ -76,6 +77,16 @@ def calcular_semaforo(ficha_id: int, aprendices: List[Aprendiz], config: Configu
     faltas = _faltas_por_aprendiz(ficha_id, corte_id=corte_id)
     tareas_ficha = tareas_visibles(ficha_id, corte_id=corte_id, ver_todas=True).all()
     ultimas_entregas = _ultima_entrega_por_aprendiz(tareas_ficha)
+    destinatarios_grupales, entregas_grupales = (
+        obtener_destinatarios_y_entregas_grupales(
+            ficha_id, [tarea.id for tarea in tareas_ficha]
+        )
+    )
+    ids_grupales = {tarea.id for tarea in tareas_ficha if tarea.es_grupal}
+    for clave in list(ultimas_entregas):
+        if clave[0] in ids_grupales:
+            ultimas_entregas.pop(clave)
+    ultimas_entregas.update(entregas_grupales)
 
     stats_map = {}
     for aprendiz in aprendices:
@@ -90,6 +101,11 @@ def calcular_semaforo(ficha_id: int, aprendices: List[Aprendiz], config: Configu
 
         tareas_pendientes = 0
         for tarea in tareas_ficha:
+            if (
+                tarea.es_grupal
+                and aprendiz.id not in destinatarios_grupales.get(tarea.id, set())
+            ):
+                continue
             entrega = ultimas_entregas.get((tarea.id, aprendiz.id))
             if entrega and entrega.estado_revision == 'rechazada':
                 tareas_pendientes += 1

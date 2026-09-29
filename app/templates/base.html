@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tyt.css') }}">
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
     {% block head %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal-system.css') }}">
     <script>
         (function() {
             try {
@@ -281,33 +282,25 @@
             });
         })();
         
-        // 3. Sistema de Modales Global
-        window.abrirModal = function(id) {
-            const m = document.getElementById(id);
-            if (m) {
-                m.showModal();
-                document.body.classList.add('modal-open');
-            }
-        };
-        
-        window.cerrarModal = function(id) {
-            const m = document.getElementById(id);
-            if (m && m.open) m.close();
-            document.body.classList.remove('modal-open');
-        };
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            document.body.addEventListener('click', function(e) {
-                if (e.target.classList.contains('app-modal-overlay') && e.target.open && !e.target.classList.contains('is-loading')) {
-                    e.target.close();
-                }
-            });
-            document.body.addEventListener('close', function(e) {
-                if (e.target.classList.contains('app-modal-overlay')) {
-                    document.body.classList.remove('modal-open');
-                }
-            }, true);
-        });
     </script>
+    <script src="{{ url_for('static', filename='js/modal-system.js') }}"></script>
+
+    <dialog id="modal-confirmacion" class="app-modal-overlay app-confirm-modal" aria-modal="true" aria-labelledby="modal-confirmacion-titulo" aria-describedby="modal-confirmacion-mensaje" data-confirm-dialog>
+        <section class="app-modal-content app-modal-content--compact app-confirm-shell">
+            <header class="app-modal-header">
+                <div class="app-confirm-heading">
+                    <span class="app-confirm-icon" aria-hidden="true">?</span>
+                    <div class="app-confirm-copy">
+                        <h2 id="modal-confirmacion-titulo" data-confirm-title>Confirme esta acción</h2>
+                        <p id="modal-confirmacion-mensaje" data-confirm-message></p>
+                    </div>
+                </div>
+            </header>
+            <footer class="app-modal-footer">
+                <button type="button" class="btn btn-outline" data-confirm-cancel autofocus>Cancelar</button>
+                <button type="button" class="btn app-confirm-accept" data-confirm-accept>Continuar</button>
+            </footer>
+        </section>
+    </dialog>
 </body>
 </html>

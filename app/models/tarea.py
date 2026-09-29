@@ -27,11 +27,19 @@ class Tarea(db.Model):
     modalidad = db.Column(
         db.String(20), nullable=False, default=MODALIDAD_EVIDENCIA, server_default=MODALIDAD_EVIDENCIA
     )
+    es_grupal = db.Column(
+        db.Boolean, nullable=False, default=False, server_default=db.false()
+    )
     creada_en = db.Column(db.DateTime, default=utc_now)
     actualizada_en = db.Column(db.DateTime, nullable=True)
 
     entregas = db.relationship('Entrega', backref='tarea', lazy='dynamic',
                                 cascade='all, delete-orphan')
+    grupos = db.relationship(
+        'Grupo',
+        secondary='tarea_grupo',
+        back_populates='tareas_grupales',
+    )
     prorrogas = db.relationship('ProrrogaTarea', backref='tarea', lazy='dynamic',
                                 cascade='all, delete-orphan')
     corte = db.relationship('Corte', back_populates='tareas')
@@ -87,6 +95,9 @@ class Entrega(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tarea_id = db.Column(db.Integer, db.ForeignKey('tareas.id'), nullable=False, index=True)
     aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
+    grupo_id = db.Column(
+        db.Integer, db.ForeignKey('grupos.id'), nullable=True, index=True
+    )
     archivo_url = db.Column(db.String(500), nullable=True)
     enlace_repositorio = db.Column(db.String(500), nullable=True)
     justificacion_retraso = db.Column(db.Text, nullable=True)
@@ -107,12 +118,20 @@ class Entrega(db.Model):
     )
 
     revisor = db.relationship('Instructor', foreign_keys=[revisada_por_id])
+    grupo = db.relationship(
+        'Grupo', backref=db.backref('entregas_grupales', lazy='dynamic')
+    )
 
     __table_args__ = (
         db.UniqueConstraint(
             'tarea_id',
             'aprendiz_id',
             name='uq_entrega_tarea_aprendiz',
+        ),
+        db.UniqueConstraint(
+            'tarea_id',
+            'grupo_id',
+            name='uq_entrega_tarea_grupo',
         ),
     )
 

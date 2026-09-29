@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/_recomendacion_card.html" import render_alertas_aprendiz %}
 {% block title %}Reporte integral · {{ aprendiz.nombre_completo }} - SENA Control{% endblock %}
 
 {% macro tone_for_pct(value) -%}
@@ -79,6 +80,8 @@
             <button type="button" class="btn btn-sm btn-primary" onclick="window.print()">🖨️ Imprimir / PDF</button>
         </div>
     </div>
+
+    {{ render_alertas_aprendiz(ficha.id, aprendiz.id) }}
 
     <header class="report-hero">
         <div class="report-identity">

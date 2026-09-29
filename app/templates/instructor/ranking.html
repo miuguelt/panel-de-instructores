@@ -518,7 +518,8 @@
                 <p class="text-muted">Todos comienzan de nuevo sin borrar el histórico anterior.</p>
             </div>
             <form method="POST" action="{{ url_for('ranking.nuevo_corte', ficha_id=ficha.id) }}"
-                  onsubmit="return confirm('¿Iniciar un nuevo corte? El resultado actual se guardará en el histórico.');">
+                  data-confirm="El resultado actual se guardará en el histórico antes de iniciar el nuevo corte."
+                  data-confirm-title="Iniciar un nuevo corte" data-confirm-label="Iniciar corte" data-confirm-intent="warning">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if corte_actual %}<input type="hidden" name="corte_id" value="{{ corte_actual.id }}">{% endif %}
                 <div class="form-row new-cut-fields">

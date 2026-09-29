@@ -262,7 +262,8 @@
             </details>
             <form method="POST"
                   action="{{ url_for('instructor.eliminar_nota_observador', ficha_id=ficha.id, nota_id=nota.id) }}"
-                  onsubmit="return confirm('Se eliminará esta observación de forma permanente. ¿Continuar?');">
+                  data-confirm="La observación se eliminará de forma permanente. ¿Desea continuar?"
+                  data-confirm-title="Eliminar observación" data-confirm-label="Eliminar" data-confirm-intent="danger">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
             </form>

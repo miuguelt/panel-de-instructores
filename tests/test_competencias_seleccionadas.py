@@ -1,6 +1,7 @@
+import json
 import unittest
 from app import create_app, db
-from app.models import Ficha, Instructor, FichaInstructor, JuicioEvaluativo, FichaCompetenciaSeleccionada
+from app.models import Ficha, Instructor, FichaInstructor, JuicioEvaluativo, FichaCompetenciaSeleccionada, Aprendiz
 
 
 class CompetenciasSeleccionadasTestCase(unittest.TestCase):
@@ -146,6 +147,95 @@ class CompetenciasSeleccionadasTestCase(unittest.TestCase):
         self.assertIn('Analizar planeación', html)
         # Verificar que el header antiguo no duplica el contenido dentro de juicios-container
         self.assertNotIn('<div class="page-header">\n        <div class="page-title-cluster">', html)
+
+    def test_modal_detalle_competencia_estructura_y_dialogo(self):
+        self._autenticar(self.inst1)
+        res = self.client.get(f'/instructor/fichas/{self.ficha.id}/juicios')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # 1. El modal debe ser un elemento <dialog> nativo con la clase estándar
+        self.assertIn('<dialog id="comp-modal-overlay" class="app-modal-overlay"', html)
+        self.assertIn('aria-labelledby="modal-comp-title"', html)
+
+        # 2. Encabezado con eyebrow, h2 semántico y botón accesible de cierre
+        self.assertIn('class="app-modal-eyebrow">Detalle de competencia</span>', html)
+        self.assertIn('id="modal-comp-title"', html)
+        self.assertIn('aria-label="Cerrar detalle"', html)
+        self.assertIn('onclick="closeCompModal()"', html)
+
+        # 3. Contenedores de KPIs, evaluadores, RAPs y aprendices pendientes
+        self.assertIn('id="modal-kpis"', html)
+        self.assertIn('id="modal-ring-wrap"', html)
+        self.assertIn('id="modal-evaluadores"', html)
+        self.assertIn('id="modal-raps"', html)
+        self.assertIn('id="modal-pendientes-section"', html)
+        self.assertIn('</dialog>', html)
+
+    def test_modal_detalle_datos_json_y_acceso(self):
+        # Crear un aprendiz y un juicio evaluativo
+        ap = Aprendiz(
+            ficha_id=self.ficha.id,
+            documento='1098765432',
+            nombre='Carlos',
+            apellidos='Gomez',
+            estado='EN_FORMACION'
+        )
+        db.session.add(ap)
+        db.session.commit()
+
+        j = JuicioEvaluativo(
+            ficha_id=self.ficha.id,
+            aprendiz_id=ap.id,
+            competencia='38199 - Orientar investigacion',
+            resultado_aprendizaje='RAP 01 - Formular propuesta',
+            juicio='APROBADO',
+            tipo_competencia='transversal',
+            funcionario_registro='Instructor Demo'
+        )
+        db.session.add(j)
+        db.session.commit()
+
+        self._autenticar(self.inst1)
+        res = self.client.get(f'/instructor/fichas/{self.ficha.id}/juicios')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # La tarjeta debe incluir la acción de análisis detallado y el trigger del modal
+        self.assertIn('openCompModal(0)', html)
+        self.assertIn('Ver análisis detallado', html)
+
+        # El JSON de comp-data debe existir y ser válido
+        self.assertIn('<script id="comp-data" type="application/json">', html)
+        start = html.find('id="comp-data"')
+        s = html.find('>', start) + 1
+        e = html.find('</script>', s)
+        json_data = json.loads(html[s:e].strip())
+        self.assertIsInstance(json_data, list)
+        self.assertGreaterEqual(len(json_data), 1)
+
+        comp = json_data[0]
+        self.assertEqual(comp['nombre'], '38199 - Orientar investigacion')
+        self.assertEqual(comp['tipo'], 'transversal')
+        self.assertIn('detalles', comp)
+        self.assertEqual(len(comp['detalles']), 1)
+        det = comp['detalles'][0]
+        self.assertEqual(det['documento'], '1098765432')
+        self.assertEqual(det['estado'], 'APROBADO')
+        self.assertEqual(det['evaluador'], 'Instructor Demo')
+
+    def test_estilos_sin_will_change_en_contenido_principal(self):
+        # Verificar que el CSS de main#contenido-principal no tenga will-change: transform
+        import os
+        css_path = os.path.join(self.app.root_path, 'static', 'css', 'styles.css')
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css = f.read()
+
+        # En main#contenido-principal no debe estar will-change que rompa modales fixed
+        idx = css.find('main#contenido-principal')
+        self.assertNotEqual(idx, -1)
+        bloque = css[idx:idx+150]
+        self.assertNotIn('will-change', bloque)
 
 
 if __name__ == '__main__':

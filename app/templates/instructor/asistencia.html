@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
 {% block title %}Llamado a Lista - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
@@ -8,6 +9,9 @@
         <h1>📋 Llamado a Lista</h1>
     </div>
 </div>
+
+{{ render_alertas_contextuales(ficha.id, 'asistencia_comite') }}
+
     {% if cortes %}
     <div class="page-control-panel">
         <div class="control-selectors-cluster">

@@ -1,0 +1,381 @@
+/* Ajustes transversales para ventanas emergentes y diálogos del panel. */
+body.modal-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+.app-modal-overlay {
+    box-sizing: border-box;
+    min-width: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
+    padding-top: max(.75rem, env(safe-area-inset-top));
+    padding-right: max(.75rem, env(safe-area-inset-right));
+    padding-bottom: max(.75rem, env(safe-area-inset-bottom));
+    padding-left: max(.75rem, env(safe-area-inset-left));
+}
+
+.app-modal-overlay[hidden] {
+    display: none !important;
+}
+
+dialog.app-modal-overlay:not([open]) {
+    display: none;
+}
+
+.app-modal-content {
+    box-sizing: border-box;
+    width: min(100%, 48rem);
+    max-height: min(90vh, 56rem);
+    max-height: min(90dvh, 56rem);
+    min-width: 0;
+    overscroll-behavior: contain;
+    border-radius: clamp(1rem, 2vw, 1.35rem);
+}
+
+.app-modal-content--wide {
+    width: min(100%, 70rem);
+}
+
+.app-modal-content--compact {
+    width: min(100%, 32rem);
+}
+
+.app-modal-header,
+.app-modal-body,
+.app-modal-footer {
+    min-width: 0;
+}
+
+.app-modal-header {
+    align-items: center;
+}
+
+.app-modal-header-copy,
+.app-modal-body > *,
+.app-modal-footer > * {
+    min-width: 0;
+}
+
+.app-modal-close,
+.app-modal-content button,
+.pl-modal-backdrop button,
+.pl-modal-raps button {
+    min-height: 42px;
+}
+
+.app-modal-close {
+    width: 42px;
+    height: 42px;
+}
+
+.app-modal-content :focus-visible,
+.pl-modal-backdrop :focus-visible,
+.pl-modal-raps :focus-visible {
+    outline: 3px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+.app-modal-content :focus:not(:focus-visible),
+.pl-modal-backdrop :focus:not(:focus-visible),
+.pl-modal-raps :focus:not(:focus-visible) {
+    outline: none;
+}
+
+.pl-modal-backdrop {
+    z-index: 9000;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: none;
+    padding: max(.75rem, env(safe-area-inset-top)) max(.75rem, env(safe-area-inset-right)) max(.75rem, env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-left));
+}
+
+.pl-modal-backdrop.is-open {
+    pointer-events: auto;
+}
+
+.pl-modal {
+    width: min(100%, 70rem);
+    max-height: min(92vh, 58rem);
+    max-height: min(92dvh, 58rem);
+    min-width: 0;
+}
+
+.pl-modal-raps {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: max(.75rem, env(safe-area-inset-top)) max(.75rem, env(safe-area-inset-right)) max(.75rem, env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-left));
+    background: var(--modal-backdrop);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.pl-modal-raps[hidden] {
+    display: none !important;
+}
+
+.pl-modal-raps.is-open {
+    display: flex;
+}
+
+.pl-modal-raps-box {
+    box-sizing: border-box;
+    width: min(100%, 58rem);
+    max-height: min(90vh, 54rem);
+    max-height: min(90dvh, 54rem);
+    min-width: 0;
+    overflow: hidden;
+}
+
+.pl-modal-raps-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.app-confirm-shell {
+    width: min(100%, 34rem);
+}
+
+.app-confirm-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: .9rem;
+    min-width: 0;
+}
+
+.app-confirm-icon {
+    display: grid;
+    flex: 0 0 2.65rem;
+    width: 2.65rem;
+    height: 2.65rem;
+    place-items: center;
+    color: var(--accent-hover);
+    background: color-mix(in srgb, var(--accent-primary) 13%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, var(--border-subtle));
+    border-radius: .85rem;
+    font-size: 1.15rem;
+}
+
+.app-confirm-modal.is-warning .app-confirm-icon {
+    color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 12%, var(--bg-card));
+    border-color: color-mix(in srgb, var(--warning) 30%, var(--border-subtle));
+}
+
+.app-confirm-modal.is-danger .app-confirm-icon {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 10%, var(--bg-card));
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--border-subtle));
+}
+
+.app-confirm-copy {
+    min-width: 0;
+}
+
+.app-confirm-copy h2 {
+    margin: 0;
+    color: var(--text-strong);
+    font-size: clamp(1.05rem, 3vw, 1.25rem);
+    line-height: 1.3;
+}
+
+.app-confirm-copy p {
+    margin: .35rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.app-confirm-modal .app-modal-footer .btn {
+    min-height: 44px;
+}
+
+.app-confirm-modal .app-confirm-accept {
+    color: var(--button-on-accent, #fff);
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.app-notice-region {
+    position: fixed;
+    z-index: 12000;
+    top: max(1rem, env(safe-area-inset-top));
+    right: max(1rem, env(safe-area-inset-right));
+    display: grid;
+    width: min(30rem, calc(100vw - 2rem));
+    gap: .65rem;
+    pointer-events: none;
+}
+
+.app-notice {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .85rem;
+    min-width: 0;
+    padding: .9rem 1rem;
+    color: var(--text-main);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 4px solid var(--accent-primary);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+    animation: modalSlideUp .18s ease-out;
+}
+
+.app-notice.is-warning { border-left-color: var(--warning); }
+.app-notice.is-danger { border-left-color: var(--danger); }
+.app-notice.is-success { border-left-color: var(--success); }
+
+.app-notice-copy {
+    min-width: 0;
+}
+
+.app-notice-copy strong {
+    display: block;
+    margin-bottom: .2rem;
+    color: var(--text-strong);
+}
+
+.app-notice-copy p {
+    margin: 0;
+    color: var(--text-main);
+    line-height: 1.45;
+}
+
+.app-notice-close {
+    display: inline-grid;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: .65rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 1.35rem;
+}
+
+.app-notice-close:hover,
+.app-notice-close:focus-visible {
+    color: var(--text-strong);
+    background: var(--bg-surface);
+    border-color: var(--border-divider);
+}
+
+.app-confirm-modal.is-warning .app-confirm-accept {
+    color: var(--text-strong);
+    background: var(--warning);
+    border-color: var(--warning);
+}
+
+.app-confirm-modal.is-danger .app-confirm-accept {
+    color: #fff;
+    background: var(--danger);
+    border-color: var(--danger);
+}
+
+.pl-modal-close:focus-visible,
+.pl-modal-raps-close:focus-visible {
+    outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+    .app-modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .app-modal-content,
+    .app-modal-content--wide,
+    .app-modal-content--compact {
+        width: 100%;
+        max-height: 92vh;
+        max-height: 92dvh;
+        border-radius: 1.25rem 1.25rem 0 0;
+    }
+
+    .app-modal-content--fullscreen {
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+
+    .app-modal-header,
+    .app-modal-body,
+    .app-modal-footer {
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+
+    .app-modal-footer {
+        flex-wrap: wrap;
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
+    .app-modal-footer > .btn {
+        flex: 1 1 8rem;
+    }
+
+    .pl-modal-backdrop,
+    .pl-modal-raps {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .pl-modal,
+    .pl-modal-raps-box {
+        width: 100%;
+        max-height: 94vh;
+        max-height: 94dvh;
+        border-radius: 1.25rem 1.25rem 0 0;
+    }
+
+    .app-confirm-shell {
+        max-height: 88vh;
+        max-height: 88dvh;
+    }
+
+    .app-notice-region {
+        top: auto;
+        right: max(.75rem, env(safe-area-inset-right));
+        bottom: max(.75rem, env(safe-area-inset-bottom));
+        left: max(.75rem, env(safe-area-inset-left));
+        width: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-modal-content,
+    .pl-modal,
+    .pl-modal-backdrop,
+    .pl-modal-backdrop.is-open .pl-modal {
+        animation-duration: .01ms !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+    }
+}

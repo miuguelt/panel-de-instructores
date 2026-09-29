@@ -521,7 +521,11 @@
 
                 <!-- Botón de Generación -->
                 <div style="padding:1.25rem;margin-top:auto;">
-                    <button type="submit" class="btn-generate-groups" onclick="return confirm('¿Generar nuevos grupos? Esto archivará la distribución anterior de esta ficha.');">
+                    <button type="submit" class="btn-generate-groups"
+                            data-confirm="¿Generar nuevos grupos? La distribución anterior de esta ficha se archivará."
+                            data-confirm-title="Generar nuevos grupos"
+                            data-confirm-label="Generar grupos"
+                            data-confirm-intent="warning">
                         <i data-lucide="dices" style="width:18px;height:18px;"></i>
                         <span>Generar Equipos</span>
                     </button>

@@ -42,10 +42,33 @@ jobs:
           python-version: "3.11"
           cache: 'pip'
 
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run JavaScript chat tests and function coverage
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/grupo_chat.js --test tests_js/grupo_chat.test.cjs
+
+      - name: Verificar navegación de planeación y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_navegacion.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-planeacion.lcov --test tests_js/planeacion_navegacion.test.cjs
+
+      - name: Verificar modales y ventanas emergentes
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/modal-system.js --test tests_js/modal_system.test.cjs
+
+      - name: Guardar cobertura de navegación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-planeacion-js
+          path: coverage-planeacion.lcov
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run Tests
         env:

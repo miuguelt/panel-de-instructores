@@ -26,6 +26,7 @@ from app.services.planeacion import comparar_fuentes, parsear_planeacion
 from app.services.programa_formacion import parsear_programa
 from app.services.versiones_archivos import (
     actualizar_estado,
+    asegurar_version_reporte,
     crear_version,
     ultima_version,
     versiones_ficha,
@@ -309,7 +310,7 @@ def descargar_todos(ficha_id):
             try:
                 raiz, relativa, _ = resolver_archivo_subido(ver.ruta_archivo)
                 ruta_fisica = raiz / relativa
-                nombre_en_zip = f'v{ver.version}_{secure_filename(ver.nombre_archivo)}'
+                nombre_en_zip = secure_filename(ver.nombre_archivo) or ver.nombre_archivo
                 zf.write(ruta_fisica, arcname=nombre_en_zip)
             except Exception:
                 current_app.logger.warning('No se pudo incluir en ZIP la versión %s de la ficha %s', ver.id, ficha_id)
@@ -333,9 +334,15 @@ def descargar_version(ficha_id, version_id):
     if not ficha or not version or version.ficha_id != ficha_id:
         flash('Archivo no encontrado.', 'error')
         return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))
+
+    if version.tipo == TIPO_REPORTE_JUICIOS:
+        version_actualizada = asegurar_version_reporte(ficha)
+        if version_actualizada and version_actualizada.id == version.id:
+            version = version_actualizada
+
     try:
         raiz, relativa, _candidatos = resolver_archivo_subido(version.ruta_archivo)
-        nombre = f'v{version.version}_{secure_filename(version.nombre_archivo)}'
+        nombre = version.nombre_archivo or secure_filename(relativa.name)
         return ArchivoService.enviar(raiz, relativa, nombre_descarga=nombre)
     except FileNotFoundError:
         flash('La versión ya no está disponible en el almacenamiento.', 'error')

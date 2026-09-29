@@ -40,6 +40,7 @@ CAT_TAREAS = 'tareas_calificaciones'
 CAT_ASISTENCIA = 'asistencia_comite'
 CAT_PLANES = 'planes_mejoramiento'
 CAT_RECONOCIMIENTOS = 'reconocimientos'
+CAT_RENDIMIENTO = 'rendimiento_academico'
 
 # Niveles de severidad y prioridad
 SEV_CRITICA = 'critica'        # Acción inmediata requerida (rojo / riesgo inminente)
@@ -544,6 +545,7 @@ def obtener_recomendaciones_aprendiz(
     ficha_id: int,
     aprendiz_id: int,
     ahora: Optional[datetime] = None,
+    curva_rendimiento: Optional[Dict[str, Any]] = None,
 ) -> List[Recomendacion]:
     """Genera recomendaciones de acción personalizadas para un aprendiz específico."""
     ahora = ahora or datetime.utcnow()
@@ -702,6 +704,126 @@ def obtener_recomendaciones_aprendiz(
                 )
             )
 
+    # 6. Evidencias vencidas no entregadas (Advertencia directa de rendimiento)
+    tareas_vencidas_sin_entrega = [
+        t for t in tareas
+        if t.id not in entregas and t.fecha_limite and t.fecha_limite < ahora
+    ]
+    if tareas_vencidas_sin_entrega:
+        n_venc = len(tareas_vencidas_sin_entrega)
+        recomendaciones.append(
+            Recomendacion(
+                id=f'aprendiz_tareas_vencidas_{aprendiz_id}',
+                categoria=CAT_RENDIMIENTO,
+                severidad=SEV_CRITICA if n_venc >= 2 else SEV_PREVENTIVA,
+                icono='🚨',
+                titulo=f'Advertencia: Tienes {n_venc} evidencia{"s" if n_venc > 1 else ""} vencida{"s" if n_venc > 1 else ""}',
+                mensaje=(
+                    f'Las evidencias no entregadas impactan negativamente tu curva de rendimiento. '
+                    f'Comunícate con tu instructor para acordar una entrega extemporánea o plan de apoyo.'
+                ),
+                accion_texto='Revisar evidencias vencidas',
+                accion_url='#seccion-tareas',
+                metrica_destacada=f'{n_venc} vencida{"s" if n_venc > 1 else ""}',
+                destinatario='aprendiz',
+                prioridad=1,
+            )
+        )
+
+    # 7. Evaluación de la Curva de Rendimiento Histórico (Advertencias y Recomendaciones)
+    if curva_rendimiento is None:
+        try:
+            from app.services.curva_rendimiento import obtener_curva_rendimiento_aprendiz
+            curva_rendimiento = obtener_curva_rendimiento_aprendiz(ficha_id, aprendiz_id)
+        except Exception:
+            curva_rendimiento = None
+
+    if curva_rendimiento and curva_rendimiento.get('tiene_datos'):
+        tendencia = curva_rendimiento.get('tendencia')
+        dif = curva_rendimiento.get('diferencia_ultimo', 0.0)
+        pt_act = curva_rendimiento.get('puntaje_actual', 0.0)
+        supera_meta = curva_rendimiento.get('supera_meta', True)
+
+        if tendencia == 'descendente' or dif <= -2.0:
+            recomendaciones.append(
+                Recomendacion(
+                    id=f'aprendiz_curva_descendente_{aprendiz_id}',
+                    categoria=CAT_RENDIMIENTO,
+                    severidad=SEV_CRITICA if pt_act < 60.0 else SEV_PREVENTIVA,
+                    icono='📉',
+                    titulo='Advertencia: Tu curva de rendimiento muestra un descenso',
+                    mensaje=(
+                        f'Tu puntaje varió en {dif} puntos respecto al corte previo. '
+                        f'Para revertir la tendencia, presenta tus actividades a tiempo y no acumules inasistencias.'
+                    ),
+                    accion_texto='Consultar mi curva',
+                    accion_url='#seccion-curva-rendimiento',
+                    metrica_destacada=f'{dif} pts',
+                    destinatario='aprendiz',
+                    prioridad=1,
+                )
+            )
+        elif not supera_meta and pt_act < 70.0:
+            dist = abs(curva_rendimiento.get('distancia_meta', 0.0))
+            recomendaciones.append(
+                Recomendacion(
+                    id=f'aprendiz_curva_bajo_meta_{aprendiz_id}',
+                    categoria=CAT_RENDIMIENTO,
+                    severidad=SEV_PREVENTIVA,
+                    icono='⚠️',
+                    titulo='Advertencia: Tu rendimiento está por debajo de la meta (70%)',
+                    mensaje=(
+                        f'Te faltan {dist} puntos para alcanzar el umbral mínimo de aprobación del 70%. '
+                        f'Sube tus evidencias pendientes y mantén tu asistencia para recuperar el ritmo.'
+                    ),
+                    accion_texto='Ver plan de mejora',
+                    accion_url='#seccion-curva-rendimiento',
+                    metrica_destacada=f'{pt_act}/100 pts',
+                    destinatario='aprendiz',
+                    prioridad=2,
+                )
+            )
+        elif pt_act >= 85.0 and tendencia == 'ascendente':
+            recomendaciones.append(
+                Recomendacion(
+                    id=f'aprendiz_curva_excelente_{aprendiz_id}',
+                    categoria=CAT_RENDIMIENTO,
+                    severidad=SEV_POSITIVA,
+                    icono='🚀',
+                    titulo='¡Excelente curva de rendimiento!',
+                    mensaje=(
+                        f'Tu puntaje de {pt_act} puntos mantiene una trayectoria en ascenso. '
+                        f'Sigue entregando a tiempo para conservar tu posición destacada.'
+                    ),
+                    accion_texto='Ver curva y logros',
+                    accion_url='#seccion-curva-rendimiento',
+                    metrica_destacada=f'{pt_act} pts',
+                    destinatario='aprendiz',
+                    prioridad=4,
+                )
+            )
+
+        # Recomendación pedagógica orientada a potenciar la curva
+        if pt_act < 85.0:
+            recomendaciones.append(
+                Recomendacion(
+                    id=f'aprendiz_rec_mejora_curva_{aprendiz_id}',
+                    categoria=CAT_RENDIMIENTO,
+                    severidad=SEV_SUGERENCIA,
+                    icono='💡',
+                    titulo='Recomendación: Cómo impulsar tu curva de rendimiento',
+                    mensaje=(
+                        'Subir tus evidencias antes de la fecha límite y conservar el 100% de asistencia '
+                        'son las dos acciones de mayor impacto para incrementar tu puntaje global.'
+                    ),
+                    accion_texto='Ir a evidencias',
+                    accion_url='#seccion-tareas',
+                    metrica_destacada='Impulsa tu curva',
+                    destinatario='aprendiz',
+                    prioridad=3,
+                )
+            )
+
     return recomendaciones
 
 
@@ -734,7 +856,7 @@ def obtener_logros_aprendiz(
     sesiones_asistidas = 0
     for s in total_sesiones:
         reg = next((r for r in s.registros if r.aprendiz_id == aprendiz_id), None)
-        if reg and reg.estado in ('PRESENTE', 'RETARDO'):
+        if reg and reg.estado in ('ASISTE', 'TARDANZA'):
             sesiones_asistidas += 1
         else:
             break

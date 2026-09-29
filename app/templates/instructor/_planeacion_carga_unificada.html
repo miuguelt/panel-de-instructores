@@ -23,15 +23,15 @@
     <details class="pl-details pl-carga-actualizar">
         <summary>
             <span>Actualizar archivos fuente</span>
-            <span class="pl-chip">Carga una nueva versión</span>
+            <span class="pl-chip">Cargar una nueva versión</span>
         </summary>
         <div class="pl-details-body">
             <p class="pl-note">Cada carga crea una versión nueva sin sobrescribir la anterior. El historial completo está en la sección «Archivos», al final de esta página.</p>
     {% else %}
     <div class="pl-card-head pl-carga-head">
         <div>
-            <h2>🚀 Centro de Carga y Análisis de Documentos</h2>
-            <p>Sincroniza los tres archivos fuente de la ficha para contrastar la planeación pedagógica GFPI-F-134, el avance real en SOFIA Plus y el diseño curricular oficial (PDF).</p>
+            <h2>Archivos para el análisis</h2>
+            <p>Seleccione los archivos que desea cargar o actualizar. La planeación define el cronograma; los juicios y el programa complementan el análisis.</p>
         </div>
         <div class="pl-sync-meter-container" style="display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem;">
             <div class="pl-sync-meter">
@@ -87,8 +87,8 @@
                 {% endif %}
                 <div class="pl-dropzone" data-input-target="input-planeacion">
                     <span class="pl-dropzone-icon">📁</span>
-                    <span class="pl-dropzone-text">{{ 'Arrastra aquí una nueva planeación o haz clic para actualizar' if version_planeacion else 'Arrastra tu archivo .xlsx o haz clic' }}</span>
-                    <input type="file" id="input-planeacion" name="archivo_planeacion" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
+                    <span class="pl-dropzone-text">{{ 'Arrastre aquí una nueva planeación o haga clic para actualizar' if version_planeacion else 'Arrastre el archivo .xlsx o haga clic' }}</span>
+                    <input type="file" id="input-planeacion" aria-label="Seleccionar planeación pedagógica en Excel" name="archivo_planeacion" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
                     <div class="pl-file-preview" style="display:none;"></div>
                 </div>
             </div>
@@ -123,8 +123,8 @@
                 {% endif %}
                 <div class="pl-dropzone" data-input-target="input-juicios">
                     <span class="pl-dropzone-icon">📁</span>
-                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo reporte o haz clic para actualizar' if version_reporte else 'Arrastra tu archivo .xls/.xlsx o haz clic' }}</span>
-                    <input type="file" id="input-juicios" name="archivo_juicios" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
+                    <span class="pl-dropzone-text">{{ 'Arrastre aquí un nuevo reporte o haga clic para actualizar' if version_reporte else 'Arrastre el archivo .xls/.xlsx o haga clic' }}</span>
+                    <input type="file" id="input-juicios" aria-label="Seleccionar reporte de juicios en Excel" name="archivo_juicios" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="pl-file-input">
                     <div class="pl-file-preview" style="display:none;"></div>
                 </div>
             </div>
@@ -158,19 +158,19 @@
                 {% endif %}
                 <div class="pl-dropzone" data-input-target="input-programa">
                     <span class="pl-dropzone-icon">📁</span>
-                    <span class="pl-dropzone-text">{{ 'Arrastra aquí un nuevo diseño curricular o haz clic para actualizar' if version_programa else 'Arrastra tu diseño curricular .pdf o haz clic' }}</span>
-                    <input type="file" id="input-programa" name="archivo_programa" accept=".pdf,application/pdf" class="pl-file-input">
+                    <span class="pl-dropzone-text">{{ 'Arrastre aquí un nuevo diseño curricular o haga clic para actualizar' if version_programa else 'Arrastre el diseño curricular .pdf o haga clic' }}</span>
+                    <input type="file" id="input-programa" aria-label="Seleccionar programa de formación en PDF" name="archivo_programa" accept=".pdf,application/pdf" class="pl-file-input">
                     <div class="pl-file-preview" style="display:none;"></div>
                 </div>
             </div>
         </div>
 
-        <div id="pl-banner-seleccionados" class="pl-banner-seleccionados" style="display:none;">
+        <div id="pl-banner-seleccionados" role="status" aria-live="polite" class="pl-banner-seleccionados" style="display:none;">
             <div class="pl-banner-seleccionados-info">
                 <span class="pl-banner-seleccionados-icon">⚡</span>
                 <div>
                     <strong id="pl-banner-seleccionados-titulo">Archivos listos para procesar</strong>
-                    <p>Haz clic en «Ejecutar Análisis Completo» para procesar las fuentes y sincronizar toda la información de la ficha.</p>
+                    <p>Haga clic en «Ejecutar Análisis Completo» para procesar las fuentes y sincronizar toda la información de la ficha.</p>
                 </div>
             </div>
             <span id="pl-banner-seleccionados-count" class="pl-chip pl-tone-info is-tone">0 archivos</span>
@@ -180,7 +180,7 @@
             <button type="submit" id="btn-ejecutar-analisis" class="btn btn-primary btn-lg pl-btn-analizar">
                 <span class="pl-btn-icon">⚡</span> <span id="btn-ejecutar-texto">Ejecutar Análisis Completo</span>
             </button>
-            <span id="pl-carga-feedback" class="pl-carga-msg" style="display:none;"></span>
+            <span id="pl-carga-feedback" role="status" aria-live="polite" class="pl-carga-msg" style="display:none;"></span>
             <div id="pl-carga-progress-wrap" class="pl-progress-wrap" style="display:none;">
                 <div class="pl-progress-bar" id="pl-carga-progress-bar" style="width:0%;"></div>
             </div>

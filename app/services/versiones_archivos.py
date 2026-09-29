@@ -18,7 +18,7 @@ from app.models.archivo_ficha import (
     TIPO_PROGRAMA,
     TIPO_REPORTE_JUICIOS,
 )
-from app.services.archivos import ArchivoDuplicado, ArchivoService
+from app.services.archivos import ArchivoDuplicado, ArchivoService, nombre_original_desde_ruta
 
 
 TIPOS_VERSIONADOS = {TIPO_PLANEACION, TIPO_REPORTE_JUICIOS, TIPO_PROGRAMA}
@@ -96,13 +96,92 @@ def actualizar_estado(version, estado, detalle=None, metadata=None):
         version.metadata_json = json.dumps(metadata, ensure_ascii=False, default=str)
 
 
+def buscar_archivo_reporte_original(ficha):
+    """Busca en el sistema de archivos un reporte original auténtico de SOFIA Plus para la ficha.
+
+    Explora tanto las subcarpetas de almacenamiento (uploads/fichas, uploads/importaciones)
+    como la raíz del proyecto para localizar archivos (.xls o .xlsx) cuyo código de ficha
+    coincida con el de la ficha. Si existen varios, prioriza el más reciente según la fecha
+    del reporte o la fecha de modificación del archivo.
+    """
+    import io
+    from pathlib import Path
+    from werkzeug.datastructures import FileStorage
+    from app.services.importacion_ficha import leer_metadata_archivo
+
+    codigo_objetivo = str(ficha.codigo or '').strip()
+    if not codigo_objetivo:
+        return None
+
+    candidatos_rutas = []
+
+    # 1. Dentro de UPLOAD_FOLDER (subcarpetas de fichas, importaciones, raíz de uploads)
+    uploads_dir = Path(current_app.config.get('UPLOAD_FOLDER', 'uploads'))
+    if uploads_dir.is_dir():
+        for patron in ('*.xls', '*.xlsx'):
+            for p in uploads_dir.rglob(patron):
+                if p.is_file() and not p.name.endswith('.part'):
+                    if f'Reporte_de_Juicios_Evaluativos_{codigo_objetivo}.xlsx' in p.name:
+                        continue
+                    candidatos_rutas.append(p)
+
+    # 2. En la raíz del proyecto y directorio actual de ejecución
+    raiz_proyecto = Path(current_app.root_path).parent
+    for base in {Path.cwd(), raiz_proyecto}:
+        if base.is_dir():
+            for p in base.glob('Reporte*.xls*'):
+                if p.is_file() and not p.name.endswith('.part'):
+                    candidatos_rutas.append(p)
+
+    candidatos_unicos = []
+    vistos = set()
+    for c in candidatos_rutas:
+        try:
+            c_res = c.resolve()
+            if c_res not in vistos and c_res.is_file():
+                vistos.add(c_res)
+                candidatos_unicos.append(c_res)
+        except OSError:
+            continue
+
+    coincidencias = []
+    for cand in candidatos_unicos:
+        try:
+            with open(cand, 'rb') as fp:
+                fs = FileStorage(stream=io.BytesIO(fp.read()), filename=cand.name)
+                meta_cand = leer_metadata_archivo(fs)
+                if meta_cand and meta_cand.get('codigo_ficha'):
+                    if str(meta_cand['codigo_ficha']).strip() == codigo_objetivo:
+                        coincidencias.append({
+                            'path': cand,
+                            'metadata': meta_cand,
+                            'fecha_reporte': meta_cand.get('fecha_reporte'),
+                            'mtime': cand.stat().st_mtime,
+                        })
+        except Exception:
+            continue
+
+    if not coincidencias:
+        return None
+
+    def _orden_clave(item):
+        f = item['fecha_reporte']
+        fecha_str = f.isoformat() if hasattr(f, 'isoformat') else (str(f) if f else '')
+        return (fecha_str, item['mtime'])
+
+    coincidencias.sort(key=_orden_clave, reverse=True)
+    return coincidencias[0]
+
+
 def asegurar_version_reporte(ficha_o_id, instructor_id=None):
     """Garantiza que una ficha con juicios evaluativos tenga su versión registrada.
 
-    Si la ficha ya tiene una versión de reporte de juicios procesada, la retorna.
-    Si no tiene versión pero ya tiene juicios evaluativos en base de datos
-    (por ejemplo creada desde el reporte antes de la tabla versionada o sincronizada),
-    genera/reconstruye el archivo Excel persistente, crea la versión 1 y la retorna.
+    Si la ficha ya tiene una versión de reporte de juicios procesada y apunta a un
+    archivo original existente, la retorna. Si la versión existente es una
+    reconstrucción sintética o su archivo no está en disco y se encuentra el archivo
+    original auténtico de SOFIA Plus, actualiza la versión con el archivo original.
+    Si no tiene versión pero ya tiene juicios evaluativos en base de datos, localiza
+    el archivo original auténtico o reconstruye la versión 1 y la retorna.
     """
     import io
     import shutil
@@ -111,7 +190,6 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
     from app.models.ficha import Ficha
     from app.models.juicio import JuicioEvaluativo
     from app.models.aprendiz import Aprendiz
-    from app.services.importacion_ficha import leer_metadata_archivo
 
     if isinstance(ficha_o_id, int):
         ficha = db.session.get(Ficha, ficha_o_id)
@@ -127,46 +205,52 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
         estado='procesado',
     ).order_by(ArchivoFichaVersion.version.desc()).first()
 
+    es_sintetico = False
+    archivo_falta = False
     if existente:
-        return existente
+        carpeta_uploads = Path(current_app.config['UPLOAD_FOLDER'])
+        ruta_fisica = carpeta_uploads / existente.ruta_archivo
+        archivo_falta = not ruta_fisica.is_file()
+        es_sintetico = (
+            existente.nombre_archivo == f'Reporte_de_Juicios_Evaluativos_{ficha.codigo}.xlsx'
+            or (existente.nombre_archivo.startswith(f'Reporte_de_Juicios_Evaluativos_{ficha.codigo}') and existente.nombre_archivo.endswith('.xlsx'))
+        )
+        if not es_sintetico and not archivo_falta:
+            return existente
 
     juicios = JuicioEvaluativo.query.filter_by(ficha_id=ficha.id).all()
-    if not juicios:
+    if not juicios and not existente:
         return None
 
     carpeta_relativa = f'fichas/{ficha.id}/{TIPO_REPORTE_JUICIOS}'
     directorio_destino = Path(current_app.config['UPLOAD_FOLDER']) / carpeta_relativa
     directorio_destino.mkdir(parents=True, exist_ok=True)
 
-    archivo_origen = None
-    candidatos = [
-        Path('Reporte de Juicios Evaluativos.xls'),
-        Path('Reporte de Juicios Evaluativos (28).xls'),
-        Path('Reporte de Juicios Evaluativos.xlsx'),
-    ]
-    for cand in candidatos:
-        if cand.is_file():
-            try:
-                with open(cand, 'rb') as fp:
-                    fs = FileStorage(stream=io.BytesIO(fp.read()), filename=cand.name)
-                    meta_cand = leer_metadata_archivo(fs)
-                    if meta_cand.get('codigo_ficha') and str(meta_cand['codigo_ficha']).strip() == str(ficha.codigo).strip():
-                        archivo_origen = cand
-                        break
-            except Exception:
-                pass
+    match_original = buscar_archivo_reporte_original(ficha)
 
-    if archivo_origen:
-        nombre_original = secure_filename(archivo_origen.name)
-        nombre_disco = f'v1_{uuid4().hex}_{nombre_original}'
-        ruta_absoluta = directorio_destino / nombre_disco
-        shutil.copy2(archivo_origen, ruta_absoluta)
+    if match_original:
+        archivo_origen = match_original['path']
+        meta = match_original['metadata']
+        nombre_original = nombre_original_desde_ruta(archivo_origen.name)
+        if not nombre_original or nombre_original == archivo_origen.name:
+            nombre_original = secure_filename(archivo_origen.name)
+        else:
+            nombre_original = secure_filename(nombre_original)
+
+        if archivo_origen.parent.resolve() == directorio_destino.resolve():
+            nombre_disco = archivo_origen.name
+            ruta_absoluta = archivo_origen
+        else:
+            num_ver = existente.version if existente else 1
+            nombre_disco = f'v{num_ver}_{uuid4().hex}_{nombre_original}'
+            ruta_absoluta = directorio_destino / nombre_disco
+            shutil.copy2(archivo_origen, ruta_absoluta)
+
         with open(ruta_absoluta, 'rb') as fp:
             digest = hashlib.sha256(fp.read()).hexdigest()
         tamano = ruta_absoluta.stat().st_size
-        with open(ruta_absoluta, 'rb') as fp:
-            fs = FileStorage(stream=io.BytesIO(fp.read()), filename=nombre_original)
-            meta = leer_metadata_archivo(fs)
+    elif existente and not archivo_falta:
+        return existente
     else:
         nombre_original = f'Reporte_de_Juicios_Evaluativos_{ficha.codigo}.xlsx'
         nombre_disco = f'v1_{uuid4().hex}_{nombre_original}'
@@ -221,6 +305,22 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
             'fecha_fin': ficha.fecha_fin.strftime('%Y-%m-%d') if ficha.fecha_fin else None,
         }
 
+    aprendices_count = Aprendiz.query.filter_by(ficha_id=ficha.id).count() if juicios else 0
+    detalle = f'{aprendices_count} aprendices, {len(juicios)} juicios sincronizados'
+
+    if existente:
+        existente.nombre_archivo = nombre_original
+        existente.ruta_archivo = f'{carpeta_relativa}/{nombre_disco}'
+        existente.tamano_bytes = tamano
+        existente.hash_sha256 = digest
+        existente.detalle = detalle
+        existente.metadata_json = json.dumps(meta, ensure_ascii=False, default=str)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        return existente
+
     inst_id = instructor_id or ficha.instructor_id
     if not inst_id and ficha.instructores:
         inst_id = ficha.instructores[0].id
@@ -228,9 +328,6 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
         from app.models.instructor import Instructor
         primer_inst = Instructor.query.first()
         inst_id = primer_inst.id if primer_inst else 1
-
-    aprendices_count = Aprendiz.query.filter_by(ficha_id=ficha.id).count()
-    detalle = f'{aprendices_count} aprendices, {len(juicios)} juicios sincronizados'
 
     version = ArchivoFichaVersion(
         ficha_id=ficha.id,
@@ -263,8 +360,7 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
 
 def versiones_ficha(ficha_id, tipo=None):
     if tipo is None or tipo == TIPO_REPORTE_JUICIOS:
-        if not ArchivoFichaVersion.query.filter_by(ficha_id=ficha_id, tipo=TIPO_REPORTE_JUICIOS).first():
-            asegurar_version_reporte(ficha_id)
+        asegurar_version_reporte(ficha_id)
     consulta = ArchivoFichaVersion.query.filter_by(ficha_id=ficha_id)
     if tipo:
         consulta = consulta.filter_by(tipo=tipo)
@@ -275,13 +371,12 @@ def versiones_ficha(ficha_id, tipo=None):
 
 
 def ultima_version(ficha_id, tipo, solo_procesadas=False):
+    if tipo == TIPO_REPORTE_JUICIOS:
+        asegurar_version_reporte(ficha_id)
     consulta = ArchivoFichaVersion.query.filter_by(ficha_id=ficha_id, tipo=tipo)
     if solo_procesadas:
         consulta = consulta.filter(ArchivoFichaVersion.estado == 'procesado')
-    res = consulta.order_by(ArchivoFichaVersion.version.desc()).first()
-    if res is None and tipo == TIPO_REPORTE_JUICIOS:
-        res = asegurar_version_reporte(ficha_id)
-    return res
+    return consulta.order_by(ArchivoFichaVersion.version.desc()).first()
 
 
 def ruta_version(version):

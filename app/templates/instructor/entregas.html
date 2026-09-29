@@ -2,6 +2,7 @@
 {% block title %}Entregas - {{ tarea.titulo }} - SENA Control{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">
 <style>
     .entregas-grid {
         display: grid;
@@ -228,7 +229,137 @@
     </div>
 </div>
 
-{% if tarea.es_actividad_clase %}
+{% if tarea.es_grupal %}
+{% set grupos_tarea = tarea.grupos|default([]) %}
+{% set resumen_grupos = namespace(entregas=0, aprobadas=0, pendientes=0) %}
+{% for grupo in grupos_tarea %}
+    {% set entrega_grupo = entregas_grupo_map.get(grupo.id) if entregas_grupo_map else none %}
+    {% if entrega_grupo %}
+        {% set resumen_grupos.entregas = resumen_grupos.entregas + 1 %}
+        {% if entrega_grupo.calificada and entrega_grupo.estado_revision != 'rechazada' %}
+            {% set resumen_grupos.aprobadas = resumen_grupos.aprobadas + 1 %}
+        {% endif %}
+    {% else %}
+        {% set resumen_grupos.pendientes = resumen_grupos.pendientes + 1 %}
+    {% endif %}
+{% endfor %}
+
+<div class="stats-container">
+    <div class="stat-card">
+        <span class="stat-title">Grupos con entrega</span>
+        <span class="stat-value">{{ resumen_grupos.entregas }} <small style="font-size:14px;color:var(--gray-500);">/ {{ grupos_tarea|length }}</small></span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-title">Aprobadas</span>
+        <span class="stat-value stat-success">{{ resumen_grupos.aprobadas }}</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-title">Pendientes de entrega</span>
+        <span class="stat-value stat-warning">{{ resumen_grupos.pendientes }}</span>
+    </div>
+</div>
+
+{% if grupos_tarea %}
+<div class="entregas-grid group-deliveries-grid">
+    {% for grupo in grupos_tarea %}
+    {% set entrega = entregas_grupo_map.get(grupo.id) if entregas_grupo_map else none %}
+    {% set status_class = 'status-pendiente' %}
+    {% if entrega %}
+        {% set status_class = 'status-entregado' if entrega.entregada_a_tiempo else 'status-retraso' %}
+    {% endif %}
+    <article class="entrega-card {{ status_class }} group-delivery-card">
+        <div class="entrega-header">
+            <div class="entrega-info">
+                <h3>{{ grupo.nombre }}</h3>
+                <small>{{ grupo.aprendices|length }} integrantes</small>
+            </div>
+            <div class="entrega-badge">
+                {% if entrega and entrega.calificada %}
+                    {% if entrega.estado_revision == 'rechazada' %}
+                    <span class="badge badge-warning">Requiere ajustes</span>
+                    {% else %}
+                    <span class="badge badge-success">Aprobada</span>
+                    {% endif %}
+                {% elif entrega %}
+                    <span class="badge badge-info">Entregada · {{ 'A tiempo' if entrega.entregada_a_tiempo else 'Extemporánea' }}</span>
+                {% else %}
+                    <span class="badge badge-secondary">Sin entregar</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <p class="group-delivery-members">
+            {% for integrante in grupo.aprendices %}
+                {{ integrante.nombre_completo }}{% if not loop.last %}, {% endif %}
+            {% else %}
+                Este grupo no tiene integrantes activos.
+            {% endfor %}
+        </p>
+
+        {% if entrega %}
+        <div class="entrega-evidencia">
+            {% if entrega.aprendiz %}
+            <p class="group-delivery-submitter">Evidencia enviada por {{ entrega.aprendiz.nombre_completo }}</p>
+            {% endif %}
+            {% if entrega.fecha_entrega %}
+            <p class="text-muted">Enviada el {{ entrega.fecha_entrega.strftime('%d/%m/%Y %H:%M') }}</p>
+            {% endif %}
+            {% if entrega.justificacion_retraso %}
+            <div class="task-alert is-warning" role="note">
+                <strong>Justificación de entrega extemporánea</strong>
+                <p>{{ entrega.justificacion_retraso }}</p>
+            </div>
+            {% endif %}
+            {% if entrega.archivo_url %}
+            <a href="{{ url_for('instructor.descargar_archivo_entrega', entrega_id=entrega.id) }}" class="btn btn-sm btn-outline btn-full">📥 Descargar evidencia del grupo</a>
+            {% endif %}
+            {% if entrega.enlace_repositorio and entrega.enlace_repositorio.strip() %}
+            <a href="{{ entrega.enlace_repositorio.strip() }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-full">🌐 Abrir enlace entregado</a>
+            {% endif %}
+        </div>
+
+        <div class="entrega-calificacion">
+            {% if entrega.calificada %}
+            <div class="calificacion-status">
+                <span>{{ 'Aprobada' if entrega.estado_revision != 'rechazada' else 'Requiere ajustes' }}</span>
+                <span class="calificacion-valor">{{ entrega.calificacion or 'Revisada' }}</span>
+            </div>
+            {% if entrega.feedback %}<p class="group-delivery-feedback">{{ entrega.feedback }}</p>{% endif %}
+            {% endif %}
+            {% if puede_editar_tarea %}
+            <form method="POST" action="{{ url_for('instructor.calificar_entrega', entrega_id=entrega.id) }}" class="form-evaluar">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <strong>{% if entrega.calificada %}Actualizar evaluación{% else %}Evaluar entrega del grupo{% endif %}</strong>
+                <div class="form-evaluar-row">
+                    <input type="text" name="calificacion" maxlength="10" placeholder="Nota" value="{{ entrega.calificacion or '' }}" required>
+                    <select name="estado_revision" aria-label="Estado de la evidencia de {{ grupo.nombre }}">
+                        <option value="aprobada" {% if entrega.estado_revision != 'rechazada' %}selected{% endif %}>Aprobada</option>
+                        <option value="rechazada" {% if entrega.estado_revision == 'rechazada' %}selected{% endif %}>Requiere ajustes</option>
+                    </select>
+                </div>
+                <textarea name="feedback" rows="3" maxlength="5000" placeholder="Retroalimentación para el grupo">{{ entrega.feedback or '' }}</textarea>
+                <button type="submit" class="btn btn-primary">Guardar evaluación</button>
+            </form>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="group-delivery-pending" role="status">
+            <strong>El grupo aún no ha enviado su evidencia.</strong>
+            {% if tarea.fecha_limite %}<span>Fecha límite: {{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</span>{% endif %}
+        </div>
+        {% endif %}
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">👥</div>
+    <h3>La tarea no tiene grupos asignados</h3>
+    <p>Asigna al menos un grupo para revisar sus entregas.</p>
+</div>
+{% endif %}
+
+{% elif tarea.es_actividad_clase %}
 {# Actividad revisada en el aula: no hay archivos, solo aprobación por lista. #}
 {% set aprobados = [] %}
 {% for ap in aprendices %}{% if entregas_map.get(ap.id) and entregas_map.get(ap.id).calificada %}{% set _ = aprobados.append(ap.id) %}{% endif %}{% endfor %}
@@ -600,7 +731,9 @@
                                 <div style="display: flex; gap: 6px; margin-top: 4px;">
                                     <button type="submit" name="accion" value="guardar" class="btn btn-sm btn-primary" style="flex: 1; justify-content: center;">Guardar prórroga</button>
                                     {% if prorroga_ap %}
-                                    <button type="submit" name="accion" value="revocar" class="btn btn-sm btn-outline" style="color: var(--sena-red); border-color: var(--sena-red);" onclick="return confirm('¿Revocar la prórroga concedida a este aprendiz?')">Revocar</button>
+                                    <button type="submit" name="accion" value="revocar" class="btn btn-sm btn-outline" style="color: var(--sena-red); border-color: var(--sena-red);"
+                                            data-confirm="¿Revocar la prórroga concedida a este aprendiz?"
+                                            data-confirm-title="Revocar prórroga" data-confirm-label="Revocar" data-confirm-intent="danger">Revocar</button>
                                     {% endif %}
                                 </div>
                             </form>
@@ -663,17 +796,28 @@
             var selected = checks.filter(function (check) { return check.checked; });
             if (selected.length === 0) {
                 event.preventDefault();
-                alert('Selecciona al menos una entrega para evaluar.');
+                if (checks[0]) checks[0].focus();
+                window.mostrarAviso('Selecciona al menos una entrega para evaluar.', {
+                    title: 'Selecciona una entrega',
+                    intent: 'warning'
+                });
                 return;
             }
             var yaEvaluadas = selected.filter(function (check) {
                 return check.dataset.entregaCalificada === 'true';
             }).length;
-            if (yaEvaluadas > 0 && !window.confirm(
-                'Has seleccionado ' + yaEvaluadas + ' entrega(s) ya evaluada(s). '
-                + 'La nueva evaluación reemplazará la nota y retroalimentación actuales. ¿Continuar?'
-            )) {
+            if (yaEvaluadas > 0) {
                 event.preventDefault();
+                window.confirmarYEnviarFormulario(
+                    form,
+                    'Seleccionó ' + yaEvaluadas + ' entrega(s) ya evaluada(s). La nueva evaluación reemplazará la nota y la retroalimentación actuales.',
+                    {
+                        title: 'Reemplazar evaluación',
+                        confirmLabel: 'Reemplazar evaluación',
+                        intent: 'warning'
+                    },
+                    event.submitter
+                );
             }
         });
         update();

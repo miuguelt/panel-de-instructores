@@ -1,11 +1,19 @@
 {% extends "base.html" %}
-{% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
+{% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_card_recomendacion %}
 {% block title %}Mi Panel - {{ aprendiz.nombre }} - SENA Control{% endblock %}
 {% block body_class %}has-learner-bottom-nav{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">
+<script src="{{ url_for('static', filename='js/grupo_chat.js') }}" defer></script>
+{% endblock %}
 
 {# REGLA: No mostrar números de documento/cédula en esta vista #}
 {% block content %}
 <div class="panel-aprendiz" id="panel-aprendiz-root">
+    {% set tareas_individuales = [] %}
+    {% for item in tareas_estado|default([]) %}
+        {% if not item.tarea.es_grupal %}{% set _ = tareas_individuales.append(item) %}{% endif %}
+    {% endfor %}
     <!-- ============================================================ -->
     <!-- CABECERA PRINCIPAL PERSONALIZADA DEL APRENDIZ                -->
     <!-- ============================================================ -->
@@ -141,6 +149,7 @@
                     <div class="d-flex align-items-center gap-2">
                         <small class="text-muted" title="Comprobando cada 10s">🔄 Actualizando...</small>
                         <form action="{{ url_for('aprendiz.cancelar_turno', ficha_id=ficha.id) }}" method="POST" style="margin:0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar turno</button>
                         </form>
                     </div>
@@ -151,6 +160,7 @@
                 </div>
             {% else %}
                 <form action="{{ url_for('aprendiz.pedir_turno', ficha_id=ficha.id) }}" method="POST" class="d-flex align-items-center" style="gap: 1rem;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="text" name="motivo" class="form-control" placeholder="¿Sobre qué necesitas ayuda? (Opcional)" maxlength="200" style="flex: 1;">
                     <button type="submit" class="btn btn-primary">Pedir Turno</button>
                 </form>
@@ -211,7 +221,7 @@
                 </div>
                 <div class="priority-progress" role="progressbar" aria-label="RAPs aprobados" aria-valuenow="{{ stats_juicios.pct_total }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ stats_juicios.pct_total }}%;"></span></div>
                 <p class="priority-card-meta">{{ stats_juicios.aprobados }} de {{ stats_juicios.total }} resultados aprobados · {{ resumen_rapido.tareas_pendientes_count }} evidencia{{ '' if resumen_rapido.tareas_pendientes_count == 1 else 's' }} pendiente{{ '' if resumen_rapido.tareas_pendientes_count == 1 else 's' }}.</p>
-                <button type="button" class="btn btn-sm btn-outline priority-action" data-jump-tab="rendimiento">Ver rendimiento y logros</button>
+                <button type="button" class="btn btn-sm btn-outline priority-action" data-jump-tab="rendimiento" data-jump-target-id="seccion-curva-rendimiento">Ver curva de rendimiento y logros</button>
             </article>
 
             <article class="priority-card priority-card-alerts {% if alertas_activas %}has-alerts{% endif %}" aria-labelledby="priority-alerts-title">
@@ -249,7 +259,12 @@
                 <button type="button" class="learner-tab-btn" data-tab-target="evidencias" role="tab" aria-selected="false" id="btn-tab-evidencias-main">
                     <span class="tab-icon">📋</span>
                     <span class="tab-label">Mis Evidencias</span>
-                    <span class="tab-pill-badge" id="tab-evidencias-counter">{{ tareas_estado|length if tareas_estado else 0 }}</span>
+                    <span class="tab-pill-badge" id="tab-evidencias-counter">{{ tareas_individuales|length }}</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="grupo" role="tab" aria-selected="false" id="btn-tab-grupo-main">
+                    <span class="tab-icon">👥</span>
+                    <span class="tab-label">Mi grupo</span>
+                    {% if trabajos_grupo %}<span class="tab-pill-badge">{{ trabajos_grupo|length }}</span>{% endif %}
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="juicios" role="tab" aria-selected="false" id="btn-tab-juicios-main">
                     <span class="tab-icon">🎓</span>
@@ -318,10 +333,10 @@
     </div>
 
     {# Compute evidence progress for unified section #}
-    {% if tareas_estado %}
-    {% set total_tareas = tareas_estado|length %}
+    {% if tareas_individuales %}
+    {% set total_tareas = tareas_individuales|length %}
     {% set _entregadas = [] %}
-    {% for item in tareas_estado %}
+    {% for item in tareas_individuales %}
         {% if item.estado in ['entregada', 'retraso'] %}
             {% set _ = _entregadas.append(item) %}
         {% endif %}
@@ -329,51 +344,174 @@
     {% set pct_evidencias = (_entregadas|length / total_tareas * 100)|round|int if total_tareas > 0 else 0 %}
     {% endif %}
 
-    {% if grupo_actual %}
-    <section class="section-container" id="seccion-grupo" data-learner-tab="resumen">
+    <section class="section-container learner-group-workspace" id="seccion-grupo-trabajo" data-learner-tab="grupo" aria-labelledby="learner-group-title">
+        {% if grupo_actual %}
         <div class="section-title-row">
-            <h2 class="section-title" style="display:flex; align-items:center; gap:8px;">
-                <span style="background: var(--primary-glow, rgba(57,169,0,0.15)); padding: 6px; border-radius: 8px; display:flex;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                </span>
-                Mi Equipo de Trabajo
-            </h2>
-            <span class="badge" style="background: linear-gradient(135deg, var(--primary) 0%, #2b8000 100%); color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; box-shadow: 0 4px 10px rgba(57,169,0,0.2);">{{ grupo_actual.nombre }}</span>
+            <div>
+                <span class="eyebrow">Trabajo colaborativo</span>
+                <h2 class="section-title" id="learner-group-title">Mi grupo: {{ grupo_actual.nombre }}</h2>
+            </div>
+            <span class="badge badge-info">{{ grupo_actual.aprendices|length }} integrantes</span>
         </div>
-        
-        <div class="card shadow-sm border-0" style="background: linear-gradient(to right bottom, var(--card-bg, #ffffff), var(--surface-100, #f8fafc)); border-radius: 20px; overflow: hidden;">
-            <div style="height: 4px; background: linear-gradient(90deg, var(--primary) 0%, #a3e635 100%); width: 100%;"></div>
-            <div class="card-body p-4 p-md-5">
-                <p class="text-muted mb-4" style="font-size: 1.05rem;">Colaboras en actividades con este equipo de trabajo. ¡Apóyense mutuamente para alcanzar sus metas!</p>
-                
-                <div class="d-flex flex-wrap gap-3">
+
+        <div class="learner-group-layout">
+            <section class="card learner-group-card" aria-labelledby="learner-group-members-title">
+                <div class="learner-group-card-heading">
+                    <div>
+                        <span class="eyebrow">Equipo de trabajo</span>
+                        <h3 id="learner-group-members-title">Integrantes</h3>
+                    </div>
+                    <span class="learner-group-icon" aria-hidden="true">👥</span>
+                </div>
+                <p class="text-muted">Aquí puedes consultar quiénes comparten las tareas y la conversación de este equipo.</p>
+                <ul class="learner-group-members">
                     {% for comp in grupo_actual.aprendices %}
-                    <div class="d-flex align-items-center bg-white px-3 py-2" style="border-radius: 16px; border: 1px solid var(--border-subtle, #e2e8f0); box-shadow: 0 2px 12px rgba(0,0,0,0.03); transition: transform 0.2s;">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 42px; height: 42px; background: linear-gradient(135deg, var(--surface-200, #f1f5f9) 0%, var(--surface-100, #f8fafc) 100%); color: var(--primary); font-weight: 700; font-size: 1rem; border: 1px solid var(--border-subtle, #e2e8f0);">
-                            {{ comp.nombre[0] }}{{ comp.apellidos[0] if comp.apellidos else '' }}
-                        </div>
-                        <div class="d-flex flex-column pe-2">
-                            <span class="fw-bold text-dark" style="font-size: 1rem; line-height: 1.2;">{{ comp.nombre }} {{ comp.apellidos }}</span>
-                            {% if comp.id == aprendiz.id %}
-                                <span class="text-primary fw-medium mt-1" style="font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> Ese eres tú
-                                </span>
+                    <li>
+                        <span class="learner-group-avatar" aria-hidden="true">{{ comp.nombre[0] }}{{ comp.apellidos[0] if comp.apellidos else '' }}</span>
+                        <span>{{ comp.nombre_completo }}</span>
+                        {% if comp.id == aprendiz.id %}<strong class="learner-group-you">Tú</strong>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if grupo_actual.creado_en %}
+                <small class="learner-group-created">Grupo activo desde {{ grupo_actual.creado_en.strftime('%d/%m/%Y') }}</small>
+                {% endif %}
+            </section>
+
+            <section class="card learner-group-tasks" aria-labelledby="learner-group-tasks-title">
+                <div class="learner-group-card-heading">
+                    <div>
+                        <span class="eyebrow">Evidencias compartidas</span>
+                        <h3 id="learner-group-tasks-title">Trabajos del grupo</h3>
+                    </div>
+                    <span class="badge badge-secondary">{{ trabajos_grupo|length if trabajos_grupo else 0 }}</span>
+                </div>
+                {% if trabajos_grupo %}
+                <div class="learner-group-task-list">
+                    {% for item in trabajos_grupo %}
+                    {% set tarea = item.tarea %}
+                    {% set entrega = item.entrega %}
+                    <article class="learner-group-task-card">
+                        <div class="learner-group-task-header">
+                            <div>
+                                <h4>{{ tarea.titulo }}</h4>
+                                <p class="task-deadline">
+                                    <span aria-hidden="true">🕒</span>
+                                    {% if tarea.fecha_limite %}
+                                    Fecha límite: <time datetime="{{ tarea.fecha_limite.isoformat() }}">{{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</time>
+                                    {% else %}Sin fecha límite{% endif %}
+                                </p>
+                            </div>
+                            {% if entrega and entrega.calificada %}
+                                {% if entrega.estado_revision == 'rechazada' %}
+                                <span class="badge badge-warning">Requiere ajustes</span>
+                                {% else %}
+                                <span class="badge badge-success">Aprobada</span>
+                                {% endif %}
+                            {% elif entrega %}
+                            <span class="badge badge-info">Entregada por el grupo</span>
+                            {% else %}
+                            <span class="badge badge-warning">{{ item.estado|default('pendiente')|replace('_', ' ')|capitalize }}</span>
                             {% endif %}
                         </div>
-                    </div>
+
+                        {% if tarea.descripcion %}<p class="task-desc">{{ tarea.descripcion }}</p>{% endif %}
+                        <div class="task-actions task-evidence-actions">
+                            {% if tarea.enlace_externo %}<a href="{{ tarea.enlace_externo }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🔗 Enlace externo</a>{% endif %}
+                            {% if tarea.material_apoyo_url %}<a href="{{ url_for('aprendiz.descargar_archivo', filename=tarea.material_apoyo_url, ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">⬇️ Material de apoyo</a>{% endif %}
+                            {% if entrega and entrega.archivo_url %}<a href="{{ url_for('aprendiz.descargar_evidencia', entrega_id=entrega.id) }}" class="btn btn-outline btn-sm">📄 Descargar evidencia del grupo</a>{% endif %}
+                            {% if entrega and entrega.enlace_repositorio %}<a href="{{ entrega.enlace_repositorio }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🌐 Abrir enlace entregado</a>{% endif %}
+                        </div>
+
+                        {% if entrega and entrega.feedback %}
+                        <div class="task-feedback" role="status">
+                            <strong>Retroalimentación del instructor{% if entrega.calificacion %} · {{ entrega.calificacion }}{% endif %}</strong>
+                            <p>{{ entrega.feedback }}</p>
+                        </div>
+                        {% endif %}
+
+                        {% if not tarea.es_actividad_clase %}
+                        <details class="entrega-form learner-group-evidence-form">
+                            <summary class="entrega-summary">📤 {{ 'Reemplazar evidencia del grupo' if entrega else 'Enviar evidencia del grupo' }}</summary>
+                            <form method="POST" action="{{ url_for('aprendiz.subir_evidencia', ficha_id=ficha.id, tarea_id=tarea.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                {% if tarea.requiere_archivo %}
+                                <div class="form-group">
+                                    <label for="evidencia-grupo-{{ tarea.id }}">Archivo de evidencia{% if entrega and entrega.archivo_url %} (opcional para reemplazar el archivo){% else %} (obligatorio){% endif %}</label>
+                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" {% if not (entrega and entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                                </div>
+                                {% else %}
+                                <div class="form-group">
+                                    <label for="evidencia-grupo-{{ tarea.id }}">Archivo de evidencia (opcional)</label>
+                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" class="form-file-input">
+                                </div>
+                                {% endif %}
+                                <div class="form-group">
+                                    <label for="repositorio-grupo-{{ tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
+                                    <input type="url" id="repositorio-grupo-{{ tarea.id }}" name="enlace_repositorio" value="{{ entrega.enlace_repositorio or '' if entrega else '' }}" placeholder="https://..." class="form-control">
+                                </div>
+                                {% if item.estado == 'vencida' %}
+                                <div class="form-group">
+                                    <label for="justificacion-grupo-{{ tarea.id }}">Justificación de la entrega extemporánea</label>
+                                    <textarea id="justificacion-grupo-{{ tarea.id }}" name="justificacion_retraso" rows="2" required placeholder="Indiquen el motivo de la entrega fuera de plazo.">{{ entrega.justificacion_retraso or '' if entrega else '' }}</textarea>
+                                </div>
+                                {% endif %}
+                                <button type="submit" class="btn btn-primary full-width">{{ 'Guardar cambios en la evidencia del grupo' if entrega else 'Enviar evidencia del grupo' }}</button>
+                            </form>
+                        </details>
+                        {% endif %}
+                    </article>
                     {% endfor %}
                 </div>
-                
-                <div class="mt-4 pt-4 border-top" style="border-color: var(--border-subtle, #e2e8f0) !important;">
-                    <div class="d-flex align-items-center text-muted" style="font-size: 0.85rem; font-weight: 500;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        Equipo consolidado el {{ grupo_actual.creado_en.strftime('%d/%m/%Y') }}
-                    </div>
+                {% else %}
+                <div class="empty-state learner-group-empty-state">
+                    <div class="empty-icon">📝</div>
+                    <h4>No hay trabajos grupales por entregar</h4>
+                    <p>Cuando tu instructor asigne una tarea a este equipo, aparecerá aquí.</p>
                 </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <section class="card learner-group-chat" data-grupo-chat data-chat-url="{{ url_for('grupo_aprendiz.mensajes', ficha_id=ficha.id) }}" aria-labelledby="learner-group-chat-title">
+            <div class="learner-group-chat-heading">
+                <div>
+                    <span class="eyebrow">Conversación asíncrona</span>
+                    <h3 id="learner-group-chat-title">Chat del grupo</h3>
+                    <p class="text-muted">Comparte avances y acuerdos. Los mensajes quedan disponibles para el equipo.</p>
+                </div>
+                <span class="learner-group-chat-live"><i aria-hidden="true"></i> Se actualiza automáticamente</span>
+            </div>
+            <div class="learner-group-chat-messages" data-chat-messages role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensajes del grupo">
+                <p class="learner-group-chat-empty" data-chat-empty>Cargando conversación…</p>
+            </div>
+            <p class="learner-group-chat-status" data-chat-status role="status" aria-live="polite"></p>
+            <form class="learner-group-chat-form" data-chat-form>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="sr-only" for="mensaje-grupo">Escribe un mensaje para tu grupo</label>
+                <textarea id="mensaje-grupo" name="contenido" rows="2" maxlength="1200" required placeholder="Escribe un mensaje para tu grupo…" data-chat-input></textarea>
+                <div class="learner-group-chat-compose-footer">
+                    <small><span data-chat-count>0</span>/1200 caracteres</small>
+                    <button type="submit" class="btn btn-primary" data-chat-submit>Enviar mensaje</button>
+                </div>
+            </form>
+        </section>
+        {% else %}
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">Trabajo colaborativo</span>
+                <h2 class="section-title" id="learner-group-title">Mi grupo</h2>
             </div>
         </div>
+        <div class="card learner-group-unassigned" role="status">
+            <span class="learner-group-icon" aria-hidden="true">👥</span>
+            <div>
+                <h3>Aún no tienes un grupo activo</h3>
+                <p>Cuando tu instructor te asigne a un grupo, podrás ver aquí a tus compañeros, las tareas compartidas y su conversación.</p>
+            </div>
+        </div>
+        {% endif %}
     </section>
-    {% endif %}
 
     {# ── Consolidated Progress Dashboard ── #}
     <section class="section-container" id="seccion-progreso" data-learner-tab="resumen">
@@ -390,7 +528,10 @@
                     <span class="progress-card-label">📅 Asistencia</span>
                     <span class="progress-card-value" style="--metric-color: {{ c_asist }};">{{ '%.0f'|format(pct_asistencia) }}%</span>
                 </div>
-                <div class="progress-card-track">
+                <div class="progress-card-track" role="progressbar"
+                     aria-label="Asistencia"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ '%.0f'|format(pct_asistencia) }}"
+                     aria-valuetext="{{ total_sesiones - total_faltas }} de {{ total_sesiones }} sesiones asistidas, {{ '%.0f'|format(pct_asistencia) }} por ciento">
                     {% if pct_asistencia > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_asistencia }}%; --metric-color: {{ c_asist }};"></div>{% endif %}
                 </div>
                 <div class="progress-card-footer">
@@ -436,17 +577,20 @@
 
             {# ── Evidencias ── #}
             <div class="progress-card">
-                {% set pct_ev = pct_evidencias if tareas_estado else 0 %}
+                {% set pct_ev = pct_evidencias if tareas_individuales else 0 %}
                 {% set c_ev = 'var(--success)' if pct_ev >= 80 else ('var(--warning)' if pct_ev >= 50 else 'var(--danger)') %}
                 <div class="progress-card-header">
                     <span class="progress-card-label">📋 Evidencias</span>
                     <span class="progress-card-value" style="--metric-color: {{ c_ev }};">{{ pct_ev }}%</span>
                 </div>
-                <div class="progress-card-track">
+                <div class="progress-card-track" role="progressbar"
+                     aria-label="Evidencias entregadas"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_ev }}"
+                     aria-valuetext="{{ _entregadas|default([])|length }} de {{ tareas_individuales|length }} evidencias entregadas, {{ pct_ev }} por ciento">
                     {% if pct_ev > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_ev }}%; --metric-color: {{ c_ev }};"></div>{% endif %}
                 </div>
                 <div class="progress-card-footer">
-                    {% if tareas_estado %}
+                    {% if tareas_individuales %}
                     <span>{{ _entregadas|length }} de {{ total_tareas }} entregadas</span>
                     <span>{{ total_tareas - _entregadas|length }} pendientes</span>
                     {% else %}
@@ -725,7 +869,7 @@
         </p>
 
         {% if aseo.turno_propio and aseo.aviso_visible %}
-        <div class="own-cleaning-alert">
+        <div class="own-cleaning-alert" role="status">
             <span>Tu próximo turno</span>
             <strong>{% if aseo.turno_propio.fecha == aseo.hoy %}¡Te toca hoy!{% else %}¡Te toca el {{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}!{% endif %}</strong>
             <p>Con {{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</p>
@@ -770,7 +914,7 @@
             <div class="upcoming-cleaning-list">
                 {% for turno in aseo.siguientes %}
                 <div class="upcoming-cleaning-row {% if turno.incluye(aprendiz.id) %}is-me{% endif %}">
-                    <time>{{ turno.fecha.strftime('%d/%m') }}</time>
+                    <time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time>
                     <span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span>
                     {% if turno.incluye(aprendiz.id) %}<strong>Tú</strong>{% endif %}
                 </div>
@@ -917,7 +1061,7 @@
                     <div>
                         <h3>Plan del {{ plan.fecha_creacion.strftime('%d/%m/%Y') }}</h3>
                         {% if plan.fecha_limite %}
-                        <p class="task-deadline">🕒 Fecha límite: {{ plan.fecha_limite.strftime('%d/%m/%Y') }}</p>
+                        <p class="task-deadline learner-plan-deadline">Fecha límite: <time datetime="{{ plan.fecha_limite.date().isoformat() }}">{{ plan.fecha_limite.strftime('%d/%m/%Y') }}</time></p>
                         {% else %}
                         <p class="text-muted">Sin fecha límite registrada</p>
                         {% endif %}
@@ -926,35 +1070,49 @@
                         {{ {'pendiente': 'Pendiente', 'cumplido': 'Cumplido', 'vencido': 'Vencido'}[plan.estado] }}
                     </span>
                 </div>
+                {% if plan.estado == 'vencido' %}
+                <div class="learner-plan-notice learner-plan-notice-overdue" role="status">
+                    <strong>La fecha límite ya pasó</strong>
+                    <p>Habla con tu instructor para revisar los pasos que siguen.</p>
+                </div>
+                {% elif plan.estado == 'pendiente' and not plan.evidencia_url %}
+                <div class="learner-plan-notice learner-plan-notice-pending" role="status">
+                    <strong>Evidencia pendiente</strong>
+                    <p>Aún no has enviado evidencia. Cuando completes las actividades, adjunta aquí el archivo para que tu instructor lo revise.</p>
+                </div>
+                {% endif %}
                 <div class="learner-plan-activities">
                     <strong>Actividades y compromisos acordados</strong>
                     <p>{{ plan.actividades }}</p>
                 </div>
 
                 {% if plan.evidencia_url %}
-                <div class="task-feedback">
+                <div class="task-feedback learner-plan-evidence-sent" role="status">
                     <strong>📎 Evidencia enviada el {{ plan.evidencia_enviada_en.strftime('%d/%m/%Y %H:%M') if plan.evidencia_enviada_en else 'fecha no disponible' }}</strong>
+                    {% if plan.estado in ('pendiente', 'vencido') %}
+                    <p class="learner-plan-review-note">Tu instructor revisará la evidencia antes de cerrar el plan.</p>
+                    {% endif %}
                     {% if plan.observaciones_aprendiz %}<p>{{ plan.observaciones_aprendiz }}</p>{% endif %}
                     <a class="btn btn-outline btn-sm" href="{{ url_for('aprendiz.descargar_evidencia_plan', plan_id=plan.id) }}">📄 Descargar mi evidencia</a>
                 </div>
-                {% elif plan.estado == 'pendiente' %}
-                <p class="learner-plan-next-step">Aún no has enviado evidencia. Adjunta un archivo cuando completes las actividades.</p>
                 {% endif %}
 
                 {% if plan.fecha_cumplimiento %}
                 <p class="text-muted">Cumplido el {{ plan.fecha_cumplimiento.strftime('%d/%m/%Y') }}.</p>
                 {% elif plan.estado == 'pendiente' %}
                 <details class="entrega-form learner-plan-evidence-form">
-                    <summary class="entrega-summary">📤 Enviar o reemplazar evidencia</summary>
+                    <summary class="entrega-summary">📤 {{ 'Reemplazar evidencia' if plan.evidencia_url else 'Enviar evidencia' }}</summary>
                     <form method="POST" action="{{ url_for('aprendiz.subir_evidencia_plan', ficha_id=ficha.id, plan_id=plan.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="form-group">
-                            <label for="plan-evidencia-{{ plan.id }}">Archivo de evidencia</label>
-                            <input type="file" id="plan-evidencia-{{ plan.id }}" name="archivo_evidencia_plan" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar,.doc,.docx" required class="form-file-input">
+                            <label for="plan-evidencia-{{ plan.id }}">Archivo de evidencia (obligatorio)</label>
+                            <input type="file" id="plan-evidencia-{{ plan.id }}" name="archivo_evidencia_plan" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar,.doc,.docx" aria-describedby="plan-evidencia-ayuda-{{ plan.id }}" required class="form-file-input">
+                            <small class="learner-form-help" id="plan-evidencia-ayuda-{{ plan.id }}">Formatos admitidos: PDF, PNG, JPG/JPEG, ZIP, RAR, DOC y DOCX.</small>
                         </div>
                         <div class="form-group">
                             <label for="plan-nota-{{ plan.id }}">Nota para tu instructor (opcional)</label>
-                            <textarea id="plan-nota-{{ plan.id }}" name="observaciones_aprendiz" rows="3" placeholder="Explica brevemente cómo cumpliste las actividades.">{{ plan.observaciones_aprendiz or '' }}</textarea>
+                            <textarea id="plan-nota-{{ plan.id }}" name="observaciones_aprendiz" rows="3" aria-describedby="plan-nota-ayuda-{{ plan.id }}" placeholder="Explica brevemente cómo cumpliste las actividades.">{{ plan.observaciones_aprendiz or '' }}</textarea>
+                            <small class="learner-form-help" id="plan-nota-ayuda-{{ plan.id }}">Puedes agregar un comentario breve para orientar la revisión.</small>
                         </div>
                         <button type="submit" class="btn btn-primary full-width">Enviar evidencia para revisión</button>
                     </form>
@@ -981,8 +1139,16 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <strong>Sesión del {{ registro.sesion.fecha.strftime('%d/%m/%Y') }}</strong>
             {% if registro.soporte_url %}<a href="{{ url_for('aprendiz.descargar_soporte', registro_id=registro.id) }}" class="link-download">Ver soporte enviado</a>{% endif %}
-            <input type="file" name="soporte" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" aria-label="Soporte de inasistencia">
-            <textarea name="nota" rows="2" placeholder="Nota para tu instructor (opcional)">{{ registro.nota or '' }}</textarea>
+            <p class="learner-support-guidance" id="guia-inasistencia-{{ registro.id }}" role="note">Adjunta un soporte o escribe una nota; completa al menos una opción para que tu instructor pueda revisar la inasistencia.</p>
+            <div class="support-form-field">
+                <label for="soporte-inasistencia-{{ registro.id }}">Soporte de inasistencia (opcional)</label>
+                <input type="file" id="soporte-inasistencia-{{ registro.id }}" name="soporte" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" aria-describedby="guia-inasistencia-{{ registro.id }} formatos-inasistencia-{{ registro.id }}">
+                <small class="learner-form-help" id="formatos-inasistencia-{{ registro.id }}">Formatos admitidos: PDF, PNG, JPG/JPEG, DOC y DOCX.</small>
+            </div>
+            <div class="support-form-field">
+                <label for="nota-inasistencia-{{ registro.id }}">Nota para tu instructor (opcional)</label>
+                <textarea id="nota-inasistencia-{{ registro.id }}" name="nota" rows="2" aria-describedby="guia-inasistencia-{{ registro.id }}" placeholder="Explica brevemente el motivo o el contexto de la inasistencia.">{{ registro.nota or '' }}</textarea>
+            </div>
             <button type="submit" class="btn btn-sm btn-primary">Enviar para revisión</button>
         </form>
         {% endfor %}
@@ -1137,38 +1303,6 @@
                 <button type="button" class="competencia-modal-close app-modal-close" data-close-competencia-modal aria-label="Cerrar detalle">&times;</button>
             </header>
 
-    <!-- FILA DE ATENCION -->
-    <div class="card mb-4" style="background-color: var(--card-bg);">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h3 class="card-title m-0">🙋‍♂️ Pedir turno con el instructor</h3>
-        </div>
-        <div class="card-body">
-            {% if turno_actual %}
-                <div class="alert {% if turno_actual.estado == 'esperando' %}alert-warning{% else %}alert-success{% endif %} mb-0 d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>Estado:</strong> 
-                        {% if turno_actual.estado == 'esperando' %}
-                            Estás en la fila. Espera a que el instructor te llame.
-                        {% else %}
-                            El instructor te está atendiendo ahora mismo.
-                        {% endif %}
-                        {% if turno_actual.motivo %}<br><small>Motivo: {{ turno_actual.motivo }}</small>{% endif %}
-                    </div>
-                    {% if turno_actual.estado == 'esperando' %}
-                    <form action="{{ url_for('aprendiz.cancelar_turno', ficha_id=ficha_id) }}" method="POST" style="margin:0;">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar turno</button>
-                    </form>
-                    {% endif %}
-                </div>
-            {% else %}
-                <form action="{{ url_for('aprendiz.pedir_turno', ficha_id=ficha_id) }}" method="POST" class="d-flex align-items-center" style="gap: 1rem;">
-                    <input type="text" name="motivo" class="form-control" placeholder="¿Sobre qué necesitas ayuda? (Opcional)" maxlength="200" style="flex: 1;">
-                    <button type="submit" class="btn btn-primary">Pedir Turno</button>
-                </form>
-            {% endif %}
-        </div>
-    </div>
-
             <div id="competencia-modal-body" class="competencia-modal-body app-modal-body"></div>
             <footer class="competencia-modal-footer app-modal-footer">
                 <form method="dialog">
@@ -1241,9 +1375,7 @@
             if (!modal || !modalBody || !modalTitle) return;
 
             const closeModal = () => {
-                if (typeof modal.close === 'function' && modal.open) modal.close();
-                else modal.removeAttribute('open');
-                document.body.classList.remove('modal-open');
+                window.cerrarModal(modal);
             };
 
             document.querySelectorAll('[data-competencia-source]').forEach((button) => {
@@ -1254,9 +1386,7 @@
                     const competenceName = row?.querySelector('[data-label="Competencia"]')?.innerText?.trim();
                     modalTitle.textContent = competenceName || 'Detalle de la competencia';
                     modalBody.replaceChildren(...Array.from(source.children).map((child) => child.cloneNode(true)));
-                    if (typeof modal.showModal === 'function') modal.showModal();
-                    else modal.setAttribute('open', '');
-                    document.body.classList.add('modal-open');
+                    window.abrirModal(modal);
                 });
             });
 
@@ -1264,12 +1394,138 @@
                 button.addEventListener('click', closeModal);
             });
 
-            modal.addEventListener('close', () => document.body.classList.remove('modal-open'));
             modal.addEventListener('click', (event) => {
                 if (event.target === modal) closeModal();
             });
         })();
     </script>
+    {% endif %}
+
+    <!-- ============================================================ -->
+    <!-- CURVA DE RENDIMIENTO Y PLAN DE MEJORA DEL APRENDIZ           -->
+    <!-- ============================================================ -->
+    {% if curva_rendimiento and curva_rendimiento.tiene_datos %}
+    <section class="card learner-curve-card" id="seccion-curva-rendimiento" data-learner-tab="rendimiento">
+        <div class="learner-curve-top">
+            <div>
+                <span class="eyebrow">Trayectoria Formativa</span>
+                <h2>Curva de Rendimiento Académico</h2>
+                <p class="text-muted curve-subtitle">Evolución histórica de tu puntaje integral basada en asistencia, evidencias calificadas y resultados aprobados.</p>
+            </div>
+            <div class="learner-curve-badges">
+                <span class="badge {{ curva_rendimiento.badge_class }}">{{ curva_rendimiento.nivel_desempeno }}</span>
+                <span class="badge badge-secondary trend-chip {{ curva_rendimiento.tendencia_clase }}">
+                    {{ curva_rendimiento.tendencia_icono }} {{ curva_rendimiento.tendencia|capitalize }}
+                    {% if curva_rendimiento.diferencia_ultimo != 0 %}
+                    ({{ '+' if curva_rendimiento.diferencia_ultimo > 0 else '' }}{{ curva_rendimiento.diferencia_ultimo }} pts)
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- Indicadores clave de la curva -->
+        <div class="learner-curve-kpis">
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Puntaje Actual</span>
+                <strong class="curve-kpi-val">{{ '%.1f'|format(curva_rendimiento.puntaje_actual) }} <small>/ 100</small></strong>
+                <span class="curve-kpi-sub">Puesto #{{ curva_rendimiento.posicion_actual }} en la ficha</span>
+            </div>
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Meta Mínima Aprobatoria</span>
+                <strong class="curve-kpi-val">{{ '%.0f'|format(curva_rendimiento.svg.meta_pct) }}%</strong>
+                <span class="curve-kpi-sub {% if curva_rendimiento.supera_meta %}text-success{% else %}text-danger{% endif %}">
+                    {% if curva_rendimiento.supera_meta %}
+                    ✓ Superas la meta (+{{ curva_rendimiento.distancia_meta }} pts)
+                    {% else %}
+                    ⚠️ Faltan {{ curva_rendimiento.distancia_meta|abs }} pts para aprobar
+                    {% endif %}
+                </span>
+            </div>
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Mejor Puntaje Histórico</span>
+                <strong class="curve-kpi-val">{{ '%.1f'|format(curva_rendimiento.mejor_puntaje) }}</strong>
+                <span class="curve-kpi-sub">Pico de rendimiento</span>
+            </div>
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Cortes Registrados</span>
+                <strong class="curve-kpi-val">{{ curva_rendimiento.puntos|length }}</strong>
+                <span class="curve-kpi-sub">Mediciones evaluadas</span>
+            </div>
+        </div>
+
+        <!-- Gráfico SVG Interactivo de la Curva -->
+        <div class="learner-curve-chart-box" role="region" aria-label="Gráfico de evolución temporal del puntaje">
+            <svg class="learner-curve-svg" viewBox="{{ curva_rendimiento.svg.viewbox }}" role="img" aria-label="Curva de rendimiento del aprendiz">
+                <defs>
+                    <linearGradient id="learner-curve-gradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="var(--accent-primary, #39a900)" stop-opacity="0.32"/>
+                        <stop offset="100%" stop-color="var(--accent-primary, #39a900)" stop-opacity="0.02"/>
+                    </linearGradient>
+                </defs>
+
+                <!-- Líneas horizontales de referencia -->
+                {% for m in curva_rendimiento.svg.marcas_y %}
+                <line class="curve-grid-line" x1="{{ curva_rendimiento.svg.x_start }}" y1="{{ m.y }}" x2="{{ curva_rendimiento.svg.x_end }}" y2="{{ m.y }}"></line>
+                <text class="curve-axis-label" x="{{ curva_rendimiento.svg.x_start - 8 }}" y="{{ m.y + 4 }}" text-anchor="end">{{ m.valor }}%</text>
+                {% endfor %}
+
+                <!-- Línea de meta de aprobación (70%) -->
+                <line class="curve-meta-line" x1="{{ curva_rendimiento.svg.x_start }}" y1="{{ curva_rendimiento.svg.y_meta }}" x2="{{ curva_rendimiento.svg.x_end }}" y2="{{ curva_rendimiento.svg.y_meta }}" stroke-dasharray="5 4"></line>
+                <text class="curve-meta-text" x="{{ curva_rendimiento.svg.x_end }}" y="{{ curva_rendimiento.svg.y_meta - 6 }}" text-anchor="end">Meta aprobatoria ({{ '%.0f'|format(curva_rendimiento.svg.meta_pct) }}%)</text>
+
+                <!-- Polígono de área -->
+                {% if curva_rendimiento.svg.poligono_area %}
+                <polygon class="curve-area-poly" points="{{ curva_rendimiento.svg.poligono_area }}" fill="url(#learner-curve-gradient)"></polygon>
+                {% endif %}
+
+                <!-- Polilínea del puntaje -->
+                {% if curva_rendimiento.svg.linea_puntaje %}
+                <polyline class="curve-line-poly" points="{{ curva_rendimiento.svg.linea_puntaje }}"></polyline>
+                {% endif %}
+
+                <!-- Puntos en la curva -->
+                {% for pt in curva_rendimiento.puntos %}
+                <g class="curve-point-item" tabindex="0" role="graphics-symbol" aria-label="Corte {{ pt.fecha_str }}: {{ pt.puntaje }} puntos (Asistencia: {{ pt.asistencia }}%, Evidencias: {{ pt.evidencias }}%)">
+                    <circle class="curve-dot {% if pt.es_ultimo %}curve-dot--current{% endif %}" cx="{{ pt.x }}" cy="{{ pt.y }}" r="{{ 6 if pt.es_ultimo else 4.5 }}"></circle>
+                    <text class="curve-date-txt" x="{{ pt.x }}" y="{{ curva_rendimiento.svg.y_zero + 16 }}" text-anchor="middle">{{ pt.fecha_str }}</text>
+                    <text class="curve-score-txt" x="{{ pt.x }}" y="{{ pt.y - 10 }}" text-anchor="middle">{{ '%.1f'|format(pt.puntaje) }}</text>
+                </g>
+                {% endfor %}
+            </svg>
+        </div>
+
+        <!-- Advertencias sobre el Rendimiento Académico -->
+        {% if advertencias_rendimiento %}
+        <div class="learner-perf-alerts-container" id="advertencias-rendimiento-box">
+            <div class="perf-block-title">
+                <span class="eyebrow text-danger">⚠️ Atención y Advertencias</span>
+                <h3>Aspectos que requieren tu atención inmediata</h3>
+                <p class="text-muted">Situaciones que pueden comprometer tu rendimiento o permanencia si no tomas acción oportunamente.</p>
+            </div>
+            <div class="perf-alerts-stack">
+                {% for adv in advertencias_rendimiento %}
+                    {{ render_banner_recomendacion(adv) }}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recomendaciones para Impulsar el Rendimiento -->
+        {% if recomendaciones_mejora %}
+        <div class="learner-perf-recs-container" id="recomendaciones-rendimiento-box">
+            <div class="perf-block-title">
+                <span class="eyebrow text-success">💡 Plan de Impulso y Recomendaciones</span>
+                <h3>Acciones recomendadas para subir tu rendimiento</h3>
+                <p class="text-muted">Pautas prácticas para elevar tu curva, mejorar tu promedio y avanzar con paso firme en tu formación SENA.</p>
+            </div>
+            <div class="perf-recs-grid">
+                {% for rec in recomendaciones_mejora %}
+                    {{ render_card_recomendacion(rec) }}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
     {% endif %}
 
     {% if ranking %}
@@ -1369,11 +1625,11 @@
                 <h2 class="tasks-section-title">Mis Tareas Programadas</h2>
             </div>
             
-            {% if tareas_estado %}
-            {% set total_tareas = tareas_estado|length %}
+            {% if tareas_individuales %}
+            {% set total_tareas = tareas_individuales|length %}
             {% set entregadas = [] %}
             {% set pendientes = [] %}
-            {% for item in tareas_estado %}
+            {% for item in tareas_individuales %}
                 {% if item.estado in ['entregada', 'retraso'] %}
                     {% set _ = entregadas.append(item) %}
                 {% else %}
@@ -1387,7 +1643,10 @@
                     <span>Progreso de Evidencias</span>
                     <span class="evidence-progress-value">{{ pct }}%</span>
                 </div>
-                <div class="progress-card-track">
+                <div class="progress-card-track" role="progressbar"
+                     aria-label="Evidencias entregadas"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct }}"
+                     aria-valuetext="{{ entregadas|length }} de {{ total_tareas }} evidencias entregadas, {{ pct }} por ciento">
                     {% if pct > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct }}%; --metric-color: var(--success);"></div>{% endif %}
                 </div>
                 <small class="text-muted evidence-progress-caption">{{ entregadas|length }} de {{ total_tareas }} entregadas</small>
@@ -1395,7 +1654,7 @@
             {% endif %}
         </div>
 
-        {% if tareas_estado %}
+        {% if tareas_individuales %}
         <!-- Barra de herramientas: Búsqueda y Filtros Rápidos de Evidencias -->
         <div class="task-filter-toolbar card-subtle">
             <div class="task-search-box">
@@ -1408,7 +1667,7 @@
             <div class="task-filter-chips" role="group" aria-label="Filtrar evidencias por estado">
                 <button type="button" class="task-chip is-active" data-task-filter="all">
                     <span>Todas</span>
-                    <span class="chip-count" id="chip-count-all">{{ tareas_estado|length }}</span>
+                    <span class="chip-count" id="chip-count-all">{{ tareas_individuales|length }}</span>
                 </button>
                 <button type="button" class="task-chip" data-task-filter="pending">
                     <span>⚠️ Por Entregar</span>
@@ -1448,17 +1707,19 @@
                  data-task-title="{{ item.tarea.titulo|lower }}"
                  data-task-desc="{{ item.tarea.descripcion|lower if item.tarea.descripcion else '' }}"
                  data-task-status="pending"
-                 data-task-extemp="{{ 'true' if (item.estado == 'vencida' or item.es_vencida_original) else 'false' }}"
+                 data-task-extemp="{{ 'true' if item.estado == 'vencida' else 'false' }}"
                  data-task-plan="{{ 'true' if item.plan else 'false' }}">
             <div class="task-item-header">
                 <div class="task-info">
                     <h3 class="task-title">{{ item.tarea.titulo }}</h3>
-                    {% if item.tarea.fecha_limite %}
-                    <p class="task-deadline">🕒 Límite: {{ item.tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</p>
-                    {% endif %}
-                    {% if item.prorroga %}
-                    <p class="task-deadline" style="color: #0284c7; font-weight: 700;">⏱️ Prórroga hasta: {{ item.prorroga.nueva_fecha_limite.strftime('%d/%m/%Y %H:%M') }}</p>
-                    {% endif %}
+                    <p class="task-deadline">
+                        <span aria-hidden="true">🕒</span>
+                        {% if item.limite_efectivo %}
+                        Límite: <time datetime="{{ item.limite_efectivo.isoformat() }}">{{ item.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}</time>
+                        {% else %}
+                        Sin fecha límite
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="task-status">
                     {% if item.prorroga and item.estado != 'vencida' %}
@@ -1477,24 +1738,76 @@
                 </div>
             </div>
 
+            {% if item.progreso_plazo is not none %}
+            <div class="task-deadline-meter is-{{ item.clase_plazo }}"
+                 role="progressbar"
+                 aria-label="Tiempo transcurrido del plazo para {{ item.tarea.titulo }}"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ item.progreso_plazo }}"
+                 aria-valuetext="{{ item.progreso_plazo }} % del plazo. {{ item.texto_tiempo_plazo }}"
+                 style="--deadline-progress: {{ item.progreso_plazo }}%;">
+                <div class="task-deadline-meter-header">
+                    <span>{% if item.clase_plazo == 'complete' %}Plazo completado{% elif item.clase_plazo == 'overdue' %}Plazo vencido{% else %}Tiempo transcurrido{% endif %}</span>
+                    <span>{{ item.progreso_plazo }}%</span>
+                </div>
+                <div class="task-deadline-meter-track" aria-hidden="true">
+                    <span class="task-deadline-meter-fill"></span>
+                </div>
+                <div class="task-deadline-meter-meta">
+                    <span>{{ item.texto_tiempo_plazo }}</span>
+                </div>
+            </div>
+            {% elif item.texto_tiempo_plazo %}
+            <p class="task-deadline-countdown">{{ item.texto_tiempo_plazo }}</p>
+            {% endif %}
+
             {% if item.tarea.descripcion %}
             <p class="task-desc">{{ item.tarea.descripcion }}</p>
             {% endif %}
             {% if item.plan %}
-            <div class="task-feedback" style="background: #fffbe6; border-left: 4px solid #faad14; padding: 10px 12px; margin: 10px 0; border-radius: 4px;">
-                <strong style="color: #ad6800;">📋 Asignada a Plan de Mejoramiento</strong>
-                <p style="margin: 4px 0 0 0; font-size: 13px; color: #613400;">
+            <div class="task-alert is-warning" role="status">
+                <span class="task-alert-icon" aria-hidden="true">📋</span>
+                <div class="task-alert-content">
+                <strong>Asignada a Plan de Mejoramiento</strong>
+                <p>
                     Esta evidencia hace parte de tu plan de mejoramiento académico. Plazo límite: {{ item.plan.fecha_limite.strftime('%d/%m/%Y') if item.plan.fecha_limite else 'Concertado' }}.
                 </p>
+                </div>
             </div>
             {% endif %}
 
-            {% if item.estado == 'vencida' or (item.es_vencida_original and not item.entrega) %}
-            <div style="background: #fff2f0; border-left: 4px solid #ff4d4f; padding: 10px 12px; margin: 10px 0; border-radius: 4px; font-size: 13px; color: #a8071a;">
-                <strong>⚠️ Entrega extemporánea permitida</strong>
-                <p style="margin: 4px 0 0 0;">
+            {% if item.clase_plazo == 'urgent' %}
+            <div class="task-alert is-danger" role="alert">
+                <span class="task-alert-icon" aria-hidden="true">⚠️</span>
+                <div class="task-alert-content">
+                <strong>El plazo vence pronto</strong>
+                <p> {{ item.texto_tiempo_plazo }}. Envía la evidencia antes de la fecha límite.</p>
+                </div>
+            </div>
+            {% elif item.clase_plazo == 'soon' %}
+            <div class="task-alert is-warning" role="status">
+                <span class="task-alert-icon" aria-hidden="true">⏳</span>
+                <div class="task-alert-content">
+                <strong>Tu plazo se acerca</strong>
+                <p>{{ item.texto_tiempo_plazo }} para enviar esta evidencia.</p>
+                </div>
+            </div>
+            {% elif item.clase_plazo == 'overdue' %}
+            <div class="task-alert is-danger" role="alert">
+                <span class="task-alert-icon" aria-hidden="true">⚠️</span>
+                <div class="task-alert-content">
+                <strong>Entrega extemporánea permitida</strong>
+                <p>
                     El plazo inicial ha vencido. Según el Reglamento del Aprendiz SENA, puedes subir tu evidencia de forma extemporánea adjuntando tu justificación para valoración del instructor.
                 </p>
+                </div>
+            </div>
+            {% elif item.prorroga %}
+            <div class="task-alert is-info" role="status">
+                <span class="task-alert-icon" aria-hidden="true">⏱️</span>
+                <div class="task-alert-content">
+                <strong>Prórroga concedida</strong>
+                <p>El nuevo plazo es {{ item.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}.</p>
+                </div>
             </div>
             {% endif %}
 
@@ -1568,7 +1881,7 @@
                                placeholder="https://github.com/..." class="form-control">
                     </div>
 
-                    {% if item.estado == 'vencida' or item.es_vencida_original %}
+                    {% if item.estado == 'vencida' %}
                     <div class="form-group">
                         <label for="justificacion-{{ item.tarea.id }}" style="font-weight: 600; color: #a8071a;">
                             Justificación o motivo de la entrega extemporánea (requerido por reglamento)
@@ -1578,7 +1891,7 @@
                     </div>
                     {% endif %}
                     <button type="submit" class="btn btn-primary full-width">
-                        {% if item.estado == 'vencida' or item.es_vencida_original %}
+                        {% if item.estado == 'vencida' %}
                             📤 Enviar evidencia extemporánea
                         {% elif item.entrega %}
                             Guardar cambios en evidencia
@@ -1614,9 +1927,14 @@
                 <div class="task-item-header">
                     <div class="task-info">
                         <h3 class="task-title">{{ item.tarea.titulo }}</h3>
-                        {% if item.tarea.fecha_limite %}
-                        <p class="task-deadline">🕒 Límite: {{ item.tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</p>
-                        {% endif %}
+                        <p class="task-deadline">
+                            <span aria-hidden="true">🕒</span>
+                            {% if item.limite_efectivo %}
+                            Límite: <time datetime="{{ item.limite_efectivo.isoformat() }}">{{ item.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}</time>
+                            {% else %}
+                            Sin fecha límite
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="task-status">
                         {% if item.estado == 'entregada' %}
@@ -1626,6 +1944,26 @@
                         {% endif %}
                     </div>
                 </div>
+
+                {% if item.progreso_plazo is not none %}
+                <div class="task-deadline-meter is-{{ item.clase_plazo }}"
+                     role="progressbar"
+                     aria-label="Tiempo transcurrido del plazo para {{ item.tarea.titulo }}"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ item.progreso_plazo }}"
+                     aria-valuetext="{{ item.progreso_plazo }} % del plazo. {{ item.texto_tiempo_plazo }}"
+                     style="--deadline-progress: {{ item.progreso_plazo }}%;">
+                    <div class="task-deadline-meter-header">
+                        <span>Plazo completado</span>
+                        <span>{{ item.progreso_plazo }}%</span>
+                    </div>
+                    <div class="task-deadline-meter-track" aria-hidden="true">
+                        <span class="task-deadline-meter-fill"></span>
+                    </div>
+                    <div class="task-deadline-meter-meta">
+                        <span>{{ item.texto_tiempo_plazo }}</span>
+                    </div>
+                </div>
+                {% endif %}
 
                 {% if item.tarea.descripcion %}
                 <p class="task-desc">{{ item.tarea.descripcion }}</p>
@@ -1640,9 +1978,12 @@
                 </div>
                 {% endif %}
                 {% if item.entrega and item.entrega.justificacion_retraso %}
-                <div style="background: #fff8e6; border: 1px solid #ffd591; border-radius: 6px; padding: 8px 10px; margin: 8px 0; font-size: 12px;">
-                    <strong style="color: #ad4e00;">💬 Justificación de entrega extemporánea:</strong>
-                    <p style="margin: 2px 0 0 0; color: #612500; font-style: italic;">"{{ item.entrega.justificacion_retraso }}"</p>
+                <div class="task-alert is-warning" role="note">
+                    <span class="task-alert-icon" aria-hidden="true">💬</span>
+                    <div class="task-alert-content">
+                    <strong>Justificación de entrega extemporánea</strong>
+                    <p>{{ item.entrega.justificacion_retraso }}</p>
+                    </div>
                 </div>
                 {% endif %}
 
@@ -2012,39 +2353,6 @@
                 </div>
                 <button type="button" class="app-modal-close" data-close-personalizacion-modal aria-label="Cerrar modal">&times;</button>
             </header>
-
-    <!-- FILA DE ATENCION -->
-    <div class="card mb-4" style="background-color: var(--card-bg);">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h3 class="card-title m-0">🙋‍♂️ Pedir turno con el instructor</h3>
-        </div>
-        <div class="card-body">
-            {% if turno_actual %}
-                <div class="alert {% if turno_actual.estado == 'esperando' %}alert-warning{% else %}alert-success{% endif %} mb-0 d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>Estado:</strong> 
-                        {% if turno_actual.estado == 'esperando' %}
-                            Estás en la fila. Espera a que el instructor te llame.
-                        {% else %}
-                            El instructor te está atendiendo ahora mismo.
-                        {% endif %}
-                        {% if turno_actual.motivo %}<br><small>Motivo: {{ turno_actual.motivo }}</small>{% endif %}
-                    </div>
-                    {% if turno_actual.estado == 'esperando' %}
-                    <form action="{{ url_for('aprendiz.cancelar_turno', ficha_id=ficha_id) }}" method="POST" style="margin:0;">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar turno</button>
-                    </form>
-                    {% endif %}
-                </div>
-            {% else %}
-                <form action="{{ url_for('aprendiz.pedir_turno', ficha_id=ficha_id) }}" method="POST" class="d-flex align-items-center" style="gap: 1rem;">
-                    <input type="text" name="motivo" class="form-control" placeholder="¿Sobre qué necesitas ayuda? (Opcional)" maxlength="200" style="flex: 1;">
-                    <button type="submit" class="btn btn-primary">Pedir Turno</button>
-                </form>
-            {% endif %}
-        </div>
-    </div>
-
 
             <div class="personalizacion-modal-body app-modal-body">
                 <p class="text-muted" style="margin-top:0; font-size: 0.9rem;">
@@ -2964,6 +3272,224 @@
         .priority-card-cleaning { grid-column: auto; }
         .priority-card { min-height: 0; }
     }
+
+    /* --- Curva de Rendimiento Académico y Plan de Mejora --- */
+    .learner-curve-card {
+        position: relative;
+        border-radius: 16px;
+        padding: 1.5rem;
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .learner-curve-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .curve-subtitle {
+        margin: 0.35rem 0 0;
+        font-size: 0.88rem;
+        color: var(--text-muted, #64748b);
+        max-width: 620px;
+        line-height: 1.45;
+    }
+
+    .learner-curve-badges {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .trend-chip {
+        font-size: 0.82rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .trend-up {
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .trend-down {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .trend-steady {
+        color: #64748b;
+        background: rgba(100, 116, 139, 0.1);
+        border: 1px solid rgba(100, 116, 139, 0.2);
+    }
+
+    .learner-curve-kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 1rem;
+    }
+
+    .curve-kpi-item {
+        background: var(--bg-canvas, rgba(0, 0, 0, 0.02));
+        border: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .curve-kpi-label {
+        font-size: 0.73rem;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        color: var(--text-muted, #64748b);
+    }
+
+    .curve-kpi-val {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--text-primary, #0f172a);
+        line-height: 1.2;
+    }
+
+    .curve-kpi-val small {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-muted, #64748b);
+    }
+
+    .curve-kpi-sub {
+        font-size: 0.78rem;
+        color: var(--text-muted, #64748b);
+    }
+
+    .learner-curve-chart-box {
+        width: 100%;
+        overflow-x: auto;
+        background: var(--bg-canvas, rgba(0, 0, 0, 0.015));
+        border: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+        border-radius: 12px;
+        padding: 0.5rem 0.25rem 0.25rem;
+    }
+
+    .learner-curve-svg {
+        width: 100%;
+        height: auto;
+        display: block;
+        min-width: 480px;
+    }
+
+    .curve-grid-line {
+        stroke: var(--border-divider, #e2e8f0);
+        stroke-width: 1;
+        stroke-opacity: 0.7;
+    }
+
+    .curve-axis-label {
+        font-size: 10px;
+        fill: var(--text-muted, #94a3b8);
+        font-family: inherit;
+    }
+
+    .curve-meta-line {
+        stroke: var(--warning, #f59e0b);
+        stroke-width: 1.5;
+        stroke-dasharray: 5 4;
+    }
+
+    .curve-meta-text {
+        font-size: 10px;
+        fill: var(--warning, #d97706);
+        font-weight: 600;
+        font-family: inherit;
+    }
+
+    .curve-line-poly {
+        fill: none;
+        stroke: var(--accent-primary, #39a900);
+        stroke-width: 3.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .curve-dot {
+        fill: var(--bg-surface, #ffffff);
+        stroke: var(--accent-primary, #39a900);
+        stroke-width: 2.5;
+        transition: transform 0.2s ease, r 0.2s ease;
+        cursor: pointer;
+    }
+
+    .curve-dot--current {
+        fill: var(--accent-primary, #39a900);
+        stroke: #ffffff;
+        stroke-width: 2.5;
+        filter: drop-shadow(0 0 5px rgba(57, 169, 0, 0.6));
+    }
+
+    .curve-dot:hover,
+    .curve-point-item:focus .curve-dot {
+        r: 7;
+        stroke-width: 3.5;
+    }
+
+    .curve-date-txt {
+        font-size: 10px;
+        fill: var(--text-muted, #64748b);
+        font-family: inherit;
+    }
+
+    .curve-score-txt {
+        font-size: 11px;
+        font-weight: 700;
+        fill: var(--text-primary, #0f172a);
+        font-family: inherit;
+    }
+
+    .learner-perf-alerts-container,
+    .learner-perf-recs-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-divider, rgba(0, 0, 0, 0.06));
+    }
+
+    .perf-block-title h3 {
+        margin: 0.25rem 0 0.2rem;
+        font-size: 1.15rem;
+        color: var(--text-primary, #0f172a);
+    }
+
+    .perf-block-title p {
+        margin: 0;
+        font-size: 0.88rem;
+    }
+
+    .perf-alerts-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .perf-recs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+    }
     </style>
 
     <!-- ============================================================ -->
@@ -3096,22 +3622,12 @@
         function openCustomizerModal() {
             if (!modalEl) return;
             syncModalInputs();
-            if (typeof modalEl.showModal === 'function') {
-                modalEl.showModal();
-            } else {
-                modalEl.setAttribute('open', '');
-            }
-            document.body.classList.add('modal-open');
+            window.abrirModal(modalEl);
         }
 
         function closeCustomizerModal() {
             if (!modalEl) return;
-            if (typeof modalEl.close === 'function' && modalEl.open) {
-                modalEl.close();
-            } else {
-                modalEl.removeAttribute('open');
-            }
-            document.body.classList.remove('modal-open');
+            window.cerrarModal(modalEl);
         }
 
         function syncModalInputs() {
@@ -3137,7 +3653,6 @@
 
         closeBtns.forEach(b => b.addEventListener('click', closeCustomizerModal));
         if (modalEl) {
-            modalEl.addEventListener('close', () => document.body.classList.remove('modal-open'));
             modalEl.addEventListener('click', e => { if (e.target === modalEl) closeCustomizerModal(); });
         }
 
@@ -3255,6 +3770,7 @@
                 const href = link.getAttribute('href');
                 let targetTab = null;
                 if (href === '#seccion-progreso') targetTab = 'resumen';
+                else if (href === '#seccion-grupo-trabajo') targetTab = 'grupo';
                 else if (href === '#seccion-juicios') targetTab = 'juicios';
                 else if (href === '#seccion-tareas') targetTab = 'evidencias';
                 else if (href === '#seccion-ranking') targetTab = 'rendimiento';
@@ -3425,6 +3941,7 @@
         let initialTab = 'resumen';
         const hash = window.location.hash;
         if (hash === '#tab-evidencias' || hash === '#seccion-tareas') initialTab = 'evidencias';
+        else if (hash === '#tab-grupo' || hash === '#seccion-grupo-trabajo') initialTab = 'grupo';
         else if (hash === '#tab-juicios' || hash === '#seccion-juicios') initialTab = 'juicios';
         else if (hash === '#tab-rendimiento' || hash === '#seccion-ranking') initialTab = 'rendimiento';
         else if (hash === '#tab-convivencia' || hash === '#seccion-aseo') initialTab = 'convivencia';
@@ -3432,7 +3949,7 @@
         else {
             try {
                 const saved = localStorage.getItem(ACTIVE_TAB_KEY);
-                if (saved && ['resumen', 'evidencias', 'juicios', 'rendimiento', 'convivencia'].includes(saved)) {
+                if (saved && ['resumen', 'evidencias', 'grupo', 'juicios', 'rendimiento', 'convivencia'].includes(saved)) {
                     initialTab = saved;
                 }
             } catch (e) {}
@@ -3463,6 +3980,10 @@
         <a href="#seccion-tareas" class="learner-bottom-link">
             <span class="bottom-nav-icon" aria-hidden="true">📝</span>
             <span>Tareas</span>
+        </a>
+        <a href="#seccion-grupo-trabajo" class="learner-bottom-link">
+            <span class="bottom-nav-icon" aria-hidden="true">👥</span>
+            <span>Grupo</span>
         </a>
         <a href="#seccion-ranking" class="learner-bottom-link">
             <span class="bottom-nav-icon" aria-hidden="true">🏆</span>

@@ -14,6 +14,7 @@ from app.models.asistencia import (
     CAUSALES_JUSTIFICADAS,
 )
 from app.models.tarea import Tarea, Entrega, ProrrogaTarea
+from app.models.grupo import Grupo
 from app.models.material import MaterialFicha
 from app.models.alertas import ConfiguracionAlertas, PlanMejoramiento
 from app.models.insignia import Insignia, InsigniaOtorgada
@@ -34,6 +35,7 @@ from app.services.cronograma import obtener_cronograma
 from app.services.asistencia import guardar_asistencia, mapa_asistencia_por_fecha
 from app.services.aseo import ajustar_turno_por_asistencia, resumen_aprendiz
 from app.services.cortes import corte_actual
+from app.services.trabajos_grupales import obtener_trabajos_grupales
 from app.services.archivos import (
     ArchivoService,
     ErrorArchivo,
@@ -209,6 +211,8 @@ def panel(ficha_id):
     tareas_estado = []
     ahora_utc = datetime.utcnow()
     for tarea in tareas:
+        if tarea.es_grupal:
+            continue
         entrega = entregas_aprendiz.get(tarea.id)
         prorroga = prorrogas_aprendiz.get(tarea.id)
         plan_tarea = planes_tarea_aprendiz.get(tarea.id)
@@ -231,6 +235,60 @@ def panel(ficha_id):
         elif limite_efectivo and limite_efectivo < ahora_utc:
             estado = 'vencida'
 
+        progreso_plazo = None
+        clase_plazo = None
+        texto_tiempo_plazo = None
+        if limite_efectivo:
+            segundos_restantes = (limite_efectivo - ahora_utc).total_seconds()
+            segundos_absolutos = abs(segundos_restantes)
+            if segundos_restantes > 0:
+                if segundos_restantes <= 24 * 60 * 60:
+                    clase_plazo = 'urgent'
+                elif segundos_restantes <= 3 * 24 * 60 * 60:
+                    clase_plazo = 'soon'
+                else:
+                    clase_plazo = 'normal'
+                prefijo_tiempo = 'Quedan '
+            else:
+                clase_plazo = 'overdue'
+                prefijo_tiempo = 'Plazo vencido hace '
+
+            if segundos_absolutos >= 24 * 60 * 60:
+                dias = int(segundos_absolutos // (24 * 60 * 60))
+                horas = int((segundos_absolutos % (24 * 60 * 60)) // (60 * 60))
+                texto_duracion = f"{dias} {'día' if dias == 1 else 'días'}"
+                if horas:
+                    texto_duracion += f" y {horas} {'hora' if horas == 1 else 'horas'}"
+            elif segundos_absolutos >= 60 * 60:
+                horas = int(segundos_absolutos // (60 * 60))
+                minutos = int((segundos_absolutos % (60 * 60)) // 60)
+                texto_duracion = f"{horas} {'hora' if horas == 1 else 'horas'}"
+                if minutos:
+                    texto_duracion += f" y {minutos} {'minuto' if minutos == 1 else 'minutos'}"
+            else:
+                minutos = max(1, int((segundos_absolutos + 59) // 60))
+                texto_duracion = f"{minutos} {'minuto' if minutos == 1 else 'minutos'}"
+            texto_tiempo_plazo = prefijo_tiempo + texto_duracion
+
+            duracion_plazo = (
+                (limite_efectivo - tarea.creada_en).total_seconds()
+                if tarea.creada_en else 0
+            )
+            if duracion_plazo > 0:
+                if entrega and estado in ('entregada', 'retraso'):
+                    progreso_plazo = 100
+                    clase_plazo = 'complete'
+                    texto_tiempo_plazo = 'Evidencia entregada'
+                else:
+                    segundos_transcurridos = (ahora_utc - tarea.creada_en).total_seconds()
+                    progreso_plazo = max(
+                        0,
+                        min(100, round(segundos_transcurridos / duracion_plazo * 100)),
+                    )
+            elif entrega and estado in ('entregada', 'retraso'):
+                clase_plazo = 'complete'
+                texto_tiempo_plazo = 'Evidencia entregada'
+
         tareas_estado.append({
             'tarea': tarea,
             'entrega': entrega,
@@ -238,7 +296,9 @@ def panel(ficha_id):
             'prorroga': prorroga,
             'plan': plan_tarea,
             'limite_efectivo': limite_efectivo,
-            'es_vencida_original': bool(tarea.fecha_limite and tarea.fecha_limite < ahora_utc),
+            'progreso_plazo': progreso_plazo,
+            'clase_plazo': clase_plazo,
+            'texto_tiempo_plazo': texto_tiempo_plazo,
         })
 
     filas_ranking, config_ranking = calcular_ranking(ficha_id)
@@ -292,8 +352,10 @@ def panel(ficha_id):
         .all()
     )
     aseo = resumen_aprendiz(ficha_id, aprendiz)
-    from app.models.grupo import Grupo
-    grupo_actual = aprendiz.grupos_asignados.filter(Grupo.activo == True).first()
+    grupo_actual = aprendiz.grupos_asignados.filter(
+        Grupo.activo.is_(True), Grupo.ficha_id == ficha_id
+    ).first()
+    trabajos_grupo = obtener_trabajos_grupales(aprendiz)
     turno_hoy = None
     if aprendiz.rol_administrativo:
         from app.models.aseo import TurnoAseo
@@ -463,11 +525,29 @@ def panel(ficha_id):
     # e insignias, que la plantilla volvia a leer una por una.
 
     cronograma = obtener_cronograma(ficha)
+    from app.services.curva_rendimiento import obtener_curva_rendimiento_aprendiz
     from app.services.recomendaciones import (
         obtener_recomendaciones_aprendiz,
         obtener_logros_aprendiz,
     )
-    recomendaciones_aprendiz = obtener_recomendaciones_aprendiz(ficha_id, aprendiz.id)
+    curva_rendimiento = obtener_curva_rendimiento_aprendiz(
+        ficha_id=ficha_id,
+        aprendiz_id=aprendiz.id,
+        fila_propia=fila_propia,
+    )
+    recomendaciones_aprendiz = obtener_recomendaciones_aprendiz(
+        ficha_id,
+        aprendiz.id,
+        curva_rendimiento=curva_rendimiento,
+    )
+    advertencias_rendimiento = [
+        r for r in recomendaciones_aprendiz
+        if r.severidad in ('critica', 'preventiva')
+    ]
+    recomendaciones_mejora = [
+        r for r in recomendaciones_aprendiz
+        if r.severidad in ('sugerencia', 'positiva') or r.categoria == 'rendimiento_academico'
+    ]
     resumen_logros = obtener_logros_aprendiz(ficha_id, aprendiz.id)
 
     # Métricas y contexto personalizado para el aprendiz (hora de Colombia UTC-5)
@@ -481,6 +561,14 @@ def panel(ficha_id):
 
     tareas_pendientes = [t for t in tareas_estado if t['estado'] in ('pendiente', 'correccion', 'vencida')]
     tareas_entregadas = [t for t in tareas_estado if t['estado'] in ('entregada', 'retraso')]
+    tareas_pendientes.extend(
+        trabajo for trabajo in trabajos_grupo
+        if trabajo['estado'] in ('pendiente', 'correccion', 'vencida')
+    )
+    tareas_entregadas.extend(
+        trabajo for trabajo in trabajos_grupo
+        if trabajo['estado'] in ('entregada', 'retraso')
+    )
     pendientes_futuras = [
         t for t in tareas_pendientes
         if t.get('limite_efectivo') and t['limite_efectivo'] >= ahora_utc
@@ -549,7 +637,11 @@ def panel(ficha_id):
                            timeline_aprendiz=timeline_aprendiz_orden,
                            instructores_aprendiz=instructores_aprendiz,
                            resumen_aprendiz=stats_resumen_aprendiz,
-                           grupo_actual=grupo_actual)
+                           grupo_actual=grupo_actual,
+                           trabajos_grupo=trabajos_grupo,
+                           curva_rendimiento=curva_rendimiento,
+                           advertencias_rendimiento=advertencias_rendimiento,
+                           recomendaciones_mejora=recomendaciones_mejora)
 
 
 def _aprendiz_admin_autorizado(ficha_id):
@@ -1001,14 +1093,31 @@ def subir_evidencia(ficha_id, tarea_id):
         flash('Esta actividad se revisa en clase; no requiere que subas nada.', 'error')
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
+    grupo_entrega = None
+    if tarea.es_grupal:
+        grupos_aprendiz = {
+            grupo.id for grupo in aprendiz.grupos_asignados.filter(
+                Grupo.activo.is_(True), Grupo.ficha_id == ficha_id
+            ).all()
+        }
+        grupo_entrega = next(
+            (grupo for grupo in tarea.grupos if grupo.id in grupos_aprendiz),
+            None,
+        )
+        if not grupo_entrega:
+            flash('Esta tarea no está asignada a un grupo activo tuyo.', 'error')
+            return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
     enlace_repo = request.form.get('enlace_repositorio', '').strip()
     archivo = request.files.get('archivo_evidencia')
-    entrega_existente = (
-        Entrega.query
-        .filter_by(tarea_id=tarea_id, aprendiz_id=aprendiz.id)
-        .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-        .first()
-    )
+    consulta_entrega = Entrega.query.filter_by(tarea_id=tarea_id)
+    if grupo_entrega:
+        consulta_entrega = consulta_entrega.filter_by(grupo_id=grupo_entrega.id)
+    else:
+        consulta_entrega = consulta_entrega.filter_by(aprendiz_id=aprendiz.id)
+    entrega_existente = consulta_entrega.order_by(
+        Entrega.fecha_entrega.desc(), Entrega.id.desc()
+    ).first()
 
     tiene_archivo_previo = bool(entrega_existente and entrega_existente.archivo_url)
     tiene_nuevo_archivo = bool(archivo and archivo.filename)
@@ -1034,7 +1143,7 @@ def subir_evidencia(ficha_id, tarea_id):
                 subcarpeta=(
                     f'ficha_{ficha_id}/'
                     f'instructor_{tarea.instructor_id}/'
-                    f'aprendiz_{aprendiz.id}/'
+                    f'{"grupo_" + str(grupo_entrega.id) if grupo_entrega else "aprendiz_" + str(aprendiz.id)}/'
                     f'tarea_{tarea.id}'
                 ),
                 prefijo_extra=f'tarea_{tarea_id}',
@@ -1076,6 +1185,7 @@ def subir_evidencia(ficha_id, tarea_id):
             db.session.add(Entrega(
                 tarea_id=tarea_id,
                 aprendiz_id=aprendiz.id,
+                grupo_id=grupo_entrega.id if grupo_entrega else None,
                 archivo_url=archivo_url,
                 enlace_repositorio=enlace_repo or None,
                 justificacion_retraso=justificacion_retraso,
@@ -1087,12 +1197,14 @@ def subir_evidencia(ficha_id, tarea_id):
         # el registro canónico en lugar de dejar datos ambiguos.
         db.session.rollback()
         try:
-            entrega_existente = (
-                Entrega.query
-                .filter_by(tarea_id=tarea.id, aprendiz_id=aprendiz.id)
-                .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-                .first()
-            )
+            consulta_entrega = Entrega.query.filter_by(tarea_id=tarea.id)
+            if grupo_entrega:
+                consulta_entrega = consulta_entrega.filter_by(grupo_id=grupo_entrega.id)
+            else:
+                consulta_entrega = consulta_entrega.filter_by(aprendiz_id=aprendiz.id)
+            entrega_existente = consulta_entrega.order_by(
+                Entrega.fecha_entrega.desc(), Entrega.id.desc()
+            ).first()
             if not entrega_existente:
                 if archivo_url:
                     ArchivoService.eliminar(archivo_url)
@@ -1337,12 +1449,27 @@ def descargar_evidencia(entrega_id):
         not entrega
         or not entrega.archivo_url
         or not aprendiz
-        or entrega.aprendiz_id != aprendiz.id
         or not entrega.tarea
         or entrega.tarea.ficha_id != ficha_id
         or not entrega.aprendiz
         or entrega.aprendiz.ficha_id != ficha_id
     ):
+        abort(404)
+
+    if entrega.grupo_id:
+        puede_descargar = bool(
+            entrega.tarea.es_grupal
+            and Grupo.query.filter(
+                Grupo.id == entrega.grupo_id,
+                Grupo.ficha_id == ficha_id,
+                Grupo.activo.is_(True),
+                Grupo.aprendices.any(Aprendiz.id == aprendiz.id),
+                Grupo.tareas_grupales.any(Tarea.id == entrega.tarea_id),
+            ).first()
+        )
+    else:
+        puede_descargar = entrega.aprendiz_id == aprendiz.id
+    if not puede_descargar:
         abort(404)
 
     raiz, relativa, _ = _resolver_archivo_subido(entrega.archivo_url)
@@ -1426,6 +1553,11 @@ def pedir_turno(ficha_id):
     motivo = request.form.get('motivo', '').strip()
     
     from app.services.atencion_service import AtencionService
+    turno_actual = AtencionService.obtener_turno_actual_aprendiz(ficha_id, aprendiz.id)
+    if turno_actual:
+        flash('Ya tienes un turno en la fila o el instructor te está atendiendo.', 'info')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
     turno = AtencionService.solicitar_turno(ficha_id, aprendiz.id, motivo=motivo)
     
     if turno.estado == 'esperando':

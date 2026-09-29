@@ -27,6 +27,7 @@ from app.models.observador import (
     NotaObservador,
 )
 from app.models.insignia import Insignia, InsigniaOtorgada
+from app.models.grupo import Grupo
 from app.models.ranking import ConfiguracionRanking
 from app.models.aseo import ConfiguracionAseo
 from app.services.ranking import actualizar_participacion_ficha
@@ -56,6 +57,8 @@ from app.services.permisos import (
     configurar_rol_aprendiz,
     puede_gestionar_ficha,
     puede_gestionar_corte,
+    puede_gestionar_asistencia,
+    puede_crear_tarea_en_corte,
     puede_gestionar_tarea,
     puede_ver_tarea,
     tareas_visibles,
@@ -83,6 +86,11 @@ from app.services.tareas import (
     obtener_prorrogas_tarea,
     obtener_tarea_gestionable,
     revocar_prorroga_tarea,
+)
+from app.services.trabajos_grupales import (
+    DatosAsignacionTareaInvalidos,
+    obtener_destinatarios_y_entregas_grupales,
+    validar_destinatarios_tarea,
 )
 from app.models.observador import NotaObservador, TIPO_NEGATIVA
 from app.models.ficha_instructor import FichaInstructor
@@ -217,6 +225,16 @@ def calcular_semaforo(ficha_id, aprendices, config, ahora=None, corte_id=None):
     faltas = _faltas_por_aprendiz(ficha_id, corte_id=corte_id)
     tareas_ficha = tareas_visibles(ficha_id, corte_id=corte_id).all()
     ultimas_entregas = _ultima_entrega_por_aprendiz(tareas_ficha)
+    destinatarios_grupales, entregas_grupales = (
+        obtener_destinatarios_y_entregas_grupales(
+            ficha_id, [tarea.id for tarea in tareas_ficha]
+        )
+    )
+    ids_grupales = {tarea.id for tarea in tareas_ficha if tarea.es_grupal}
+    for clave in list(ultimas_entregas):
+        if clave[0] in ids_grupales:
+            ultimas_entregas.pop(clave)
+    ultimas_entregas.update(entregas_grupales)
 
     stats_map = {}
     for aprendiz in aprendices:
@@ -231,6 +249,11 @@ def calcular_semaforo(ficha_id, aprendices, config, ahora=None, corte_id=None):
 
         tareas_pendientes = 0
         for tarea in tareas_ficha:
+            if (
+                tarea.es_grupal
+                and aprendiz.id not in destinatarios_grupales.get(tarea.id, set())
+            ):
+                continue
             entrega = ultimas_entregas.get((tarea.id, aprendiz.id))
             if entrega and entrega.estado_revision == 'rechazada':
                 tareas_pendientes += 1
@@ -1438,8 +1461,8 @@ def asistencia(ficha_id):
     parametros_corte = {'corte_id': corte_id} if corte_id else {}
 
     if request.method == 'POST':
-        if corte and not puede_gestionar_corte(corte):
-            flash('Puedes consultar este corte compartido, pero solo su instructor responsable puede modificar la asistencia.', 'error')
+        if corte and not puede_gestionar_asistencia(corte, ficha):
+            flash('Puedes consultar este corte, pero no está habilitado para modificar la asistencia.', 'error')
             return redirect(url_for('instructor.asistencia', ficha_id=ficha_id, **parametros_corte))
         fecha_str = request.form.get('fecha', '')
         if not fecha_str:
@@ -1591,7 +1614,7 @@ def asistencia(ficha_id):
                                Corte.fecha_inicio.desc(), Corte.id.desc()
                            ).all(),
                            corte_actual=corte,
-                           puede_editar_corte=(corte is None or puede_gestionar_corte(corte)))
+                           puede_editar_corte=puede_gestionar_asistencia(corte, ficha))
 
 @instructor_bp.route('/fichas/<int:ficha_id>/asistencia/aprendiz/<int:aprendiz_id>/modal')
 @login_required
@@ -1752,15 +1775,21 @@ def tareas(ficha_id):
             corte_id = corte.id if corte else None
 
     if request.method == 'POST':
-        if corte and not puede_gestionar_corte(corte):
+        if corte and not puede_crear_tarea_en_corte(corte, ficha):
             flash(
-                'Este corte es de solo lectura: está cerrado, archivado o pertenece a otro instructor.',
+                'Este corte es de solo lectura: está cerrado, archivado o no tienes permisos en esta ficha.',
                 'error',
             )
             return redirect(url_for('instructor.tareas', ficha_id=ficha_id, corte_id=corte_id))
         try:
             datos = leer_datos_tarea(request.form)
-        except DatosTareaInvalidos as exc:
+            es_grupal, grupos_destino = validar_destinatarios_tarea(
+                ficha_id,
+                request.form.get('tipo_asignacion', 'individual'),
+                datos['modalidad'],
+                request.form.getlist('grupos_ids[]'),
+            )
+        except (DatosTareaInvalidos, DatosAsignacionTareaInvalidos) as exc:
             flash(str(exc), 'error')
             return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
@@ -1778,6 +1807,8 @@ def tareas(ficha_id):
             instructor_id=current_user.id,
             corte_id=corte_id,
             material_apoyo_url=material_url,
+            es_grupal=es_grupal,
+            grupos=grupos_destino,
             **datos,
         )
         db.session.add(tarea)
@@ -1820,7 +1851,7 @@ def tareas(ficha_id):
     if modo_todos or ver_todas:
         grupos = agrupar_tareas_por_corte_e_instructor(lista_tareas, cortes_lista)
 
-    cortes_editables = [c for c in cortes_lista if puede_gestionar_corte(c)] if modo_todos else []
+    cortes_editables = [c for c in cortes_lista if puede_crear_tarea_en_corte(c, ficha)] if modo_todos else []
 
     from app.services.recomendaciones import obtener_recomendaciones_ficha, CAT_TAREAS
     recoms = obtener_recomendaciones_ficha(ficha_id, instructor_id=current_user.id)
@@ -1836,10 +1867,11 @@ def tareas(ficha_id):
         modo_todos=modo_todos,
         cortes_editables=cortes_editables,
         grupos=grupos,
-        puede_editar_corte=(corte is None or puede_gestionar_corte(corte)),
+        puede_editar_corte=puede_crear_tarea_en_corte(corte, ficha),
         filtro_instructor=filtro_instructor,
         instructores_ficha=instructores_ficha,
         recomendaciones_tareas=recomendaciones_tareas,
+        grupos_ficha=Grupo.query.filter_by(ficha_id=ficha_id, activo=True).order_by(Grupo.nombre).all(),
     )
 
 
@@ -1857,11 +1889,28 @@ def editar_tarea(ficha_id, tarea_id):
 
     try:
         datos = leer_datos_tarea(request.form)
-    except DatosTareaInvalidos as exc:
+        es_grupal, grupos_destino = validar_destinatarios_tarea(
+            ficha_id,
+            request.form.get('tipo_asignacion', 'individual'),
+            datos['modalidad'],
+            request.form.getlist('grupos_ids[]'),
+        )
+    except (DatosTareaInvalidos, DatosAsignacionTareaInvalidos) as exc:
         flash(str(exc), 'error')
         return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
     tiene_entregas = tarea.entregas.count() > 0
+    if tiene_entregas and (
+        es_grupal != tarea.es_grupal
+        or {grupo.id for grupo in grupos_destino} != {grupo.id for grupo in tarea.grupos}
+    ):
+        flash(
+            'No se puede cambiar la asignación individual o grupal cuando ya hay entregas. '
+            'El resto de los cambios sí se guardó.',
+            'error',
+        )
+        es_grupal = tarea.es_grupal
+        grupos_destino = list(tarea.grupos)
     if tiene_entregas and datos['modalidad'] != tarea.modalidad:
         # Cambiar de modalidad con entregas registradas dejaría evidencias
         # huérfanas o aprobaciones de aula sin sentido. Se conserva la actual.
@@ -1889,6 +1938,8 @@ def editar_tarea(ficha_id, tarea_id):
 
     for campo, valor in datos.items():
         setattr(tarea, campo, valor)
+    tarea.es_grupal = es_grupal
+    tarea.grupos = grupos_destino
     if material_nuevo:
         tarea.material_apoyo_url = material_nuevo
     elif quitar_material:
@@ -2058,12 +2109,27 @@ def evidencias_faltantes(ficha_id):
         (prorroga.tarea_id, prorroga.aprendiz_id): prorroga
         for prorroga in prorrogas_query
     }
+    destinatarios_grupales, entregas_grupales = (
+        obtener_destinatarios_y_entregas_grupales(ficha_id, ids_tareas)
+    )
+    ids_grupales = {tarea.id for tarea in tareas if tarea.es_grupal}
+    for clave in list(entregas_map):
+        if clave[0] in ids_grupales:
+            entregas_map.pop(clave)
+    entregas_map.update(entregas_grupales)
 
     datos_aprendices = []
     for ap in aprendices_list:
         faltantes = []
         entregadas = 0
+        tareas_aprendiz = []
         for tarea in tareas:
+            if (
+                tarea.es_grupal
+                and ap.id not in destinatarios_grupales.get(tarea.id, set())
+            ):
+                continue
+            tareas_aprendiz.append(tarea)
             entrega = entregas_map.get((tarea.id, ap.id))
             prorroga = prorrogas_map.get((tarea.id, ap.id))
             fecha_limite = (
@@ -2098,7 +2164,7 @@ def evidencias_faltantes(ficha_id):
                     ),
                 })
 
-        total_tareas = len(tareas)
+        total_tareas = len(tareas_aprendiz)
         cantidad_faltante = len(faltantes)
         estado_general = (
             'sin_tareas' if total_tareas == 0
@@ -2123,7 +2189,7 @@ def evidencias_faltantes(ficha_id):
             item['aprendiz'].nombre.casefold(),
         )
     )
-    total_asignaciones = len(aprendices_list) * len(tareas)
+    total_asignaciones = sum(item['total_tareas'] for item in datos_aprendices)
     total_entregadas = sum(item['entregadas'] for item in datos_aprendices)
     resumen = {
         'total_tareas': len(tareas),
@@ -2180,6 +2246,10 @@ def ver_entregas(tarea_id):
     entregas_map = {}
     for entrega in entregas:
         entregas_map.setdefault(entrega.aprendiz_id, entrega)
+    entregas_grupo_map = {}
+    for entrega in entregas:
+        if entrega.grupo_id:
+            entregas_grupo_map.setdefault(entrega.grupo_id, entrega)
     aprendices = Aprendiz.query_en_formacion(ficha.id).order_by(Aprendiz.apellidos).all()
 
     # Obtener insignias de la ficha
@@ -2197,6 +2267,7 @@ def ver_entregas(tarea_id):
 
     return render_template('entregas.html', tarea=tarea, ficha=ficha,
                            aprendices=aprendices, entregas_map=entregas_map,
+                           entregas_grupo_map=entregas_grupo_map,
                            insignias_map=insignias_map,
                            prorrogas_map=prorrogas_map,
                            planes_map=planes_map,

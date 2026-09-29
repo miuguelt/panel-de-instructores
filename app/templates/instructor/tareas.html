@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
+{% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
 {% block title %}Tareas - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">
 <style>
     .modalidad-opciones {
         display: grid;
@@ -146,13 +147,7 @@
     </div>
 </div>
 
-{% if recomendaciones_tareas %}
-<div class="tareas-recommendations-cluster" style="margin-bottom: 1.25rem;">
-    {% for rec in recomendaciones_tareas[:2] %}
-        {{ render_banner_recomendacion(rec) }}
-    {% endfor %}
-</div>
-{% endif %}
+{{ render_alertas_contextuales(ficha.id, 'tareas_calificaciones') }}
 
     <div class="page-control-panel">
         <div class="control-selectors-cluster">
@@ -254,6 +249,34 @@
         <div class="form-group">
             <label for="descripcion">Descripción</label>
             <textarea id="descripcion" name="descripcion" rows="3" placeholder="Describe lo que deben hacer los aprendices..."></textarea>
+        </div>
+
+        <fieldset class="form-group assignment-type-fieldset">
+            <legend>¿A quién se asigna?</legend>
+            <div class="assignment-type-grid">
+                <label class="assignment-type-option">
+                    <input type="radio" name="tipo_asignacion" value="individual" checked data-tipo-asignacion>
+                    <span><strong>Individual</strong><small>Cada aprendiz entrega su propia evidencia.</small></span>
+                </label>
+                <label class="assignment-type-option {% if not grupos_ficha %}is-disabled{% endif %}">
+                    <input type="radio" name="tipo_asignacion" value="grupal" data-tipo-asignacion
+                           {% if not grupos_ficha %}disabled aria-describedby="sin-grupos-disponibles"{% endif %}>
+                    <span><strong>Por grupos</strong><small>Una evidencia compartida por cada grupo seleccionado.</small></span>
+                </label>
+            </div>
+            {% if not grupos_ficha %}
+            <small id="sin-grupos-disponibles" class="form-hint">Primero debes crear los grupos de esta ficha para asignar una tarea grupal.</small>
+            {% endif %}
+        </fieldset>
+
+        <div class="form-group task-groups-picker" data-grupos-picker hidden>
+            <label for="grupos-tarea">Grupos responsables</label>
+            <select id="grupos-tarea" name="grupos_ids[]" multiple size="5" data-grupos-select>
+                {% for grupo in grupos_ficha|default([]) %}
+                <option value="{{ grupo.id }}">{{ grupo.nombre }}</option>
+                {% endfor %}
+            </select>
+            <small class="form-hint">Selecciona uno o varios grupos. Cada grupo tendrá una sola entrega compartida.</small>
         </div>
 
         <div class="form-group">
@@ -359,15 +382,32 @@
     // oculta para no prometer un comportamiento que no existe.
     document.querySelectorAll('[data-form-tarea]').forEach(function (contenedor) {
         var soloEvidencia = contenedor.querySelector('[data-solo-evidencia]');
-        if (!soloEvidencia) { return; }
-        function sincronizar() {
+        function sincronizarModalidad() {
+            if (!soloEvidencia) { return; }
             var seleccion = contenedor.querySelector('[data-modalidad]:checked');
             soloEvidencia.hidden = !seleccion || seleccion.value !== 'evidencia';
         }
         contenedor.querySelectorAll('[data-modalidad]').forEach(function (radio) {
-            radio.addEventListener('change', sincronizar);
+            radio.addEventListener('change', sincronizarModalidad);
         });
-        sincronizar();
+        sincronizarModalidad();
+
+        var selectorGrupos = contenedor.querySelector('[data-grupos-picker]');
+        var gruposSelect = contenedor.querySelector('[data-grupos-select]');
+        var radiosAsignacion = contenedor.querySelectorAll('[data-tipo-asignacion]');
+        if (!selectorGrupos || !gruposSelect || !radiosAsignacion.length) { return; }
+
+        function sincronizarAsignacion() {
+            var esGrupal = contenedor.querySelector('[data-tipo-asignacion]:checked')?.value === 'grupal';
+            selectorGrupos.hidden = !esGrupal;
+            gruposSelect.required = esGrupal;
+            gruposSelect.disabled = !esGrupal;
+            gruposSelect.setAttribute('aria-required', esGrupal ? 'true' : 'false');
+        }
+        radiosAsignacion.forEach(function (radio) {
+            radio.addEventListener('change', sincronizarAsignacion);
+        });
+        sincronizarAsignacion();
     });
 </script>
 {% endblock %}

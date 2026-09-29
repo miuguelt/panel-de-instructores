@@ -345,6 +345,7 @@ def create_app(test_config=None):
     _register('app.routes.aseo', 'aseo_bp', url_prefix='/instructor')
     _register('app.routes.seguimiento', 'seguimiento_bp', url_prefix='/instructor')
     _register('app.routes.aprendiz', 'aprendiz_bp', url_prefix='/aprendiz')
+    _register('app.routes.grupo_aprendiz', 'grupo_aprendiz_bp')
     _register('app.routes.aseo', 'aseo_aprendiz_bp', url_prefix='/aprendiz')
     _register('app.routes.seguimiento', 'aprendiz_seguimiento_bp', url_prefix='/aprendiz')
     _register('app.routes.grupos', 'grupos_bp', url_prefix='/instructor')
@@ -356,6 +357,41 @@ def create_app(test_config=None):
             'La aplicacion arranco en modo DEGRADADO. Rutas no disponibles: %s',
             ' | '.join(app.config['STARTUP_ERRORS']),
         )
+
+    def _alertas_modulo(ficha_id, categoria):
+        if not current_user.is_authenticated or not ficha_id:
+            return []
+        cache_key = f'_alertas_modulo_{ficha_id}'
+        from flask import g
+        if hasattr(g, cache_key):
+            todas = getattr(g, cache_key)
+        else:
+            try:
+                from app.services.recomendaciones import obtener_recomendaciones_ficha
+                todas = obtener_recomendaciones_ficha(ficha_id)
+                setattr(g, cache_key, todas)
+            except Exception:
+                todas = []
+                setattr(g, cache_key, todas)
+        return [r for r in todas if r.categoria == categoria]
+
+    def _alertas_aprendiz(ficha_id, aprendiz_id):
+        if not current_user.is_authenticated or not ficha_id or not aprendiz_id:
+            return []
+        cache_key = f'_alertas_aprendiz_{aprendiz_id}'
+        from flask import g
+        if hasattr(g, cache_key):
+            return getattr(g, cache_key)
+        try:
+            from app.services.recomendaciones import obtener_recomendaciones_aprendiz
+            todas = obtener_recomendaciones_aprendiz(ficha_id, aprendiz_id)
+            setattr(g, cache_key, todas)
+            return todas
+        except Exception:
+            return []
+
+    app.jinja_env.globals['alertas_modulo'] = _alertas_modulo
+    app.jinja_env.globals['alertas_aprendiz'] = _alertas_aprendiz
 
     _static_v_cache = {}
 
@@ -398,6 +434,8 @@ def create_app(test_config=None):
             'datetime': datetime,
             'max_upload_bytes': app.config.get('MAX_UPLOAD_BYTES') or 0,
             'static_v': static_v,
+            'alertas_modulo': _alertas_modulo,
+            'alertas_aprendiz': _alertas_aprendiz,
         }
 
     @app.template_filter('tipo_competencia')
@@ -493,6 +531,8 @@ def create_app(test_config=None):
         if request.method == 'POST':
             if (
                 request.endpoint in {
+                    'aprendiz.pedir_turno',
+                    'aprendiz.cancelar_turno',
                     'aprendiz.subir_evidencia',
                     'aprendiz.subir_evidencia_plan',
                     'aprendiz.adjuntar_soporte_inasistencia',

@@ -105,9 +105,9 @@ _MAX_MAGIC_READ = 1024
 # aunque la vista pida `inline=1`.
 EXTENSIONES_INLINE: set[str] = {'png', 'jpg', 'jpeg', 'pdf'}
 
-# `{prefijo_}{uuid12}_{nombre original}`: se usa para devolverle al usuario el
+# `{prefijo_}{uuid}_{nombre original}`: se usa para devolverle al usuario el
 # nombre con el que subió el archivo en vez del nombre técnico del disco.
-_PREFIJO_TECNICO = re.compile(r'(?:^|_)[0-9a-f]{12}_')
+_PREFIJO_TECNICO = re.compile(r'(?:^|_)v?\d*_*[0-9a-f]{12,32}_')
 
 
 def _magic_coincide(contenido: bytes, extension: str) -> bool:

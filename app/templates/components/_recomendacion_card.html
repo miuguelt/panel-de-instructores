@@ -58,3 +58,25 @@
 </article>
 {% endif %}
 {% endmacro %}
+
+{% macro render_alertas_contextuales(ficha_id, categoria) %}
+{% set alertas = alertas_modulo(ficha_id, categoria) %}
+{% if alertas %}
+<div class="module-contextual-alerts" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+    {% for alerta in alertas %}
+        {{ render_banner_recomendacion(alerta) }}
+    {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro render_alertas_aprendiz(ficha_id, aprendiz_id) %}
+{% set alertas = alertas_aprendiz(ficha_id, aprendiz_id) %}
+{% if alertas %}
+<div class="student-contextual-alerts no-print" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+    {% for alerta in alertas %}
+        {{ render_banner_recomendacion(alerta) }}
+    {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}

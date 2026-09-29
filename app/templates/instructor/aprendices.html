@@ -2167,7 +2167,6 @@
     let currentUrl = (input && input.dataset.urlWifi) ? input.dataset.urlWifi : (input ? input.value : '');
     let qrGeneradoPreview = false;
     let qrGeneradoTv = false;
-    let previousFocusedElement = null;
 
     if (input && currentUrl && input.value !== currentUrl) {
         input.value = currentUrl;
@@ -2250,10 +2249,7 @@
 
     function openTvModal() {
         if (!tvModal) return;
-        previousFocusedElement = document.activeElement;
-        tvModal.removeAttribute('hidden');
-        tvModal.classList.add('is-open');
-        document.body.style.overflow = 'hidden';
+        window.abrirModal('qr-tv-modal');
 
         // Asegurar que el QR en alta resolución esté generado con la URL activa
         renderTvQR(currentUrl, !qrGeneradoTv);
@@ -2270,12 +2266,7 @@
         if (document.fullscreenElement) {
             document.exitFullscreen().catch(() => {});
         }
-        tvModal.classList.remove('is-open');
-        tvModal.setAttribute('hidden', '');
-        document.body.style.overflow = '';
-        if (previousFocusedElement && typeof previousFocusedElement.focus === 'function') {
-            previousFocusedElement.focus();
-        }
+        window.cerrarModal('qr-tv-modal');
     }
 
     function toggleFullscreen() {
@@ -2360,7 +2351,10 @@
             }
 
             if (!dataUrl) {
-                alert('El código QR aún se está generando. Intenta en un segundo.');
+                window.mostrarAviso('El código QR aún se está generando. Intenta de nuevo en un momento.', {
+                    title: 'Código en preparación',
+                    intent: 'warning'
+                });
                 return;
             }
 

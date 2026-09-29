@@ -22,6 +22,7 @@ from app.models.ficha_instructor import FichaInstructor
 from app.models.observador import TIPO_NEGATIVA, NotaObservador
 from app.models.tarea import Entrega, ProrrogaTarea, Tarea
 from app.services.asistencia import contar_sesiones_registradas
+from app.services.trabajos_grupales import obtener_destinatarios_y_entregas_grupales
 
 
 # ─────────────────────────────────────────────
@@ -87,6 +88,18 @@ class ContextoFicha:
         )
         for entrega in entregas:
             self.entregas[entrega.aprendiz_id].setdefault(entrega.tarea_id, entrega)
+
+        self.destinatarios_grupales, entregas_grupales = (
+            obtener_destinatarios_y_entregas_grupales(
+                ficha_id, [tarea.id for tarea in self.tareas]
+            )
+        )
+        for tarea in self.tareas:
+            if tarea.es_grupal:
+                for entregas_aprendiz in self.entregas.values():
+                    entregas_aprendiz.pop(tarea.id, None)
+        for (tarea_id, aprendiz_id), entrega in entregas_grupales.items():
+            self.entregas[aprendiz_id][tarea_id] = entrega
 
         self.prorrogas = defaultdict(dict)
         prorrogas = (
@@ -397,6 +410,11 @@ def _incumplimientos_academicos(aprendiz_id, ficha_id, ahora, contexto=None):
 
     incumplidas = []
     for tarea in tareas:
+        if (
+            tarea.es_grupal
+            and aprendiz_id not in ctx.destinatarios_grupales.get(tarea.id, set())
+        ):
+            continue
         entrega = por_tarea.get(tarea.id)
         prorroga = ctx.prorroga(aprendiz_id, tarea.id)
         limite_efectivo = prorroga.nueva_fecha_limite if prorroga and prorroga.nueva_fecha_limite else tarea.fecha_limite
@@ -731,7 +749,26 @@ def crear_recordatorios_aprendiz(ficha_id, aprendiz_id, ahora=None):
     ):
         entregas_aprendiz.setdefault(entrega.tarea_id, entrega)
 
+    destinatarios_grupales, entregas_grupales = (
+        obtener_destinatarios_y_entregas_grupales(
+            ficha_id, [tarea.id for tarea in tareas]
+        )
+    )
     for tarea in tareas:
+        if tarea.es_grupal:
+            entregas_aprendiz.pop(tarea.id, None)
+    entregas_aprendiz.update({
+        tarea_id: entrega
+        for (tarea_id, destino_id), entrega in entregas_grupales.items()
+        if destino_id == aprendiz_id
+    })
+
+    for tarea in tareas:
+        if (
+            tarea.es_grupal
+            and aprendiz_id not in destinatarios_grupales.get(tarea.id, set())
+        ):
+            continue
         if not tarea.fecha_limite:
             continue
         entrega = entregas_aprendiz.get(tarea.id)
@@ -772,15 +809,31 @@ def notificar_calificacion(entrega, ficha_id, commit=True):
     ``commit=False`` permite que las operaciones masivas agreguen todas las
     notificaciones a la misma transacción que las calificaciones.
     """
-    if not entrega or not entrega.aprendiz:
+    if not entrega:
         return
-    registrar_notificacion(
-        'aprendiz', entrega.aprendiz_id,
-        'Tu instructor publicó una calificación o retroalimentación. Si no estás de acuerdo, '
-        'puedes solicitar revisión dentro de los dos días hábiles siguientes a la publicación.',
-        'calificacion', f'calificacion:{entrega.id}:{entrega.revisada_en}', ficha_id,
-        f'/aprendiz/{ficha_id}/panel?documento={entrega.aprendiz.documento}',
-    )
+    if entrega.grupo_id and entrega.tarea and entrega.tarea.es_grupal:
+        _destinatarios, entregas_compartidas = obtener_destinatarios_y_entregas_grupales(
+            ficha_id, [entrega.tarea_id]
+        )
+        ids_aprendices = {
+            aprendiz_id
+            for (tarea_id, aprendiz_id), entrega_grupal in entregas_compartidas.items()
+            if tarea_id == entrega.tarea_id and entrega_grupal.id == entrega.id
+        }
+        aprendices = Aprendiz.query.filter(
+            Aprendiz.id.in_(ids_aprendices)
+        ).order_by(Aprendiz.id).all() if ids_aprendices else []
+    else:
+        aprendices = [entrega.aprendiz] if entrega.aprendiz else []
+
+    for aprendiz in aprendices:
+        registrar_notificacion(
+            'aprendiz', aprendiz.id,
+            'Tu instructor publicó una calificación o retroalimentación. Si no estás de acuerdo, '
+            'puedes solicitar revisión dentro de los dos días hábiles siguientes a la publicación.',
+            'calificacion', f'calificacion:{entrega.id}:{entrega.revisada_en}', ficha_id,
+            f'/aprendiz/{ficha_id}/panel?documento={aprendiz.documento}',
+        )
     if commit:
         db.session.commit()
 

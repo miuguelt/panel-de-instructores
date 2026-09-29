@@ -1,7 +1,17 @@
 {% extends "base.html" %}
+{% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
 {% block title %}Casos de seguimiento - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
+        <h1>🛡️ Casos de Seguimiento</h1>
+    </div>
+</div>
+
+{{ render_alertas_contextuales(ficha.id, 'asistencia_comite') }}
+
 {% if resumen is defined and resumen %}
 {% set page_summary = resumen %}
 {% else %}
@@ -250,16 +260,22 @@
                     </div>
                     <div class="case-actions">
                         {% if alerta.estado == 'activa' %}
-                        <form method="POST" action="{{ url_for('seguimiento.resolver_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}" onsubmit="return confirm('¿Confirmas que este caso fue revisado y puede cerrarse?');">
+                        <form method="POST" action="{{ url_for('seguimiento.resolver_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}"
+                              data-confirm="¿Confirma que este caso fue revisado y puede cerrarse?"
+                              data-confirm-title="Cerrar caso revisado" data-confirm-label="Cerrar caso">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-primary">Marcar revisada</button>
                         </form>
-                        <form method="POST" action="{{ url_for('seguimiento.escalar_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}" onsubmit="return confirm('¿Confirmas que este caso debe prepararse para comité?');">
+                        <form method="POST" action="{{ url_for('seguimiento.escalar_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}"
+                              data-confirm="¿Confirma que este caso debe prepararse para comité?"
+                              data-confirm-title="Preparar caso para comité" data-confirm-label="Preparar comité" data-confirm-intent="warning">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-warning">Preparar comité</button>
                         </form>
                         {% else %}
-                        <form method="POST" action="{{ url_for('seguimiento.resolver_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}" onsubmit="return confirm('¿Confirmas el cierre de este caso escalado?');">
+                        <form method="POST" action="{{ url_for('seguimiento.resolver_alerta', ficha_id=ficha.id, alerta_id=alerta.id) }}"
+                              data-confirm="¿Confirma el cierre de este caso escalado?"
+                              data-confirm-title="Cerrar caso escalado" data-confirm-label="Cerrar caso">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-primary">Cerrar caso</button>
                         </form>

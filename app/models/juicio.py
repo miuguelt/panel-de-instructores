@@ -1,3 +1,4 @@
+import secrets
 from app.helpers import utc_now
 
 from app import db
@@ -17,7 +18,7 @@ class JuicioEvaluativo(db.Model):
     fecha_fuente_texto = db.Column(db.String(80), nullable=True)
     funcionario_registro = db.Column(db.String(200), nullable=True)
     fuente_archivo = db.Column(db.String(255), nullable=True)
-    huella = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    huella = db.Column(db.String(64), nullable=False, unique=True, index=True, default=lambda: secrets.token_hex(32))
     importado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     ficha = db.relationship('Ficha', back_populates='juicios_evaluativos')

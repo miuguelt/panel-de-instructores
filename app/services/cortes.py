@@ -40,21 +40,30 @@ def corte_actual(ficha_id, corte_id=None):
     if corte_id:
         return corte_visible(ficha_id, corte_id)
 
-    propios = cortes_visibles(ficha_id)
+    visibles = cortes_visibles(ficha_id)
     if getattr(current_user, 'is_authenticated', False) and not getattr(current_user, 'es_admin', False):
-        propios = propios.filter(Corte.instructor_id == current_user.id)
+        propios = visibles.filter(Corte.instructor_id == current_user.id)
         propio_activo = propios.filter(Corte.estado == Corte.ESTADO_ACTIVO).order_by(
             Corte.fecha_inicio.desc(), Corte.id.desc()
         ).first()
         if propio_activo:
             return propio_activo
-        return propios.order_by(Corte.fecha_inicio.desc(), Corte.id.desc()).first()
-    activo = propios.filter(Corte.estado == Corte.ESTADO_ACTIVO).order_by(
+        propio_cualquiera = propios.order_by(Corte.fecha_inicio.desc(), Corte.id.desc()).first()
+        if propio_cualquiera:
+            return propio_cualquiera
+        # Si el instructor no tiene cortes propios en la ficha, usa el corte compartido activo
+        compartido_activo = visibles.filter(Corte.estado == Corte.ESTADO_ACTIVO).order_by(
+            Corte.fecha_inicio.desc(), Corte.id.desc()
+        ).first()
+        if compartido_activo:
+            return compartido_activo
+        return visibles.order_by(Corte.fecha_inicio.desc(), Corte.id.desc()).first()
+    activo = visibles.filter(Corte.estado == Corte.ESTADO_ACTIVO).order_by(
         Corte.fecha_inicio.desc(), Corte.id.desc()
     ).first()
     if activo:
         return activo
-    return propios.order_by(Corte.fecha_inicio.desc(), Corte.id.desc()).first()
+    return visibles.order_by(Corte.fecha_inicio.desc(), Corte.id.desc()).first()
 
 
 def siguiente_nombre_corte(ficha_id, instructor_id):

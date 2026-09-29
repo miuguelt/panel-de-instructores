@@ -546,15 +546,9 @@ function abrirModalCompetencia(rowEl) {
         apContainer.appendChild(empty);
     }
     
-    const modal = document.getElementById('modalCompetencia');
-    modal.showModal();
-    document.body.classList.add('modal-open');
+    window.abrirModal('modalCompetencia');
 }
 
-// Modales manejados por funciones globales en base.html
-
-document.getElementById('modalCompetencia')?.addEventListener('close', () => {
-    document.body.classList.remove('modal-open');
-});
+// El sistema global de modales administra el foco y el bloqueo del fondo.
 </script>
 {% endblock %}

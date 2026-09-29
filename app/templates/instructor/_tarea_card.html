@@ -3,6 +3,11 @@
     <div class="task-header">
         <h3>{{ tarea.titulo }}</h3>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            {% if tarea.es_grupal %}
+            <span class="badge badge-info">👥 Entrega grupal</span>
+            {% else %}
+            <span class="badge badge-secondary">👤 Entrega individual</span>
+            {% endif %}
             {% if tarea.es_actividad_clase %}
             <span class="badge badge-info">Se revisa en clase</span>
             {% else %}
@@ -17,6 +22,11 @@
     </div>
     {% if tarea.creador %}
     <p class="text-muted">Instructor responsable: {{ tarea.creador.nombre }}{% if tarea.corte and tarea.corte.compartido %} · Información compartida{% endif %}</p>
+    {% endif %}
+    {% if tarea.es_grupal and tarea.grupos %}
+    <p class="group-assignment-names"><strong>Grupos responsables:</strong>
+        {% for grupo in tarea.grupos %}<span>{{ grupo.nombre }}</span>{% if not loop.last %}<span aria-hidden="true">·</span>{% endif %}{% endfor %}
+    </p>
     {% endif %}
     {% if tarea.descripcion %}
     <p class="task-desc">{{ tarea.descripcion }}</p>
@@ -34,7 +44,8 @@
         </a>
         {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}<form method="POST"
               action="{{ url_for('instructor.eliminar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
-              onsubmit="return confirm('Se eliminará la tarea «{{ tarea.titulo|e }}» junto con todas sus entregas, calificaciones y archivos. Esta acción no se puede deshacer. ¿Continuar?');"
+              data-confirm="Se eliminará la tarea «{{ tarea.titulo|e }}» junto con sus entregas, calificaciones y archivos. Esta acción no se puede deshacer. ¿Desea continuar?"
+              data-confirm-title="Eliminar tarea" data-confirm-label="Eliminar tarea" data-confirm-intent="danger"
               style="display: inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             {% if tarea.corte_id %}<input type="hidden" name="corte_id" value="{{ tarea.corte_id }}">{% endif %}
@@ -57,6 +68,37 @@
             <div class="form-group">
                 <label for="descripcion-{{ tarea.id }}">Descripción</label>
                 <textarea id="descripcion-{{ tarea.id }}" name="descripcion" rows="3">{{ tarea.descripcion or '' }}</textarea>
+            </div>
+
+            <fieldset class="form-group assignment-type-fieldset">
+                <legend>¿A quién se asigna?</legend>
+                <div class="assignment-type-grid">
+                    <label class="assignment-type-option">
+                        <input type="radio" name="tipo_asignacion" value="individual" data-tipo-asignacion {% if not tarea.es_grupal %}checked{% endif %}>
+                        <span><strong>Individual</strong><small>Cada aprendiz entrega su propia evidencia.</small></span>
+                    </label>
+                    <label class="assignment-type-option {% if not grupos_ficha and not tarea.grupos %}is-disabled{% endif %}">
+                        <input type="radio" name="tipo_asignacion" value="grupal" data-tipo-asignacion {% if tarea.es_grupal %}checked{% endif %}
+                               {% if not grupos_ficha and not tarea.grupos %}disabled aria-describedby="sin-grupos-editar-{{ tarea.id }}"{% endif %}>
+                        <span><strong>Por grupos</strong><small>Una evidencia compartida por cada grupo seleccionado.</small></span>
+                    </label>
+                </div>
+                {% if not grupos_ficha and not tarea.grupos %}<small id="sin-grupos-editar-{{ tarea.id }}" class="form-hint">No hay grupos activos en esta ficha.</small>{% endif %}
+            </fieldset>
+
+            <div class="form-group task-groups-picker" data-grupos-picker hidden>
+                <label for="grupos-tarea-{{ tarea.id }}">Grupos responsables</label>
+                <select id="grupos-tarea-{{ tarea.id }}" name="grupos_ids[]" multiple size="5" data-grupos-select>
+                    {% for grupo in grupos_ficha|default([]) %}
+                    <option value="{{ grupo.id }}" {% if grupo.id in tarea.grupos|map(attribute='id')|list %}selected{% endif %}>{{ grupo.nombre }}</option>
+                    {% endfor %}
+                    {% for grupo in tarea.grupos %}
+                    {% if grupo.id not in grupos_ficha|default([])|map(attribute='id')|list %}
+                    <option value="{{ grupo.id }}" selected>{{ grupo.nombre }} (inactivo)</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <small class="form-hint">Selecciona uno o varios grupos. Cada grupo tendrá una sola entrega compartida.</small>
             </div>
 
             <div class="form-group">

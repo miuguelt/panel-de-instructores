@@ -105,6 +105,30 @@ class RankingTestCase(unittest.TestCase):
         filas, _ = calcular_ranking(self.ficha.id)
         self.assertTrue(all(fila['puntaje_total'] == 0 for fila in filas))
 
+    def test_aprendiz_sin_asistencia_no_recibe_puntualidad(self):
+        # Crear mes de sesiones donde Carlos (aprendiz) siempre falta
+        ahora = datetime.utcnow()
+        inicio_mes = datetime(ahora.year, ahora.month, 1)
+        for i in range(4):
+            sesion = SesionAsistencia(ficha_id=self.ficha.id, fecha=inicio_mes + timedelta(days=i))
+            db.session.add(sesion)
+            db.session.commit()
+            registro = RegistroAsistencia(
+                sesion_id=sesion.id,
+                aprendiz_id=self.ana.id,
+                estado='FALTA'
+            )
+            db.session.add(registro)
+        db.session.commit()
+
+        actualizar_participacion_ficha(self.ficha.id, ahora=ahora)
+        
+        # Carlos no debe tener la insignia de puntualidad total
+        insignias_carlos = [
+            o.insignia.codigo for o in InsigniaOtorgada.query.filter_by(aprendiz_id=self.ana.id).all()
+        ]
+        self.assertNotIn('PUNTUALIDAD_TOTAL', insignias_carlos)
+
     def test_entregas_tempranas_otorgan_logros_permanentes(self):
         for numero in range(5):
             tarea = Tarea(

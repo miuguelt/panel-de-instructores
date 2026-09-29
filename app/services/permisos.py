@@ -20,16 +20,18 @@ def puede_gestionar_ficha(ficha):
 
 
 def tareas_visibles(ficha_id, corte_id=None, ver_todas=False, instructor_id=None):
-    """Devuelve solo las tareas que el usuario puede consultar en una ficha."""
+    """Devuelve solo las tareas que el usuario puede consultar en una ficha.
+
+    Al consultar un corte concreto o con ver_todas=True, todos los instructores
+    autorizados ven el contenido compartido; la edición sigue restringida al
+    creador mediante ``puede_gestionar_tarea()``.
+    """
     consulta = Tarea.query.filter_by(ficha_id=ficha_id)
     if corte_id is not None:
         consulta = consulta.filter(Tarea.corte_id == corte_id)
     if instructor_id is not None:
         consulta = consulta.filter(Tarea.instructor_id == instructor_id)
     elif not ver_todas and hasattr(current_user, 'is_authenticated') and current_user.is_authenticated and not getattr(current_user, 'es_admin', False):
-        # Al consultar un corte concreto, todos los instructores autorizados
-        # pueden ver el contenido compartido; la edición sigue restringida al
-        # creador mediante puede_gestionar_tarea().
         if corte_id is None:
             consulta = consulta.filter(Tarea.instructor_id == current_user.id)
     return consulta
@@ -60,6 +62,40 @@ def puede_gestionar_corte(corte):
     if not corte.esta_activo:
         return False
     return current_user.es_admin or corte.instructor_id == current_user.id
+
+
+def puede_gestionar_asistencia(corte, ficha=None):
+    """Permite registrar asistencia al creador del corte, a un admin o a colaboradores si el corte es compartido y está activo."""
+    if not current_user.is_authenticated:
+        return False
+    if corte is None:
+        ficha_obj = ficha or (db.session.get(Ficha, corte.ficha_id) if corte else None)
+        return puede_gestionar_ficha(ficha_obj) if ficha_obj else True
+    if not corte.esta_activo:
+        return False
+    if getattr(current_user, 'es_admin', False) or corte.instructor_id == current_user.id:
+        return True
+    if corte.compartido:
+        ficha_obj = ficha or corte.ficha
+        return puede_gestionar_ficha(ficha_obj)
+    return False
+
+
+def puede_crear_tarea_en_corte(corte, ficha=None):
+    """Permite crear tareas en un corte activo al responsable o a colaboradores de la ficha si está compartido."""
+    if not current_user.is_authenticated:
+        return False
+    if corte is None:
+        ficha_obj = ficha or (db.session.get(Ficha, corte.ficha_id) if corte else None)
+        return puede_gestionar_ficha(ficha_obj) if ficha_obj else True
+    if not corte.esta_activo:
+        return False
+    if getattr(current_user, 'es_admin', False) or corte.instructor_id == current_user.id:
+        return True
+    if corte.compartido:
+        ficha_obj = ficha or corte.ficha
+        return puede_gestionar_ficha(ficha_obj)
+    return False
 
 
 def puede_administrar_corte(corte):

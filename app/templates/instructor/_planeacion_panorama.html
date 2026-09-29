@@ -764,6 +764,8 @@
                         data-int-dir="{{ celda.intensidad_semanal }}"
                         data-int-tot="{{ celda.intensidad_semanal_tot }}"
                         data-raps='{{ celda.raps|tojson|safe }}'
+                        role="button" tabindex="0" aria-haspopup="dialog" aria-controls="modal-detalle-raps"
+                        aria-label="Ver {{ celda.num_raps }} resultados de aprendizaje de {{ celda.etiqueta }} para {{ fila.instructor }}"
                         onclick="mostrarDetalleRap(this)"
                         title="{{ fila.instructor }} en {{ celda.etiqueta }}: {{ celda.horas_directas }}h directas (~{{ celda.intensidad_semanal }} h/sem) [{{ celda.num_raps }} RAPs]">
                         <div class="pl-heat-val heat-val-display">{{ celda.horas_directas|round|int }}h</div>
@@ -813,7 +815,7 @@
 </section>
 
 <!-- Modal / Drawer de Desglose de RAPs por Celda -->
-<div id="modal-detalle-raps" class="pl-modal-raps" role="dialog" aria-modal="true" aria-labelledby="modal-raps-titulo" style="display:none;">
+<div id="modal-detalle-raps" class="pl-modal-raps" role="dialog" aria-modal="true" aria-labelledby="modal-raps-titulo" aria-hidden="true" hidden>
     <div class="pl-modal-raps-box">
         <div class="pl-modal-raps-head">
             <div>
@@ -876,8 +878,6 @@ function cambiarModoHeatmap(modo) {
     });
 }
 
-let ultimoFocoRaps = null;
-
 function mostrarDetalleRap(td) {
     const rawRaps = td.getAttribute('data-raps');
     if (!rawRaps) return;
@@ -916,34 +916,20 @@ function mostrarDetalleRap(td) {
     });
 
     const modal = document.getElementById('modal-detalle-raps');
-    ultimoFocoRaps = document.activeElement;
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    const btnCierre = modal.querySelector('.pl-modal-raps-close');
-    if (btnCierre) btnCierre.focus();
+    window.abrirModal(modal);
 }
 
 function cerrarDetalleRap() {
     const modal = document.getElementById('modal-detalle-raps');
-    if (modal) modal.style.display = 'none';
-    document.body.style.overflow = '';
-    if (ultimoFocoRaps && ultimoFocoRaps.focus) ultimoFocoRaps.focus();
-    ultimoFocoRaps = null;
+    if (modal) window.cerrarModal(modal);
 }
 
-window.addEventListener('click', function(e) {
-    const modal = document.getElementById('modal-detalle-raps');
-    if (modal && e.target === modal) {
-        cerrarDetalleRap();
-    }
-});
-
-window.addEventListener('keydown', function(e) {
-    if (e.key !== 'Escape') return;
-    const modal = document.getElementById('modal-detalle-raps');
-    if (modal && modal.style.display !== 'none') {
-        cerrarDetalleRap();
-    }
+document.querySelectorAll('.pl-heatmap-cell[role="button"]').forEach(function (celda) {
+    celda.addEventListener('keydown', function (evento) {
+        if (evento.key !== 'Enter' && evento.key !== ' ') return;
+        evento.preventDefault();
+        mostrarDetalleRap(celda);
+    });
 });
 </script>
 {% endif %}

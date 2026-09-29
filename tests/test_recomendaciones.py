@@ -225,3 +225,71 @@ class RecomendacionesTestCase(unittest.TestCase):
         self.assertIn('Racha de Hierro', html)
         self.assertIn('Entregas Impecables', html)
 
+    def test_recomendacion_advertencia_curva_descendente(self):
+        """Verifica que una curva de rendimiento descendente genere advertencia."""
+        from app.models.ranking import PuntajeHistorico
+        h1 = PuntajeHistorico(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz1.id,
+            fecha_corte=datetime(2026, 3, 1),
+            puntaje_total=75.0,
+            posicion=2,
+        )
+        h2 = PuntajeHistorico(
+            ficha_id=self.ficha.id,
+            aprendiz_id=self.aprendiz1.id,
+            fecha_corte=datetime(2026, 3, 15),
+            puntaje_total=58.0,
+            posicion=6,
+        )
+        db.session.add_all([h1, h2])
+        db.session.commit()
+
+        recoms = obtener_recomendaciones_aprendiz(self.ficha.id, self.aprendiz1.id)
+        adv_desc = next((r for r in recoms if 'curva de rendimiento muestra un descenso' in r.titulo), None)
+        self.assertIsNotNone(adv_desc)
+        self.assertEqual(adv_desc.severidad, SEV_CRITICA)
+        self.assertIn('-17.0 pts', adv_desc.metrica_destacada)
+
+    def test_recomendacion_advertencia_tareas_vencidas(self):
+        """Verifica advertencia cuando el aprendiz tiene evidencias vencidas pendientes."""
+        ahora = datetime.utcnow()
+        t1 = Tarea(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            titulo='Diagrama UML',
+            fecha_limite=ahora - timedelta(days=2),
+            modalidad=MODALIDAD_EVIDENCIA,
+        )
+        t2 = Tarea(
+            ficha_id=self.ficha.id,
+            instructor_id=self.instructor.id,
+            titulo='Base de datos',
+            fecha_limite=ahora - timedelta(days=1),
+            modalidad=MODALIDAD_EVIDENCIA,
+        )
+        db.session.add_all([t1, t2])
+        db.session.commit()
+
+        recoms = obtener_recomendaciones_aprendiz(self.ficha.id, self.aprendiz1.id, ahora=ahora)
+        adv_venc = next((r for r in recoms if 'vencida' in r.titulo.lower()), None)
+        self.assertIsNotNone(adv_venc)
+        self.assertEqual(adv_venc.severidad, SEV_CRITICA)
+        self.assertIn('2 vencidas', adv_venc.metrica_destacada)
+
+    def test_ruta_panel_aprendiz_renderiza_curva_rendimiento_y_advertencias(self):
+        """Verifica que el panel del aprendiz renderice la curva de rendimiento, gráfico SVG, advertencias y recomendaciones."""
+        client = self.app.test_client()
+        with client.session_transaction() as sess:
+            sess['aprendiz_documento'] = self.aprendiz1.documento
+            sess['aprendiz_ficha_id'] = self.ficha.id
+
+        res = client.get(f'/aprendiz/{self.ficha.id}/panel')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn('Curva de Rendimiento Académico', html)
+        self.assertIn('learner-curve-card', html)
+        self.assertIn('seccion-curva-rendimiento', html)
+        self.assertIn('learner-curve-svg', html)
+        self.assertIn('Meta Mínima Aprobatoria', html)
+

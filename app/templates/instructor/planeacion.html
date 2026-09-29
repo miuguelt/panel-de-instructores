@@ -1,72 +1,36 @@
 {% extends "base.html" %}
+{% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
 {% block title %}Línea de tiempo de la ficha {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion_workspace.css') }}">
+<script src="{{ url_for('static', filename='js/planeacion_navegacion.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
-<div class="pl-page">
-    <div class="page-header pl-header">
-        <div class="page-title-cluster pl-title-cluster">
-            <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-            <h1>Línea de tiempo de la ficha</h1>
-        </div>
-        <div class="page-header-actions pl-actions">
-            <div class="pl-actions-main">
-                <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-secondary">🎓 Juicios por aprendiz</a>
-                <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="btn btn-outline">📊 Estadísticas</a>
-                <button type="button" class="btn btn-outline" onclick="window.print()" title="Imprimir o guardar vista gráfica como PDF">
-                    🖨️ Informe
-                </button>
-            </div>
-            {% set total_descargables = (1 if version_planeacion else 0) + (1 if version_reporte else 0) + (1 if version_programa else 0) %}
-            {% if total_descargables %}
-            <div class="pl-actions-group" role="group" aria-label="Descargar archivos fuente">
-                <span class="pl-actions-group-label">Fuentes:</span>
-                <div class="pl-actions-group-buttons">
-                    {% if version_planeacion %}
-                    <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_planeacion.id) }}" class="btn btn-xs btn-outline" title="Descargar Planeación Pedagógica GFPI-F-134 (v{{ version_planeacion.version }})">
-                        📊 Planeación
-                    </a>
-                    {% endif %}
-                    {% if version_reporte %}
-                    <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_reporte.id) }}" class="btn btn-xs btn-outline" title="Descargar Reporte de Juicios SOFIA Plus (v{{ version_reporte.version }})">
-                        📋 Juicios
-                    </a>
-                    {% endif %}
-                    {% if version_programa %}
-                    <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}" class="btn btn-xs btn-outline" title="Descargar Programa de Formación Oficial en PDF (v{{ version_programa.version }})">
-                        📑 Programa
-                    </a>
-                    {% endif %}
-                    {% if total_descargables > 1 %}
-                    <a href="{{ url_for('planeacion.descargar_todos', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Descargar todos los archivos fuente en formato .zip">
-                        📦 .zip
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
+<div class="pl-page" data-ficha-id="{{ ficha.id }}">
+    {% include 'instructor/_planeacion_cabecera.html' %}
+
+    {{ render_alertas_contextuales(ficha.id, 'fases_cronograma') }}
 
     {% if importacion_id %}
-    <div class="pl-verdict pl-tone-info" data-importacion-id="{{ importacion_id }}">
+    <div class="pl-verdict pl-tone-info" role="status" aria-live="polite" data-importacion-id="{{ importacion_id }}">
         <span class="pl-verdict-icon" aria-hidden="true">⏳</span>
         <div>
             <strong>Reporte en procesamiento</strong>
-            <p>La vista se actualizará cuando termine la importación. Puedes permanecer aquí; el sistema revisa el estado automáticamente.</p>
+            <p>La vista se actualizará cuando termine la importación. Puede permanecer aquí; el sistema revisa el estado automáticamente.</p>
         </div>
     </div>
     {% endif %}
 
     {% if error_planeacion %}
-    <div class="pl-verdict pl-tone-danger">
+    <div class="pl-verdict pl-tone-danger" role="alert">
         <span class="pl-verdict-icon" aria-hidden="true">⚠️</span>
         <div>
             <strong>La planeación no está disponible</strong>
             <p>{{ error_planeacion }}</p>
+            <a class="btn btn-outline" href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}">Reintentar</a>
         </div>
     </div>
     {% endif %}
@@ -74,32 +38,12 @@
     {# Centro de Carga y Análisis de los Tres Documentos #}
     {% include 'instructor/_planeacion_carga_unificada.html' %}
 
-    {% if analisis %}
-    <nav class="pl-subnav" aria-label="Secciones de esta página">
-        <a href="#seccion-resumen" class="pl-subnav-link is-active">Resumen</a>
-        {% if curva_svg %}<a href="#seccion-curva-s" class="pl-subnav-link">Curva S</a>{% endif %}
-        <a href="#seccion-gantt" class="pl-subnav-link">Cronograma</a>
-        <a href="#seccion-riesgos" class="pl-subnav-link">Riesgos</a>
-        {% if seguimiento_fases %}<a href="#seccion-seguimiento-fases" class="pl-subnav-link">Fase actual</a>{% endif %}
-        {% if proyeccion and proyeccion.cfd %}<a href="#seccion-cfd" class="pl-subnav-link">Flujo RAPs</a>{% endif %}
-        {% if radar and radar.ejes %}<a href="#seccion-radar" class="pl-subnav-link">Radar</a>{% endif %}
-        {% if heatmap_docente and heatmap_docente.filas %}<a href="#heatmap-docente-section" class="pl-subnav-link">Carga docente</a>{% endif %}
-        {% if contraste and contraste.disponible %}<a href="#seccion-contraste" class="pl-subnav-link">Contraste</a>{% endif %}
-        {% if diagnostico %}<a href="#seccion-diagnostico" class="pl-subnav-link">Diagnóstico</a>{% endif %}
-        <a href="#seccion-detalle" class="pl-subnav-link">Detalle por fase</a>
-        <a href="#documentos" class="pl-subnav-link">Archivos</a>
-        <div class="pl-subnav-tools">
-            <button type="button" id="pl-expandir-todo" class="pl-subnav-tool" title="Expandir todas las secciones plegables">▾ Expandir todo</button>
-            <button type="button" id="pl-colapsar-todo" class="pl-subnav-tool" title="Contraer todas las secciones plegables">▸ Colapsar todo</button>
-        </div>
-    </nav>
-    {% endif %}
-
     {% if not analisis %}
     <div class="pl-empty">
         <div class="empty-icon">🧭</div>
-        <h2>Arma la línea de tiempo de la ficha</h2>
-        <p>Utiliza el panel superior para cargar los tres documentos clave: la <strong>Planeación Pedagógica GFPI-F-134</strong>, el <strong>Reporte de Juicios Evaluativos</strong> de SOFIA Plus y el <strong>Programa de Formación (PDF)</strong>. Al hacer clic en <em>Ejecutar Análisis Completo</em>, el sistema cruzará las fuentes, calculará el avance real, identificará atrasos y habilitará el catálogo pedagógico detallado con conocimientos de proceso, saber y criterios de evaluación.</p>
+        <h2>Comience con los archivos de la ficha</h2>
+        <p>Cargue la planeación pedagógica para consultar el cronograma. Añada el reporte de juicios para comparar el avance real y el programa de formación para completar el detalle curricular.</p>
+        <a href="#centro-carga" class="btn btn-primary">Cargar archivos</a>
     </div>
     {% else %}
         {% if not analisis.alineacion.alineado %}
@@ -1024,15 +968,11 @@
             p.classList.toggle('is-active', p.id === paneIdDefault);
         });
 
-        modal.classList.add('is-open');
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
+        window.abrirModal(modal);
     }
 
     function cerrarModalPlaneacion() {
-        modal.classList.remove('is-open');
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
+        window.cerrarModal(modal);
         currentModalDato = null;
     }
 
@@ -1457,25 +1397,6 @@
         });
     });
 
-    // 6. Navegación interna (scroll-spy) de la barra de secciones
-    const subnavLinks = document.querySelectorAll('.pl-subnav-link');
-    if (subnavLinks.length && 'IntersectionObserver' in window) {
-        const linkPorId = {};
-        subnavLinks.forEach(l => { linkPorId[l.getAttribute('href').slice(1)] = l; });
-        const observer = new IntersectionObserver(function (entries) {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && linkPorId[entry.target.id]) {
-                    subnavLinks.forEach(l => l.classList.remove('is-active'));
-                    linkPorId[entry.target.id].classList.add('is-active');
-                }
-            });
-        }, { rootMargin: '-20% 0px -70% 0px' });
-        Object.keys(linkPorId).forEach(id => {
-            const seccion = document.getElementById(id);
-            if (seccion) observer.observe(seccion);
-        });
-    }
-
     // 7. Activación por teclado de elementos clicables (Gantt, tablas, tarjetas)
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -1491,80 +1412,6 @@
             e.preventDefault();
             mostrarDetalleRap(celdaHeat);
         }
-    });
-    // 8. Secciones plegables con memoria por ficha (localStorage)
-    const seccionesPlegables = document.querySelectorAll('.pl-page section.pl-card[id]:not(.pl-carga-card)');
-    const claveSeccion = id => 'pl-collapse:f{{ ficha.id }}:' + id;
-
-    function fijarEstadoSeccion(sec, colapsada) {
-        const toggle = sec.querySelector(':scope > .pl-card-head .pl-card-toggle');
-        sec.classList.toggle('is-collapsed', colapsada);
-        if (toggle) {
-            toggle.setAttribute('aria-expanded', colapsada ? 'false' : 'true');
-            toggle.title = colapsada ? 'Expandir sección' : 'Contraer sección';
-        }
-    }
-
-    function guardarEstadoSeccion(sec, colapsada) {
-        try { localStorage.setItem(claveSeccion(sec.id), colapsada ? '1' : '0'); } catch (e) {}
-    }
-
-    seccionesPlegables.forEach(sec => {
-        const head = sec.querySelector(':scope > .pl-card-head');
-        if (!head) return;
-
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'pl-card-toggle';
-        toggle.setAttribute('aria-expanded', 'true');
-        toggle.setAttribute('aria-controls', sec.id);
-        toggle.title = 'Contraer sección';
-        toggle.innerHTML = '<span class="pl-card-toggle-icon" aria-hidden="true"></span>';
-
-        // Encabezados flex (con controles a la derecha) reciben el botón en flujo;
-        // los demás lo llevan en la esquina superior derecha.
-        if (window.getComputedStyle(head).display === 'flex') {
-            toggle.classList.add('is-inline');
-        } else {
-            head.classList.add('has-toggle');
-        }
-        head.appendChild(toggle);
-
-        let colapsada = sec.dataset.collapseDefault === 'cerrado';
-        try {
-            const guardado = localStorage.getItem(claveSeccion(sec.id));
-            if (guardado !== null) colapsada = guardado === '1';
-        } catch (e) {}
-        fijarEstadoSeccion(sec, colapsada);
-
-        toggle.addEventListener('click', function () {
-            const nuevo = !sec.classList.contains('is-collapsed');
-            fijarEstadoSeccion(sec, nuevo);
-            guardarEstadoSeccion(sec, nuevo);
-        });
-    });
-
-    function plegarTodo(colapsada) {
-        seccionesPlegables.forEach(sec => {
-            if (!sec.querySelector(':scope > .pl-card-head .pl-card-toggle')) return;
-            fijarEstadoSeccion(sec, colapsada);
-            guardarEstadoSeccion(sec, colapsada);
-        });
-    }
-    const btnExpandirTodo = document.getElementById('pl-expandir-todo');
-    const btnColapsarTodo = document.getElementById('pl-colapsar-todo');
-    if (btnExpandirTodo) btnExpandirTodo.addEventListener('click', function () { plegarTodo(false); });
-    if (btnColapsarTodo) btnColapsarTodo.addEventListener('click', function () { plegarTodo(true); });
-
-    // Al saltar desde la subnav a una sección plegada, se expande sola
-    subnavLinks.forEach(enlace => {
-        enlace.addEventListener('click', function () {
-            const sec = document.getElementById(this.getAttribute('href').slice(1));
-            if (sec && sec.classList.contains('is-collapsed')) {
-                fijarEstadoSeccion(sec, false);
-                guardarEstadoSeccion(sec, false);
-            }
-        });
     });
 })();
 </script>

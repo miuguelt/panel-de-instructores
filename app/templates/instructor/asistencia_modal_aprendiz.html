@@ -322,10 +322,8 @@
 
             function cerrarModal() {
                 document.removeEventListener('keydown', handleEscKey);
+                window.cerrarModal(modal.id);
                 modal.remove();
-                if (!document.querySelector('[data-asistencia-modal]')) {
-                    document.body.classList.remove('modal-open');
-                }
             }
 
             function handleEscKey(e) {
@@ -348,7 +346,7 @@
                 document.removeEventListener('keydown', handleEscKey);
             };
             document.addEventListener('keydown', handleEscKey);
-            document.body.classList.add('modal-open');
+            window.abrirModal(modal);
 
             /* ---------- Calendario ---------- */
 

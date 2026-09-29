@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
 {% block title %}Planes de mejoramiento - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
@@ -8,6 +9,8 @@
         <h1>📋 Planes de mejoramiento</h1>
     </div>
 </div>
+
+{{ render_alertas_contextuales(ficha.id, 'planes_mejoramiento') }}
 
 <div class="participation-note">
     <span aria-hidden="true">📋</span>

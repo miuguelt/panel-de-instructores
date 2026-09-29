@@ -1,5 +1,15 @@
 # Diseño de SENA Control
 
+## Contrato de diseño — planeación de la ficha (29 de septiembre de 2026)
+
+- Usuario y objetivo: el instructor identifica la ficha, consulta su avance y accede al cronograma o a la actualización de fuentes desde el encabezado.
+- Jerarquía: identidad de la ficha y acción principal → navegación de consultas frecuentes → estado de las fuentes → resumen y análisis → historial. Los gráficos complementarios se agrupan en «Más análisis».
+- Dirección visual: tablero Bento editorial con superficies sólidas, acento institucional, tipografía jerárquica y espaciado consistente. Se reutilizan los tokens de los temas existentes.
+- Interacción: los enlaces abren las secciones contraídas, incluido el enlace directo de la URL. Las preferencias de plegado se conservan por ficha. Los controles tienen nombre accesible, foco visible y altura mínima de 44 px.
+- Estados: vacío con acceso a la carga; procesamiento anunciado; errores con reintento; fuentes parciales o completas con sus versiones reales; se conservan validación, progreso y confirmaciones de carga existentes.
+- Alcance de datos: presentación y navegación; no se modifican cálculos, permisos, contratos de carga ni tratamiento de datos educativos o personales.
+- Verificación: pruebas de renderizado Flask y comportamiento de navegación en JavaScript, integración en CI y revisión a 320, 390, 768, 1440, 1920 y 2560 px y zoom del 200 %.
+
 ## Dirección visual
 
 La interfaz usa un tablero operativo de inspiración Bento: superficies agrupadas, jerarquía por estados y acciones contextuales. La identidad SENA se conserva en el verde institucional, mientras que los colores de estado ayudan a detectar atención, avance y riesgo sin depender únicamente del color.
