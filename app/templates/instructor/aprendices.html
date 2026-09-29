@@ -230,26 +230,9 @@
                 <div class="share-url-box">
                     <div class="share-url-header-row">
                         <span class="share-access-badge"><span aria-hidden="true">✓</span> Acceso habilitado</span>
-                        {% if url_red_local and url_red_local != url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) %}
-                        <span class="share-wifi-badge" title="IP de red local detectada en el aula"><span aria-hidden="true">📶</span> WiFi: {{ ip_local }}</span>
-                        {% endif %}
                     </div>
                     <label for="learner-access-url">Enlace directo de la ficha</label>
-                    <input id="learner-access-url" type="text" value="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" readonly class="form-control" data-url-local="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" {% if url_red_local %}data-url-wifi="{{ url_red_local }}"{% endif %}>
-                    
-                    {% if url_red_local and url_red_local != url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) %}
-                    <div class="share-network-switch" id="share-network-switch">
-                        <span class="network-switch-label">Conexión de aprendices:</span>
-                        <div class="network-switch-pills">
-                            <button type="button" class="network-switch-btn is-active" id="btn-switch-url-wifi" data-target-url="{{ url_red_local }}" title="Recomendado para que los aprendices se conecten desde sus celulares vía WiFi">
-                                📶 Red WiFi ({{ ip_local }})
-                            </button>
-                            <button type="button" class="network-switch-btn" id="btn-switch-url-local" data-target-url="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" title="Solo accesible desde este mismo computador">
-                                💻 Localhost
-                            </button>
-                        </div>
-                    </div>
-                    {% endif %}
+                    <input id="learner-access-url" type="text" value="{{ enlace_acceso_aprendices }}" readonly class="form-control">
 
                     <div class="share-actions-row">
                         <button type="button" class="btn btn-primary" id="copy-learner-access"><span aria-hidden="true">⧉</span> Copiar enlace</button>
@@ -528,7 +511,7 @@
                     <div class="qr-tv-url-card">
                         <span class="qr-tv-url-label">Enlace directo si prefieres escribirlo:</span>
                         <div class="qr-tv-url-row">
-                            <code class="qr-tv-url-text" id="qr-tv-current-url">{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}</code>
+                            <code class="qr-tv-url-text" id="qr-tv-current-url">{{ enlace_acceso_aprendices }}</code>
                             <button type="button" class="btn btn-sm btn-outline qr-tv-copy-btn" id="qr-tv-copy-btn" title="Copiar enlace directo">
                                 <span aria-hidden="true">⧉</span> Copiar
                             </button>
@@ -536,19 +519,6 @@
                         <span class="copy-feedback qr-tv-copy-feedback" id="qr-tv-copy-feedback" role="status" aria-live="polite"></span>
                     </div>
 
-                    {% if url_red_local and url_red_local != url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) %}
-                    <div class="qr-tv-network-selector">
-                        <span class="network-selector-title">Dirección de red proyectada:</span>
-                        <div class="network-pills-row">
-                            <button type="button" class="network-pill is-active" id="modal-pill-wifi" data-url="{{ url_red_local }}" title="Recomendada para conexión de aprendices en el aula">
-                                📶 WiFi Aula ({{ ip_local }})
-                            </button>
-                            <button type="button" class="network-pill" id="modal-pill-local" data-url="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True) }}" title="Solo para pruebas en este computador">
-                                💻 Localhost
-                            </button>
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -1219,65 +1189,6 @@
     margin-bottom: 0.2rem;
 }
 
-.share-wifi-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #1e40af;
-    background: #dbeafe;
-    padding: 0.2rem 0.55rem;
-    border-radius: 9999px;
-}
-
-.share-network-switch {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.5rem 0.65rem;
-    background: var(--bg-surface-subtle, #f8fafc);
-    border: 1px dashed var(--border-subtle, #e2e8f0);
-    border-radius: 8px;
-    margin-top: 0.2rem;
-}
-
-.network-switch-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--text-muted);
-}
-
-.network-switch-pills {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-}
-
-.network-switch-btn {
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.3rem 0.6rem;
-    border-radius: 6px;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    color: #334155;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.network-switch-btn:hover {
-    border-color: #94a3b8;
-    background: #f1f5f9;
-}
-
-.network-switch-btn.is-active {
-    background: #39A900;
-    border-color: #39A900;
-    color: #ffffff;
-    font-weight: 700;
-}
-
 .share-actions-row {
     display: flex;
     gap: 0.5rem;
@@ -1657,51 +1568,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     flex: 1;
-}
-
-.qr-tv-network-selector {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.6rem 0.8rem;
-    background: rgba(57, 169, 0, 0.06);
-    border: 1px solid rgba(57, 169, 0, 0.2);
-    border-radius: 10px;
-}
-
-.network-selector-title {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--sena-green-dark, #246B00);
-}
-
-.network-pills-row {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-}
-
-.network-pill {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.3rem 0.65rem;
-    border-radius: 6px;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    color: #1e293b;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.network-pill:hover {
-    background: #f1f5f9;
-}
-
-.network-pill.is-active {
-    background: #39A900;
-    border-color: #39A900;
-    color: #ffffff;
-    font-weight: 700;
 }
 
 .qr-tv-footer {
@@ -2157,20 +2023,13 @@
     const btnDownloadHd = document.getElementById("btn-download-qr-hd");
     const tvCopyBtn = document.getElementById("qr-tv-copy-btn");
     const tvCopyFeedback = document.getElementById("qr-tv-copy-feedback");
-    const btnSwitchWifi = document.getElementById("btn-switch-url-wifi");
-    const btnSwitchLocal = document.getElementById("btn-switch-url-local");
-    const modalPillWifi = document.getElementById("modal-pill-wifi");
-    const modalPillLocal = document.getElementById("modal-pill-local");
     const fileInput = document.getElementById('archivo-aprendices');
     const fileName = document.getElementById('archivo-aprendices-nombre');
 
-    let currentUrl = (input && input.dataset.urlWifi) ? input.dataset.urlWifi : (input ? input.value : '');
+    let currentUrl = input ? input.value : '';
     let qrGeneradoPreview = false;
     let qrGeneradoTv = false;
 
-    if (input && currentUrl && input.value !== currentUrl) {
-        input.value = currentUrl;
-    }
     if (tvCurrentUrl && currentUrl) {
         tvCurrentUrl.textContent = currentUrl;
     }
@@ -2221,30 +2080,6 @@
         } catch (error) {
             qrTvContainer.innerHTML = '<span class="qr-fallback">QR de proyección no disponible.</span>';
         }
-    }
-
-    function setActiveUrl(newUrl) {
-        if (!newUrl) return;
-        currentUrl = newUrl;
-        if (input) input.value = newUrl;
-        if (tvCurrentUrl) tvCurrentUrl.textContent = newUrl;
-
-        // Sincronizar botones de selector en tarjeta
-        if (btnSwitchWifi && btnSwitchLocal) {
-            const isWifi = btnSwitchWifi.dataset.targetUrl === newUrl;
-            btnSwitchWifi.classList.toggle('is-active', isWifi);
-            btnSwitchLocal.classList.toggle('is-active', !isWifi);
-        }
-
-        // Sincronizar botones de selector en modal
-        if (modalPillWifi && modalPillLocal) {
-            const isWifi = modalPillWifi.dataset.url === newUrl;
-            modalPillWifi.classList.toggle('is-active', isWifi);
-            modalPillLocal.classList.toggle('is-active', !isWifi);
-        }
-
-        renderPreviewQR(currentUrl);
-        renderTvQR(currentUrl, true);
     }
 
     function openTvModal() {
@@ -2314,28 +2149,6 @@
             closeTvModal();
         }
     });
-
-    // Conmutador de URL (WiFi vs Localhost)
-    if (btnSwitchWifi) {
-        btnSwitchWifi.addEventListener('click', function () {
-            setActiveUrl(this.dataset.targetUrl);
-        });
-    }
-    if (btnSwitchLocal) {
-        btnSwitchLocal.addEventListener('click', function () {
-            setActiveUrl(this.dataset.targetUrl);
-        });
-    }
-    if (modalPillWifi) {
-        modalPillWifi.addEventListener('click', function () {
-            setActiveUrl(this.dataset.url);
-        });
-    }
-    if (modalPillLocal) {
-        modalPillLocal.addEventListener('click', function () {
-            setActiveUrl(this.dataset.url);
-        });
-    }
 
     // Descarga de QR en máxima resolución (PNG 1024x1024 px)
     if (btnDownloadHd) {

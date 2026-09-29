@@ -896,6 +896,10 @@ def asignar_o_actualizar_turno(
         raise ValueError('Selecciona dos aprendices válidos.')
     if aprendiz_1.ficha_id != ficha_id or aprendiz_2.ficha_id != ficha_id:
         raise ValueError('Los aprendices deben pertenecer a la misma ficha.')
+    if aprendiz_1.estado not in ESTADOS_ACTIVOS:
+        raise ValueError(f'{aprendiz_1.nombre_completo} no está en formación activa en esta ficha.')
+    if aprendiz_2.estado not in ESTADOS_ACTIVOS:
+        raise ValueError(f'{aprendiz_2.nombre_completo} no está en formación activa en esta ficha.')
 
     if es_festivo_colombia(fecha):
         raise ValueError(f'No se pueden programar turnos en días festivos ({fecha.strftime("%d/%m/%Y")}).')
@@ -914,6 +918,12 @@ def asignar_o_actualizar_turno(
             actor_label=actor,
         )
     else:
+        if not SesionAsistencia.query.filter_by(ficha_id=ficha_id, fecha=fecha).first():
+            db.session.add(SesionAsistencia(
+                ficha_id=ficha_id,
+                fecha=fecha,
+                observaciones=f'Sesión creada automáticamente al asignar turno de aseo por {actor}.',
+            ))
         turno = TurnoAseo(
             ficha_id=ficha_id,
             fecha=fecha,
@@ -946,6 +956,10 @@ def reemplazar_aprendices(
         or aprendiz_2.ficha_id != turno.ficha_id
     ):
         raise ValueError('Los aprendices deben pertenecer a la misma ficha.')
+    if aprendiz_1.estado not in ESTADOS_ACTIVOS:
+        raise ValueError(f'{aprendiz_1.nombre_completo} no está en formación activa en esta ficha.')
+    if aprendiz_2.estado not in ESTADOS_ACTIVOS:
+        raise ValueError(f'{aprendiz_2.nombre_completo} no está en formación activa en esta ficha.')
 
     actor = actor_label or (
         'el instructor' if origen == 'instructor' else 'el aprendiz administrador'
@@ -1070,6 +1084,9 @@ def resumen_aprendiz(ficha_id, aprendiz):
     entrantes = IntercambioAseo.query.filter_by(
         aprendiz_recibe_id=aprendiz.id, estado='pendiente'
     ).order_by(IntercambioAseo.creado_en.desc()).all()
+    salientes = IntercambioAseo.query.filter_by(
+        aprendiz_solicita_id=aprendiz.id, estado='pendiente'
+    ).order_by(IntercambioAseo.creado_en.desc()).all()
     candidatos = [
         item for item in activos
         if item.id != aprendiz.id
@@ -1086,6 +1103,7 @@ def resumen_aprendiz(ficha_id, aprendiz):
         'auditoria': auditoria,
         'aviso_visible': visible,
         'intercambios_entrantes': entrantes,
+        'intercambios_salientes': salientes,
         'candidatos_intercambio': candidatos,
     }
 

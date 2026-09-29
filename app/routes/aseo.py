@@ -393,6 +393,7 @@ def gestionar(ficha_id):
         ficha=ficha,
         actor=actor,
         aprendices=aprendices_activos(ficha_id),
+        contadores=recalcular_contadores(ficha_id),
         turnos=turnos,
         mes=mes,
         nombre_mes=f'{MESES[mes.month]} {mes.year}',

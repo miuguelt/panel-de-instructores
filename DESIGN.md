@@ -10,6 +10,22 @@
 - Alcance de datos: presentación y navegación; no se modifican cálculos, permisos, contratos de carga ni tratamiento de datos educativos o personales.
 - Verificación: pruebas de renderizado Flask y comportamiento de navegación en JavaScript, integración en CI y revisión a 320, 390, 768, 1440, 1920 y 2560 px y zoom del 200 %.
 
+## Contrato de diseño — cronograma planificado y avance real (29 de septiembre de 2026)
+
+- Tarea principal: el instructor compara el periodo previsto y el avance aprobado de cada competencia, y abre su ficha pedagógica desde la misma tarjeta.
+- Jerarquía: filtros → fases y trimestres → nombre y estado de la competencia → horas, RAP y porcentaje aprobado → acción para ver la ficha.
+- Presentación: cada competencia conserva su nombre y metadatos en una tarjeta; el cronograma ocupa el carril temporal. En pantallas estrechas, el nombre de la competencia permanece visible mientras el instructor desplaza los trimestres.
+- Lectura: el porcentaje aprobado se presenta completo junto con la barra visual; las barras dejan de alojar texto que se recortaba según su longitud. El nombre del cronograma, los botones y el detalle de cada barra tienen etiquetas accesibles.
+- Interacción: solo el botón «Ver ficha» abre el detalle de la competencia. El carril desplazable recibe foco de teclado, ofrece una indicación en móvil y limita el desplazamiento al propio cronograma.
+- Responsive: tarjetas legibles desde 320 px; filtros y acción con altura mínima de 42 px; las columnas temporales usan desplazamiento horizontal interno sin ampliar la página.
+- Alcance: no se cambian los cálculos de porcentaje, periodo, retraso o prioridad ni el filtro existente.
+
+### Criterios BDD
+
+- Dada una competencia con nombre largo, cuando el instructor recorre el cronograma, entonces puede leer el nombre completo y abrir la ficha con un botón claramente identificado.
+- Dado un porcentaje de avance, cuando la barra es más corta que su etiqueta, entonces el porcentaje sigue visible completo en los metadatos de la tarjeta.
+- Dado un teléfono o un control por teclado, cuando el instructor recorre los trimestres, entonces el nombre de la competencia permanece a la vista y el foco del teclado identifica el área desplazable.
+
 ## Dirección visual
 
 La interfaz usa un tablero operativo de inspiración Bento: superficies agrupadas, jerarquía por estados y acciones contextuales. La identidad SENA se conserva en el verde institucional, mientras que los colores de estado ayudan a detectar atención, avance y riesgo sin depender únicamente del color.

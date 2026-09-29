@@ -262,13 +262,21 @@
 .pl-gantt-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+    scrollbar-color: var(--border-divider) var(--bg-surface);
+    scrollbar-width: thin;
+    scroll-padding-inline: 1rem;
     width: 100%;
+}
+.pl-gantt-wrap:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
 }
 .pl-gantt {
     display: grid;
-    gap: 0.2rem;
-    --pl-label: minmax(12rem, 19rem);
-    min-width: 50rem;
+    gap: 0.35rem;
+    --pl-label: minmax(18rem, 22rem);
+    min-width: 64rem;
 }
 
 .pl-gantt-scale {
@@ -279,7 +287,7 @@
     position: sticky;
     top: 0;
     z-index: 2;
-    padding-bottom: 0.35rem;
+    padding-bottom: 0.45rem;
     background: var(--bg-card);
 }
 .pl-gantt-scale-cols {
@@ -288,7 +296,8 @@
     gap: 2px;
 }
 .pl-gantt-scale-col {
-    padding: 0.3rem 0.2rem;
+    min-height: 3.25rem;
+    padding: 0.45rem 0.3rem;
     border-radius: 8px 8px 0 0;
     background: var(--bg-surface);
     text-align: center;
@@ -321,24 +330,52 @@
 .pl-gantt-row {
     display: grid;
     grid-template-columns: var(--pl-label) minmax(0, 1fr);
-    gap: 0.6rem;
+    gap: 0.8rem;
     align-items: center;
-    padding: 0.28rem 0;
-    border-radius: 8px;
+    margin: 0.35rem 0;
+    padding: 0.55rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-surface) 58%, var(--bg-card));
+    transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.pl-gantt-row:hover { background: color-mix(in srgb, var(--accent-primary) 6%, transparent); }
+.pl-gantt-row:hover,
+.pl-gantt-row:focus-within {
+    border-color: color-mix(in srgb, var(--accent-primary) 48%, var(--border-subtle));
+    background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-card));
+}
 
-.pl-gantt-label { min-width: 0; container-type: inline-size; }
+.pl-gantt-label {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.55rem;
+    min-width: 0;
+    padding: 0.45rem 0.55rem;
+    border-radius: 9px;
+    background: var(--bg-card);
+    container-type: inline-size;
+}
 .pl-gantt-name {
     display: block;
     color: var(--text-main);
-    font-size: clamp(0.7rem, 0.66rem + 0.5cqi, 0.85rem);
+    font-size: clamp(0.85rem, 0.8rem + 0.35cqi, 1rem);
     line-height: 1.35;
     overflow-wrap: normal;
     word-break: normal;
     hyphens: none;
 }
-.pl-gantt-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.2rem; }
+.pl-gantt-meta {
+    grid-column: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+    min-width: 0;
+}
 .pl-chip {
     display: inline-flex;
     align-items: center;
@@ -348,9 +385,25 @@
     border-radius: 999px;
     color: var(--text-muted);
     background: var(--bg-surface);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 700;
     white-space: nowrap;
+}
+.pl-gantt-name-row { grid-column: 1 / -1; }
+.pl-gantt-progress { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.pl-gantt .pl-btn-pedagogico {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 42px;
+    padding: 0.45rem 0.7rem;
+    white-space: nowrap;
+}
+.pl-gantt-hint {
+    display: none;
+    margin: 0.5rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
 }
 .pl-gantt-filter-bar {
     display: flex;
@@ -358,12 +411,13 @@
     flex-wrap: wrap;
 }
 .pl-filter-btn {
-    padding: 0.28rem 0.65rem;
+    min-height: 42px;
+    padding: 0.45rem 0.8rem;
     border: 1px solid var(--border-subtle);
     border-radius: 999px;
     background: var(--bg-surface);
     color: var(--text-muted);
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -393,10 +447,15 @@
 }
 
 .pl-gantt-scale-title {
+    position: sticky;
+    left: 0;
+    z-index: 3;
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
-    padding-bottom: 0.2rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 8px 8px 0 0;
+    background: var(--bg-card);
 }
 .pl-gantt-scale-title span {
     color: var(--text-strong);
@@ -417,7 +476,7 @@
 
 .pl-gantt-name-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.4rem;
     flex-wrap: wrap;
 }
@@ -428,11 +487,11 @@
     grid-template-columns: repeat(var(--pl-cols, 8), minmax(0, 1fr));
     gap: 2px;
     padding: 0;
-    min-height: 2.65rem;
-    height: 2.65rem;
+    min-height: 3rem;
+    height: 3rem;
     align-items: stretch;
 }
-.pl-gantt-cell { grid-row: 1; height: 100%; border-radius: 6px; background: var(--bg-surface); }
+.pl-gantt-cell { grid-row: 1; height: 100%; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--bg-card); }
 .pl-gantt-cell.is-productiva { background: color-mix(in srgb, var(--warning) 10%, var(--bg-surface)); }
 
 /* Dual Gantt Bars: Planificada y Real con posicionamiento continuo */
@@ -445,7 +504,7 @@
 }
 
 .pl-gantt-bar-plan {
-    top: 2px;
+    top: 3px;
     height: 0.95rem;
     border: 1px dashed var(--accent-primary);
     background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-card));
@@ -454,14 +513,6 @@
     padding: 0 0.35rem;
     z-index: 2;
     min-width: 1.8rem;
-}
-.pl-bar-plan-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 .pl-gantt-bar-plan.is-sugerida {
     border-color: var(--text-muted);
@@ -475,7 +526,7 @@
 }
 
 .pl-gantt-bar-real {
-    bottom: 2px;
+    bottom: 3px;
     height: 1.25rem;
     border: 1px solid var(--pl-tone, var(--accent-primary));
     border-radius: 999px;
@@ -494,18 +545,6 @@
     background: var(--pl-tone, var(--accent-primary));
     opacity: 0.6;
     border-radius: inherit;
-}
-.pl-gantt-value {
-    position: relative;
-    display: block;
-    padding: 0 0.35rem;
-    color: var(--text-strong);
-    font-size: 0.68rem;
-    font-weight: 800;
-    line-height: 1.25rem;
-    text-align: center;
-    white-space: nowrap;
-    z-index: 3;
 }
 .pl-gantt-bar.is-estimado { border-style: dashed; }
 
@@ -654,6 +693,23 @@
         border-radius: 12px;
         padding-bottom: 0.5rem;
     }
+    .pl-gantt { --pl-label: minmax(14rem, 17rem); min-width: 58rem; }
+    .pl-gantt-hint { display: block; }
+}
+
+@media (max-width: 460px) {
+    .pl-gantt { --pl-label: minmax(13rem, 15rem); min-width: 56rem; }
+    .pl-gantt-label { grid-template-columns: minmax(0, 1fr); }
+    .pl-gantt-name-row,
+    .pl-gantt-meta,
+    .pl-gantt .pl-btn-pedagogico {
+        grid-column: 1;
+    }
+    .pl-gantt .pl-btn-pedagogico {
+        grid-row: auto;
+        justify-self: start;
+        margin-top: 0.45rem;
+    }
 }
 
 @media (max-width: 640px) {
@@ -766,6 +822,11 @@
 .pl-btn-pedagogico:hover {
     background: var(--accent-primary);
     color: #fff;
+}
+.pl-gantt .pl-btn-pedagogico:focus-visible,
+.pl-filter-btn:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
 }
 
 /* --- Centro de Carga Unificada ------------------------------------------- */
@@ -1283,7 +1344,6 @@ details.pl-collapsible-section > .pl-collapsible-body {
     border-radius: 999px;
     white-space: nowrap;
 }
-
 .pl-pedagogico-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));

@@ -1,4 +1,3 @@
-import socket
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func, select
@@ -115,27 +114,6 @@ instructor_bp = Blueprint('instructor', __name__, template_folder='../templates/
 ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
 MAX_LONGITUD_CALIFICACION = 10
 ZONA_HORARIA_BOGOTA = ZoneInfo('America/Bogota')
-
-
-_ip_local_cache = None
-
-
-def _obtener_ip_local():
-    """Obtiene la dirección IP de red local para facilitar el escaneo QR desde dispositivos móviles en el aula."""
-    global _ip_local_cache
-    if _ip_local_cache is not None:
-        return _ip_local_cache
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0.1)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        _ip_local_cache = ip
-        return ip
-    except Exception:
-        _ip_local_cache = '127.0.0.1'
-        return '127.0.0.1'
 
 
 def _validar_calificacion(valor, obligatoria=False):
@@ -833,10 +811,9 @@ def aprendices(ficha_id):
         .all()
     )
 
-    ip_local = _obtener_ip_local()
-    puerto = request.host.split(':')[1] if ':' in request.host else ('443' if request.is_secure else '80')
-    scheme = request.scheme
-    url_red_local = f"{scheme}://{ip_local}:{puerto}/aprendiz/{ficha.id}" if ip_local and ip_local != '127.0.0.1' else None
+    enlace_acceso_aprendices = url_for(
+        'aprendiz.vista_aprendiz', ficha_id=ficha.id, _external=True
+    )
 
     return render_template(
         'aprendices.html',
@@ -853,8 +830,7 @@ def aprendices(ficha_id):
         al_dia_count=al_dia_count,
         en_proceso_count=en_proceso_count,
         en_riesgo_count=en_riesgo_count,
-        ip_local=ip_local,
-        url_red_local=url_red_local,
+        enlace_acceso_aprendices=enlace_acceso_aprendices,
     )
 
 

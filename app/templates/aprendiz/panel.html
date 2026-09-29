@@ -864,8 +864,11 @@
             </div>
             <span class="cleaning-balance-pill">{{ aseo.contador.veces_aseo }} turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }} cumplido{{ '' if aseo.contador.veces_aseo == 1 else 's' }}</span>
         </div>
-        <p class="text-muted cleaning-card-link">
+        <p class="text-muted cleaning-card-link" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver calendario completo y tabla de equidad</a>
+            {% if aprendiz.rol_administrativo %}
+            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">🛠️ Gestionar y asignar turnos de aseo</a>
+            {% endif %}
         </p>
 
         {% if aseo.turno_propio and aseo.aviso_visible %}
@@ -952,6 +955,15 @@
         </details>
         {% endif %}
         {% endif %}
+
+        {% for intercambio in aseo.intercambios_salientes %}
+        <div class="swap-request outgoing-swap-request" style="border-left: 3px solid var(--accent, #00324D); background: var(--surface-secondary, rgba(255,255,255,0.03)); padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 0.75rem;">
+            <p style="margin: 0;">
+                📤 <strong>Solicitud de intercambio enviada:</strong> Le propusiste a <strong>{{ intercambio.aprendiz_recibe.nombre_completo }}</strong> cambiar tu turno del {{ intercambio.turno.fecha.strftime('%d/%m/%Y') }}.
+                <span class="badge badge-warning" style="margin-left: 0.5rem;">Pendiente de su respuesta</span>
+            </p>
+        </div>
+        {% endfor %}
 
         {% for intercambio in aseo.intercambios_entrantes %}
         <div class="swap-request">

@@ -265,6 +265,99 @@ class AprendizAdministradorTestCase(unittest.TestCase):
         db.session.refresh(self.aprendices[2])
         self.assertTrue(self.aprendices[2].rol_administrativo)
 
+    def test_aprendiz_administrador_asigna_turno_manual_y_crea_sesion(self):
+        self.aprendices[0].rol_administrativo = True
+        db.session.commit()
+        self._sesion_aprendiz(self.aprendices[0])
+
+        fecha_manual = date.today() + timedelta(days=4)
+        from app.services.festivos import es_festivo_colombia
+        while es_festivo_colombia(fecha_manual):
+            fecha_manual += timedelta(days=1)
+
+        # 1. Asignación válida
+        resp = self.cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/asignar',
+            data={
+                'fecha': fecha_manual.isoformat(),
+                'aprendiz_1_id': self.aprendices[1].id,
+                'aprendiz_2_id': self.aprendices[2].id,
+                'observacion': 'Asignación manual de delegada',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        turno = TurnoAseo.query.filter_by(
+            ficha_id=self.ficha.id, fecha=fecha_manual
+        ).first()
+        self.assertIsNotNone(turno)
+        self.assertEqual(turno.generado_por, 'aprendiz_admin')
+        self.assertIn('el aprendiz administrador Ana', turno.auditoria_1)
+        # Verifica que la sesión de asistencia fue creada automáticamente
+        sesion = SesionAsistencia.query.filter_by(
+            ficha_id=self.ficha.id, fecha=fecha_manual
+        ).first()
+        self.assertIsNotNone(sesion)
+
+        # 2. Intento de asignar al mismo aprendiz en ambas posiciones es rechazado
+        resp_mismo = self.cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/asignar',
+            data={
+                'fecha': (fecha_manual + timedelta(days=1)).isoformat(),
+                'aprendiz_1_id': self.aprendices[1].id,
+                'aprendiz_2_id': self.aprendices[1].id,
+            },
+            follow_redirects=True,
+        )
+        self.assertIn('dos aprendices diferentes'.encode(), resp_mismo.data)
+
+        # 3. Intento de asignar a un aprendiz retirado es rechazado
+        self.aprendices[2].estado = 'RETIRADO'
+        db.session.commit()
+        resp_retirado = self.cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/asignar',
+            data={
+                'fecha': (fecha_manual + timedelta(days=2)).isoformat(),
+                'aprendiz_1_id': self.aprendices[1].id,
+                'aprendiz_2_id': self.aprendices[2].id,
+            },
+            follow_redirects=True,
+        )
+        self.assertIn('no está en formación activa'.encode(), resp_retirado.data)
+
+    def test_panel_muestra_enlace_gestion_y_solicitudes_salientes(self):
+        self.aprendices[0].rol_administrativo = True
+        db.session.commit()
+        self._sesion_aprendiz(self.aprendices[0])
+
+        # Crear turno propio en fecha futura
+        fecha_turno = date.today() + timedelta(days=3)
+        turno_propio = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_turno,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_propio)
+        db.session.commit()
+
+        # Enviar solicitud de intercambio hacia aprendiz 2 (Carmen)
+        resp_intercambio = self.cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno_propio.id}/intercambiar',
+            data={'aprendiz_recibe_id': self.aprendices[2].id},
+            follow_redirects=True,
+        )
+        self.assertEqual(resp_intercambio.status_code, 200)
+
+        # Cargar panel y verificar solicitud saliente y botón de gestión
+        resp_panel = self.cliente.get(f'/aprendiz/{self.ficha.id}/panel')
+        self.assertEqual(resp_panel.status_code, 200)
+        self.assertIn('Solicitud de intercambio enviada'.encode(), resp_panel.data)
+        self.assertIn('Gestionar y asignar turnos de aseo'.encode(), resp_panel.data)
+
 
 if __name__ == '__main__':
     unittest.main()
+

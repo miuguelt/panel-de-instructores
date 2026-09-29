@@ -9,12 +9,12 @@
         <div class="pl-gantt-filter-bar">
             <button type="button" class="pl-filter-btn is-active" data-filter="all">Todas ({{ linea.competencias|length }})</button>
             <button type="button" class="pl-filter-btn" data-filter="tecnicas">⚡ Técnicas ({{ linea.resumen.competencias_exigibles }})</button>
-            <button type="button" class="pl-filter-btn" data-filter="atrasadas">⚠️ Con Retraso ({{ linea.resumen.competencias_atrasadas }})</button>
+            <button type="button" class="pl-filter-btn" data-filter="atrasadas">⚠️ Con retraso ({{ linea.resumen.competencias_atrasadas }})</button>
             <button type="button" class="pl-filter-btn" data-filter="flexibles">🌱 Transversales ({{ linea.resumen.competencias_sugeridas }})</button>
         </div>
     </div>
 
-    <div class="pl-gantt-wrap">
+    <div class="pl-gantt-wrap" role="region" aria-label="Cronograma planificado y avance por trimestre" tabindex="0">
         <div class="pl-gantt" style="--pl-cols: {{ calendario.bloques|length }}">
             <div class="pl-gantt-scale">
                 <div class="pl-gantt-scale-title">
@@ -55,13 +55,9 @@
                 {% set comp_tipo = 'tecnicas' if competencia.exigible else 'flexibles' %}
                 {% set comp_atraso = 'atrasadas' if competencia.estado_tiempo in ('atrasado', 'critico') else 'al_dia' %}
                 
-                <div class="pl-gantt-row pl-clickable pl-gantt-item" 
-                     data-type="{{ comp_tipo }}" 
-                     data-status="{{ comp_atraso }}"
-                     data-pedagogico-target="{{ competencia.nombre }}"
-                     tabindex="0" role="button"
-                     aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}"
-                     title="Haz clic para abrir la ficha pedagógica con criterios, saberes y estadísticas">
+                <article class="pl-gantt-row pl-gantt-item"
+                     data-type="{{ comp_tipo }}"
+                     data-status="{{ comp_atraso }}">
                     
                     <div class="pl-gantt-label">
                         <div class="pl-gantt-name-row">
@@ -73,18 +69,23 @@
                         </div>
                         
                         <span class="pl-gantt-meta">
-                            <span class="pl-chip">{{ competencia.etiqueta_trimestre }}{{ '' if competencia.exigible else ' (sugerido)' }}</span>
+                            <span class="pl-chip">Plan: {{ competencia.etiqueta_trimestre }}{{ '' if competencia.exigible else ' (sugerido)' }}</span>
                             <span class="pl-chip pl-tone-{{ competencia.estado_tono }} is-tone">{{ competencia.estado_label }}</span>
                             {% if competencia.dias_desfase is defined and competencia.dias_desfase > 0 %}
                             <span class="pl-gantt-desfase-badge">⏱ {{ competencia.dias_desfase }}d retraso</span>
                             {% endif %}
                             <span class="pl-chip"><strong>{{ competencia.horas|round|int }} h</strong></span>
                             <span class="pl-chip">{{ competencia.resultados_total }} RAPs</span>
-                            <button type="button" class="pl-btn-pedagogico" style="margin-left:auto;">📋 Ver datos</button>
+                            <span class="pl-chip pl-gantt-progress" aria-label="Aprendices aprobados: {{ competencia.porcentaje_avance }}%">{{ competencia.porcentaje_avance }}% aprobados</span>
                         </span>
+                        <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ competencia.nombre }}"
+                                aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}"
+                                title="Abrir criterios, saberes y estadísticas de esta competencia">
+                            <span aria-hidden="true">📋</span> Ver ficha
+                        </button>
                     </div>
 
-                    <div class="pl-gantt-track">
+                    <div class="pl-gantt-track" role="img" aria-label="Cronograma visual de {{ competencia.nombre }}. Planeada en {{ competencia.etiqueta_trimestre }}; avance real: {{ competencia.porcentaje_avance }}% aprobado; estado: {{ competencia.estado_label }}.">
                         {% for bloque in calendario.bloques %}
                         <span class="pl-gantt-cell {{ 'is-productiva' if bloque.etapa == 'productiva' }}" aria-hidden="true"></span>
                         {% endfor %}
@@ -93,7 +94,6 @@
                         <div class="pl-gantt-bar pl-gantt-bar-plan {{ 'is-sugerida' if not competencia.exigible else '' }}"
                              style="left: {{ competencia.gantt_left_pct }}%; width: {{ competencia.gantt_width_pct }}%;"
                              title="Planificado: {{ competencia.etiqueta_trimestre }} · {{ competencia.horas|round|int }} horas (~{{ competencia.duracion_semanas }} sem){% if competencia.fecha_plan_inicio and competencia.fecha_plan_fin %} · Desde {{ competencia.fecha_plan_inicio.strftime('%d/%m/%Y') if competencia.fecha_plan_inicio.strftime is defined else competencia.fecha_plan_inicio }} hasta {{ competencia.fecha_plan_fin.strftime('%d/%m/%Y') if competencia.fecha_plan_fin.strftime is defined else competencia.fecha_plan_fin }}{% endif %}">
-                            <span class="pl-bar-plan-label">Plan: {{ competencia.etiqueta_trimestre }} ({{ competencia.horas|round|int }}h · ~{{ competencia.duracion_semanas|round(1) }}sem)</span>
                         </div>
 
                         {# 2. Barra Inferior: Ejecución Real en SOFIA Plus #}
@@ -101,15 +101,16 @@
                              style="left: {{ competencia.gantt_left_pct }}%; width: {{ competencia.gantt_width_pct }}%; --pl-avance: {{ competencia.porcentaje_avance }};"
                              title="Real SOFIA: {{ competencia.porcentaje_avance }}% aprobado ({{ competencia.estado_label }}){% if competencia.fecha_primera_aprobacion %} · Primera aprobación: {{ competencia.fecha_primera_aprobacion.strftime('%d/%m/%Y') if competencia.fecha_primera_aprobacion.strftime is defined else competencia.fecha_primera_aprobacion }}{% endif %}{% if competencia.fecha_cierre_real %} · Cerrado el {{ competencia.fecha_cierre_real.strftime('%d/%m/%Y') if competencia.fecha_cierre_real.strftime is defined else competencia.fecha_cierre_real }}{% endif %}{% if competencia.dias_desfase > 0 %} · {{ competencia.dias_desfase }} días de desfase{% endif %}">
                             <span class="pl-gantt-fill" aria-hidden="true"></span>
-                            <span class="pl-gantt-value">{{ competencia.porcentaje_avance }}% real</span>
                         </div>
                     </div>
-                </div>
+                </article>
                 {% endfor %}
                 {% endfor %}
             </div>
         </div>
     </div>
+
+    <p class="pl-gantt-hint">Desplaza el cronograma horizontalmente para consultar todos los trimestres.</p>
 
     <div class="pl-legend" style="margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border-subtle);">
         <span class="pl-tone-info"><i style="background:var(--accent-primary)"></i> Barra superior: Ventana y Carga Horaria Planificada</span>

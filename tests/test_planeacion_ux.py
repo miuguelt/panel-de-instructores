@@ -98,6 +98,22 @@ class PlaneacionUXTestCase(unittest.TestCase):
         self.assertTrue('undefined' not in visible)
         self.assertTrue(bool(re.search(r'<a[^>]*href="#centro-carga"[^>]*>\s*Cargar archivos\s*</a>', html)), 'El estado vacío necesita una acción directa de carga.')
 
+    def test_cronograma_muestra_etiquetas_estables_y_acciones_accesibles(self):
+        html = self.pagina(con_planeacion=True)
+        cronograma = re.search(r'<div\b[^>]*class="pl-gantt-wrap"[^>]*>', html)
+        self.assertIsNotNone(cronograma)
+        self.assertIn('role="region"', cronograma.group(0))
+        self.assertIn('aria-label="Cronograma planificado y avance por trimestre"', cronograma.group(0))
+        tarjetas = re.findall(r'<article\b[^>]*class="pl-gantt-row[^>]*>(.*?)</article>', html, re.S)
+        self.assertGreater(len(tarjetas), 0)
+        for tarjeta in tarjetas:
+            self.assertRegex(tarjeta, r'<button\b[^>]*class="pl-btn-pedagogico"[^>]*aria-label="Abrir ficha pedagógica de [^"]+"')
+            self.assertIn('Ver ficha', tarjeta)
+            self.assertIn('pl-gantt-progress', tarjeta)
+            self.assertIn('% aprobados', tarjeta)
+        self.assertIn('Desplaza el cronograma horizontalmente para consultar todos los trimestres', html)
+        self.assertNotRegex(html, r'class="pl-gantt-row[^>]*role="button"')
+
     def test_carga_ofrece_nombres_accesibles_y_anuncia_resultados(self):
         html = self.pagina()
         for nombre in ['archivo_planeacion', 'archivo_juicios', 'archivo_programa']:

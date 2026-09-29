@@ -1,10 +1,9 @@
 import unittest
+import re
 from datetime import date
-from unittest.mock import patch
 
 from app import create_app, db
 from app.models import Ficha, Instructor
-from app.routes.instructor import _obtener_ip_local
 
 
 class AprendicesQrTestCase(unittest.TestCase):
@@ -49,19 +48,6 @@ class AprendicesQrTestCase(unittest.TestCase):
         db.drop_all()
         self.contexto.pop()
 
-    def test_obtener_ip_local_devuelve_cadena_valida(self):
-        ip = _obtener_ip_local()
-        self.assertIsInstance(ip, str)
-        self.assertTrue(len(ip) >= 7)
-
-    @patch('app.routes.instructor.socket.socket')
-    def test_obtener_ip_local_fallback_en_error(self, mock_socket):
-        import app.routes.instructor as inst_mod
-        inst_mod._ip_local_cache = None
-        mock_socket.side_effect = Exception('Network unreachable')
-        ip = _obtener_ip_local()
-        self.assertEqual(ip, '127.0.0.1')
-
     def test_vista_aprendices_incluye_elementos_proyeccion_tv(self):
         resp = self.client.get(f'/instructor/fichas/{self.ficha.id}/aprendices')
         self.assertEqual(resp.status_code, 200)
@@ -86,17 +72,29 @@ class AprendicesQrTestCase(unittest.TestCase):
         self.assertIn('Abre la cámara de tu celular', html)
         self.assertIn('Ingresa tu número de documento', html)
 
-    def test_vista_aprendices_con_ip_local_muestra_selector_red(self):
-        with patch('app.routes.instructor._obtener_ip_local', return_value='192.168.1.101'):
-            resp = self.client.get(f'/instructor/fichas/{self.ficha.id}/aprendices', headers={'Host': 'localhost:8009'})
-            self.assertEqual(resp.status_code, 200)
-            html = resp.get_data(as_text=True)
+    def test_vista_aprendices_comparte_unico_enlace_del_sitio_en_qr_y_campo(self):
+        with self.client.session_transaction(base_url='https://control.enlinea.sbs') as sess:
+            sess['_user_id'] = str(self.instructor.id)
+            sess['_fresh'] = True
+        resp = self.client.get(
+            f'/instructor/fichas/{self.ficha.id}/aprendices',
+            base_url='https://control.enlinea.sbs',
+        )
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        enlace_esperado = f'https://control.enlinea.sbs/aprendiz/{self.ficha.id}'
+        campo_enlace = re.search(r'<input id="learner-access-url"[^>]*value="([^"]+)"', html)
+        enlace_qr_ampliado = re.search(
+            r'<code class="qr-tv-url-text" id="qr-tv-current-url">([^<]+)</code>',
+            html,
+        )
 
-            # Selector en tarjeta
-            self.assertIn('192.168.1.101', html)
-            self.assertIn('id="btn-switch-url-wifi"', html)
-            self.assertIn('id="btn-switch-url-local"', html)
-
-            # Selector en modal
-            self.assertIn('id="modal-pill-wifi"', html)
-            self.assertIn('id="modal-pill-local"', html)
+        self.assertIsNotNone(campo_enlace)
+        self.assertIsNotNone(enlace_qr_ampliado)
+        self.assertEqual(campo_enlace.group(1), enlace_esperado)
+        self.assertEqual(enlace_qr_ampliado.group(1), enlace_esperado)
+        self.assertNotIn('Localhost', html)
+        self.assertNotIn('btn-switch-url-', html)
+        self.assertNotIn('modal-pill-', html)
+        self.assertNotIn('data-url-local=', html)
+        self.assertNotIn('data-url-wifi=', html)
