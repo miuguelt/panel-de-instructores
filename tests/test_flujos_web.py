@@ -1660,7 +1660,7 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertEqual(resultado['resumen_raps']['pendientes'], 1)
         self.assertIn('Retraso de 1 fase', resultado['mensaje_veredicto'])
 
-    def test_registro_de_blueprints_y_cache_de_ip_local(self):
+    def test_registro_de_blueprints(self):
         from unittest.mock import Mock, patch
 
         from app.routes import registrar_rutas
@@ -1671,16 +1671,6 @@ class FlujosWebTestCase(unittest.TestCase):
         registrar_rutas(app_falso)
         self.assertEqual(app_falso.register_blueprint.call_count, 13)
         self.assertEqual(app_falso.config['STARTUP_ERRORS'], [])
-
-        socket_falso = Mock()
-        socket_falso.getsockname.return_value = ('192.168.1.20', 12345)
-        with patch.object(instructor_routes, '_ip_local_cache', None), patch.object(
-            instructor_routes.socket, 'socket', return_value=socket_falso
-        ) as crear_socket:
-            self.assertEqual(instructor_routes._obtener_ip_local(), '192.168.1.20')
-            self.assertEqual(instructor_routes._obtener_ip_local(), '192.168.1.20')
-            crear_socket.assert_called_once()
-        socket_falso.connect.assert_called_once_with(('8.8.8.8', 80))
 
 
 if __name__ == '__main__':

@@ -39,6 +39,12 @@ dialog.app-modal-overlay:not([open]) {
     border-radius: clamp(1rem, 2vw, 1.35rem);
 }
 
+.app-modal-overlay.is-closing .app-modal-content {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
 .app-modal-content--wide {
     width: min(100%, 70rem);
 }

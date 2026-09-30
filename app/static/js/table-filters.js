@@ -1,3 +1,11 @@
+function debounce(fn, ms) {
+    let timer;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), ms);
+    };
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     initTableFilters();
     initClickableRows();
@@ -188,42 +196,44 @@ function initTableFilters() {
 
         // Filter function
         const runFilters = () => {
-            const terminos = _filtroTerminos(searchInput.value);
-            const stateTerm = stateSelect ? stateSelect.value : '';
-            const activo = terminos.length > 0 || stateTerm !== '';
-            let visibleCount = 0;
+            requestAnimationFrame(() => {
+                const terminos = _filtroTerminos(searchInput.value);
+                const stateTerm = stateSelect ? stateSelect.value : '';
+                const activo = terminos.length > 0 || stateTerm !== '';
+                let visibleCount = 0;
 
-            items.forEach(item => {
-                const itemState = item.getAttribute('data-estado') || '';
+                items.forEach(item => {
+                    const itemState = item.getAttribute('data-estado') || '';
 
-                const matchesSearch = _filtroCoincide(item.textContent, terminos);
-                const matchesState = stateTerm === '' || itemState === stateTerm;
+                    const matchesSearch = _filtroCoincide(item.textContent, terminos);
+                    const matchesState = stateTerm === '' || itemState === stateTerm;
 
-                if (matchesSearch && matchesState) {
-                    item.style.display = '';
-                    visibleCount++;
+                    if (matchesSearch && matchesState) {
+                        item.style.display = '';
+                        visibleCount++;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+
+                // Highlight button if filters are active
+                if (activo) {
+                    toggleBtn.innerHTML = `🔍 Filtrar lista <span class="badge badge-success" style="margin-left:4px;">${visibleCount}</span>`;
+                    resultLabel.textContent = visibleCount === 1
+                        ? '1 registro visible de ' + items.length
+                        : visibleCount + ' registros visibles de ' + items.length;
                 } else {
-                    item.style.display = 'none';
+                    toggleBtn.innerHTML = '🔍 Filtrar lista';
+                    resultLabel.textContent = '';
+                }
+                clearBtn.hidden = !activo;
+
+                if (activo && visibleCount === 0) {
+                    buildEmptyNotice().style.display = '';
+                } else if (emptyNotice) {
+                    emptyNotice.style.display = 'none';
                 }
             });
-
-            // Highlight button if filters are active
-            if (activo) {
-                toggleBtn.innerHTML = `🔍 Filtrar lista <span class="badge badge-success" style="margin-left:4px;">${visibleCount}</span>`;
-                resultLabel.textContent = visibleCount === 1
-                    ? '1 registro visible de ' + items.length
-                    : visibleCount + ' registros visibles de ' + items.length;
-            } else {
-                toggleBtn.innerHTML = '🔍 Filtrar lista';
-                resultLabel.textContent = '';
-            }
-            clearBtn.hidden = !activo;
-
-            if (activo && visibleCount === 0) {
-                buildEmptyNotice().style.display = '';
-            } else if (emptyNotice) {
-                emptyNotice.style.display = 'none';
-            }
         };
 
         // Al filtrar se conserva el punto de lectura: el bloque de filtros no se
@@ -233,7 +243,7 @@ function initTableFilters() {
             else runFilters();
         };
 
-        searchInput.addEventListener('input', applyFilters);
+        searchInput.addEventListener('input', debounce(applyFilters, 200));
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && searchInput.value !== '') {
                 e.preventDefault();

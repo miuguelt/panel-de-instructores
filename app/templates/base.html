@@ -161,11 +161,11 @@
         {% block content %}{% endblock %}
     </main>
 
-    <script src="{{ url_for('static', filename='js/filter-view.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/filter-view.js') }}" defer></script>
     {% block scripts %}{% endblock %}
-    <script src="{{ url_for('static', filename='js/table-filters.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/table-filters.js') }}" defer></script>
     <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_upload_bytes | int }};</script>
-    <script src="{{ url_for('static', filename='js/uploads.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/uploads.js') }}" defer></script>
     <script>
         // 1. Inicialización de componentes comunes (funciona en carga inicial y navegación HTMX)
         function inicializarUIBase() {
@@ -283,7 +283,7 @@
         })();
         
     </script>
-    <script src="{{ url_for('static', filename='js/modal-system.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal-system.js') }}" defer></script>
 
     <dialog id="modal-confirmacion" class="app-modal-overlay app-confirm-modal" aria-modal="true" aria-labelledby="modal-confirmacion-titulo" aria-describedby="modal-confirmacion-mensaje" data-confirm-dialog>
         <section class="app-modal-content app-modal-content--compact app-confirm-shell">
