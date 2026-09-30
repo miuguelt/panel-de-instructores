@@ -924,6 +924,189 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
         self.assertIn('Debes pertenecer a esta ficha para gestionar los turnos de aseo'.encode(), resp_ajeno.data)
 
+    def test_aprendiz_configurar_reglas_aseo(self):
+        aprendiz = self.aprendices[1]
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as s:
+            s['aprendiz_documento'] = aprendiz.documento
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        # 1. Configurar saltar ausentes y 48 horas de aviso
+        resp = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={
+                'excluir_ausentes': 'on',
+                'aviso_horas': '48',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('Configuración de turnos de aseo actualizada'.encode(), resp.data)
+
+        from app.models.aseo import ConfiguracionAseo
+        config = ConfiguracionAseo.query.filter_by(ficha_id=self.ficha.id).first()
+        self.assertIsNotNone(config)
+        self.assertTrue(config.excluir_ausentes)
+        self.assertEqual(config.aviso_horas, 48)
+
+        # 2. Validación de valor no entero en aviso_horas
+        resp_invalido = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={
+                'aviso_horas': 'texto_invalido',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp_invalido.status_code, 200)
+        self.assertIn('Las horas de aviso deben ser un número entero'.encode(), resp_invalido.data)
+
+        # 3. Usuario ajeno no puede configurar
+        cliente_ajeno = self.app.test_client()
+        with cliente_ajeno.session_transaction() as s:
+            s['aprendiz_documento'] = '00000000'
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        resp_bloqueado = cliente_ajeno.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={'aviso_horas': '24'},
+            follow_redirects=True,
+        )
+        self.assertIn('Debes pertenecer a esta ficha'.encode(), resp_bloqueado.data)
+
+    def test_aprendiz_excluir_y_reactivar_aprendiz(self):
+        actor = self.aprendices[0]
+        companero = self.aprendices[2]
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as s:
+            s['aprendiz_documento'] = actor.documento
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        # 1. Excluir temporalmente al compañero por motivo de salud
+        fecha_hasta = date.today() + timedelta(days=10)
+        resp_excluir = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/exclusion/{companero.id}',
+            data={
+                'excluido_hasta': fecha_hasta.isoformat(),
+                'motivo': 'Incapacidad médica',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp_excluir.status_code, 200)
+        self.assertIn('quedó excluido temporalmente'.encode(), resp_excluir.data)
+
+        contador = ContadorAseo.query.filter_by(
+            ficha_id=self.ficha.id, aprendiz_id=companero.id
+        ).first()
+        self.assertIsNotNone(contador)
+        self.assertEqual(contador.excluido_hasta, fecha_hasta)
+        self.assertEqual(contador.motivo_exclusion, 'Incapacidad médica')
+
+        # 2. Reactivar al compañero borrando la fecha de exclusión
+        resp_reactivar = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/exclusion/{companero.id}',
+            data={
+                'excluido_hasta': '',
+                'motivo': '',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp_reactivar.status_code, 200)
+        self.assertIn('volvió a la cola justa'.encode(), resp_reactivar.data)
+
+        db.session.refresh(contador)
+        self.assertIsNone(contador.excluido_hasta)
+        self.assertIsNone(contador.motivo_exclusion)
+
+        # 3. Intentar excluir un ID inexistente
+        resp_inexistente = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/exclusion/99999',
+            data={'excluido_hasta': fecha_hasta.isoformat()},
+            follow_redirects=True,
+        )
+        self.assertIn('Aprendiz no encontrado'.encode(), resp_inexistente.data)
+
+    def test_aprendiz_generar_turnos_con_respetar_manuales(self):
+        actor = self.aprendices[0]
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as s:
+            s['aprendiz_documento'] = actor.documento
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        fecha_1 = date.today() + timedelta(days=1)
+        fecha_2 = date.today() + timedelta(days=2)
+        while es_festivo_colombia(fecha_1) or es_festivo_colombia(fecha_2):
+            fecha_1 += timedelta(days=1)
+            fecha_2 = fecha_1 + timedelta(days=1)
+
+        self._crear_sesion(fecha_1)
+        self._crear_sesion(fecha_2)
+        db.session.commit()
+
+        # Crear una asignación manual para fecha_1 con aprendices 4 y 5
+        asignar_o_actualizar_turno(
+            ficha_id=self.ficha.id,
+            fecha=fecha_1,
+            aprendiz_1_id=self.aprendices[4].id,
+            aprendiz_2_id=self.aprendices[5].id,
+            observacion='Turno manual acordado',
+            origen='aprendiz',
+        )
+        db.session.commit()
+
+        # Generar turnos para el rango con respetar_manuales='on'
+        resp = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/generar',
+            data={
+                'fecha_inicio': fecha_1.isoformat(),
+                'fecha_fin': fecha_2.isoformat(),
+                'recalcular': 'on',
+                'respetar_manuales': 'on',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # El turno de fecha_1 debe conservarse con la pareja manual
+        t1 = TurnoAseo.query.filter_by(ficha_id=self.ficha.id, fecha=fecha_1).first()
+        self.assertIsNotNone(t1)
+        self.assertEqual(t1.aprendiz_1_id, self.aprendices[4].id)
+        self.assertEqual(t1.aprendiz_2_id, self.aprendices[5].id)
+
+    def test_panel_aprendiz_muestra_opcion_programar_aseo_en_ambos_estados(self):
+        aprendiz = self.aprendices[0]
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as s:
+            s['aprendiz_documento'] = aprendiz.documento
+            s['aprendiz_ficha_id'] = self.ficha.id
+
+        # Estado A: Sin turno propio asignado
+        resp_sin_turno = cliente.get(f'/aprendiz/{self.ficha.id}/panel')
+        self.assertEqual(resp_sin_turno.status_code, 200)
+        self.assertIn('Programar aseo'.encode(), resp_sin_turno.data)
+        self.assertIn(f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar'.encode(), resp_sin_turno.data)
+
+        # Estado B: Con turno propio asignado
+        fecha_turno = date.today() + timedelta(days=3)
+        while es_festivo_colombia(fecha_turno):
+            fecha_turno += timedelta(days=1)
+
+        self._crear_sesion(fecha_turno)
+        db.session.add(TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_turno,
+            aprendiz_1_id=aprendiz.id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        ))
+        db.session.commit()
+
+        resp_con_turno = cliente.get(f'/aprendiz/{self.ficha.id}/panel')
+        self.assertEqual(resp_con_turno.status_code, 200)
+        # Debe mostrar "Tu próximo turno" y el botón para "Programar aseo"
+        self.assertIn('Tu próximo turno'.encode(), resp_con_turno.data)
+        self.assertIn('Programar aseo'.encode(), resp_con_turno.data)
+        self.assertIn(f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar'.encode(), resp_con_turno.data)
 
 
 if __name__ == '__main__':

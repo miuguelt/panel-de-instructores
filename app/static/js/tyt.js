@@ -16,6 +16,10 @@
         document.getElementById('tyt-results-count').textContent = `${visible} de ${rows.length} aprendices`;
         document.getElementById('tyt-no-results').hidden = visible > 0;
     }
-    search.addEventListener('input', update);
+
+    const debouncedUpdate = (window.FiltroVista && window.FiltroVista.debounce)
+        ? window.FiltroVista.debounce(update, 160)
+        : update;
+    search.addEventListener('input', debouncedUpdate);
     filter.addEventListener('change', update);
 })();

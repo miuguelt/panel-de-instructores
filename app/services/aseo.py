@@ -25,6 +25,7 @@ from app.services.festivos import (
 ESTADOS_ACTIVOS = ESTADOS_EN_FORMACION
 ESTADOS_PRESENTES = ('ASISTE', 'TARDANZA')
 ESTADOS_PENDIENTES = ('programado', 'intercambiado')
+ORIGENES_MANUALES = ('instructor', 'aprendiz', 'aprendiz_admin', 'manual')
 
 
 def aprendices_activos(ficha_id):
@@ -284,7 +285,7 @@ def generar_turnos(
     # Si se respetan asignaciones manuales o turnos no recalculables dentro del rango
     for fecha, turno in existentes.items():
         if turno.estado in ESTADOS_PENDIENTES:
-            es_manual = respetar_manuales and turno.generado_por == 'instructor'
+            es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
             es_pasado = proteger_pasados and fecha < hoy
             if es_manual or es_pasado or not recalcular_existentes:
                 for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
@@ -310,7 +311,7 @@ def generar_turnos(
                     turno_existente.aprendiz_2_id,
                 }
                 continue
-            if respetar_manuales and turno_existente.generado_por == 'instructor':
+            if respetar_manuales and turno_existente.generado_por in ORIGENES_MANUALES:
                 omitidos_manuales += 1
                 for a_id in (turno_existente.aprendiz_1_id, turno_existente.aprendiz_2_id):
                     ultimo_turno_asignado[a_id] = sesion.fecha

@@ -483,7 +483,10 @@ document.addEventListener('DOMContentLoaded', function () {
             row.hidden = !(matchesText && matchesType);
         });
     }
-    search?.addEventListener('input', filterJudgements);
+    const debouncedFilterJudgements = (window.FiltroVista && window.FiltroVista.debounce)
+        ? window.FiltroVista.debounce(filterJudgements, 160)
+        : filterJudgements;
+    search?.addEventListener('input', debouncedFilterJudgements);
     type?.addEventListener('change', filterJudgements);
 });
 </script>

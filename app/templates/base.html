@@ -16,6 +16,7 @@
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
     {% block head %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modal-system.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/loading-indicator.css') }}">
     <script>
         (function() {
             try {
@@ -26,6 +27,14 @@
     </script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
+    <div id="app-loading-overlay" class="app-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="false">
+        <div class="app-loading-card">
+            <span class="app-loading-spinner" aria-hidden="true"></span>
+            <p class="app-loading-title">Cargando la aplicación</p>
+            <p class="app-loading-message">Espera un momento, por favor.</p>
+        </div>
+    </div>
+    <noscript><style>#app-loading-overlay { display: none !important; }</style></noscript>
     <div id="app-progress-bar" class="app-progress-bar" aria-hidden="true"></div>
     <a class="skip-link" href="#contenido-principal">Saltar al contenido principal</a>
     {% block navbar %}
@@ -194,21 +203,36 @@
             const bar = document.getElementById('app-progress-bar');
             if (!bar) return;
 
-            document.addEventListener('htmx:beforeRequest', function() {
+            function iniciarProgreso() {
                 bar.classList.remove('is-finishing');
                 bar.classList.add('is-loading');
-            });
+            }
 
-            document.addEventListener('htmx:afterOnLoad', function() {
+            function terminarProgreso() {
                 bar.classList.remove('is-loading');
                 bar.classList.add('is-finishing');
                 setTimeout(() => {
                     bar.classList.remove('is-finishing');
                 }, 200);
-            });
+            }
 
+            document.addEventListener('htmx:beforeRequest', iniciarProgreso);
+            document.addEventListener('htmx:afterOnLoad', terminarProgreso);
             document.addEventListener('htmx:requestError', function() {
                 bar.classList.remove('is-loading', 'is-finishing');
+            });
+
+            document.addEventListener('click', function(e) {
+                const a = e.target.closest('a');
+                if (!a || !a.href) return;
+                if (a.origin !== window.location.origin || a.hasAttribute('download') || a.target === '_blank') return;
+                if (a.getAttribute('href').startsWith('#') || a.getAttribute('href').startsWith('javascript:')) return;
+                if (a.href.includes('/descargar') || a.href.includes('/logout') || a.href.includes('/exportar') || a.href.includes('/plantilla')) return;
+                iniciarProgreso();
+            }, { passive: true });
+
+            window.addEventListener('beforeunload', function() {
+                iniciarProgreso();
             });
         })();
 
@@ -284,6 +308,7 @@
         
     </script>
     <script src="{{ url_for('static', filename='js/modal-system.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/loading-indicator.js') }}" defer></script>
 
     <dialog id="modal-confirmacion" class="app-modal-overlay app-confirm-modal" aria-modal="true" aria-labelledby="modal-confirmacion-titulo" aria-describedby="modal-confirmacion-mensaje" data-confirm-dialog>
         <section class="app-modal-content app-modal-content--compact app-confirm-shell">

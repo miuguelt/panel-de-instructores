@@ -195,6 +195,7 @@
                     <p class="priority-card-meta">Estado: <strong>{{ 'Intercambiado' if aseo.turno_propio.estado == 'intercambiado' else 'Programado' }}</strong>. Revisa la fecha antes de iniciar la jornada.</p>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
                         <button type="button" class="btn btn-sm btn-primary priority-action action-jump-btn" data-jump-tab="convivencia">Ver detalle del turno</button>
+                        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline priority-action" title="Programar y organizar los turnos de aseo de la ficha">🧹 Programar aseo</a>
                         {% if aseo.turno_propio.fecha <= aseo.hoy and aseo.turno_propio.estado != 'cumplido' %}
                         <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=aseo.turno_propio.id) }}" style="margin: 0; display: inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -227,7 +228,7 @@
                     {% endif %}
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
                         <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline priority-action">Ver calendario de turnos</a>
-                        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary priority-action" title="Generar nuevos turnos con cola justa">⚙️ Generar turnos</a>
+                        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary priority-action" title="Programar y generar turnos con cola justa">🧹 Programar aseo</a>
                     </div>
                 {% endif %}
             </article>
@@ -916,7 +917,7 @@
         </div>
         <p class="text-muted cleaning-card-link" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver calendario completo y tabla de equidad</a>
-            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">🛠️ Gestionar y asignar turnos de aseo</a>
+            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">🧹 Programar aseo: Gestionar y asignar turnos de aseo</a>
         </p>
 
         {% if aseo.turno_propio and aseo.aviso_visible %}
@@ -1019,6 +1020,10 @@
                     <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
                         <input type="checkbox" name="recalcular" checked>
                         Recalcular pendientes
+                    </label>
+                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
+                        <input type="checkbox" name="respetar_manuales" checked>
+                        Conservar manuales
                     </label>
                     <button type="submit" class="btn btn-sm btn-primary">Generar turnos</button>
                 </div>

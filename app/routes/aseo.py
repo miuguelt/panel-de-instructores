@@ -389,26 +389,93 @@ def gestionar(ficha_id):
         return _volver_al_panel_aprendiz(ficha_id)
 
     mes = _mes_consulta(request.args.get('mes'))
-    fin_mes = mes.replace(day=calendar.monthrange(mes.year, mes.month)[1])
-    turnos = TurnoAseo.query.filter(
+    ultimo_dia = calendar.monthrange(mes.year, mes.month)[1]
+    fin_mes = mes.replace(day=ultimo_dia)
+    semanas = calendar.Calendar(firstweekday=0).monthdatescalendar(
+        mes.year, mes.month
+    )
+    turnos_mes = TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
         TurnoAseo.fecha.between(mes, fin_mes),
     ).order_by(TurnoAseo.fecha).all()
+    turnos_por_fecha = {turno.fecha: turno for turno in turnos_mes}
+    sesiones_mes = {
+        sesion.fecha
+        for sesion in SesionAsistencia.query.filter(
+            SesionAsistencia.ficha_id == ficha_id,
+            SesionAsistencia.fecha.between(mes, fin_mes),
+        ).all()
+    }
+
+    config = obtener_configuracion(ficha_id)
+    recalcular_contadores(ficha_id)
+    db.session.commit()
+    contadores = {
+        contador.aprendiz_id: contador
+        for contador in ContadorAseo.query.filter_by(ficha_id=ficha_id).all()
+    }
+    aprendices = aprendices_activos(ficha_id)
+    proximos = {}
+    for turno in TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.fecha >= date.today(),
+        TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
+    ).order_by(TurnoAseo.fecha).all():
+        for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
+            proximos.setdefault(aprendiz_id, turno.fecha)
+
+    equidad = [
+        {
+            'aprendiz': aprendiz,
+            'contador': contadores.get(aprendiz.id),
+            'proxima': proximos.get(aprendiz.id),
+        }
+        for aprendiz in aprendices
+        if contadores.get(aprendiz.id)
+    ]
+    orden = request.args.get('orden', 'veces')
+    if orden == 'nombre':
+        equidad.sort(
+            key=lambda fila: (
+                fila['aprendiz'].apellidos.lower(),
+                fila['aprendiz'].nombre.lower(),
+            )
+        )
+    elif orden == 'ultima':
+        equidad.sort(
+            key=lambda fila: fila['contador'].ultima_vez_aseo or date.min
+        )
+    elif orden == 'proxima':
+        equidad.sort(key=lambda fila: fila['proxima'] or date.max)
+    else:
+        equidad.sort(
+            key=lambda fila: (
+                fila['contador'].veces_aseo,
+                fila['contador'].ultima_vez_aseo or date.min,
+            )
+        )
+
     festivos_dict = obtener_festivos_colombia(mes.year)
     festivos_mes = {f: nom for f, nom in festivos_dict.items() if mes <= f <= fin_mes}
-    total_turnos = len(turnos)
-    total_cumplidos = sum(1 for turno in turnos if turno.estado == 'cumplido')
+    total_turnos = len(turnos_mes)
+    total_cumplidos = sum(1 for turno in turnos_mes if turno.estado == 'cumplido')
     total_programados = sum(
-        1 for turno in turnos if turno.estado in ESTADOS_PENDIENTES
+        1 for turno in turnos_mes if turno.estado in ESTADOS_PENDIENTES
     )
 
     return render_template(
         'aprendiz/gestion_aseo.html',
         ficha=ficha,
         actor=actor,
-        aprendices=aprendices_activos(ficha_id),
-        contadores=recalcular_contadores(ficha_id),
-        turnos=turnos,
+        config=config,
+        aprendices=aprendices,
+        contadores=contadores,
+        equidad=equidad,
+        orden=orden,
+        turnos=turnos_mes,
+        turnos_por_fecha=turnos_por_fecha,
+        sesiones_mes=sesiones_mes,
+        semanas=semanas,
         mes=mes,
         nombre_mes=f'{MESES[mes.month]} {mes.year}',
         mes_anterior=_mover_mes(mes, -1).strftime('%Y-%m'),
@@ -434,14 +501,16 @@ def generar_como_aprendiz(ficha_id):
     try:
         inicio = _fecha_formulario(request.form.get('fecha_inicio'), 'fecha inicial')
         fin = _fecha_formulario(request.form.get('fecha_fin'), 'fecha final')
+        recalcular = request.form.get('recalcular', 'on') in ('on', 'true', '1')
+        respetar_manuales = request.form.get('respetar_manuales', 'on') in ('on', 'true', '1')
         origen_generacion = 'aprendiz_admin' if actor.rol_administrativo else 'aprendiz'
         resultado = generar_turnos(
             ficha_id,
             inicio,
             fin,
             generado_por=origen_generacion,
-            recalcular_existentes=request.form.get('recalcular', 'on') in ('on', 'true', '1'),
-            respetar_manuales=True,
+            recalcular_existentes=recalcular,
+            respetar_manuales=respetar_manuales,
         )
         db.session.commit()
     except ValueError as exc:
@@ -449,11 +518,32 @@ def generar_como_aprendiz(ficha_id):
         flash(str(exc), 'error')
         return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
 
-    total = len(resultado['creados']) + len(resultado.get('recalculados', []))
-    if total:
-        flash(f'Se generaron o actualizaron {total} turno(s) de aseo (omitiendo festivos).', 'success')
+    creados = len(resultado['creados'])
+    recalculados = len(resultado.get('recalculados', []))
+    cumplidos = resultado.get('cumplidos_conservados', 0)
+    manuales = resultado.get('omitidos_manuales', 0)
+
+    partes = []
+    if creados:
+        partes.append(f'{creados} nuevo(s)')
+    if recalculados:
+        partes.append(f'{recalculados} pendiente(s) recalculado(s)')
+    if cumplidos:
+        partes.append(f'{cumplidos} cumplido(s) conservado(s)')
+    if manuales:
+        partes.append(f'{manuales} manual(es) conservado(s)')
+
+    if partes:
+        mensaje = f'Cálculo de turnos completado ({", ".join(partes)}) para {resultado["sesiones"]} sesión(es).'
     else:
-        flash('No hubo cambios en los turnos del rango seleccionado.', 'info')
+        mensaje = f'No se requirieron cambios en las {resultado["sesiones"]} sesiones evaluadas.'
+
+    if resultado.get('sin_candidatos'):
+        mensaje += (
+            f' {len(resultado["sin_candidatos"])} sesión(es) no tenían dos '
+            'aprendices elegibles.'
+        )
+    flash(mensaje, 'success' if (creados or recalculados) else 'info')
     
     origen = request.form.get('origen') or request.args.get('origen')
     if origen == 'panel':
@@ -576,6 +666,70 @@ def asignar_como_aprendiz(ficha_id):
         flash(str(exc), 'error')
 
     mes_redir = request.form.get('fecha', '')[:7] or date.today().strftime('%Y-%m')
+    return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id, mes=mes_redir))
+
+
+@aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo/config', methods=['POST'])
+@limiter.limit('30 per minute')
+def configurar_como_aprendiz(ficha_id):
+    actor = _aprendiz_autorizado(ficha_id)
+    ficha = db.session.get(Ficha, ficha_id)
+    if not ficha or not actor:
+        flash('Debes pertenecer a esta ficha para configurar los turnos de aseo.', 'error')
+        return _volver_al_panel_aprendiz(ficha_id)
+    config = obtener_configuracion(ficha_id)
+    config.excluir_ausentes = request.form.get('excluir_ausentes') in ('on', 'true', '1')
+    try:
+        config.aviso_horas = max(
+            0, min(720, int(request.form.get('aviso_horas', 24)))
+        )
+    except (TypeError, ValueError):
+        flash('Las horas de aviso deben ser un número entero.', 'error')
+        return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
+    db.session.commit()
+    flash('Configuración de turnos de aseo actualizada.', 'success')
+    return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
+
+
+@aseo_aprendiz_bp.route(
+    '/<int:ficha_id>/turnos-aseo/exclusion/<int:aprendiz_id>',
+    methods=['POST'],
+)
+@limiter.limit('30 per minute')
+def excluir_como_aprendiz(ficha_id, aprendiz_id):
+    actor = _aprendiz_autorizado(ficha_id)
+    ficha = db.session.get(Ficha, ficha_id)
+    aprendiz = db.session.get(Aprendiz, aprendiz_id)
+    if not ficha or not actor or not aprendiz or aprendiz.ficha_id != ficha_id:
+        flash('Aprendiz no encontrado o no tienes permiso para esta ficha.', 'error')
+        return _volver_al_panel_aprendiz(ficha_id)
+    contador = ContadorAseo.query.filter_by(
+        ficha_id=ficha_id, aprendiz_id=aprendiz_id
+    ).first()
+    if not contador:
+        asegurar_contadores(ficha_id)
+        contador = ContadorAseo.query.filter_by(
+            ficha_id=ficha_id, aprendiz_id=aprendiz_id
+        ).first()
+
+    hasta = request.form.get('excluido_hasta', '').strip()
+    if hasta:
+        try:
+            contador.excluido_hasta = _fecha_formulario(hasta, 'fecha de exclusión')
+        except ValueError as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
+        contador.motivo_exclusion = request.form.get('motivo', '').strip() or None
+        flash(
+            f'{aprendiz.nombre_completo} quedó excluido temporalmente sin perder su contador.',
+            'success',
+        )
+    else:
+        contador.excluido_hasta = None
+        contador.motivo_exclusion = None
+        flash(f'{aprendiz.nombre_completo} volvió a la cola justa.', 'success')
+    db.session.commit()
+    mes_redir = request.args.get('mes') or date.today().strftime('%Y-%m')
     return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id, mes=mes_redir))
 
 

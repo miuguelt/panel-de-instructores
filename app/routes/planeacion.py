@@ -48,13 +48,26 @@ def _metadata_ficha(ficha):
     }
 
 
+_CACHE_PROGRAMA_PARSED: dict[tuple, dict] = {}
+
+
 def _programa_vigente(version_programa):
     """Lee el programa cargado sin tumbar la vista si el PDF quedó ilegible."""
     if not version_programa:
         return None
+    clave = (
+        getattr(version_programa, 'id', None),
+        getattr(version_programa, 'tamano_bytes', None),
+        getattr(version_programa, 'hash_sha256', None),
+    )
+    if clave in _CACHE_PROGRAMA_PARSED:
+        return _CACHE_PROGRAMA_PARSED[clave]
     try:
         ruta = Path(current_app.config['UPLOAD_FOLDER']) / version_programa.ruta_archivo
-        return parsear_programa(ruta)
+        programa = parsear_programa(ruta)
+        if clave[0] is not None:
+            _CACHE_PROGRAMA_PARSED[clave] = programa
+        return programa
     except Exception:
         current_app.logger.exception(
             'No se pudo leer el programa de formación de la versión %s', version_programa.id

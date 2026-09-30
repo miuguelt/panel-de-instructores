@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Gestionar aseo - {{ ficha.codigo }}{% endblock %}
+{% block title %}Programar y gestionar aseo - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block body_class %}has-learner-bottom-nav{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header cleaning-page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back">&larr; Mi panel</a>
+        <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back" title="Volver a mi panel">&larr; Mi panel</a>
         <div>
-            <span class="eyebrow">{% if actor.rol_administrativo %}Aprendiz administrador{% else %}Gestión de turnos de aseo{% endif %} · {{ ficha.codigo }}</span>
-            <h1>Gestionar turnos de aseo</h1>
+            <span class="eyebrow">{% if actor.rol_administrativo %}Aprendiz administrador — Gestionar turnos de aseo{% else %}Gestionar turnos de aseo{% endif %} · {{ ficha.codigo }}</span>
+            <h1>🧹 Programar y gestionar turnos de aseo</h1>
         </div>
     </div>
-    <div class="header-actions">
-        <button type="button" id="btn-share-whatsapp" class="btn-whatsapp" title="Compartir la programación de aseo con el grupo por WhatsApp">
+    <div class="page-header-actions">
+        <button type="button" id="btn-share-whatsapp" class="btn-whatsapp" title="Compartir la programación de aseo con los compañeros por WhatsApp">
             <svg viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.4-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.13-.14.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.47c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1s.9 2.44 1.03 2.61c.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.15-1.18-.07-.1-.23-.16-.48-.29z"/></svg>
             Compartir por WhatsApp
         </button>
@@ -23,205 +23,435 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card" style="margin-bottom: 1.25rem;">
     <p class="text-muted" style="margin: 0;">
-        Estás gestionando la operación de aseo como <strong>{{ actor.nombre_completo }}</strong>.
-        {% if actor.rol_administrativo %}
-        Tus asignaciones se conservan con tu rol delegado al recalcular la cola de turnos.
-        {% else %}
-        Puedes generar turnos para el grupo con cola justa y registrar los turnos cumplidos.
-        {% endif %}
+        Estás programando y gestionando los turnos de aseo como <strong>{{ actor.nombre_completo }}</strong>.
+        Dispones de las mismas capacidades operativas para calcular turnos con cola justa, asignar parejas puntuales, ajustar la configuración de asignación, excluir aprendices temporalmente y registrar turnos cumplidos.
     </p>
 </div>
 
-<section class="cleaning-admin-summary" id="gestion-aseo-resumen" aria-labelledby="gestion-aseo-resumen-title">
-    <div class="cleaning-admin-summary-copy">
-        <span class="eyebrow">Centro de operación</span>
-        <h2 id="gestion-aseo-resumen-title">Organiza el aseo de la ficha</h2>
-        <p class="text-muted">Genera el periodo con cola justa, asigna una fecha puntual, marca turnos cumplidos y comparte el cronograma al grupo.</p>
-    </div>
-    <div class="cleaning-admin-metrics" aria-label="Resumen del mes">
-        <div><strong>{{ total_turnos }}</strong><span>turnos del mes</span></div>
-        <div><strong>{{ total_programados }}</strong><span>programados</span></div>
-        <div><strong>{{ total_cumplidos }}</strong><span>cumplidos</span></div>
-    </div>
-    <nav class="cleaning-admin-actions" aria-label="Acciones de gestión de turnos">
-        <a href="#form-generar-turnos">Generar periodo</a>
-        <a href="#form-asignar-turno">Asignar fecha</a>
-        <a href="#calendario-turnos">Marcar turnos hechos</a>
-        {% if actor.rol_administrativo %}
-        <a href="{{ url_for('aprendiz.asistencia_admin', ficha_id=ficha.id) }}">Hacer llamado a lista</a>
-        {% endif %}
-    </nav>
-</section>
+<div class="cleaning-summary-grid" id="gestion-aseo-resumen">
+    <article class="cleaning-summary-card">
+        <span>Sesiones del mes</span>
+        <strong>{{ sesiones_mes|length }}</strong>
+    </article>
+    <article class="cleaning-summary-card">
+        <span>Programados</span>
+        <strong>{{ total_programados }}</strong>
+    </article>
+    <article class="cleaning-summary-card">
+        <span>Cumplidos</span>
+        <strong>{{ total_cumplidos }}</strong>
+    </article>
+</div>
 
-<section class="card form-card" id="form-generar-turnos" aria-labelledby="form-generar-turnos-title">
-    <h2 id="form-generar-turnos-title"><span class="cleaning-step-number">1</span> Generar turnos por periodo</h2>
-    <p class="text-muted">El sistema reparte los turnos entre aprendices activos en formación según la cola justa, omitiendo automáticamente los días festivos de Colombia.</p>
-    <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-row">
-            <div class="form-group">
-                <label for="fecha-inicio">Desde</label>
-                <input id="fecha-inicio" name="fecha_inicio" type="date" value="{{ fecha_inicio_default.isoformat() }}" required>
+<div class="cleaning-controls">
+    <!-- Card 1: Calcular turnos con Cola Justa -->
+    <section class="card cleaning-panel-card cleaning-calc-card" id="form-generar-turnos">
+        <div class="cleaning-card-header">
+            <div class="cleaning-badge">
+                <svg class="cleaning-badge-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v18M3 9l9-6 9 6M6 15l-3-6h6l-3 6a3 3 0 0 1-6 0zm12 0l-3-6h6l-3 6a3 3 0 0 1-6 0z"/>
+                </svg>
+                <span>Cola Justa y Equidad</span>
             </div>
-            <div class="form-group">
-                <label for="fecha-fin">Hasta</label>
-                <input id="fecha-fin" name="fecha_fin" type="date" value="{{ fecha_fin_default.isoformat() }}" required>
+            <h2>Calcular turnos de aseo</h2>
+            <p class="cleaning-card-desc">Calcula y redistribuye los días faltantes equilibrando las cargas según los turnos cumplidos por cada aprendiz. Los turnos cumplidos se conservan intactos y se omiten los festivos de Colombia.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}" class="cleaning-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="cleaning-form-grid">
+                <!-- Rango de Fechas -->
+                <div class="cleaning-dates-row">
+                    <div class="cleaning-input-group">
+                        <label for="fecha_inicio" class="cleaning-input-label">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            Desde
+                        </label>
+                        <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio_default.isoformat() }}" required class="cleaning-date-field">
+                    </div>
+                    <div class="cleaning-input-group">
+                        <label for="fecha_fin" class="cleaning-input-label">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            Hasta
+                        </label>
+                        <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin_default.isoformat() }}" required class="cleaning-date-field">
+                    </div>
+                </div>
+
+                <!-- Opciones / Modificadores -->
+                <div class="cleaning-options-row">
+                    <label class="cleaning-option-chip">
+                        <input type="checkbox" name="recalcular" checked class="cleaning-custom-checkbox">
+                        <span class="cleaning-chip-box">
+                            <span class="cleaning-chip-title">Recalcular días pendientes</span>
+                            <span class="cleaning-chip-sub">Reasigna fechas futuras sin turno cumplido</span>
+                        </span>
+                    </label>
+                    <label class="cleaning-option-chip">
+                        <input type="checkbox" name="respetar_manuales" checked class="cleaning-custom-checkbox">
+                        <span class="cleaning-chip-box">
+                            <span class="cleaning-chip-title">Conservar manuales</span>
+                            <span class="cleaning-chip-sub">Mantiene asignaciones manuales previas</span>
+                        </span>
+                    </label>
+                </div>
             </div>
-            <label class="checkbox-label" style="align-self: center;">
-                <input type="checkbox" name="recalcular" checked>
-                Recalcular turnos pendientes
+
+            <!-- Botón de Acción -->
+            <div class="cleaning-form-actions">
+                <button type="submit" class="btn btn-primary btn-calc-turnos">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-right: 6px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    Calcular turnos
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Card 2: Asignar turno manual para una fecha -->
+    <section class="card cleaning-panel-card" id="form-asignar-turno" style="border-top: 4px solid var(--accent, #00324D);">
+        <div class="cleaning-card-header">
+            <div class="cleaning-badge cleaning-badge-neutral">
+                <svg class="cleaning-badge-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Asignación manual</span>
+            </div>
+            <h2>Asignar turno por fecha</h2>
+            <p class="cleaning-card-desc">Programa directamente a dos aprendices para un día específico de formación. Los días festivos de Colombia se omiten automáticamente.</p>
+        </div>
+
+        <div id="alerta-seleccion-pareja" class="alert alert-warning" style="display: none; margin-bottom: 1rem;">
+            ⚠️ <strong>Atención:</strong> Has seleccionado al mismo aprendiz en ambas posiciones. Debes elegir dos aprendices diferentes.
+        </div>
+
+        <form method="POST" id="form-asignar-manual" action="{{ url_for('aseo_aprendiz.asignar_como_aprendiz', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-row" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 140px;">
+                    <label for="fecha-asignar" class="cleaning-input-label">Fecha</label>
+                    <input id="fecha-asignar" name="fecha" type="date" value="{{ hoy.isoformat() }}" required class="form-control">
+                </div>
+                <div class="form-group" style="flex: 1.5; min-width: 200px;">
+                    <label for="aprendiz-1" class="cleaning-input-label">Primer aprendiz</label>
+                    <select id="aprendiz-1" name="aprendiz_1_id" required class="form-control">
+                        <option value="">Seleccionar aprendiz...</option>
+                        {% for aprendiz in aprendices %}
+                        <option value="{{ aprendiz.id }}">
+                            {{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }} turno{{ '' if contadores[aprendiz.id].veces_aseo == 1 else 's' }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1.5; min-width: 200px;">
+                    <label for="aprendiz-2" class="cleaning-input-label">Segundo aprendiz</label>
+                    <select id="aprendiz-2" name="aprendiz_2_id" required class="form-control">
+                        <option value="">Seleccionar aprendiz...</option>
+                        {% for aprendiz in aprendices %}
+                        <option value="{{ aprendiz.id }}">
+                            {{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }} turno{{ '' if contadores[aprendiz.id].veces_aseo == 1 else 's' }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" style="margin-top: 8px; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 220px; margin-bottom: 0;">
+                    <input name="observacion" type="text" placeholder="Observación o motivo de la asignación (opcional)" class="form-control">
+                </div>
+                <button type="submit" id="btn-submit-asignar" class="btn btn-outline">Asignar turno</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Card 3: Reglas de Asignación / Configuración -->
+    <section class="card cleaning-panel-card cleaning-config-card" id="form-config-turnos">
+        <div class="cleaning-card-header">
+            <div class="cleaning-badge cleaning-badge-neutral">
+                <svg class="cleaning-badge-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Reglas de asignación</span>
+            </div>
+            <h2>Configuración</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('aseo_aprendiz.configurar_como_aprendiz', ficha_id=ficha.id) }}" class="cleaning-config-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="cleaning-option-chip">
+                <input type="checkbox" name="excluir_ausentes" {% if config and config.excluir_ausentes %}checked{% endif %} class="cleaning-custom-checkbox">
+                <span class="cleaning-chip-box">
+                    <span class="cleaning-chip-title">Saltar ausentes</span>
+                    <span class="cleaning-chip-sub">Omite automáticamente a quienes no asistieron</span>
+                </span>
             </label>
-            <button type="submit" class="btn btn-primary">Generar turnos</button>
-        </div>
-    </form>
-</section>
+            <div class="cleaning-input-group" style="margin-top: 12px;">
+                <label for="aviso_horas" class="cleaning-input-label">Aviso anticipado</label>
+                <div class="cleaning-number-wrap">
+                    <input type="number" id="aviso_horas" name="aviso_horas" min="0" max="720" value="{{ config.aviso_horas if config else 24 }}" class="cleaning-number-field">
+                    <span class="cleaning-field-unit">horas</span>
+                </div>
+            </div>
+            <div class="cleaning-form-actions" style="margin-top: 14px;">
+                <button type="submit" class="btn btn-outline btn-sm btn-full">Guardar configuración</button>
+            </div>
+        </form>
+    </section>
+</div>
 
-<section class="card form-card" id="form-asignar-turno" aria-labelledby="form-asignar-turno-title">
-    <h2 id="form-asignar-turno-title"><span class="cleaning-step-number">2</span> Asignar turno manual para una fecha</h2>
-    <p class="text-muted">Asigna directamente a dos aprendices para un día específico. Los días festivos de Colombia se rechazan automáticamente.</p>
-    
-    <div id="alerta-seleccion-pareja" class="alert alert-warning" style="display: none; margin-bottom: 1rem;">
-        ⚠️ <strong>Atención:</strong> Has seleccionado al mismo aprendiz en ambas posiciones. Debes elegir dos aprendices diferentes.
-    </div>
-
-    <form method="POST" id="form-asignar-manual" action="{{ url_for('aseo_aprendiz.asignar_como_aprendiz', ficha_id=ficha.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-row">
-            <div class="form-group">
-                <label for="fecha-asignar">Fecha</label>
-                <input id="fecha-asignar" name="fecha" type="date" value="{{ hoy.isoformat() }}" required>
-            </div>
-            <div class="form-group">
-                <label for="aprendiz-1">Primer aprendiz</label>
-                <select id="aprendiz-1" name="aprendiz_1_id" required>
-                    <option value="">Seleccionar aprendiz...</option>
-                    {% for aprendiz in aprendices %}
-                    <option value="{{ aprendiz.id }}">
-                        {{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }} turno{{ '' if contadores[aprendiz.id].veces_aseo == 1 else 's' }}){% endif %}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="aprendiz-2">Segundo aprendiz</label>
-                <select id="aprendiz-2" name="aprendiz_2_id" required>
-                    <option value="">Seleccionar aprendiz...</option>
-                    {% for aprendiz in aprendices %}
-                    <option value="{{ aprendiz.id }}">
-                        {{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }} turno{{ '' if contadores[aprendiz.id].veces_aseo == 1 else 's' }}){% endif %}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <small class="text-muted" style="display: block; margin: 4px 0 10px;">
-            💡 <strong>Sugerencia de equidad:</strong> Selecciona aprendices con menor número de turnos completados entre paréntesis para mantener equilibrada la carga.
-        </small>
-        <div class="form-row" style="margin-top: 6px; align-items: center;">
-            <div class="form-group" style="flex: 1;">
-                <input name="observacion" type="text" placeholder="Observación o motivo de la asignación (opcional)">
-            </div>
-            <button type="submit" id="btn-submit-asignar" class="btn btn-outline">Asignar turno</button>
-        </div>
-    </form>
-</section>
-
-{% if festivos_mes %}
-<div class="alert alert-info" style="margin-bottom: 1.5rem;">
-    <strong>Festivos de este mes (sin programación de aseo):</strong>
-    {% for f, nom in festivos_mes.items() %}
-    <span class="badge badge-secondary" style="margin: 2px 4px;">{{ f.strftime('%d/%m') }}: {{ nom }}</span>
-    {% endfor %}
+{% if sesiones_mes|length == 0 and turnos_por_fecha|length == 0 %}
+<div class="alert alert-info" role="alert" style="margin-bottom: 1.5rem;">
+    <strong>Todavía no hay sesiones de formación registradas en {{ nombre_mes }}.</strong><br>
+    Las sesiones se crean al tomar asistencia o al importar reportes. Puedes también asignar fechas manualmente con el formulario superior.
 </div>
 {% endif %}
 
-<div class="section-header" id="calendario-turnos" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
-    <div>
-        <span class="eyebrow">Seguimiento operativo</span>
-        <h2><span class="cleaning-step-number">3</span> Calendario · {{ nombre_mes }}</h2>
+<!-- Calendario mensual interactivo en cuadrícula -->
+<section class="card calendar-card" id="calendario-turnos">
+    <div class="calendar-toolbar" data-filter-region="aseo-calendario-toolbar">
+        <a class="calendar-arrow" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_anterior) }}" aria-label="Mes anterior">&larr;</a>
+        <div>
+            <span class="eyebrow">Calendario mensual</span>
+            <h2>{{ nombre_mes }}</h2>
+        </div>
+        <a class="calendar-arrow" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_siguiente) }}" aria-label="Mes siguiente">&rarr;</a>
     </div>
-    <div class="header-actions" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-        <input type="search" id="filtro-turnos-tabla" placeholder="🔍 Filtrar por nombre o fecha..." class="form-control" style="width: auto; max-width: 250px; font-size: 0.85rem; padding: 6px 10px;">
-        <a class="btn btn-sm btn-outline" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_anterior) }}">&larr; Anterior</a>
-        <a class="btn btn-sm btn-outline" href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes_siguiente) }}">Siguiente &rarr;</a>
-    </div>
-</div>
 
-{% if turnos %}
-<div class="table-container">
-    <div class="table-responsive" tabindex="0">
-        <table class="table table-sena" id="tabla-turnos-aseo">
-            <caption class="sr-only">Turnos de aseo de {{ nombre_mes }}</caption>
+    <div class="cleaning-calendar-scroll">
+        <div class="cleaning-calendar">
+            {% for nombre in ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] %}
+            <div class="calendar-weekday">{{ nombre }}</div>
+            {% endfor %}
+            {% for semana in semanas %}
+                {% for dia in semana %}
+                {% set turno = turnos_por_fecha.get(dia) %}
+                {% set festivo_nombre = festivos_mes.get(dia) if festivos_mes else none %}
+                <article class="calendar-day {% if dia.month != mes.month %}outside{% endif %} {% if dia == hoy %}today{% endif %} {% if dia in sesiones_mes %}has-session{% endif %} {% if festivo_nombre %}is-holiday{% endif %}">
+                    <div class="calendar-day-number">
+                        <span>{{ dia.day }}</span>
+                        {% if festivo_nombre %}
+                        <span class="holiday-dot" title="Festivo: {{ festivo_nombre }}"></span>
+                        {% elif dia in sesiones_mes %}
+                        <span class="session-dot" title="Día de formación"></span>
+                        {% endif %}
+                    </div>
+                    {% if festivo_nombre %}
+                    <div class="calendar-holiday" title="{{ festivo_nombre }}">
+                        <span class="badge badge-festivo">🇨🇴 Festivo</span>
+                        <strong>{{ festivo_nombre }}</strong>
+                    </div>
+                    {% endif %}
+                    {% if turno %}
+                    <div class="calendar-assignment state-{{ turno.estado }}">
+                        <span class="badge badge-{{ 'success' if turno.estado == 'cumplido' else 'warning' }}">{{ turno.estado }}</span>
+                        <strong class="{% if turno.estado == 'cumplido' and turno.completado_1 == false %}attendance-absent{% endif %}">{{ turno.aprendiz_1.nombre }} {{ turno.aprendiz_1.apellidos[:1] }}.</strong>
+                        <strong class="{% if turno.estado == 'cumplido' and turno.completado_2 == false %}attendance-absent{% endif %}">{{ turno.aprendiz_2.nombre }} {{ turno.aprendiz_2.apellidos[:1] }}.</strong>
+                        {% if turno.estado == 'cumplido' %}
+                        <small>
+                            {% if turno.completado_1 and turno.completado_2 %}
+                            Ambos asistieron
+                            {% elif turno.completado_1 %}
+                            {{ turno.aprendiz_1.nombre }} asistió solo
+                            {% elif turno.completado_2 %}
+                            {{ turno.aprendiz_2.nombre }} asistió solo
+                            {% else %}
+                            Ninguno asistió
+                            {% endif %}
+                        </small>
+                        {% else %}
+                        <small>{{ 'Automático' if turno.generado_por == 'sistema' else 'Ajuste manual' }}</small>
+                        {% endif %}
+                    </div>
+                    <details class="calendar-actions">
+                        <summary>Gestionar</summary>
+                        <form method="POST" action="{{ url_for('aseo_aprendiz.editar_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" class="calendar-edit-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="aprendiz_1_id" aria-label="Primer aprendiz">
+                                {% for aprendiz in aprendices %}
+                                <option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_1_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="aprendiz_2_id" aria-label="Segundo aprendiz">
+                                {% for aprendiz in aprendices %}
+                                <option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_2_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="observacion" placeholder="Motivo del cambio">
+                            <button class="btn btn-sm btn-outline" type="submit">Cambiar pareja</button>
+                        </form>
+                        {% if turno.estado != 'cumplido' %}
+                        <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-primary btn-full" type="submit">✓ Marcar cumplido</button>
+                        </form>
+                        {% endif %}
+                        {% if turno.auditoria_1 or turno.auditoria_2 %}
+                        <details class="audit-details">
+                            <summary>¿Por qué los eligió?</summary>
+                            {% if turno.auditoria_1 %}<p><strong>{{ turno.aprendiz_1.nombre }}:</strong> {{ turno.auditoria_1 }}</p>{% endif %}
+                            {% if turno.auditoria_2 %}<p><strong>{{ turno.aprendiz_2.nombre }}:</strong> {{ turno.auditoria_2 }}</p>{% endif %}
+                        </details>
+                        {% endif %}
+                    </details>
+                    {% elif dia in sesiones_mes and not festivo_nombre %}
+                    <span class="calendar-unassigned">Sin asignar</span>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+    <div class="calendar-legend">
+        <span><i class="session-dot"></i> Sesión registrada</span>
+        <span><i class="legend-block programmed"></i> Programado</span>
+        <span><i class="legend-block done"></i> Cumplido</span>
+        <span><i class="legend-absent"></i> Ausente (no suma al contador)</span>
+        <span><i class="legend-block holiday"></i> Festivo</span>
+    </div>
+</section>
+
+<!-- Tabla de seguimiento y filtro rápido de turnos -->
+<section class="card" id="seguimiento-turnos-tabla" style="margin-top: 1.5rem;">
+    <div class="section-header" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
+        <div>
+            <span class="eyebrow">Listado cronológico</span>
+            <h2>Turnos programados de {{ nombre_mes }}</h2>
+        </div>
+        <div class="header-actions">
+            <input type="search" id="filtro-turnos-tabla" placeholder="🔍 Filtrar por nombre o fecha..." class="form-control" style="width: auto; max-width: 250px; font-size: 0.85rem; padding: 6px 10px;">
+        </div>
+    </div>
+
+    {% if turnos %}
+    <div class="table-container">
+        <div class="table-responsive" tabindex="0">
+            <table class="table table-sena" id="tabla-turnos-aseo">
+                <caption class="sr-only">Turnos de aseo de {{ nombre_mes }}</caption>
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Fecha</th>
+                        <th style="width: 48%;">Aprendices asignados</th>
+                        <th style="width: 17%;">Estado</th>
+                        <th style="width: 20%;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for turno in turnos %}
+                    <tr class="fila-turno" data-texto="{{ turno.fecha.strftime('%d/%m/%Y') }} {{ turno.aprendiz_1.nombre_completo }} {{ turno.aprendiz_2.nombre_completo }} {{ turno.observacion or '' }}">
+                        <td data-label="Fecha">
+                            <strong>{{ turno.fecha.strftime('%d/%m/%Y') }}</strong>
+                            {% if turno.fecha == hoy %}&nbsp;<span class="badge badge-success">Hoy</span>{% endif %}
+                        </td>
+                        <td data-label="Aprendices">
+                            <div class="turno-aprendices-resumen" style="margin-bottom: 0.35rem;">
+                                <strong>{{ turno.aprendiz_1.nombre_completo }}</strong> y <strong>{{ turno.aprendiz_2.nombre_completo }}</strong>
+                                {% if turno.observacion %}<div class="text-muted small"><em>Nota: {{ turno.observacion }}</em></div>{% endif %}
+                            </div>
+                            <details class="turno-editar-details" style="margin-top: 0.35rem;">
+                                <summary class="btn btn-sm btn-outline" style="cursor: pointer; display: inline-block; font-size: 0.78rem; padding: 3px 8px;">✏️ Cambiar pareja</summary>
+                                <form method="POST" action="{{ url_for('aseo_aprendiz.editar_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" class="turno-edicion-form" style="margin-top: 0.5rem; padding: 0.6rem; background: var(--surface-secondary, rgba(255,255,255,0.03)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius: 6px;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="form-row" style="gap: 0.5rem; margin-bottom: 0.5rem;">
+                                        <div class="form-group" style="flex: 1;">
+                                            <label class="small text-muted">Primer aprendiz</label>
+                                            <select name="aprendiz_1_id" aria-label="Primer aprendiz del {{ turno.fecha.strftime('%d/%m/%Y') }}" required>
+                                                {% for aprendiz in aprendices %}<option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_1_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }}){% endif %}</option>{% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="flex: 1;">
+                                            <label class="small text-muted">Segundo aprendiz</label>
+                                            <select name="aprendiz_2_id" aria-label="Segundo aprendiz del {{ turno.fecha.strftime('%d/%m/%Y') }}" required>
+                                                {% for aprendiz in aprendices %}<option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_2_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }}){% endif %}</option>{% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-row" style="gap: 0.5rem; align-items: center;">
+                                        <input name="observacion" type="text" value="{{ turno.observacion or '' }}" placeholder="Motivo del cambio (opcional)" style="flex: 1;">
+                                        <button type="submit" class="btn btn-sm btn-primary">Guardar cambio</button>
+                                    </div>
+                                </form>
+                            </details>
+                        </td>
+                        <td data-label="Estado">
+                            <span class="badge {% if turno.estado == 'cumplido' %}badge-success{% else %}badge-info{% endif %}">{{ 'Cumplido' if turno.estado == 'cumplido' else 'Programado' }}</span>
+                            <div class="text-muted small" style="margin-top: 3px;">{{ 'Automático' if turno.generado_por == 'sistema' else 'Manual' }}</div>
+                        </td>
+                        <td data-label="Acciones">
+                            {% if turno.estado != 'cumplido' %}
+                            <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como hecho">✓ Marcar hecho</button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted" style="font-weight: 500;">✓ Cumplido</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state"><div class="empty-icon">🧹</div><h3>No hay turnos en este mes</h3><p>Usa la tarjeta de cálculo superior para generar la rotación con cola justa.</p></div>
+    {% endif %}
+</section>
+
+<!-- Tabla de equidad y disponibilidad (idéntica a la del instructor) -->
+<section class="card equity-card" id="tabla-equidad-aseo" style="margin-top: 1.5rem;">
+    <div class="section-header compact">
+        <div>
+            <span class="eyebrow">Transparencia y justicia</span>
+            <h2>Tabla de equidad y disponibilidad</h2>
+        </div>
+        <span class="badge badge-info">{{ equidad|length }} activos</span>
+    </div>
+    <p class="text-muted">Los contadores solo suben cuando el aprendiz está presente el día de su turno. Si falta, su puesto se conserva y el sistema lo prioriza en la próxima ocasión. Una exclusión temporal conserva el lugar acumulado sin perjudicar su avance formativo.</p>
+    <div class="table-container">
+    <div class="table-responsive" data-filter-region="aseo-equidad-tabla">
+        <table class="table equity-table">
+            <caption class="sr-only">Tabla de equidad de turnos de aseo</caption>
             <thead>
                 <tr>
-                    <th style="width: 14%;">Fecha</th>
-                    <th style="width: 50%;">Aprendices asignados</th>
-                    <th style="width: 16%;">Estado</th>
-                    <th style="width: 20%;">Acciones</th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='nombre') }}">Aprendiz</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Veces</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='ultima') }}">Última vez</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='proxima') }}">Próxima estimada</a></th>
+                    <th scope="col">Disponibilidad</th>
                 </tr>
             </thead>
             <tbody>
-            {% for turno in turnos %}
-                <tr class="fila-turno" data-texto="{{ turno.fecha.strftime('%d/%m/%Y') }} {{ turno.aprendiz_1.nombre_completo }} {{ turno.aprendiz_2.nombre_completo }} {{ turno.observacion or '' }}">
-                    <td data-label="Fecha">
-                        <strong>{{ turno.fecha.strftime('%d/%m/%Y') }}</strong>
-                        {% if turno.fecha == hoy %}&nbsp;<span class="badge badge-success">Hoy</span>{% endif %}
-                    </td>
-                    <td data-label="Aprendices">
-                        <div class="turno-aprendices-resumen" style="margin-bottom: 0.35rem;">
-                            <strong>{{ turno.aprendiz_1.nombre_completo }}</strong> y <strong>{{ turno.aprendiz_2.nombre_completo }}</strong>
-                            {% if turno.observacion %}<div class="text-muted small"><em>Nota: {{ turno.observacion }}</em></div>{% endif %}
-                        </div>
-                        <details class="turno-editar-details" style="margin-top: 0.35rem;">
-                            <summary class="btn btn-sm btn-outline" style="cursor: pointer; display: inline-block; font-size: 0.78rem; padding: 3px 8px;">✏️ Cambiar pareja</summary>
-                            <form method="POST" action="{{ url_for('aseo_aprendiz.editar_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" class="turno-edicion-form" style="margin-top: 0.5rem; padding: 0.6rem; background: var(--surface-secondary, rgba(255,255,255,0.03)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius: 6px;">
+                {% for fila in equidad %}
+                <tr data-estado="{{ fila.aprendiz.estado }}">
+                    <td data-label="Aprendiz"><strong>{{ fila.aprendiz.nombre_completo }}</strong></td>
+                    <td data-label="Veces"><span class="equity-count">{{ fila.contador.veces_aseo }}</span></td>
+                    <td data-label="Última vez">{{ fila.contador.ultima_vez_aseo.strftime('%d/%m/%Y') if fila.contador.ultima_vez_aseo else 'Nunca' }}</td>
+                    <td data-label="Próxima">{{ fila.proxima.strftime('%d/%m/%Y') if fila.proxima else 'Sin programar' }}</td>
+                    <td data-label="Disponibilidad">
+                        <details class="availability-details">
+                            <summary>
+                                {% if fila.contador.excluido_hasta and fila.contador.excluido_hasta >= hoy %}
+                                <span class="badge badge-warning">Excluido hasta {{ fila.contador.excluido_hasta.strftime('%d/%m') }}</span>
+                                {% else %}
+                                <span class="badge badge-success">Disponible</span>
+                                {% endif %}
+                            </summary>
+                            <form method="POST" action="{{ url_for('aseo_aprendiz.excluir_como_aprendiz', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}" class="availability-form">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <div class="form-row" style="gap: 0.5rem; margin-bottom: 0.5rem;">
-                                    <div class="form-group" style="flex: 1;">
-                                        <label class="small text-muted">Primer aprendiz</label>
-                                        <select name="aprendiz_1_id" aria-label="Primer aprendiz del {{ turno.fecha.strftime('%d/%m/%Y') }}" required>
-                                            {% for aprendiz in aprendices %}<option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_1_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }}){% endif %}</option>{% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="form-group" style="flex: 1;">
-                                        <label class="small text-muted">Segundo aprendiz</label>
-                                        <select name="aprendiz_2_id" aria-label="Segundo aprendiz del {{ turno.fecha.strftime('%d/%m/%Y') }}" required>
-                                            {% for aprendiz in aprendices %}<option value="{{ aprendiz.id }}" {% if aprendiz.id == turno.aprendiz_2_id %}selected{% endif %}>{{ aprendiz.nombre_completo }}{% if contadores and aprendiz.id in contadores %} ({{ contadores[aprendiz.id].veces_aseo }}){% endif %}</option>{% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-row" style="gap: 0.5rem; align-items: center;">
-                                    <input name="observacion" type="text" value="{{ turno.observacion or '' }}" placeholder="Motivo del cambio (opcional)" style="flex: 1;">
-                                    <button type="submit" class="btn btn-sm btn-primary">Guardar cambio</button>
-                                </div>
+                                <input type="date" name="excluido_hasta" value="{{ fila.contador.excluido_hasta.isoformat() if fila.contador.excluido_hasta else '' }}">
+                                <input type="text" name="motivo" value="{{ fila.contador.motivo_exclusion or '' }}" placeholder="Motivo (opcional)">
+                                <button type="submit" class="btn btn-sm btn-outline">{% if fila.contador.excluido_hasta %}Actualizar / reactivar al borrar fecha{% else %}Excluir temporalmente{% endif %}</button>
                             </form>
                         </details>
                     </td>
-                    <td data-label="Estado">
-                        <span class="badge {% if turno.estado == 'cumplido' %}badge-success{% else %}badge-info{% endif %}">{{ 'Cumplido' if turno.estado == 'cumplido' else 'Programado' }}</span>
-                        <div class="text-muted small" style="margin-top: 3px;">{{ 'Automático' if turno.generado_por == 'sistema' else 'Manual' }}</div>
-                    </td>
-                    <td data-label="Acciones">
-                        {% if turno.estado != 'cumplido' %}
-                        <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-sm btn-primary" aria-label="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como hecho">✓ Marcar hecho</button>
-                        </form>
-                        {% else %}
-                        <span class="text-muted" style="font-weight: 500;">✓ Cumplido</span>
-                        {% endif %}
-                    </td>
                 </tr>
-            {% endfor %}
+                {% endfor %}
             </tbody>
         </table>
     </div>
-</div>
-{% else %}
-<div class="empty-state"><div class="empty-icon">🧹</div><h3>No hay turnos en este mes</h3><p>Usa el formulario del paso 1 para generar el calendario con cola justa.</p></div>
-{% endif %}
+    </div>
+</section>
 {% endblock %}
 
 {% block scripts %}
@@ -272,28 +502,34 @@ document.addEventListener('DOMContentLoaded', function() {
             var programa = "{{ ficha.nombre_programa }}";
             var mesNombre = "{{ nombre_mes }}";
 
-            var filas = document.querySelectorAll('#tabla-turnos-aseo tbody tr.fila-turno');
+            var dias = document.querySelectorAll('.cleaning-calendar .calendar-day:not(.outside)');
             var asignaciones = [];
 
-            filas.forEach(function(fila) {
-                var fechaEl = fila.querySelector('td[data-label="Fecha"] strong');
-                var resumenEl = fila.querySelector('.turno-aprendices-resumen');
-                if (fechaEl && resumenEl) {
-                    var fechaTexto = fechaEl.textContent.trim();
-                    var aprendicesTexto = resumenEl.textContent.trim().replace(/\s+/g, ' ');
-                    asignaciones.push('• *' + fechaTexto + ':* ' + aprendicesTexto);
+            dias.forEach(function(diaEl) {
+                var numEl = diaEl.querySelector('.calendar-day-number span');
+                var asigEl = diaEl.querySelector('.calendar-assignment');
+                if (numEl && asigEl) {
+                    var diaNum = numEl.textContent.trim();
+                    var strongs = asigEl.querySelectorAll('strong');
+                    var learners = [];
+                    strongs.forEach(function(s) {
+                        var t = s.textContent.trim();
+                        if (t) learners.push(t);
+                    });
+                    var learnerText = learners.length > 0 ? learners.join(' y ') : asigEl.textContent.trim();
+                    asignaciones.push('• *' + diaNum + ' de ' + mesNombre + ':* ' + learnerText);
                 }
             });
 
             var texto = '🧹 *PROGRAMACIÓN DE TURNOS DE ASEO*\n' +
                         '📌 *Ficha ' + fichaCodigo + '* (' + programa + ')\n' +
-                        '📅 *Periodo:* ' + mesNombre + '\n\n';
+                        '📅 *Mes:* ' + mesNombre + '\n\n';
 
             if (asignaciones.length > 0) {
                 texto += asignaciones.join('\n') + '\n\n';
-                texto += '✨ _¡Compromiso de todos para mantener nuestro ambiente de aprendizaje impecable!_';
+                texto += '✨ _¡Cuidemos y mantengamos limpio nuestro ambiente de aprendizaje!_';
             } else {
-                texto += 'No hay turnos registrados en este mes.\n';
+                texto += 'No hay turnos asignados aún para este mes.\n';
             }
 
             var url = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(texto);

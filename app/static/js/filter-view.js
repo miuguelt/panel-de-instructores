@@ -219,6 +219,18 @@
         restaurarTrasRecarga();
     }
 
+    function debounce(fn, ms) {
+        var timer;
+        return function () {
+            var context = this;
+            var args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                fn.apply(context, args);
+            }, ms);
+        };
+    }
+
     window.FiltroVista = {
         normalizar: normalizar,
         terminos: terminos,
@@ -228,6 +240,7 @@
         desplazarA: desplazarA,
         revelar: revelar,
         aplicar: aplicar,
-        recordar: recordar
+        recordar: recordar,
+        debounce: debounce
     };
 })();

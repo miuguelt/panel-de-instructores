@@ -61,6 +61,9 @@ jobs:
       - name: Verificar modales y ventanas emergentes
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/modal-system.js --test tests_js/modal_system.test.cjs
 
+      - name: Verificar el testigo de carga y su cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/loading-indicator.js --test tests_js/loading_indicator.test.cjs
+
       - name: Guardar cobertura de navegación
         if: always()
         uses: actions/upload-artifact@v4

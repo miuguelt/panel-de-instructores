@@ -514,8 +514,8 @@ updateAttendanceSummary();
 
 var searchInput = document.getElementById('asistencia-search');
 if (searchInput) {
-    searchInput.addEventListener('input', function() {
-        var query = this.value;
+    var filtrarAsistencia = function() {
+        var query = searchInput.value;
         var toolbar = document.querySelector('.attendance-toolbar');
         var terminos = window.FiltroVista ? window.FiltroVista.terminos(query) : query.toLowerCase().split(/\s+/).filter(Boolean);
 
@@ -533,7 +533,13 @@ if (searchInput) {
         } else {
             runFilter();
         }
-    });
+    };
+
+    var debouncedFiltrarAsistencia = (window.FiltroVista && window.FiltroVista.debounce)
+        ? window.FiltroVista.debounce(filtrarAsistencia, 160)
+        : filtrarAsistencia;
+
+    searchInput.addEventListener('input', debouncedFiltrarAsistencia);
 }
 </script>
 {% endblock %}

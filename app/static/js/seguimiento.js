@@ -47,9 +47,17 @@
             }
         };
 
-        [searchInput, prioritySelect, statusSelect].forEach(function (control) {
-            control.addEventListener('input', applyFilters);
-            control.addEventListener('change', applyFilters);
+        const debouncedApply = (window.FiltroVista && window.FiltroVista.debounce)
+            ? window.FiltroVista.debounce(applyFilters, 180)
+            : applyFilters;
+
+        if (searchInput) {
+            searchInput.addEventListener('input', debouncedApply);
+        }
+        [prioritySelect, statusSelect].forEach(function (control) {
+            if (control) {
+                control.addEventListener('change', applyFilters);
+            }
         });
         list.dataset.followupReady = 'true';
         applyFilters();

@@ -979,10 +979,19 @@
     // Buscador en tiempo real dentro del modal
     const searchInput = document.getElementById('modal-search-input');
     if (searchInput) {
+        const filtrarModal = (window.FiltroVista && window.FiltroVista.debounce)
+            ? window.FiltroVista.debounce(function (val) {
+                if (currentModalDato) {
+                    renderModalPanels(currentModalDato, val);
+                }
+            }, 180)
+            : function (val) {
+                if (currentModalDato) {
+                    renderModalPanels(currentModalDato, val);
+                }
+            };
         searchInput.addEventListener('input', function () {
-            if (currentModalDato) {
-                renderModalPanels(currentModalDato, this.value);
-            }
+            filtrarModal(this.value);
         });
     }
 

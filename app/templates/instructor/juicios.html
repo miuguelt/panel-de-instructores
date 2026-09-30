@@ -577,7 +577,10 @@
             runFilter();
         }
     }
-    if (searchInput) searchInput.addEventListener('input', filterCards);
+    const debouncedFilterCards = (window.FiltroVista && window.FiltroVista.debounce)
+        ? window.FiltroVista.debounce(filterCards, 160)
+        : filterCards;
+    if (searchInput) searchInput.addEventListener('input', debouncedFilterCards);
 
     // keyboard navigation on cards
     cards.forEach(card => {

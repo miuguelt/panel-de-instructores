@@ -1256,7 +1256,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (searchInput) searchInput.addEventListener('input', function() { filterFichas(this.value); });
+    var debouncedFilterFichas = (window.FiltroVista && window.FiltroVista.debounce)
+        ? window.FiltroVista.debounce(function(val) { filterFichas(val); }, 150)
+        : function(val) { filterFichas(val); };
+    if (searchInput) searchInput.addEventListener('input', function() { debouncedFilterFichas(this.value); });
     if (searchClear) searchClear.addEventListener('click', clearSearch);
     if (noResultsClear) noResultsClear.addEventListener('click', clearSearch);
     filterFichas('');
