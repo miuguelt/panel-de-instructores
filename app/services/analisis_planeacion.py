@@ -22,6 +22,7 @@ from app.services.emparejamiento_juicios import (
     texto_limpio as _texto,
 )
 from app.services.planeacion import calcular_fechas_estimadas, comparar_fuentes
+from app.services.evaluacion_planeacion import evaluar_resultado
 
 
 def _fecha_texto(valor):
@@ -227,6 +228,7 @@ def construir_analisis(ficha, contenido_planeacion, version_planeacion=None, ver
             pct_cobertura = 0
         unidad = dict(unidad)
         unidad.update({
+            'evaluacion': evaluar_resultado(aprendices_para_avance, relacionados),
             'total_juicios': total,
             'aprobados': aprobados,
             'pendientes': total - aprobados,

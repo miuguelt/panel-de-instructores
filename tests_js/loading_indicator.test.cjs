@@ -97,10 +97,25 @@ test('la plantilla incluye el indicador bloqueante y sus estilos', () => {
     assert.match(plantilla, /Cargando la aplicación/);
     assert.match(plantilla, /css\/loading-indicator\.css/);
     assert.match(plantilla, /js\/loading-indicator\.js/);
+    assert.ok(
+        plantilla.indexOf('js/loading-indicator.js') < plantilla.indexOf('vendor/htmx/htmx.min.js'),
+        'el indicador debe ejecutarse antes de HTMX'
+    );
     assert.match(estilos, /position: fixed/);
     assert.match(estilos, /inset: 0/);
     assert.match(estilos, /\.app-loading-overlay\[hidden\]/);
     assert.match(estilos, /prefers-reduced-motion/);
+});
+
+test('el HTML inicial permite usar la página aunque no terminen de cargar los scripts', () => {
+    const plantilla = fs.readFileSync(baseTemplatePath, 'utf8');
+    const indicador = plantilla.match(/<div[^>]+id="app-loading-overlay"[^>]*>/)[0];
+    assert.match(indicador, /\shidden(?:\s|>)/);
+    assert.match(indicador, /aria-hidden="true"/);
+    assert.doesNotMatch(plantilla, /<script[^>]+src="https:\/\/unpkg/);
+    const aprendices = fs.readFileSync(path.resolve(__dirname, '../app/templates/instructor/aprendices.html'), 'utf8');
+    assert.doesNotMatch(aprendices, /<script[^>]+src="https:/);
+    assert.match(aprendices, /vendor\/qrcodejs\/qrcode\.min\.js/);
 });
 
 test('el indicador se oculta cuando termina la carga inicial del documento', () => {
@@ -134,8 +149,10 @@ test('no bloquea interacciones que no navegan dentro de la aplicación', async (
     enlaceInvalido.href = 'http://[';
     const casos = [
         { enlace: crearEnlace('#contenido') },
+        { enlace: crearEnlace('https://panel.example/instructor/dashboard#contenido') },
         { enlace: crearEnlace('https://externo.example/recurso') },
         { enlace: crearEnlace('/descargar/archivo') },
+        { enlace: crearEnlace('/instructor/entregas/109/archivo') },
         { enlace: crearEnlace('/reporte/exportar') },
         { enlace: crearEnlace('/archivo/plantilla') },
         { enlace: crearEnlace('/auth/logout') },
@@ -254,9 +271,18 @@ test('limpia la carga al cancelar HTMX y al volver a la página', async () => {
     await vaciarMicrotareas();
     assert.equal(entorno.indicador.hidden, true);
 
-    entorno.window.emitir('beforeunload');
+    entorno.document.emitir('click', {
+        target: objetivo(crearEnlace('/instructor/fichas')), button: 0, defaultPrevented: false
+    });
+    await vaciarMicrotareas();
     assert.equal(entorno.indicador.hidden, false);
     entorno.window.emitir('pageshow');
     assert.equal(entorno.indicador.hidden, true);
     assert.equal(entorno.body.getAttribute('aria-busy'), 'false');
+});
+
+test('beforeunload de una descarga o navegación externa no bloquea la página', () => {
+    const entorno = crearEntorno();
+    entorno.window.emitir('beforeunload');
+    assert.equal(entorno.indicador.hidden, true);
 });

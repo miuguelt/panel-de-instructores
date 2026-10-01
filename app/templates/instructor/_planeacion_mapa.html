@@ -4,7 +4,7 @@
     <div class="pl-card-head" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
         <div>
             <h2>Cronograma de la ficha: plan vs. avance real (Gantt)</h2>
-            <p>Representación multicapa y proporcional al volumen horario. La <strong>barra superior</strong> muestra la ventana planeada en el proyecto formativo (GFPI-F-134) y la <strong>barra inferior</strong> muestra la ejecución real en SOFIA Plus con el porcentaje de aprendices aprobados.</p>
+            <p>Consulte cada competencia y sus resultados de aprendizaje por fase. La barra superior muestra el periodo planeado y la inferior, el avance aprobado. Abra “Ver aprendices” para consultar pendientes, juicios e instructores evaluadores.</p>
         </div>
         <div class="pl-gantt-filter-bar">
             <button type="button" class="pl-filter-btn is-active" data-filter="all">Todas ({{ linea.competencias|length }})</button>
@@ -19,7 +19,7 @@
             <div class="pl-gantt-scale">
                 <div class="pl-gantt-scale-title">
                     <span>Estructura Curricular</span>
-                    <small>Horas & Tipo</small>
+                    <small>Competencias y resultados de aprendizaje</small>
                 </div>
                 <div class="pl-gantt-scale-cols">
                     {% for bloque in calendario.bloques %}
@@ -64,7 +64,7 @@
                             <span class="pl-gantt-status-dot" style="background:var(--{{ 'danger' if competencia.estado_tono == 'danger' else ('warning' if competencia.estado_tono == 'warning' else ('success' if competencia.estado_tono == 'success' else 'text-muted')) }})"></span>
                             <span class="pl-gantt-name"><strong>{{ competencia.nombre }}</strong></span>
                             {% if competencia.es_camino_critico %}
-                            <span class="pl-badge-critico" title="Competencia técnica crítica para la certificación">⚡ Crítica</span>
+                            <span class="pl-badge-critico" title="Competencia técnica necesaria para la certificación">Técnica</span>
                             {% endif %}
                         </div>
                         
@@ -75,20 +75,37 @@
                             <span class="pl-gantt-desfase-badge">⏱ {{ competencia.dias_desfase }}d retraso</span>
                             {% endif %}
                             <span class="pl-chip"><strong>{{ competencia.horas|round|int }} h</strong></span>
-                            <span class="pl-chip">{{ competencia.resultados_total }} RAPs</span>
+                            <span class="pl-chip">{{ competencia.resultados_total }} RAP</span>
                             <span class="pl-chip pl-gantt-progress" aria-label="Aprendices aprobados: {{ competencia.porcentaje_avance }}%">{{ competencia.porcentaje_avance }}% aprobados</span>
                         </span>
+                        {% if competencia.evaluacion_resumen is defined %}
+                        <div class="pl-gantt-evaluacion" aria-label="Seguimiento de aprendices en este tramo">
+                            <span><strong>{{ competencia.evaluacion_resumen.evaluados }}</strong> {{ 'evaluado' if competencia.evaluacion_resumen.evaluados == 1 else 'evaluados' }}</span>
+                            <span class="pl-eval-pendientes"><strong>{{ competencia.evaluacion_resumen.pendientes }}</strong> {{ 'pendiente' if competencia.evaluacion_resumen.pendientes == 1 else 'pendientes' }}</span>
+                            <small>de {{ competencia.evaluacion_resumen.total }} aprendices · {{ competencia.evaluacion_resumen.parciales }} con evaluación parcial</small>
+                        </div>
+                        {% endif %}
+                        <div class="pl-gantt-acciones">
+                        {% if competencia.seguimiento_id is defined %}
+                        <button type="button" class="pl-btn-evaluacion" data-evaluacion-target="{{ competencia.seguimiento_id }}" aria-label="Ver aprendices y evaluaciones de {{ competencia.nombre }} en {{ fase.nombre }}">Ver aprendices</button>
+                        {% endif %}
                         <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ competencia.nombre }}"
                                 aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}"
                                 title="Abrir criterios, saberes y estadísticas de esta competencia">
                             <span aria-hidden="true">📋</span> Ver ficha
                         </button>
+                        </div>
                     </div>
 
+                    <div class="pl-gantt-carril">
+                    <div class="pl-gantt-mobile-scale" aria-hidden="true">
+                        {% for bloque in calendario.bloques %}<span class="{{ 'is-en_curso' if bloque.estado == 'en_curso' }}">{{ bloque.etiqueta }}</span>{% endfor %}
+                    </div>
                     <div class="pl-gantt-track" role="img" aria-label="Cronograma visual de {{ competencia.nombre }}. Planeada en {{ competencia.etiqueta_trimestre }}; avance real: {{ competencia.porcentaje_avance }}% aprobado; estado: {{ competencia.estado_label }}.">
                         {% for bloque in calendario.bloques %}
                         <span class="pl-gantt-cell {{ 'is-productiva' if bloque.etapa == 'productiva' }}" aria-hidden="true"></span>
                         {% endfor %}
+                        <i class="pl-gantt-hoy pl-gantt-hoy-local" style="--pl-hoy: {{ calendario.posicion_hoy }}" aria-hidden="true"></i>
 
                         {# 1. Barra Superior: Planeación GFPI-F-134 #}
                         <div class="pl-gantt-bar pl-gantt-bar-plan {{ 'is-sugerida' if not competencia.exigible else '' }}"
@@ -103,6 +120,23 @@
                             <span class="pl-gantt-fill" aria-hidden="true"></span>
                         </div>
                     </div>
+                    <p class="pl-gantt-carril-nota">Plan: {{ competencia.etiqueta_trimestre }} · {{ competencia.porcentaje_avance }}% aprobados</p>
+                    </div>
+                    <details class="pl-gantt-resultados">
+                        <summary>Resultados de aprendizaje <span>{{ competencia.resultados_total }} RAP</span></summary>
+                        <div class="pl-gantt-rap-lista">
+                            {% for resultado in competencia.resultados %}
+                            <article class="pl-gantt-rap">
+                                <small>{{ resultado.actividad }}{% if resultado.rap_codigo %} · Código {{ resultado.rap_codigo }}{% endif %}</small>
+                                <h4>{{ resultado.rap }}</h4>
+                                {% if resultado.evaluacion is defined %}
+                                <p><strong>{{ resultado.evaluacion.resumen.evaluados }}</strong> {{ 'evaluado' if resultado.evaluacion.resumen.evaluados == 1 else 'evaluados' }} · <strong>{{ resultado.evaluacion.resumen.pendientes }}</strong> {{ 'pendiente' if resultado.evaluacion.resumen.pendientes == 1 else 'pendientes' }} de {{ resultado.evaluacion.resumen.total }}</p>
+                                {% endif %}
+                                {% if resultado.instructores %}<p class="pl-note">Instructores previstos: {{ resultado.instructores|join(', ') }}</p>{% endif %}
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </details>
                 </article>
                 {% endfor %}
                 {% endfor %}
@@ -110,7 +144,7 @@
         </div>
     </div>
 
-    <p class="pl-gantt-hint">Desplaza el cronograma horizontalmente para consultar todos los trimestres.</p>
+    <p class="pl-gantt-hint">En celular, el periodo aparece debajo de cada competencia. Abra los resultados de aprendizaje para consultar sus conteos.</p>
 
     <div class="pl-legend" style="margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border-subtle);">
         <span class="pl-tone-info"><i style="background:var(--accent-primary)"></i> Barra superior: Ventana y Carga Horaria Planificada</span>
@@ -120,7 +154,7 @@
         <span class="pl-tone-neutral"><i style="border:1px dashed var(--text-muted)"></i> Transversal / Inglés (cronograma flexible)</span>
     </div>
     <p class="pl-note" style="margin-top:.6rem">
-        <strong>Ponderación y Realismo:</strong> Las macro-competencias de alto volumen horario como <em>Construcción de Software (1.008 h)</em> abarcan múltiples trimestres de desarrollo activo. La línea vertical roja marca la fecha actual. Los RAPs se consideran consolidados cuando al menos el 80% de los aprendices vigentes cuentan con juicio aprobado.
+        La línea roja marca la fecha actual. El avance aprobado y el cierre temporal (umbral del 80%) son distintos del seguimiento de evaluación: un aprendiz queda pendiente mientras tenga algún RAP de este tramo sin juicio.
     </p>
 </section>
 

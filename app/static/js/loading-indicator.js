@@ -25,8 +25,11 @@
         }
 
         if (destino.origin !== window.location.origin) return false;
+        if (destino.hash && destino.pathname === window.location.pathname
+            && destino.search === window.location.search) return false;
         const ruta = destino.pathname;
         return !ruta.includes('/descargar')
+            && !/\/archivo(?:\/|$)/.test(ruta)
             && !ruta.includes('/logout')
             && !ruta.includes('/exportar')
             && !ruta.includes('/plantilla');
@@ -91,7 +94,6 @@
     document.addEventListener('submit', alEnviarFormulario);
     document.addEventListener('htmx:beforeRequest', alIniciarSolicitudHtmx);
     document.addEventListener('htmx:afterRequest', alFinalizarSolicitudHtmx);
-    window.addEventListener('beforeunload', mostrarIndicador);
     window.addEventListener('pageshow', alVolverAPagina);
 
     if (document.readyState === 'loading') {

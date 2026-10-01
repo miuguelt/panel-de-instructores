@@ -92,6 +92,7 @@ class Config:
     SECRET_KEY = _secret_key
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    HTTP_SLOW_REQUEST_MS = _env_int('HTTP_SLOW_REQUEST_MS', 1000, minimum=0)
     # El pool es por proceso worker. Los valores por defecto están pensados para
     # una instancia pequeña de Coolify: 2 procesos x 4 hilos y hasta 6
     # conexiones por proceso (12 en total). Se pueden ampliar por entorno si

@@ -33,6 +33,7 @@ services:
       # vacía desde Coolify.
       - WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
       - GUNICORN_THREADS=${GUNICORN_THREADS:-4}
+      - HTTP_SLOW_REQUEST_MS=${HTTP_SLOW_REQUEST_MS:-1000}
       - FLASK_ENV=${FLASK_ENV:-production}
       - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}
       - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}

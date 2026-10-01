@@ -1,14 +1,15 @@
 """Contrato de la navegación y contexto de la ficha en planeación."""
 
 import re
+import json
 import secrets
 import unittest
-from datetime import date
+from datetime import date, datetime
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from app import create_app, db
-from app.models import Ficha, Instructor
+from app.models import Aprendiz, Ficha, Instructor, JuicioEvaluativo
 from tests.apoyo_planeacion import crear_planeacion_xlsx
 
 
@@ -111,8 +112,57 @@ class PlaneacionUXTestCase(unittest.TestCase):
             self.assertIn('Ver ficha', tarjeta)
             self.assertIn('pl-gantt-progress', tarjeta)
             self.assertIn('% aprobados', tarjeta)
-        self.assertIn('Desplaza el cronograma horizontalmente para consultar todos los trimestres', html)
+        self.assertIn('En celular, el periodo aparece debajo de cada competencia', html)
         self.assertNotRegex(html, r'class="pl-gantt-row[^>]*role="button"')
+
+    def test_cronograma_ofrece_rap_con_conteos_y_detalle_por_aprendiz(self):
+        self.pagina(con_planeacion=True)
+        ana = Aprendiz(ficha_id=self.ficha.id, documento='111', nombre='Ana', apellidos='Prueba', estado='EN FORMACION')
+        beatriz = Aprendiz(ficha_id=self.ficha.id, documento='222', nombre='Beatriz', apellidos='Prueba', estado='EN FORMACION')
+        retirado = Aprendiz(ficha_id=self.ficha.id, documento='333', nombre='Retirado', apellidos='Prueba', estado='RETIRADO')
+        db.session.add_all([ana, beatriz, retirado])
+        db.session.flush()
+        db.session.add(JuicioEvaluativo(ficha_id=self.ficha.id, aprendiz_id=ana.id,
+            resultado_aprendizaje='601390 - Identificar la dinámica organizacional del SENA.',
+            juicio='NO APROBADO', funcionario_registro='Instructora evaluadora', fecha_juicio=datetime(2026, 9, 15)))
+        db.session.commit()
+        html = self.pagina()
+        datos = json.loads(re.search(r'<script id="pl-evaluaciones-json"[^>]*>(.*?)</script>', html, re.S).group(1))
+        induccion = next(d for d in datos.values() if d['nombre'] == 'Inducción')
+        self.assertEqual(induccion['resumen']['total'], 2)
+        self.assertEqual(induccion['resumen']['evaluados'], 1)
+        self.assertEqual(induccion['resumen']['pendientes'], 1)
+        self.assertEqual(induccion['resultados'][0]['aprendices'][0]['instructor'], 'Instructora evaluadora')
+        self.assertNotIn(retirado.id, [a['id'] for a in induccion['aprendices']])
+        self.assertIn('data-evaluacion-target="tramo-0"', html)
+        self.assertIn('Resultados de aprendizaje', html)
+        self.assertIn('Ver aprendices', html)
+        self.assertRegex(html, r'<strong>1</strong> evaluado</span>')
+        self.assertRegex(html, r'<strong>1</strong> pendiente</span>')
+        self.assertIn('js/planeacion_evaluaciones.js', html)
+        self.assertRegex(html, r'<dialog[^>]*id="pl-evaluaciones"[^>]*aria-labelledby="pl-evaluaciones-titulo"')
+        self.assertIn('601390', html)
+        # Una nueva consulta debe reflejar el juicio persistido más reciente.
+        db.session.add(JuicioEvaluativo(ficha_id=self.ficha.id, aprendiz_id=beatriz.id,
+            resultado_aprendizaje='601390 - Identificar la dinámica organizacional del SENA.',
+            juicio='APROBADO', funcionario_registro='Otro instructor', fecha_juicio=datetime(2026, 9, 16)))
+        db.session.commit()
+        actualizado = json.loads(re.search(r'<script id="pl-evaluaciones-json"[^>]*>(.*?)</script>', self.pagina(), re.S).group(1))
+        self.assertEqual(actualizado['tramo-0']['resumen']['pendientes'], 0)
+
+    def test_el_detalle_de_evaluaciones_conserva_el_aislamiento_de_la_ficha(self):
+        self.pagina(con_planeacion=True)
+        ajeno = Instructor(nombre='Instructor ajeno', correo='ajeno@example.com')
+        ajeno.set_password(secrets.token_urlsafe(24))
+        db.session.add(ajeno)
+        db.session.commit()
+        with self.cliente.session_transaction() as sesion:
+            sesion['_user_id'] = str(ajeno.id)
+        from flask import g
+        g.pop('_login_user', None)
+        respuesta = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/planeacion')
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertNotIn('pl-evaluaciones-json', respuesta.get_data(as_text=True))
 
     def test_carga_ofrece_nombres_accesibles_y_anuncia_resultados(self):
         html = self.pagina()

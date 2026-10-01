@@ -2040,9 +2040,9 @@
 
 {% block scripts %}
 <!-- Librería QR Code -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/qrcodejs/qrcode.min.js') }}" defer></script>
 <script>
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
     // 1. Manejo del código QR, Proyección TV en Máxima Resolución y Enlace
     const button = document.getElementById('copy-learner-access');
     const input = document.getElementById('learner-access-url');
@@ -2331,6 +2331,6 @@
 
         searchInput.addEventListener('input', debouncedFiltro);
     }
-})();
+}, { once: true });
 </script>
 {% endblock %}

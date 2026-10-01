@@ -59,8 +59,8 @@
 {% endif %}
 {% endmacro %}
 
-{% macro render_alertas_contextuales(ficha_id, categoria) %}
-{% set alertas = alertas_modulo(ficha_id, categoria) %}
+{% macro render_alertas_contextuales(ficha_id, categoria, alertas=none) %}
+{% if alertas is none %}{% set alertas = alertas_modulo(ficha_id, categoria) %}{% endif %}
 {% if alertas %}
 <div class="module-contextual-alerts" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
     {% for alerta in alertas %}

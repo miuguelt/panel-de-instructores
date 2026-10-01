@@ -143,6 +143,7 @@ def analisis(ficha_id):
         veredicto=panorama.get('veredicto') if panorama else None,
         contraste=panorama.get('contraste') if panorama else None,
         catalogo_pedagogico=panorama.get('catalogo_pedagogico', {}) if panorama else {},
+        seguimiento_evaluacion=panorama.get('seguimiento_evaluacion', {}) if panorama else {},
         desempeno_ficha=panorama.get('desempeno_ficha') if panorama else None,
         radar=panorama.get('radar') if panorama else None,
         heatmap_docente=panorama.get('heatmap_docente') if panorama else None,

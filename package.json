@@ -1,0 +1,11 @@
+{
+  "name": "panel-de-instructores-pruebas",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests_js/*.test.cjs",
+    "test:browser": "node --test tests_browser/*.test.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

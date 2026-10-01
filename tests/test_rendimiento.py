@@ -183,7 +183,8 @@ class CacheEstaticosTestCase(BaseRendimiento):
         self.assertIn('rel="preload"', html)
         self.assertIn('fonts.googleapis.com/css2', html)
         self.assertIn('onload="this.onload=null;this.rel=\'stylesheet\'"', html)
-        self.assertIn('src="https://unpkg.com/htmx.org@2.0.4" defer', html)
+        self.assertRegex(html, r'src="/static/vendor/htmx/htmx\.min\.js\?v=\d+" defer')
+        self.assertNotIn('src="https://unpkg.com/htmx.org', html)
 
     def test_html_se_entrega_comprimido_para_navegadores_compatibles(self):
         respuesta = self.cliente.get(

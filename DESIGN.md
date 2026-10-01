@@ -1,5 +1,15 @@
 # Diseño de SENA Control
 
+## Contrato de diseño — seguimiento de evaluaciones por tramo (1 de octubre de 2026)
+
+- Dirección visual: tablero Bento con tarjetas operativas, superficies sólidas y tokens institucionales existentes.
+- Jerarquía: competencia y periodo → aprendices evaluados y pendientes → acciones → RAP desplegables con actividad, código y conteos.
+- Semántica: evaluado y aprobado se consultan por separado. En un tramo, tener un RAP pendiente impide aparecer como completamente evaluado; la evaluación parcial se identifica expresamente.
+- Detalle: diálogo con selección de RAP, búsqueda por nombre o documento, filtro por instructor registrado y estados pendientes, evaluados y todos. El listado usa tarjetas en orden alfabético con juicio, instructor y fecha por RAP.
+- Celular: una columna desde 320 px; el cronograma aparece bajo el resumen y repite los trimestres. Los controles tienen altura mínima de 44 px y el diálogo cabe en el ancho y alto disponibles.
+- Accesibilidad y estados: diálogo nativo, Escape, devolución del foco, nombres completos, anuncios de conteo, vacío con instrucciones para ajustar filtros y error de lectura con reintento. La consulta usa datos ya cargados, sin espera remota adicional.
+- Contratos y criterios BDD: [Seguimiento de evaluaciones](docs/architecture/seguimiento-evaluaciones-planeacion.md).
+
 ## Contrato de diseño — planeación de la ficha (29 de septiembre de 2026)
 
 - Usuario y objetivo: el instructor identifica la ficha, consulta su avance y accede al cronograma o a la actualización de fuentes desde el encabezado.

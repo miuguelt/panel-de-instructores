@@ -1,0 +1,16 @@
+{
+  "htmx": {
+    "version": "2.0.4",
+    "file": "htmx.min.js",
+    "url": "https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js",
+    "license": "https://unpkg.com/htmx.org@2.0.4/LICENSE",
+    "sha256": "e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447"
+  },
+  "qrcodejs": {
+    "version": "1.0.0",
+    "file": "qrcode.min.js",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js",
+    "license": "https://raw.githubusercontent.com/davidshimjs/qrcodejs/master/LICENSE",
+    "sha256": "c541ef06327885a8415bca8df6071e14189b4855336def4f36db54bde8484f36"
+  }
+}

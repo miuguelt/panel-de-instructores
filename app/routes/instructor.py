@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
-from sqlalchemy import or_, func, select
+from sqlalchemy import or_, func, select, case
 from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from app import db
 from app.models.ficha import Ficha
 from app.models.corte import Corte
@@ -772,16 +772,21 @@ def aprendices(ficha_id):
     en_riesgo_count = 0
 
     if aprendiz_ids:
-        juicios = JuicioEvaluativo.query.filter(
+        juicio_normalizado = func.upper(JuicioEvaluativo.juicio)
+        resumen = db.session.query(
+            JuicioEvaluativo.aprendiz_id,
+            func.count(JuicioEvaluativo.id),
+            func.sum(case((
+                juicio_normalizado.contains('APROBADO') & ~juicio_normalizado.contains('AUN NO'),
+                1,
+            ), else_=0)),
+        ).filter(
             JuicioEvaluativo.ficha_id == ficha_id,
             JuicioEvaluativo.aprendiz_id.in_(aprendiz_ids),
-        ).all()
-        from collections import defaultdict
-        tmp = defaultdict(lambda: {'total': 0, 'aprobados': 0, 'pct': 0})
-        for j in juicios:
-            tmp[j.aprendiz_id]['total'] += 1
-            if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper():
-                tmp[j.aprendiz_id]['aprobados'] += 1
+        ).group_by(JuicioEvaluativo.aprendiz_id).all()
+        tmp = {a_id: {'total': 0, 'aprobados': 0, 'pct': 0} for a_id in aprendiz_ids}
+        for a_id, total, aprobados in resumen:
+            tmp[a_id].update(total=total, aprobados=aprobados)
 
         for a_id in aprendiz_ids:
             s = tmp[a_id]
@@ -1860,12 +1865,14 @@ def tareas(ficha_id):
         corte_id=corte_id,
         ver_todas=ver_todas,
         instructor_id=instructor_filtro_id,
+    ).options(
+        joinedload(Tarea.creador), joinedload(Tarea.corte), selectinload(Tarea.grupos),
     ).order_by(
         Tarea.creada_en.desc()
     ).all()
 
     instructores_ficha = [ficha.instructor]
-    for fi in ficha.instructores_asociados.all():
+    for fi in ficha.instructores_asociados.options(joinedload(FichaInstructor.instructor)).all():
         if fi.instructor and fi.instructor.id != ficha.instructor_id and fi.instructor not in instructores_ficha:
             instructores_ficha.append(fi.instructor)
 
@@ -1882,8 +1889,9 @@ def tareas(ficha_id):
     cortes_editables = [c for c in cortes_lista if puede_crear_tarea_en_corte(c, ficha)] if modo_todos else []
 
     from app.services.recomendaciones import obtener_recomendaciones_ficha, CAT_TAREAS
-    recoms = obtener_recomendaciones_ficha(ficha_id, instructor_id=current_user.id)
-    recomendaciones_tareas = [r for r in recoms if r.categoria == CAT_TAREAS]
+    recomendaciones_tareas = obtener_recomendaciones_ficha(
+        ficha_id, instructor_id=current_user.id, categorias={CAT_TAREAS},
+    )
 
     return render_template(
         'tareas.html',
@@ -3266,9 +3274,10 @@ def juicios(ficha_id):
 
     instructores_ordenados = sorted(instructores_resumen.items(), key=lambda x: x[1]['total'], reverse=True)
 
-    from app.services.recomendaciones import obtener_recomendaciones_ficha, CAT_FASES, CAT_JUICIOS
-    recoms = obtener_recomendaciones_ficha(ficha_id, instructor_id=current_user.id)
-    recomendaciones_juicios = [r for r in recoms if r.categoria in (CAT_FASES, CAT_JUICIOS)]
+    from app.services.recomendaciones import obtener_recomendaciones_ficha, CAT_JUICIOS
+    recomendaciones_juicios = obtener_recomendaciones_ficha(
+        ficha_id, instructor_id=current_user.id, categorias={CAT_JUICIOS},
+    )
 
     return render_template('juicios.html', ficha=ficha, estadisticas=estadisticas, 
                            aprendices_stats=aprendices_stats, cronograma=obtener_cronograma(ficha),

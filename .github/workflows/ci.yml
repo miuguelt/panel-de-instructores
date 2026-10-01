@@ -58,18 +58,48 @@ jobs:
       - name: Verificar navegación de planeación y cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_navegacion.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-planeacion.lcov --test tests_js/planeacion_navegacion.test.cjs
 
+      - name: Verificar seguimiento de evaluaciones y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_evaluaciones.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-evaluaciones.lcov --test tests_js/planeacion_evaluaciones.test.cjs
+
       - name: Verificar modales y ventanas emergentes
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/modal-system.js --test tests_js/modal_system.test.cjs
 
       - name: Verificar el testigo de carga y su cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/loading-indicator.js --test tests_js/loading_indicator.test.cjs
 
+      - name: Verificar la disposición del panel de grupos
+        run: node --test tests_js/grupos_layout.test.cjs
+
+      - name: Instalar el navegador de pruebas
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verificar evaluaciones y carga del directorio de aprendices
+        run: |
+          python -m tests.exportar_evaluaciones
+          python -m tests.exportar_rendimiento
+          npm run test:browser
+
+      - name: Guardar evidencia visual del cronograma y las evaluaciones
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluaciones-presentacion
+          path: |
+            test-results/cronograma-*.png
+            test-results/evaluaciones-*.png
+            test-results/aprendices-carga.png
+          if-no-files-found: error
+
       - name: Guardar cobertura de navegación
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cobertura-planeacion-js
-          path: coverage-planeacion.lcov
+          path: |
+            coverage-planeacion.lcov
+            coverage-evaluaciones.lcov
           if-no-files-found: error
           retention-days: 14
 

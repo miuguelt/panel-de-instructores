@@ -1,0 +1,84 @@
+/* Cronograma y seguimiento: tarjetas fluidas desde 320 px. */
+.pl-page .pl-gantt { min-width: 0; --pl-label: minmax(0, 40%); }
+.pl-page .pl-gantt-wrap { overflow: visible; padding: 0; border: 0; }
+.pl-page .pl-gantt-scale, .pl-page .pl-gantt-overlay { display: none; }
+.pl-page .pl-gantt-row { grid-template-columns: minmax(0, 1fr); padding: 1rem; gap: 1rem; background: var(--bg-card); border-radius: 16px; margin: .35rem 0; }
+.pl-page .pl-gantt-label { position: static; display: flex; flex-direction: column; align-items: stretch; gap: .7rem; padding: 0; container-type: normal; }
+.pl-page .pl-gantt-name { font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
+.pl-page .pl-gantt-name-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; }
+.pl-page .pl-gantt-name-row .pl-gantt-name { flex: 1 1 15rem; }
+.pl-page .pl-gantt-meta { margin: 0; gap: .4rem; }
+.pl-page .pl-gantt-meta .pl-chip { font-size: .78rem; white-space: normal; }
+.pl-page .pl-badge-critico { border-color: var(--border-divider); color: var(--text-muted); background: var(--bg-surface); }
+.pl-gantt-evaluacion { display: flex; gap: .65rem 1rem; flex-wrap: wrap; padding: .8rem; border: 1px solid var(--border-divider); background: var(--bg-surface); border-radius: 10px; font-size: .86rem; color: var(--text-strong); }
+.pl-gantt-evaluacion strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.pl-gantt-evaluacion small { flex-basis: 100%; color: var(--text-muted); font-size: .78rem; line-height: 1.5; }
+.pl-eval-pendientes { font-weight: 600; }
+.pl-gantt-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
+.pl-page .pl-gantt-acciones button { flex: 1 1 8rem; min-height: 44px; border-radius: 10px; white-space: normal; padding: .6rem .8rem; font-size: .86rem; }
+.pl-btn-evaluacion { border: 1px solid var(--accent-primary); background: var(--accent-primary); color: #fff; font-weight: 700; cursor: pointer; }
+.pl-gantt-carril { min-width: 0; align-self: center; }
+.pl-gantt-mobile-scale { display: grid; grid-template-columns: repeat(var(--pl-cols, 8), minmax(0, 1fr)); margin-bottom: .4rem; gap: 2px; }
+.pl-gantt-mobile-scale span { padding: .45rem .1rem; font-size: .7rem; text-align: center; color: var(--text-muted); background: var(--bg-surface); border-radius: 5px; overflow-wrap: anywhere; }
+.pl-gantt-mobile-scale .is-en_curso { color: var(--text-strong); font-weight: 700; background: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-card)); }
+.pl-gantt-carril-nota { font-size: .76rem; color: var(--text-muted); margin: .5rem 0 0; }
+.pl-page .pl-gantt-hoy-local { display: block; z-index: 3; height: 100%; top: 0; left: calc(var(--pl-hoy) * 1%); }
+.pl-page .pl-gantt-bar { min-width: 0; max-width: 100%; }
+.pl-gantt-resultados { grid-column: 1 / -1; border-top: 1px solid var(--border-divider); padding-top: .25rem; min-width: 0; }
+.pl-gantt-resultados summary { cursor: pointer; min-height: 44px; padding: .6rem 0; color: var(--text-strong); font-size: .88rem; font-weight: 600; }
+.pl-gantt-resultados summary span { margin-left: .5rem; color: var(--text-muted); font-weight: 400; }
+.pl-gantt-rap-lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem; padding-top: .5rem; }
+.pl-gantt-rap { background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 10px; padding: 1rem; min-width: 0; overflow-wrap: anywhere; }
+.pl-gantt-rap h4 { font-size: .9rem; line-height: 1.55; margin: .4rem 0; color: var(--text-strong); }
+.pl-gantt-rap small, .pl-gantt-rap p { color: var(--text-muted); font-size: .8rem; line-height: 1.6; margin: .3rem 0; }
+.pl-eval-dialog { box-sizing: border-box; width: min(64rem, calc(100% - 1rem)); max-width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); margin: auto; border: 1px solid var(--border-divider); border-radius: 18px; padding: 0; background: var(--bg-card); color: var(--text-main); box-shadow: var(--shadow); }
+.pl-eval-dialog::backdrop { background: rgb(0 0 0 / .55); }
+.pl-eval-dialog *, .pl-gantt-row * { box-sizing: border-box; min-width: 0; }
+.pl-eval-panel { padding: 1rem; }
+.pl-eval-head { display: flex; align-items: start; justify-content: space-between; gap: .7rem; }
+.pl-eval-head h2 { font-size: clamp(1.1rem, 2vw, 1.5rem); color: var(--text-strong); line-height: 1.4; margin: .3rem 0; overflow-wrap: anywhere; }
+.pl-eval-head p { color: var(--text-muted); font-size: .8rem; }
+.pl-eval-dialog button { min-height: 44px; border: 1px solid var(--border-divider); border-radius: 8px; padding: .6rem .8rem; cursor: pointer; color: var(--text-strong); background: var(--bg-surface); font-weight: 600; }
+.pl-eval-close { flex-shrink: 0; }
+.pl-eval-metricas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: 1rem 0; }
+.pl-eval-metrica { display: grid; gap: .35rem; padding: .8rem .5rem; background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 10px; text-align: center; }
+.pl-eval-metrica strong { font-size: 1.4rem; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.pl-eval-metrica span { font-size: .78rem; color: var(--text-muted); }
+.pl-eval-controles { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; }
+.pl-eval-controles label { display: grid; gap: .35rem; font-size: .84rem; font-weight: 600; color: var(--text-strong); }
+.pl-eval-controles :is(input, select) { width: 100%; max-width: 100%; min-height: 44px; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-divider); border-radius: 8px; padding: .6rem; font: inherit; }
+.pl-eval-filtros { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0; }
+.pl-eval-filtros button { flex: 1; }
+.pl-eval-filtros button[aria-pressed="true"] { background: var(--text-strong); color: var(--bg-card); border-color: var(--text-strong); }
+.pl-eval-descripcion { color: var(--text-strong); font-size: .86rem; line-height: 1.6; overflow-wrap: anywhere; }
+.pl-eval-nota, .pl-eval-contador { color: var(--text-muted); font-size: .78rem; line-height: 1.6; }
+.pl-eval-contador { font-weight: 600; border-top: 1px solid var(--border-divider); padding-top: .8rem; }
+.pl-eval-lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; }
+.pl-eval-aprendiz { padding: 1rem; border: 1px solid var(--border-divider); border-radius: 12px; background: var(--bg-surface); overflow-wrap: anywhere; }
+.pl-eval-aprendiz-head { display: flex; flex-wrap: wrap; gap: .65rem; align-items: start; justify-content: space-between; }
+.pl-eval-aprendiz h3 { margin: 0 0 .25rem; font-size: 1rem; line-height: 1.5; color: var(--text-strong); }
+.pl-eval-aprendiz-head p, .pl-eval-progreso { margin: .25rem 0; color: var(--text-muted); font-size: .8rem; }
+.pl-eval-estado { padding: .25rem .55rem; font-size: .75rem; border: 1px solid var(--border-divider); border-radius: 6px; background: var(--bg-card); }
+.pl-eval-estado.is-evaluado { border-color: var(--success); }
+.pl-eval-estado.is-parcial { border-color: var(--warning); }
+.pl-eval-juicio { display: grid; gap: .35rem; font-size: .82rem; line-height: 1.55; padding-top: .8rem; margin-top: .7rem; border-top: 1px solid var(--border-divider); }
+.pl-eval-juicio strong { color: var(--text-strong); }
+.pl-eval-fecha { color: var(--text-muted); }
+.pl-eval-aprobado { font-weight: 700; }
+.pl-eval-vacio { padding: 1.5rem; border: 1px dashed var(--border-divider); border-radius: 12px; line-height: 1.6; color: var(--text-muted); }
+.pl-eval-dialog :is(button, input, select):focus-visible { outline: 3px solid var(--accent-primary); outline-offset: 2px; }
+@media (min-width: 640px) {
+    .pl-eval-panel { padding: 1.5rem; }
+    .pl-eval-controles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pl-eval-busqueda { grid-column: 1 / -1; }
+    .pl-eval-lista, .pl-gantt-rap-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1100px) {
+    .pl-page .pl-gantt-scale { display: grid; }
+    .pl-page .pl-gantt-scale-title { position: static; }
+    .pl-page .pl-gantt-row { grid-template-columns: var(--pl-label) minmax(0, 1fr); padding: 1.2rem; }
+    .pl-gantt-mobile-scale { display: none; }
+}
+@media print {
+    .pl-eval-dialog, .pl-gantt-acciones { display: none; }
+}

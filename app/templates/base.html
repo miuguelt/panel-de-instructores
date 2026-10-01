@@ -13,7 +13,8 @@
     <noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"></noscript>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tyt.css') }}">
-    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+    <script src="{{ url_for('static', filename='js/loading-indicator.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='vendor/htmx/htmx.min.js') }}" defer></script>
     {% block head %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modal-system.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/loading-indicator.css') }}">
@@ -27,7 +28,7 @@
     </script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
-    <div id="app-loading-overlay" class="app-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="false">
+    <div id="app-loading-overlay" class="app-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true" hidden>
         <div class="app-loading-card">
             <span class="app-loading-spinner" aria-hidden="true"></span>
             <p class="app-loading-title">Cargando la aplicación</p>
@@ -308,7 +309,6 @@
         
     </script>
     <script src="{{ url_for('static', filename='js/modal-system.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/loading-indicator.js') }}" defer></script>
 
     <dialog id="modal-confirmacion" class="app-modal-overlay app-confirm-modal" aria-modal="true" aria-labelledby="modal-confirmacion-titulo" aria-describedby="modal-confirmacion-mensaje" data-confirm-dialog>
         <section class="app-modal-content app-modal-content--compact app-confirm-shell">

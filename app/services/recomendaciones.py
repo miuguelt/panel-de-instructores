@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from sqlalchemy import func, or_
 
@@ -343,33 +343,35 @@ def _evaluar_tareas_instructor(
 
     # R6: Tareas próximas a vencer con baja entrega
     limite_proximo = ahora + timedelta(hours=48)
-    for t in todas_tareas:
-        if t.fecha_limite and ahora <= t.fecha_limite <= limite_proximo:
-            entregadas_count = Entrega.query.filter_by(tarea_id=t.id).count()
-            if total_activos > 0:
-                pct_entregado = round((entregadas_count / total_activos) * 100)
-                if pct_entregado < 50:
-                    horas_restantes = max(round((t.fecha_limite - ahora).total_seconds() / 3600), 1)
-                    recomendaciones.append(
-                        Recomendacion(
-                            id=f'tarea_por_vencer_baja_entrega_{t.id}',
-                            categoria=CAT_TAREAS,
-                            severidad=SEV_PREVENTIVA,
-                            icono='⏳',
-                            titulo=f'Baja entrega en tarea por vencer: {t.titulo[:35]}',
-                            mensaje=(
-                                f'La tarea vence en {horas_restantes}h y solo el {pct_entregado}% '
-                                f'del grupo ({entregadas_count}/{total_activos}) ha entregado. '
-                                f'Se sugiere enviar un recordatorio en clase o verificar bloqueos técnicos.'
-                            ),
-                            accion_texto='Ver tarea',
-                            accion_url=f'/instructor/fichas/{ficha.id}/tareas',
-                            metrica_destacada=f'{pct_entregado}% entregado · {horas_restantes}h restantes',
-                            prioridad=4,
-                        )
+    tareas_proximas = [t for t in todas_tareas if t.fecha_limite and ahora <= t.fecha_limite <= limite_proximo]
+    conteos = dict(db.session.query(Entrega.tarea_id, func.count(Entrega.id)).filter(
+        Entrega.tarea_id.in_([t.id for t in tareas_proximas]),
+    ).group_by(Entrega.tarea_id).all()) if tareas_proximas and total_activos > 0 else {}
+    for t in tareas_proximas:
+        if total_activos > 0:
+            entregadas_count = conteos.get(t.id, 0)
+            pct_entregado = round((entregadas_count / total_activos) * 100)
+            if pct_entregado < 50:
+                horas_restantes = max(round((t.fecha_limite - ahora).total_seconds() / 3600), 1)
+                recomendaciones.append(
+                    Recomendacion(
+                        id=f'tarea_por_vencer_baja_entrega_{t.id}',
+                        categoria=CAT_TAREAS,
+                        severidad=SEV_PREVENTIVA,
+                        icono='⏳',
+                        titulo=f'Baja entrega en tarea por vencer: {t.titulo[:35]}',
+                        mensaje=(
+                            f'La tarea vence en {horas_restantes}h y solo el {pct_entregado}% '
+                            f'del grupo ({entregadas_count}/{total_activos}) ha entregado. '
+                            f'Se sugiere enviar un recordatorio en clase o verificar bloqueos técnicos.'
+                        ),
+                        accion_texto='Ver tarea',
+                        accion_url=f'/instructor/fichas/{ficha.id}/tareas',
+                        metrica_destacada=f'{pct_entregado}% entregado · {horas_restantes}h restantes',
+                        prioridad=4,
                     )
-                    break
-
+                )
+                break
     return recomendaciones
 
 
@@ -480,8 +482,14 @@ def obtener_recomendaciones_ficha(
     instructor_id: Optional[int] = None,
     ahora: Optional[datetime] = None,
     contexto_precalculado: Optional[Dict[str, Any]] = None,
+    categorias: Optional[Iterable[str]] = None,
 ) -> List[Recomendacion]:
-    """Obtiene y prioriza las recomendaciones pedagógicas y operativas para la ficha."""
+    """Evalúa únicamente los módulos solicitados; sin filtro conserva todas las alertas."""
+    seleccion = set(categorias) if categorias is not None else {
+        CAT_FASES, CAT_JUICIOS, CAT_TAREAS, CAT_ASISTENCIA, CAT_PLANES,
+    }
+    if not seleccion:
+        return []
     ahora = ahora or datetime.utcnow()
     hoy = ahora.date()
     ficha = db.session.get(Ficha, ficha_id)
@@ -503,9 +511,9 @@ def obtener_recomendaciones_ficha(
         alertas_activas = contexto_precalculado.get('alertas_activas', [])
         planes_pendientes = contexto_precalculado.get('planes_pendientes', [])
     else:
-        cronograma = obtener_cronograma(ficha)
-        fases_data = obtener_seguimiento_fases_dashboard(ficha, cronograma, hoy=hoy)
-        aprendices_activos = Aprendiz.query_en_formacion(ficha_id).all()
+        cronograma = obtener_cronograma(ficha) if CAT_FASES in seleccion else {}
+        fases_data = obtener_seguimiento_fases_dashboard(ficha, cronograma, hoy=hoy) if CAT_FASES in seleccion else {}
+        aprendices_activos = Aprendiz.query_en_formacion(ficha_id).all() if seleccion & {CAT_JUICIOS, CAT_TAREAS} else []
         top_competencias = None
         entregas_pendientes = (
             Entrega.query
@@ -516,20 +524,25 @@ def obtener_recomendaciones_ficha(
                 or_(Entrega.calificada == False, Entrega.estado_revision == 'pendiente'),
             )
             .all()
-        )
-        todas_tareas = Tarea.query.filter_by(ficha_id=ficha_id).all()
+        ) if CAT_TAREAS in seleccion else []
+        todas_tareas = Tarea.query.filter_by(ficha_id=ficha_id).all() if CAT_TAREAS in seleccion else []
         aprendices_rojo = []
         aprendices_amarillo = []
-        alertas_activas = Alerta.query.filter_by(ficha_id=ficha_id, estado='activa').all()
-        planes_pendientes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id, estado='pendiente').all()
+        alertas_activas = Alerta.query.filter_by(ficha_id=ficha_id, estado='activa').all() if CAT_ASISTENCIA in seleccion else []
+        planes_pendientes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id, estado='pendiente').all() if CAT_PLANES in seleccion else []
 
     todas: List[Recomendacion] = []
-    todas.extend(_evaluar_ritmo_fases_instructor(ficha, fases_data, cronograma))
-    todas.extend(_evaluar_juicios_instructor(ficha, aprendices_activos, top_competencias))
-    todas.extend(_evaluar_tareas_instructor(ficha, entregas_pendientes, todas_tareas, len(aprendices_activos), ahora))
-    todas.extend(_evaluar_asistencia_comite_instructor(
-        ficha, aprendices_rojo, aprendices_amarillo, alertas_activas, planes_pendientes, ahora
-    ))
+    if CAT_FASES in seleccion:
+        todas.extend(_evaluar_ritmo_fases_instructor(ficha, fases_data, cronograma))
+    if CAT_JUICIOS in seleccion:
+        todas.extend(_evaluar_juicios_instructor(ficha, aprendices_activos, top_competencias))
+    if CAT_TAREAS in seleccion:
+        todas.extend(_evaluar_tareas_instructor(ficha, entregas_pendientes, todas_tareas, len(aprendices_activos), ahora))
+    if seleccion & {CAT_ASISTENCIA, CAT_PLANES}:
+        todas.extend(_evaluar_asistencia_comite_instructor(
+            ficha, aprendices_rojo, aprendices_amarillo, alertas_activas, planes_pendientes, ahora
+        ))
+    todas = [r for r in todas if r.categoria in seleccion]
 
     # Ordenar por prioridad (1 es más urgente) y luego por severidad
     severidad_orden = {SEV_CRITICA: 0, SEV_PREVENTIVA: 1, SEV_SUGERENCIA: 2, SEV_POSITIVA: 3}

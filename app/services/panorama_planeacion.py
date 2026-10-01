@@ -23,6 +23,7 @@ from app.services.graficos_planeacion import (
     construir_radar,
 )
 from app.services.linea_tiempo import construir_linea_tiempo
+from app.services.evaluacion_planeacion import construir_seguimiento
 from app.services.proyeccion_ficha import construir_proyeccion
 from app.services.seguimiento_fases import construir_seguimiento_fases
 
@@ -152,6 +153,7 @@ def construir_panorama(ficha, contenido_planeacion, version_planeacion=None,
         meses_lectivos=calendario.get('meses_lectiva', 0),
     )
     enriquecer_con_pedagogia(linea, contraste)
+    seguimiento_evaluacion = construir_seguimiento(linea)
     catalogo_ped = construir_catalogo(linea, contraste)
     diagnostico = revisar_datos_planeacion(
         linea['resultados'],
@@ -175,6 +177,7 @@ def construir_panorama(ficha, contenido_planeacion, version_planeacion=None,
         'diagnostico': diagnostico,
         'contraste': contraste,
         'catalogo_pedagogico': catalogo_ped,
+        'seguimiento_evaluacion': seguimiento_evaluacion,
         'desempeno_ficha': desempeno,
         'radar': radar,
         'heatmap_docente': heatmap_docente,

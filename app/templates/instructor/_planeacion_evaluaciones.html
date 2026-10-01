@@ -1,0 +1,30 @@
+{# El diálogo usa los mismos RAP del tramo seleccionado, aunque la competencia se repita en otra fase. #}
+<p id="pl-evaluaciones-error" class="pl-note" role="alert" hidden></p>
+<dialog id="pl-evaluaciones" class="pl-eval-dialog" aria-labelledby="pl-evaluaciones-titulo" aria-describedby="pl-evaluaciones-contexto">
+    <div class="pl-eval-panel">
+        <header class="pl-eval-head">
+            <div>
+                <p class="pl-eyebrow">Seguimiento de evaluación</p>
+                <h2 id="pl-evaluaciones-titulo">Aprendices del tramo</h2>
+                <p id="pl-evaluaciones-contexto"></p>
+            </div>
+            <button id="pl-evaluaciones-cerrar" type="button" class="pl-eval-close" aria-label="Cerrar seguimiento de evaluación">Cerrar ✕</button>
+        </header>
+        <div id="pl-evaluaciones-metricas" class="pl-eval-metricas"></div>
+        <div class="pl-eval-controles">
+            <label>Resultado de aprendizaje<select id="pl-evaluaciones-rap"></select></label>
+            <label>Instructor evaluador<select id="pl-evaluaciones-instructor"></select></label>
+            <label class="pl-eval-busqueda">Buscar aprendiz<input id="pl-evaluaciones-buscar" type="search" placeholder="Nombre o documento" autocomplete="off"></label>
+        </div>
+        <div class="pl-eval-filtros" role="group" aria-label="Estado de evaluación">
+            <button type="button" data-evaluacion-estado="pendiente" aria-pressed="true">Pendientes</button>
+            <button type="button" data-evaluacion-estado="evaluado" aria-pressed="false">Evaluados</button>
+            <button type="button" data-evaluacion-estado="todos" aria-pressed="false">Todos</button>
+        </div>
+        <p id="pl-evaluaciones-descripcion" class="pl-eval-descripcion"></p>
+        <p class="pl-eval-nota">Evaluado no significa aprobado. El instructor corresponde al funcionario registrado en el reporte de juicios; si el dato falta, se indica “No registrado”.</p>
+        <p id="pl-evaluaciones-contador" class="pl-eval-contador" role="status" aria-live="polite" aria-atomic="true"></p>
+        <div id="pl-evaluaciones-lista" class="pl-eval-lista"></div>
+    </div>
+</dialog>
+<script id="pl-evaluaciones-json" type="application/json">{{ seguimiento_evaluacion|default({})|tojson }}</script>

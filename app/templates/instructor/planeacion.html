@@ -5,7 +5,9 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion_workspace.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion_evaluaciones.css') }}">
 <script src="{{ url_for('static', filename='js/planeacion_navegacion.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/planeacion_evaluaciones.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -58,6 +60,7 @@
 
         {% include 'instructor/_planeacion_panorama.html' %}
         {% include 'instructor/_planeacion_mapa.html' %}
+        {% include 'instructor/_planeacion_evaluaciones.html' %}
         {% include 'instructor/_planeacion_programa.html' %}
         {% include 'instructor/_planeacion_detalle.html' %}
     {% endif %}

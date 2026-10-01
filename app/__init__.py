@@ -252,6 +252,8 @@ def create_app(test_config=None):
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_opts
 
     db.init_app(app)
+    from app.http_timing import registrar_tiempos_http
+    registrar_tiempos_http(app, db)
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Debes iniciar sesion para acceder a esta pagina.'
@@ -367,14 +369,14 @@ def create_app(test_config=None):
     def _alertas_modulo(ficha_id, categoria):
         if not current_user.is_authenticated or not ficha_id:
             return []
-        cache_key = f'_alertas_modulo_{ficha_id}'
+        cache_key = f'_alertas_modulo_{ficha_id}_{categoria}'
         from flask import g
         if hasattr(g, cache_key):
             todas = getattr(g, cache_key)
         else:
             try:
                 from app.services.recomendaciones import obtener_recomendaciones_ficha
-                todas = obtener_recomendaciones_ficha(ficha_id)
+                todas = obtener_recomendaciones_ficha(ficha_id, categorias={categoria})
                 setattr(g, cache_key, todas)
             except Exception:
                 todas = []
@@ -484,6 +486,7 @@ def create_app(test_config=None):
         estado = {
             'status': 'ok',
             'database': 'connected',
+            'database_engine': db.engine.dialect.name,
             'rate_limiter': app.config.get('LIMITER_BACKEND'),
             'secret_key': 'efimera (revisar SECRET_KEY)' if SECRET_KEY_IS_EPHEMERAL else 'ok',
             'uploads': uploads,
