@@ -40,6 +40,8 @@ services:
       - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-52428800}
     volumes:
       - uploads:/app/uploads
+    ports:
+      - "${PORT:-8009}:8009"
     expose:
       - "8009"
     healthcheck:
@@ -53,6 +55,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.app-compress.compress=true"
+      - "traefik.http.services.app.loadbalancer.server.port=8009"
 
 
   worker:

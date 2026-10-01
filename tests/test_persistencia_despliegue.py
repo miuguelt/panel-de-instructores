@@ -129,6 +129,19 @@ class PersistenciaDespliegueTestCase(unittest.TestCase):
                 f'El servicio {servicio} no define LOG_LEVEL por defecto.',
             )
 
+    def test_servicio_web_publica_puerto_8009_y_configura_puerto_traefik(self):
+        app_block = self.servicios['app']
+        self.assertIn(
+            '- "${PORT:-8009}:8009"',
+            app_block,
+            'El servicio web debe mapear el puerto 8009 para responder solicitudes directas.',
+        )
+        self.assertIn(
+            '- "traefik.http.services.app.loadbalancer.server.port=8009"',
+            app_block,
+            'El servicio web debe declarar el puerto del load balancer para Traefik.',
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

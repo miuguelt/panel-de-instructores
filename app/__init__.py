@@ -258,6 +258,12 @@ def create_app(test_config=None):
     migrate.init_app(app, db)
     csrf.init_app(app)
 
+    # --- Soporte para proxy inverso (Traefik / Coolify) ---
+    # Procesa cabeceras X-Forwarded-* para que scheme (https) y host se resuelvan
+    # correctamente en redirecciones, cookies de sesion y url_for().
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     # --- Compresion de respuestas ---
     # Varias vistas de instructor renderizan HTML de cientos de KB (juicios
     # supera 1 MB), que viaja sin comprimir en cada peticion. gzip lo reduce
