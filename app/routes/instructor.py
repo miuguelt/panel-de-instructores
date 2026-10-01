@@ -53,6 +53,7 @@ from app.services.importacion_ficha import (
     validar_reporte_ficha,
 )
 from app.services.permisos import (
+    cambiar_estado_activo_aprendiz,
     configurar_rol_aprendiz,
     puede_gestionar_ficha,
     puede_gestionar_corte,
@@ -843,7 +844,12 @@ def configuracion_aprendices(ficha_id):
         return redirect(url_for('instructor.fichas'))
 
     aprendices_administrables = (
-        Aprendiz.query_llamado_lista(ficha_id)
+        Aprendiz.query_llamado_lista(ficha_id, solo_activos=True)
+        .order_by(Aprendiz.apellidos, Aprendiz.nombre)
+        .all()
+    )
+    todos_aprendices = (
+        Aprendiz.query.filter_by(ficha_id=ficha_id)
         .order_by(Aprendiz.apellidos, Aprendiz.nombre)
         .all()
     )
@@ -855,6 +861,7 @@ def configuracion_aprendices(ficha_id):
         'aprendices_configuracion.html',
         ficha=ficha,
         aprendices_administrables=aprendices_administrables,
+        todos_aprendices=todos_aprendices,
         administrador=administrador,
     )
 
@@ -895,6 +902,51 @@ def actualizar_rol_administrativo(ficha_id, aprendiz_id):
         flash('Ocurrió un error al actualizar el rol administrativo.', 'error')
 
     return redirect(url_for('instructor.configuracion_aprendices', ficha_id=ficha_id))
+
+
+@instructor_bp.route(
+    '/fichas/<int:ficha_id>/aprendices/<int:aprendiz_id>/estado-activo',
+    methods=['POST'],
+)
+@login_required
+def alternar_estado_activo_aprendiz(ficha_id, aprendiz_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    accion = (request.form.get('accion') or '').strip().lower()
+    activo = None
+    if accion == 'deshabilitar':
+        activo = False
+    elif accion == 'habilitar':
+        activo = True
+
+    try:
+        aprendiz = cambiar_estado_activo_aprendiz(ficha_id, aprendiz_id, activo=activo)
+        db.session.commit()
+        if aprendiz.activo:
+            flash(
+                f'{aprendiz.nombre_completo} ha sido habilitado para ranking y turnos de aseo.',
+                'success',
+            )
+        else:
+            flash(
+                f'{aprendiz.nombre_completo} ha sido deshabilitado. No aparecerá en el ranking ni en los turnos de aseo.',
+                'info',
+            )
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'error')
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Error al cambiar estado activo del aprendiz')
+        flash('Ocurrió un error al actualizar el estado del aprendiz.', 'error')
+
+    siguiente = request.form.get('next') or request.referrer
+    if siguiente and siguiente.startswith('/'):
+        return redirect(siguiente)
+    return redirect(url_for('instructor.aprendices', ficha_id=ficha_id))
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/aprendices/<int:aprendiz_id>/historial')

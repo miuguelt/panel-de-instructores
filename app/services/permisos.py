@@ -132,6 +132,7 @@ def puede_administrar_ficha_como_aprendiz(ficha_id):
         and aprendiz
         and aprendiz.rol_administrativo
         and aprendiz.estado in ESTADOS_LLAMADO_LISTA
+        and aprendiz.activo
     )
 
 
@@ -143,7 +144,7 @@ def configurar_rol_aprendiz(ficha_id, aprendiz_id, habilitar=True):
     ).first()
     if not aprendiz:
         raise ValueError('El aprendiz no pertenece a esta ficha.')
-    if habilitar and aprendiz.estado not in ESTADOS_LLAMADO_LISTA:
+    if habilitar and (aprendiz.estado not in ESTADOS_LLAMADO_LISTA or not aprendiz.activo):
         raise ValueError('Solo un aprendiz activo o condicionado puede recibir este rol.')
 
     if habilitar:
@@ -152,4 +153,27 @@ def configurar_rol_aprendiz(ficha_id, aprendiz_id, habilitar=True):
             synchronize_session='fetch',
         )
     aprendiz.rol_administrativo = bool(habilitar)
+    return aprendiz
+
+
+def cambiar_estado_activo_aprendiz(ficha_id, aprendiz_id, activo=None):
+    """Habilita o deshabilita a un aprendiz para su participación en ranking y aseo."""
+    from app.services.aseo import desvincular_aprendiz_de_turnos_futuros
+
+    aprendiz = Aprendiz.query.filter_by(
+        id=aprendiz_id,
+        ficha_id=ficha_id,
+    ).first()
+    if not aprendiz:
+        raise ValueError('El aprendiz no pertenece a esta ficha.')
+
+    nuevo_estado = not aprendiz.activo if activo is None else bool(activo)
+    aprendiz.activo = nuevo_estado
+
+    if not nuevo_estado:
+        if aprendiz.rol_administrativo:
+            aprendiz.rol_administrativo = False
+        desvincular_aprendiz_de_turnos_futuros(ficha_id, aprendiz_id)
+
+    db.session.flush()
     return aprendiz

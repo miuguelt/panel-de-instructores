@@ -897,9 +897,9 @@ def asignar_o_actualizar_turno(
         raise ValueError('Selecciona dos aprendices válidos.')
     if aprendiz_1.ficha_id != ficha_id or aprendiz_2.ficha_id != ficha_id:
         raise ValueError('Los aprendices deben pertenecer a la misma ficha.')
-    if aprendiz_1.estado not in ESTADOS_ACTIVOS:
+    if aprendiz_1.estado not in ESTADOS_ACTIVOS or not aprendiz_1.activo:
         raise ValueError(f'{aprendiz_1.nombre_completo} no está en formación activa en esta ficha.')
-    if aprendiz_2.estado not in ESTADOS_ACTIVOS:
+    if aprendiz_2.estado not in ESTADOS_ACTIVOS or not aprendiz_2.activo:
         raise ValueError(f'{aprendiz_2.nombre_completo} no está en formación activa en esta ficha.')
 
     if es_festivo_colombia(fecha):
@@ -957,9 +957,9 @@ def reemplazar_aprendices(
         or aprendiz_2.ficha_id != turno.ficha_id
     ):
         raise ValueError('Los aprendices deben pertenecer a la misma ficha.')
-    if aprendiz_1.estado not in ESTADOS_ACTIVOS:
+    if aprendiz_1.estado not in ESTADOS_ACTIVOS or not aprendiz_1.activo:
         raise ValueError(f'{aprendiz_1.nombre_completo} no está en formación activa en esta ficha.')
-    if aprendiz_2.estado not in ESTADOS_ACTIVOS:
+    if aprendiz_2.estado not in ESTADOS_ACTIVOS or not aprendiz_2.activo:
         raise ValueError(f'{aprendiz_2.nombre_completo} no está en formación activa en esta ficha.')
 
     actor = actor_label or (
@@ -985,6 +985,67 @@ def reemplazar_aprendices(
         turno.completado_1 = True
         turno.completado_2 = True
         recalcular_contadores(turno.ficha_id)
+
+
+def desvincular_aprendiz_de_turnos_futuros(ficha_id, aprendiz_id):
+    """Reemplaza al aprendiz deshabilitado en turnos pendientes futuros o cancela el turno si no hay candidatos."""
+    hoy = date.today()
+    turnos_futuros = TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.fecha >= hoy,
+        TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
+        db.or_(
+            TurnoAseo.aprendiz_1_id == aprendiz_id,
+            TurnoAseo.aprendiz_2_id == aprendiz_id,
+        ),
+    ).all()
+
+    if not turnos_futuros:
+        return
+
+    activos = aprendices_activos(ficha_id)
+    candidatos_base = [a for a in activos if a.id != aprendiz_id]
+
+    if not candidatos_base:
+        for turno in turnos_futuros:
+            db.session.delete(turno)
+        db.session.flush()
+        return
+
+    contadores = asegurar_contadores(ficha_id)
+    cargas_prog, ultima_prog = _cargas_programadas(ficha_id)
+    historial_parejas = _obtener_historial_parejas(ficha_id)
+
+    for turno in turnos_futuros:
+        otro_id = turno.aprendiz_2_id if turno.aprendiz_1_id == aprendiz_id else turno.aprendiz_1_id
+        candidatos = [a for a in candidatos_base if a.id != otro_id]
+        if not candidatos:
+            db.session.delete(turno)
+            continue
+
+        reemplazo = _elegir_por_cola_justa(
+            candidatos,
+            contadores,
+            cargas_prog,
+            ultima_prog,
+            companero_id=otro_id,
+            historial_parejas=historial_parejas,
+        )
+        if not reemplazo:
+            db.session.delete(turno)
+            continue
+
+        if turno.aprendiz_1_id == aprendiz_id:
+            turno.aprendiz_1_id = reemplazo.id
+            turno.auditoria_1 = 'Reemplazo automático por deshabilitación de aprendiz.'
+        else:
+            turno.aprendiz_2_id = reemplazo.id
+            turno.auditoria_2 = 'Reemplazo automático por deshabilitación de aprendiz.'
+
+        cargas_prog[reemplazo.id] += 1
+        ultima_prog[reemplazo.id] = turno.fecha
+
+    db.session.flush()
 
 
 def _reemplazar_en_turno(turno, sale_id, entra_id, auditoria):

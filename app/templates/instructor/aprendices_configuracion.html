@@ -50,7 +50,68 @@
     {% endif %}
 </div>
 
-<div class="card" style="max-width: 760px;">
+<div class="card" style="max-width: 760px; margin-top: 1.5rem;">
+    <h2>Participación en ranking y turnos de aseo</h2>
+    <p class="text-muted">
+        Puedes deshabilitar aprendices específicos para que no se incluyan en el ranking
+        ni se les asignen turnos de aseo. El aprendiz conservará su historial de asistencia,
+        juicios evaluativos y evidencias registradas.
+    </p>
+
+    {% if todos_aprendices %}
+    <div class="table-responsive" style="margin-top: 1rem;">
+        <table class="table table-sena">
+            <thead>
+                <tr>
+                    <th>Aprendiz</th>
+                    <th class="text-center">Estado oficial</th>
+                    <th class="text-center">Participación</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ap in todos_aprendices %}
+                <tr>
+                    <td>
+                        <strong>{{ ap.nombre_completo }}</strong>
+                        <br><small class="text-muted">{{ ap.tipo_documento }} {{ ap.documento }}</small>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge badge-{{ ap.estado|tono_estado }}">{{ ap.estado|etiqueta_estado }}</span>
+                    </td>
+                    <td class="text-center">
+                        {% if ap.activo %}
+                        <span class="badge badge-success">Habilitado</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Deshabilitado</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <form method="POST" action="{{ url_for('instructor.alternar_estado_activo_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="next" value="{{ url_for('instructor.configuracion_aprendices', ficha_id=ficha.id) }}">
+                            {% if ap.activo %}
+                            <input type="hidden" name="accion" value="deshabilitar">
+                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);" onclick="return confirm('¿Deseas deshabilitar a este aprendiz de ranking y aseo?');">
+                                Deshabilitar
+                            </button>
+                            {% else %}
+                            <input type="hidden" name="accion" value="habilitar">
+                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--success, #16a34a);">
+                                Habilitar
+                            </button>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card" style="max-width: 760px; margin-top: 1.5rem;">
     <h2>Permisos incluidos</h2>
     <ul>
         <li>Generar turnos nuevos en un rango de fechas.</li>

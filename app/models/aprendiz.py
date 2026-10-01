@@ -96,6 +96,9 @@ class Aprendiz(db.Model):
     tipo_documento = db.Column(db.String(5), default='CC')
     correo = db.Column(db.String(150), nullable=True)
     estado = db.Column(db.String(20), default='EN_FORMACION')
+    activo = db.Column(
+        db.Boolean, nullable=False, default=True, server_default=db.true()
+    )
     # Este rol es deliberadamente independiente del usuario instructor. Solo
     # habilita operaciones operativas acotadas dentro de la ficha.
     rol_administrativo = db.Column(
@@ -114,25 +117,44 @@ class Aprendiz(db.Model):
     )
 
     @classmethod
-    def query_en_formacion(cls, ficha_id):
+    def query_en_formacion(cls, ficha_id, solo_activos=True):
         """Query de aprendices de la ficha que siguen en formacion."""
-        return cls.query.filter(
+        consulta = cls.query.filter(
             cls.ficha_id == ficha_id,
             cls.estado.in_(ESTADOS_EN_FORMACION),
         )
+        if solo_activos:
+            consulta = consulta.filter(cls.activo.is_(True))
+        return consulta
 
     @classmethod
-    def query_llamado_lista(cls, ficha_id):
+    def query_llamado_lista(cls, ficha_id, solo_activos=False):
         """Query de aprendices que participan en el llamado a lista:
         en formacion y condicionados (siguen asistiendo a clase)."""
-        return cls.query.filter(
+        consulta = cls.query.filter(
             cls.ficha_id == ficha_id,
             cls.estado.in_(ESTADOS_LLAMADO_LISTA),
         )
+        if solo_activos:
+            consulta = consulta.filter(cls.activo.is_(True))
+        return consulta
 
     @property
     def en_formacion(self):
-        return self.estado in ESTADOS_EN_FORMACION
+        return self.estado in ESTADOS_EN_FORMACION and self.activo
+
+    @property
+    def deshabilitado(self):
+        """Indica si el aprendiz ha sido excluido de ranking y turnos de aseo."""
+        return not self.activo
+
+    def deshabilitar(self):
+        """Deshabilita al aprendiz para que no participe en ranking ni aseo."""
+        self.activo = False
+
+    def habilitar(self):
+        """Habilita al aprendiz para que participe en ranking y aseo."""
+        self.activo = True
 
     @property
     def es_aprendiz_administrador(self):

@@ -13,7 +13,8 @@ from sqlalchemy import create_engine, text
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REVISION_MERGE = 'e025798e7b92'
-REVISION_HEAD = 'b7f2c1d9a640'
+REVISION_HEAD = 'c8e3f2b1a950'
+REVISION_ACTIVO_APRENDICES = 'c8e3f2b1a950'
 REVISION_TRABAJOS_GRUPALES = 'b7f2c1d9a640'
 REVISION_INSIGNIAS_GRUPO = 'f016a2b9c421'
 RAMA_GRUPOS = 'dfe8ae6bc6d3'
@@ -42,8 +43,12 @@ class MigrationHeadsTestCase(unittest.TestCase):
             REVISION_MERGE,
         )
         self.assertEqual(
-            scripts.get_revision(REVISION_HEAD).down_revision,
+            scripts.get_revision(REVISION_TRABAJOS_GRUPALES).down_revision,
             REVISION_INSIGNIAS_GRUPO,
+        )
+        self.assertEqual(
+            scripts.get_revision(REVISION_HEAD).down_revision,
+            REVISION_TRABAJOS_GRUPALES,
         )
 
     def test_merge_no_modifica_ni_el_esquema_ni_los_datos_existentes(self):

@@ -302,6 +302,9 @@
                 <div class="learner-meta">
                     <span class="learner-doc">{{ ap.tipo_documento }} {{ ap.documento }}</span>
                     <span class="badge badge-{{ ap.estado|tono_estado }}">{{ ap.estado|etiqueta_estado }}</span>
+                    {% if not ap.activo %}
+                    <span class="badge badge-secondary" title="Deshabilitado de ranking y turnos de aseo">Deshabilitado</span>
+                    {% endif %}
                     {% if ap.rol_administrativo %}
                     <span class="badge badge-success" title="Aprendiz administrador de la ficha">👑 Admin</span>
                     {% endif %}
@@ -340,6 +343,20 @@
             <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id) }}#registrar" class="btn btn-outline btn-action-mobile">
                 📓 Observador
             </a>
+            <form method="POST" action="{{ url_for('instructor.alternar_estado_activo_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" style="display:inline; width: 100%;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if ap.activo %}
+                <input type="hidden" name="accion" value="deshabilitar">
+                <button type="submit" class="btn btn-outline btn-action-mobile" style="color: var(--danger, #dc2626); width: 100%;" onclick="return confirm('¿Deseas deshabilitar a este aprendiz de ranking y aseo?');">
+                    🚫 Deshabilitar
+                </button>
+                {% else %}
+                <input type="hidden" name="accion" value="habilitar">
+                <button type="submit" class="btn btn-outline btn-action-mobile" style="color: var(--success, #16a34a); width: 100%;">
+                    ✅ Habilitar
+                </button>
+                {% endif %}
+            </form>
         </div>
     </article>
     {% endfor %}
@@ -375,6 +392,11 @@
                         </td>
                         <td data-label="Estado" class="text-center">
                             <span class="badge badge-{{ ap.estado|tono_estado }}">{{ ap.estado|etiqueta_estado }}</span>
+                            {% if not ap.activo %}
+                            <div style="margin-top: 4px;">
+                                <span class="badge badge-secondary" title="Deshabilitado de ranking y turnos de aseo">Deshabilitado</span>
+                            </div>
+                            {% endif %}
                         </td>
                         <td data-label="Rol operativo" class="text-center">
                             {% if ap.rol_administrativo %}
@@ -404,6 +426,16 @@
                             <div class="table-actions-cluster">
                                 <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" class="btn btn-sm btn-outline" title="Ver historial de avance del aprendiz">Ver Avance</a>
                                 <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=ap.id) }}#registrar" class="btn btn-sm btn-outline" title="Registrar observación en el observador">Observador</a>
+                                <form method="POST" action="{{ url_for('instructor.alternar_estado_activo_aprendiz', ficha_id=ficha.id, aprendiz_id=ap.id) }}" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    {% if ap.activo %}
+                                    <input type="hidden" name="accion" value="deshabilitar">
+                                    <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);" title="Deshabilitar de ranking y turnos de aseo" onclick="return confirm('¿Deseas deshabilitar a este aprendiz de ranking y aseo?');">Deshabilitar</button>
+                                    {% else %}
+                                    <input type="hidden" name="accion" value="habilitar">
+                                    <button type="submit" class="btn btn-sm btn-outline" style="color: var(--success, #16a34a);" title="Habilitar en ranking y turnos de aseo">Habilitar</button>
+                                    {% endif %}
+                                </form>
                             </div>
                         </td>
                     </tr>
