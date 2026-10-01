@@ -58,6 +58,11 @@ def _redis_destino(redis_url=None):
     if not raw:
         return 'NO_DEFINIDO'
     try:
+        from app import _encode_redis_url
+        raw = _encode_redis_url(raw)
+    except Exception:
+        pass
+    try:
         parsed = urlsplit(raw)
         host = parsed.hostname or 'sin-host'
         port = parsed.port or (6379 if parsed.scheme in ('redis', 'rediss') else 'sin-puerto')

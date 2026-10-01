@@ -25,7 +25,7 @@ services:
       - SMTP_FROM
       - PUBLIC_BASE_URL
       - WTF_CSRF_TIME_LIMIT
-      - LOG_LEVEL
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DB_POOL_SIZE
       - DB_MAX_OVERFLOW
       # Gunicorn lee WEB_CONCURRENCY al importar su propio módulo, antes de
@@ -58,6 +58,9 @@ services:
   worker:
     build: .
     restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
     logging:
       driver: json-file
       options:
@@ -78,7 +81,7 @@ services:
       - SMTP_PASSWORD
       - SMTP_FROM
       - WTF_CSRF_TIME_LIMIT
-      - LOG_LEVEL
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DB_POOL_SIZE
       - DB_MAX_OVERFLOW
       - IMPORTACIONES_ASINCRONAS=${IMPORTACIONES_ASINCRONAS:-true}

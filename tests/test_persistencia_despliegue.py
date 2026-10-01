@@ -113,6 +113,22 @@ class PersistenciaDespliegueTestCase(unittest.TestCase):
         self.assertIn('RUN_MIGRATIONS=true', dockerfile)
         self.assertIn('COPY --chown=adso:adso . .', dockerfile)
 
+    def test_worker_espera_salud_del_servicio_web_para_evitar_carreras_de_migracion(self):
+        worker_block = self.servicios['worker']
+        self.assertIn('depends_on:', worker_block)
+        self.assertIn('app:', worker_block)
+        self.assertIn('condition: service_healthy', worker_block)
+
+    def test_log_level_tiene_valor_por_defecto_en_compose_y_entrypoint(self):
+        entrypoint = _leer(os.path.join(RAIZ, 'docker-entrypoint.sh'))
+        self.assertIn('LOG_LEVEL="${LOG_LEVEL:-INFO}"', entrypoint)
+        for servicio in ('app', 'worker'):
+            self.assertIn(
+                '- LOG_LEVEL=${LOG_LEVEL:-INFO}',
+                self.servicios[servicio],
+                f'El servicio {servicio} no define LOG_LEVEL por defecto.',
+            )
+
 
 if __name__ == '__main__':
     unittest.main()

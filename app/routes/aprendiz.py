@@ -23,6 +23,7 @@ from app.services.ranking import (
     actualizar_participacion_ficha,
     calcular_ranking,
     mensaje_motivacional,
+    obtener_configuracion,
 )
 from app.models.alertas import Alerta, Notificacion, PlanMejoramiento
 from app.services.alertas import (
@@ -150,7 +151,11 @@ def panel(ficha_id):
 
     pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones else 100
 
-    actualizar_participacion_ficha(ficha_id)
+    filas_ranking = None
+    try:
+        filas_ranking, _ = actualizar_participacion_ficha(ficha_id)
+    except Exception:
+        pass
 
     # Las insignias nuevas se marcan aqui, antes de armar el resto de la vista:
     # este es el ultimo commit del request y un commit expira los objetos vivos
@@ -301,7 +306,10 @@ def panel(ficha_id):
             'texto_tiempo_plazo': texto_tiempo_plazo,
         })
 
-    filas_ranking, config_ranking = calcular_ranking(ficha_id)
+    if filas_ranking is None:
+        filas_ranking, config_ranking = calcular_ranking(ficha_id)
+    else:
+        config_ranking = obtener_configuracion(ficha_id, crear=True)
     fila_propia = next(
         (fila for fila in filas_ranking if fila['aprendiz'].id == aprendiz.id),
         None,

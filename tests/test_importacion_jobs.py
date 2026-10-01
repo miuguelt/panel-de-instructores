@@ -22,6 +22,17 @@ class ImportacionJobsTestCase(unittest.TestCase):
         )
         self.assertNotIn('super-secret', destino)
 
+    def test_redis_destino_soporta_caracteres_especiales_en_password(self):
+        destino = _redis_destino(
+            'redis://default:clave/con@arroba@redis-host:6379/0'
+        )
+        self.assertEqual(
+            destino,
+            'redis://redis-host:6379/0',
+        )
+        self.assertNotIn('clave', destino)
+        self.assertNotIn('arroba', destino)
+
     def test_cliente_redis_hace_ping_antes_de_entregarlo(self):
         fake = Mock()
         factory = Mock(return_value=fake)

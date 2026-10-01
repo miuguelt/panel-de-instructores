@@ -7,6 +7,8 @@ set -e
 
 PROCESS_ROLE="${PROCESS_TYPE:-web}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
+export LOG_LEVEL
 echo "Iniciando proceso '${PROCESS_ROLE}' en contenedor ${HOSTNAME:-desconocido}."
 
 # Resume una URL sin imprimir usuario, password ni query string. Además de ser
@@ -14,13 +16,18 @@ echo "Iniciando proceso '${PROCESS_ROLE}' en contenedor ${HOSTNAME:-desconocido}
 url_summary() {
   URL_TO_SUMMARIZE="$1" python3 - <<'PY'
 import os
-from urllib.parse import urlsplit
+import re
+from urllib.parse import quote, urlsplit
 
 raw = (os.environ.get('URL_TO_SUMMARIZE') or '').strip().strip('"').strip("'")
 if not raw:
     print('NO_DEFINIDA')
     raise SystemExit
 try:
+    m = re.match(r'^([a-zA-Z0-9+.-]+://)([^:@]*):([^@]+)@(.+)$', raw)
+    if m:
+        scheme, user, pwd, rest = m.groups()
+        raw = f"{scheme}{user}:{quote(pwd, safe='')}@{rest}"
     parsed = urlsplit(raw)
     host = parsed.hostname or 'sin-host'
     port = parsed.port
