@@ -92,7 +92,11 @@
                             <input type="hidden" name="next" value="{{ url_for('instructor.configuracion_aprendices', ficha_id=ficha.id) }}">
                             {% if ap.activo %}
                             <input type="hidden" name="accion" value="deshabilitar">
-                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);" onclick="return confirm('¿Deseas deshabilitar a este aprendiz de ranking y aseo?');">
+                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);"
+                                data-confirm="¿Desea deshabilitar a este aprendiz del ranking y de los turnos de aseo?"
+                                data-confirm-title="Deshabilitar aprendiz"
+                                data-confirm-label="Deshabilitar"
+                                data-confirm-intent="danger">
                                 Deshabilitar
                             </button>
                             {% else %}

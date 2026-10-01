@@ -347,7 +347,11 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if ap.activo %}
                 <input type="hidden" name="accion" value="deshabilitar">
-                <button type="submit" class="btn btn-outline btn-action-mobile" style="color: var(--danger, #dc2626); width: 100%;" onclick="return confirm('¿Deseas deshabilitar a este aprendiz de ranking y aseo?');">
+                <button type="submit" class="btn btn-outline btn-action-mobile" style="color: var(--danger, #dc2626); width: 100%;"
+                    data-confirm="¿Desea deshabilitar a este aprendiz del ranking y de los turnos de aseo?"
+                    data-confirm-title="Deshabilitar aprendiz"
+                    data-confirm-label="Deshabilitar"
+                    data-confirm-intent="danger">
                     🚫 Deshabilitar
                 </button>
                 {% else %}
@@ -430,7 +434,11 @@
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     {% if ap.activo %}
                                     <input type="hidden" name="accion" value="deshabilitar">
-                                    <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);" title="Deshabilitar de ranking y turnos de aseo" onclick="return confirm('¿Deseas deshabilitar a este aprendiz de ranking y aseo?');">Deshabilitar</button>
+                                    <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);" title="Deshabilitar de ranking y turnos de aseo"
+                                        data-confirm="¿Desea deshabilitar a este aprendiz del ranking y de los turnos de aseo?"
+                                        data-confirm-title="Deshabilitar aprendiz"
+                                        data-confirm-label="Deshabilitar"
+                                        data-confirm-intent="danger">Deshabilitar</button>
                                     {% else %}
                                     <input type="hidden" name="accion" value="habilitar">
                                     <button type="submit" class="btn btn-sm btn-outline" style="color: var(--success, #16a34a);" title="Habilitar en ranking y turnos de aseo">Habilitar</button>
