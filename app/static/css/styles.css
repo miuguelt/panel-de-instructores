@@ -12100,3 +12100,308 @@ main#contenido-principal {
     .skeleton { animation: none; }
 }
 
+/* ============================================================
+   PORTAFOLIO DIGITAL DE EVIDENCIAS (GITHUB Y NOTION)
+   ============================================================ */
+.portafolio-bento-card {
+    background: var(--card-bg, #ffffff);
+    border-radius: var(--radius, 16px);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.portafolio-bento-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.portafolio-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.25rem 0 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-strong, #0f172a);
+}
+
+.portafolio-subtitle {
+    margin: 0;
+    max-width: 720px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.portafolio-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.25rem;
+}
+
+.portafolio-tile {
+    position: relative;
+    border-radius: var(--radius-sm, 12px);
+    padding: 1.25rem;
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+    background: var(--surface-1, #f8fafc);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.portafolio-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.portafolio-tile--github {
+    border-top: 3px solid #24292e;
+}
+
+.portafolio-tile--notion {
+    border-top: 3px solid var(--accent-primary, #39a900);
+}
+
+.portafolio-tile-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.portafolio-tile-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.portafolio-brand-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brand-github {
+    background: #0f172a;
+    color: #ffffff;
+}
+
+.brand-notion {
+    background: #ffffff;
+    color: #000000;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.portafolio-brand-name {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-strong, #0f172a);
+}
+
+.portafolio-brand-type {
+    font-size: 0.75rem;
+    color: var(--text-muted, #64748b);
+}
+
+.portafolio-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+}
+
+.status-indicator-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.portafolio-url-preview {
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-2, rgba(0, 0, 0, 0.03));
+    border-radius: 8px;
+    color: var(--text-strong, #0f172a);
+}
+
+.portafolio-url-preview .url-protocol {
+    color: var(--text-muted, #94a3b8);
+}
+
+.portafolio-empty-description {
+    font-size: 0.82rem;
+    color: var(--text-muted, #64748b);
+    line-height: 1.4;
+    margin-bottom: 1rem;
+}
+
+.portafolio-actions-cluster {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.btn-outline-github {
+    border: 1px solid #24292e;
+    color: var(--text-strong, #24292e);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-outline-github:hover {
+    background: #24292e;
+    color: #ffffff;
+}
+
+.btn-outline-notion {
+    border: 1px solid var(--border-color, #cbd5e1);
+    color: var(--text-strong, #0f172a);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-outline-notion:hover {
+    background: var(--surface-2, #e2e8f0);
+}
+
+.btn-primary-github {
+    background: #24292e;
+    color: #ffffff;
+    border: none;
+}
+
+.btn-primary-github:hover {
+    background: #0f172a;
+    color: #ffffff;
+}
+
+.btn-primary-notion {
+    background: var(--accent-primary, #39a900);
+    color: #ffffff;
+    border: none;
+}
+
+.btn-primary-notion:hover {
+    background: var(--color-sena-green-dark, #2d8500);
+    color: #ffffff;
+}
+
+.badge-dot-success {
+    display: inline-block;
+    color: var(--success, #10b981);
+    font-size: 0.75rem;
+    vertical-align: middle;
+    margin-left: 2px;
+}
+
+/* Portafolio en tabla y tarjetas de instructor */
+.portafolio-table-chips {
+    display: flex;
+    gap: 0.35rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.portafolio-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.portafolio-badge--github {
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+.portafolio-badge--github:hover {
+    background: #1e293b;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.portafolio-badge--notion {
+    background: var(--surface-2, #f1f5f9);
+    color: var(--text-strong, #0f172a);
+    border: 1px solid var(--border-color, #cbd5e1);
+}
+
+.portafolio-badge--notion:hover {
+    background: var(--surface-3, #e2e8f0);
+    transform: translateY(-1px);
+}
+
+.portafolio-vacio {
+    font-size: 0.8rem;
+    color: var(--text-muted, #94a3b8);
+}
+
+.portafolio-vacio-mobile {
+    font-size: 0.75rem;
+    color: var(--text-muted, #94a3b8);
+}
+
+.learner-portafolio-mobile-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-block: 0.4rem 0.6rem;
+    padding: 0.35rem 0.6rem;
+    background: var(--surface-1, rgba(0, 0, 0, 0.02));
+    border-radius: 8px;
+}
+
+.report-meta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 6px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.04));
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-strong, #0f172a);
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.report-meta-link:hover {
+    color: var(--accent-primary, #39a900);
+    background: var(--surface-3, rgba(0, 0, 0, 0.08));
+}
+
+.portafolio-modal-shell {
+    max-width: 540px;
+    width: 92vw;
+    background: var(--card-bg, #ffffff);
+    border-radius: var(--radius, 16px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+

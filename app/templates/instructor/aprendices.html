@@ -312,6 +312,23 @@
             </div>
         </div>
 
+        <!-- Enlaces de Portafolio Digital Mobile -->
+        <div class="learner-portafolio-mobile-row">
+            {% if ap.enlace_github %}
+            <a href="{{ ap.enlace_github }}" target="_blank" rel="noopener noreferrer" class="portafolio-badge portafolio-badge--github" title="Abrir GitHub de {{ ap.nombre }}">
+                <span>🐱 GitHub ↗</span>
+            </a>
+            {% endif %}
+            {% if ap.enlace_notion %}
+            <a href="{{ ap.enlace_notion }}" target="_blank" rel="noopener noreferrer" class="portafolio-badge portafolio-badge--notion" title="Abrir Notion de {{ ap.nombre }}">
+                <span>📓 Notion ↗</span>
+            </a>
+            {% endif %}
+            {% if not ap.enlace_github and not ap.enlace_notion %}
+            <small class="text-muted portafolio-vacio-mobile">Portafolio no registrado</small>
+            {% endif %}
+        </div>
+
         <!-- Barra de Carga y Porcentaje del Aprendiz -->
         <div class="learner-progress-section">
             <div class="learner-progress-header">
@@ -379,6 +396,7 @@
                         <th scope="col" class="text-center">Estado</th>
                         <th scope="col" class="text-center">Rol operativo</th>
                         <th scope="col" style="min-width: 200px;">Progreso Juicios</th>
+                        <th scope="col" class="text-center" style="min-width: 140px;">Portafolio</th>
                         <th scope="col" class="text-center" style="width: 190px;">Acciones</th>
                     </tr>
                 </thead>
@@ -425,6 +443,25 @@
                             {% else %}
                             <span class="text-muted">—</span>
                             {% endif %}
+                        </td>
+                        <td data-label="Portafolio" class="text-center">
+                            <div class="portafolio-table-chips">
+                                {% if ap.enlace_github %}
+                                <a href="{{ ap.enlace_github }}" target="_blank" rel="noopener noreferrer" class="portafolio-badge portafolio-badge--github" title="Abrir GitHub de {{ ap.nombre }} ({{ ap.enlace_github }})">
+                                    <span>🐱 GitHub</span>
+                                    <span class="external-icon">↗</span>
+                                </a>
+                                {% endif %}
+                                {% if ap.enlace_notion %}
+                                <a href="{{ ap.enlace_notion }}" target="_blank" rel="noopener noreferrer" class="portafolio-badge portafolio-badge--notion" title="Abrir Notion de {{ ap.nombre }} ({{ ap.enlace_notion }})">
+                                    <span>📓 Notion</span>
+                                    <span class="external-icon">↗</span>
+                                </a>
+                                {% endif %}
+                                {% if not ap.enlace_github and not ap.enlace_notion %}
+                                <span class="text-muted portafolio-vacio" title="Sin enlaces registrados">—</span>
+                                {% endif %}
+                            </div>
                         </td>
                         <td data-label="Acciones" class="text-center">
                             <div class="table-actions-cluster">

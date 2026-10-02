@@ -86,6 +86,38 @@ def tono_estado(estado):
     return TONOS_ESTADO.get(normalizar_estado(estado), 'secondary')
 
 
+def normalizar_url_portafolio(url, tipo=None):
+    """Normaliza y valida enlaces web para portafolio (GitHub, Notion, etc.)."""
+    if not url:
+        return None
+    url_texto = str(url).strip()
+    if not url_texto:
+        return None
+    if not re.match(r'^https?://', url_texto, re.IGNORECASE):
+        url_texto = f'https://{url_texto}'
+    if len(url_texto) > 500:
+        raise ValueError('El enlace no puede superar los 500 caracteres.')
+
+    patron_url = re.compile(
+        r'^https?://'
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'
+        r'localhost|'
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
+        r'(?::\d+)?'
+        r'(?:/?|[/?]\S+)$',
+        re.IGNORECASE,
+    )
+    if not patron_url.match(url_texto):
+        raise ValueError('La dirección web ingresada no tiene una estructura válida.')
+
+    if tipo == 'github' and 'github.com' not in url_texto.lower():
+        raise ValueError('El enlace de GitHub debe pertenecer al dominio github.com.')
+    if tipo == 'notion' and 'notion.' not in url_texto.lower():
+        raise ValueError('El enlace de Notion debe pertenecer al dominio notion.so o notion.site.')
+
+    return url_texto
+
+
 class Aprendiz(db.Model):
     __tablename__ = 'aprendices'
 
@@ -105,6 +137,8 @@ class Aprendiz(db.Model):
         db.Boolean, nullable=False, default=False, server_default=db.false()
     )
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
+    enlace_github = db.Column(db.String(500), nullable=True)
+    enlace_notion = db.Column(db.String(500), nullable=True)
 
     registros_asistencia = db.relationship('RegistroAsistencia', backref='aprendiz',
                                            lazy='dynamic', cascade='all, delete-orphan')
@@ -172,6 +206,11 @@ class Aprendiz(db.Model):
     @property
     def activo_en_planeacion(self):
         return self.estado_normalizado in ESTADOS_PLANEACION_ACTIVOS
+
+    @property
+    def tiene_enlaces_portafolio(self):
+        """Indica si el aprendiz tiene registrado al menos uno de sus enlaces de portafolio."""
+        return bool(self.enlace_github or self.enlace_notion)
 
     @property
     def nombre_completo(self):

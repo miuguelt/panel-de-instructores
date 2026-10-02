@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort, session
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort, session, jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import current_user
@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload
 from app import db, limiter
 from app.models.ficha import Ficha
-from app.models.aprendiz import Aprendiz
+from app.models.aprendiz import Aprendiz, normalizar_url_portafolio
 from app.models.asistencia import (
     RegistroAsistencia,
     SesionAsistencia,
@@ -1615,4 +1615,64 @@ def cancelar_turno(ficha_id):
         AtencionService.cambiar_estado(turno.id, 'cancelado')
         flash('Turno cancelado.', 'success')
         
+    return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+
+@aprendiz_bp.route('/<int:ficha_id>/guardar-portafolio', methods=['POST'])
+@limiter.limit("20 per minute")
+def guardar_portafolio(ficha_id):
+    documento = _documento_aprendiz_para_ficha(ficha_id)
+    es_ajax = (
+        request.is_json
+        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in request.headers.get('Accept', '')
+    )
+    if not documento:
+        if es_ajax:
+            return jsonify({'ok': False, 'error': 'Sesión no válida o expirada. Por favor ingresa de nuevo.'}), 401
+        flash('Sesión no válida o expirada. Por favor ingresa de nuevo.', 'error')
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+
+    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
+    if not aprendiz:
+        if es_ajax:
+            return jsonify({'ok': False, 'error': 'Aprendiz no encontrado en esta ficha.'}), 404
+        flash('Aprendiz no encontrado en esta ficha.', 'error')
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+
+    datos = request.get_json(silent=True) if request.is_json else request.form
+    github_raw = datos.get('enlace_github', '')
+    notion_raw = datos.get('enlace_notion', '')
+
+    try:
+        github_valido = normalizar_url_portafolio(github_raw, tipo='github')
+        notion_valido = normalizar_url_portafolio(notion_raw, tipo='notion')
+    except ValueError as e:
+        if es_ajax:
+            return jsonify({'ok': False, 'error': str(e)}), 400
+        flash(str(e), 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    aprendiz.enlace_github = github_valido
+    aprendiz.enlace_notion = notion_valido
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        mensaje_error = 'Ocurrió un error al guardar los enlaces. Por favor intenta de nuevo.'
+        if es_ajax:
+            return jsonify({'ok': False, 'error': mensaje_error}), 500
+        flash(mensaje_error, 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+    mensaje_exito = 'Tus enlaces de GitHub y Notion se han actualizado correctamente.'
+    if es_ajax:
+        return jsonify({
+            'ok': True,
+            'mensaje': mensaje_exito,
+            'enlace_github': aprendiz.enlace_github,
+            'enlace_notion': aprendiz.enlace_notion,
+        })
+
+    flash(mensaje_exito, 'success')
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))

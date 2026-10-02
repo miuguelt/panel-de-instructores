@@ -94,6 +94,12 @@
                     <span><strong>{{ aprendiz.tipo_documento or 'Documento' }}</strong> {{ aprendiz.documento }}</span>
                     {% if aprendiz.correo %}<span>{{ aprendiz.correo }}</span>{% endif %}
                     <span>Ficha <a href="{{ url_for('instructor.dashboard', ficha_id=ficha.id) }}">{{ ficha.codigo }}</a></span>
+                    {% if aprendiz.enlace_github %}
+                    <span><a href="{{ aprendiz.enlace_github }}" target="_blank" rel="noopener noreferrer" class="report-meta-link">🐱 GitHub ↗</a></span>
+                    {% endif %}
+                    {% if aprendiz.enlace_notion %}
+                    <span><a href="{{ aprendiz.enlace_notion }}" target="_blank" rel="noopener noreferrer" class="report-meta-link">📓 Notion ↗</a></span>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -111,6 +117,113 @@
         <div><span>Inicio de ficha</span><strong>{{ ficha.fecha_inicio.strftime('%d/%m/%Y') if ficha.fecha_inicio else 'No registrado' }}</strong></div>
         <div><span>Finalización estimada</span><strong>{{ ficha.fecha_fin.strftime('%d/%m/%Y') if ficha.fecha_fin else 'No registrada' }}</strong></div>
     </div>
+
+    <!-- ============================================================ -->
+    <!-- SECCIÓN DE PORTAFOLIO DIGITAL (INSTRUCTOR)                   -->
+    <!-- ============================================================ -->
+    <section class="card report-portafolio-card mb-4" style="background: var(--card-bg, #ffffff); border-radius: var(--radius, 14px); padding: 1.25rem 1.5rem; margin-block: 1.25rem; border: 1px solid var(--border-color, rgba(0,0,0,0.08));">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+                <span class="report-eyebrow" style="display: block; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--accent-primary, #39a900);">💼 Portafolio Digital de Evidencias</span>
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Repositorio de Código y Bitácora</h3>
+                <p class="text-muted small" style="margin: 0;">Enlaces registrados por {{ aprendiz.nombre }} para revisión técnica y metodológica.</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-edit-portafolio-instructor" onclick="document.getElementById('dialog-portafolio-instructor').showModal()">
+                ✏️ Editar Enlaces
+            </button>
+        </div>
+
+        <div class="report-portafolio-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+            <!-- Tarjeta GitHub -->
+            <div class="portafolio-item-box" style="background: var(--surface-1, rgba(0,0,0,0.02)); border: 1px solid var(--border-color, rgba(0,0,0,0.08)); border-radius: var(--radius-sm, 10px); padding: 1rem;">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="font-size: 1.35rem;" aria-hidden="true">🐱</span>
+                        <div>
+                            <strong style="display: block; font-size: 0.95rem;">GitHub</strong>
+                            <small class="text-muted">Repositorio de proyectos y control de versiones</small>
+                        </div>
+                    </div>
+                    {% if aprendiz.enlace_github %}
+                    <span class="badge badge-success">Activo</span>
+                    {% else %}
+                    <span class="badge badge-secondary">Sin registrar</span>
+                    {% endif %}
+                </div>
+                {% if aprendiz.enlace_github %}
+                <div style="margin-top: 0.5rem;">
+                    <a href="{{ aprendiz.enlace_github }}" target="_blank" rel="noopener noreferrer" class="d-inline-flex align-items-center gap-1 text-truncate" style="color: var(--accent-primary, #39a900); font-weight: 600; font-size: 0.88rem; max-width: 100%;">
+                        <span>{{ aprendiz.enlace_github }}</span>
+                        <span aria-hidden="true">↗</span>
+                    </a>
+                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                        <a href="{{ aprendiz.enlace_github }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary">Abrir Repositorio ↗</a>
+                        <button type="button" class="btn btn-xs btn-outline" onclick="navigator.clipboard.writeText('{{ aprendiz.enlace_github }}')">Copiar</button>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0" style="margin-top: 0.5rem;">El aprendiz aún no ha registrado su enlace de GitHub.</p>
+                {% endif %}
+            </div>
+
+            <!-- Tarjeta Notion -->
+            <div class="portafolio-item-box" style="background: var(--surface-1, rgba(0,0,0,0.02)); border: 1px solid var(--border-color, rgba(0,0,0,0.08)); border-radius: var(--radius-sm, 10px); padding: 1rem;">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="font-size: 1.35rem;" aria-hidden="true">📓</span>
+                        <div>
+                            <strong style="display: block; font-size: 0.95rem;">Notion</strong>
+                            <small class="text-muted">Bitácora pedagógica y documentación de evidencias</small>
+                        </div>
+                    </div>
+                    {% if aprendiz.enlace_notion %}
+                    <span class="badge badge-success">Activo</span>
+                    {% else %}
+                    <span class="badge badge-secondary">Sin registrar</span>
+                    {% endif %}
+                </div>
+                {% if aprendiz.enlace_notion %}
+                <div style="margin-top: 0.5rem;">
+                    <a href="{{ aprendiz.enlace_notion }}" target="_blank" rel="noopener noreferrer" class="d-inline-flex align-items-center gap-1 text-truncate" style="color: var(--accent-primary, #39a900); font-weight: 600; font-size: 0.88rem; max-width: 100%;">
+                        <span>{{ aprendiz.enlace_notion }}</span>
+                        <span aria-hidden="true">↗</span>
+                    </a>
+                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                        <a href="{{ aprendiz.enlace_notion }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary">Abrir Bitácora ↗</a>
+                        <button type="button" class="btn btn-xs btn-outline" onclick="navigator.clipboard.writeText('{{ aprendiz.enlace_notion }}')">Copiar</button>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0" style="margin-top: 0.5rem;">El aprendiz aún no ha registrado su bitácora de Notion.</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Modal Instructor para editar enlaces de portafolio -->
+    <dialog id="dialog-portafolio-instructor" class="app-modal-overlay" aria-modal="true" style="border:none; background:transparent; padding:0;">
+        <div class="app-modal-content" style="background:var(--card-bg, #fff); border-radius:var(--radius, 14px); max-width:500px; width:92vw; padding:1.5rem; box-shadow:0 20px 40px rgba(0,0,0,0.25);">
+            <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="margin:0; font-size:1.15rem;">💼 Enlaces de Portafolio - {{ aprendiz.nombre }}</h3>
+                <button type="button" class="app-modal-close" onclick="document.getElementById('dialog-portafolio-instructor').close()" style="background:none; border:none; font-size:1.4rem; cursor:pointer;">&times;</button>
+            </header>
+            <form method="POST" action="{{ url_for('instructor.guardar_portafolio_instructor', ficha_id=ficha.id, aprendiz_id=aprendiz.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group mb-3">
+                    <label for="inst-github" style="font-weight:700; font-size:0.88rem; display:block; margin-bottom:4px;">🐱 Repositorio o Perfil en GitHub</label>
+                    <input type="url" id="inst-github" name="enlace_github" class="form-control" value="{{ aprendiz.enlace_github or '' }}" placeholder="https://github.com/..." maxlength="500">
+                </div>
+                <div class="form-group mb-3">
+                    <label for="inst-notion" style="font-weight:700; font-size:0.88rem; display:block; margin-bottom:4px;">📓 Bitácora o Portafolio en Notion</label>
+                    <input type="url" id="inst-notion" name="enlace_notion" class="form-control" value="{{ aprendiz.enlace_notion or '' }}" placeholder="https://tu-bitacora.notion.site/..." maxlength="500">
+                </div>
+                <footer style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.25rem;">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('dialog-portafolio-instructor').close()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </footer>
+            </form>
+        </div>
+    </dialog>
 
     {% if instructores|length > 1 %}
     <div class="report-notice">

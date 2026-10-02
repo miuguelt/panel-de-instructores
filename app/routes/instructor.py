@@ -1,12 +1,12 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func, select, case
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from app import db
 from app.models.ficha import Ficha
 from app.models.corte import Corte
-from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz, etiqueta_estado
+from app.models.aprendiz import ESTADOS_EN_FORMACION, Aprendiz, etiqueta_estado, normalizar_url_portafolio
 from app.models.asistencia import SesionAsistencia, RegistroAsistencia, ESTADOS_ASISTENCIA, CAUSALES_JUSTIFICADAS
 from app.models.tarea import (
     MODALIDAD_CLASE,
@@ -1308,6 +1308,57 @@ def historial_aprendiz(ficha_id, aprendiz_id):
                            planes_aprendiz=planes_aprendiz,
                            seguimiento_resumen=seguimiento_resumen,
                            resumen_reporte=resumen_reporte)
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/aprendices/<int:aprendiz_id>/portafolio', methods=['POST'])
+@login_required
+def guardar_portafolio_instructor(ficha_id, aprendiz_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    aprendiz = db.session.get(Aprendiz, aprendiz_id)
+    if not puede_gestionar_ficha(ficha) or not aprendiz or aprendiz.ficha_id != ficha_id:
+        abort(403)
+
+    es_ajax = (
+        request.is_json
+        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in request.headers.get('Accept', '')
+    )
+    datos = request.get_json(silent=True) if request.is_json else request.form
+    github_raw = datos.get('enlace_github', '')
+    notion_raw = datos.get('enlace_notion', '')
+
+    try:
+        github_valido = normalizar_url_portafolio(github_raw, tipo='github')
+        notion_valido = normalizar_url_portafolio(notion_raw, tipo='notion')
+    except ValueError as e:
+        if es_ajax:
+            return jsonify({'ok': False, 'error': str(e)}), 400
+        flash(str(e), 'error')
+        return redirect(url_for('instructor.historial_aprendiz', ficha_id=ficha_id, aprendiz_id=aprendiz.id))
+
+    aprendiz.enlace_github = github_valido
+    aprendiz.enlace_notion = notion_valido
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        mensaje_error = 'Ocurrió un error al guardar los enlaces del aprendiz.'
+        if es_ajax:
+            return jsonify({'ok': False, 'error': mensaje_error}), 500
+        flash(mensaje_error, 'error')
+        return redirect(url_for('instructor.historial_aprendiz', ficha_id=ficha_id, aprendiz_id=aprendiz.id))
+
+    mensaje_exito = f'Los enlaces de GitHub y Notion de {aprendiz.nombre} fueron actualizados con éxito.'
+    if es_ajax:
+        return jsonify({
+            'ok': True,
+            'mensaje': mensaje_exito,
+            'enlace_github': aprendiz.enlace_github,
+            'enlace_notion': aprendiz.enlace_notion,
+        })
+
+    flash(mensaje_exito, 'success')
+    return redirect(url_for('instructor.historial_aprendiz', ficha_id=ficha_id, aprendiz_id=aprendiz.id))
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/cargar-excel', methods=['POST'])

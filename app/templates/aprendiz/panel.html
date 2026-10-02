@@ -60,6 +60,9 @@
                 <button type="button" class="btn btn-sm btn-primary-gradient btn-customize-hub" id="btn-open-customizer">
                     🎨 Personalizar mi espacio
                 </button>
+                <button type="button" class="btn btn-sm btn-outline btn-open-portafolio-modal" id="btn-open-portafolio-modal" title="Gestionar enlaces de GitHub y Notion">
+                    💼 Mi Portafolio Digital{% if aprendiz.tiene_enlaces_portafolio %} <span class="badge-dot-success" title="Enlaces configurados">●</span>{% endif %}
+                </button>
                 <a href="{{ url_for('aprendiz.descargar_reporte', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline" title="Descargar reporte académico oficial en PDF">
                     📄 Reporte PDF
                 </a>
@@ -378,6 +381,135 @@
         </div>
     </section>
     {% endif %}
+
+    <!-- ============================================================ -->
+    <!-- SECCIÓN DE PORTAFOLIO DIGITAL: GITHUB Y NOTION               -->
+    <!-- ============================================================ -->
+    <section class="card portafolio-bento-card" id="seccion-portafolio-digital" data-learner-tab="resumen" aria-labelledby="portafolio-section-title">
+        <div class="portafolio-bento-header">
+            <div class="portafolio-header-titles">
+                <span class="eyebrow">Evidencias en la nube &middot; Repositorios y Bitácora</span>
+                <h2 id="portafolio-section-title" class="portafolio-title">
+                    <span class="portafolio-title-icon" aria-hidden="true">💼</span>
+                    <span>Mi Portafolio Digital de Evidencias</span>
+                </h2>
+                <p class="text-muted portafolio-subtitle">
+                    Vincula tu repositorio de GitHub y tu bitácora de Notion. Tus instructores consultarán estos enlaces directamente para revisar tus desarrollos, código fuente y documentación de proyectos.
+                </p>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary btn-edit-portafolio btn-open-portafolio-modal" id="btn-trigger-portafolio-edit">
+                ✏️ Gestionar Enlaces
+            </button>
+        </div>
+
+        <div class="portafolio-cards-grid">
+            <!-- Tarjeta GitHub -->
+            <article class="portafolio-tile portafolio-tile--github {% if aprendiz.enlace_github %}is-connected{% else %}is-empty{% endif %}" id="tile-portafolio-github">
+                <div class="portafolio-tile-top">
+                    <div class="portafolio-tile-brand">
+                        <div class="portafolio-brand-badge brand-github">
+                            <svg class="brand-svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="portafolio-brand-name">GitHub</h3>
+                            <span class="portafolio-brand-type">Código fuente &middot; Repositorios</span>
+                        </div>
+                    </div>
+                    <div class="portafolio-tile-status">
+                        {% if aprendiz.enlace_github %}
+                        <span class="badge badge-success portafolio-status-pill">
+                            <span class="status-indicator-dot"></span> Conectado
+                        </span>
+                        {% else %}
+                        <span class="badge badge-secondary portafolio-status-pill">Sin registrar</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="portafolio-tile-body">
+                    {% if aprendiz.enlace_github %}
+                    <p class="portafolio-url-preview text-truncate" title="{{ aprendiz.enlace_github }}">
+                        <span class="url-protocol">https://</span>{{ aprendiz.enlace_github|replace('https://', '')|replace('http://', '') }}
+                    </p>
+                    <div class="portafolio-actions-cluster">
+                        <a href="{{ aprendiz.enlace_github }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-outline-github" title="Abrir tu perfil o repositorio de GitHub en una nueva pestaña">
+                            <span>Visitar repositorio</span>
+                            <svg class="external-link-icon" viewBox="0 0 20 20" width="13" height="13" fill="currentColor">
+                                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                            </svg>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" onclick="navigator.clipboard.writeText('{{ aprendiz.enlace_github }}')" title="Copiar enlace al portapapeles">
+                            📋 Copiar
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="portafolio-empty-description">
+                        Añade el enlace de tu perfil o repositorio principal en GitHub para que los instructores evalúen tus proyectos de software y control de versiones.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-primary-github btn-open-portafolio-modal" data-target-input="github">
+                        ➕ Vincular GitHub
+                    </button>
+                    {% endif %}
+                </div>
+            </article>
+
+            <!-- Tarjeta Notion -->
+            <article class="portafolio-tile portafolio-tile--notion {% if aprendiz.enlace_notion %}is-connected{% else %}is-empty{% endif %}" id="tile-portafolio-notion">
+                <div class="portafolio-tile-top">
+                    <div class="portafolio-tile-brand">
+                        <div class="portafolio-brand-badge brand-notion">
+                            <svg class="brand-svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                <path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.64c-.467-.373-.98-.606-1.913-.56L3.432 2.062c-.373.047-.466.28-.326.467zm.84 3.732v13.623c0 .84.42 1.12 1.306 1.073l14.288-.84c.887-.046.98-.606.98-1.26V7.054c0-.653-.28-.933-.887-.887l-14.754.887c-.606.046-.933.327-.933.886zm13.355.933c.093.42.093.84-.28.887l-.98.14v10.124c-.466.28-.98.42-1.493.42-.84 0-1.213-.28-1.96-1.12l-4.993-7.886v7.747l1.727.373c.093.42-.14.793-.56.84l-3.826.233c-.094-.42 0-.84.373-.887l1.167-.233V9.854l-1.4-.14c-.094-.42.093-.793.513-.84l4.013-.233 5.367 8.26V9.667l-1.54-.186c-.093-.42.14-.793.56-.84z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="portafolio-brand-name">Notion</h3>
+                            <span class="portafolio-brand-type">Bitácora formativa &middot; Documentación</span>
+                        </div>
+                    </div>
+                    <div class="portafolio-tile-status">
+                        {% if aprendiz.enlace_notion %}
+                        <span class="badge badge-success portafolio-status-pill">
+                            <span class="status-indicator-dot"></span> Conectado
+                        </span>
+                        {% else %}
+                        <span class="badge badge-secondary portafolio-status-pill">Sin registrar</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="portafolio-tile-body">
+                    {% if aprendiz.enlace_notion %}
+                    <p class="portafolio-url-preview text-truncate" title="{{ aprendiz.enlace_notion }}">
+                        <span class="url-protocol">https://</span>{{ aprendiz.enlace_notion|replace('https://', '')|replace('http://', '') }}
+                    </p>
+                    <div class="portafolio-actions-cluster">
+                        <a href="{{ aprendiz.enlace_notion }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-outline-notion" title="Abrir tu bitácora de Notion en una nueva pestaña">
+                            <span>Visitar bitácora</span>
+                            <svg class="external-link-icon" viewBox="0 0 20 20" width="13" height="13" fill="currentColor">
+                                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                            </svg>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" onclick="navigator.clipboard.writeText('{{ aprendiz.enlace_notion }}')" title="Copiar enlace al portapapeles">
+                            📋 Copiar
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="portafolio-empty-description">
+                        Vincula tu espacio o página pública de Notion con la bitácora de aprendizaje, apuntes y reflexiones pedagógicas del proceso de formación.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-primary-notion btn-open-portafolio-modal" data-target-input="notion">
+                        ➕ Vincular Notion
+                    </button>
+                    {% endif %}
+                </div>
+            </article>
+        </div>
+    </section>
 
     <div data-learner-tab="resumen">
         {% include '_cronograma.html' %}
@@ -2736,6 +2868,74 @@
     </dialog>
 
     <!-- ============================================================ -->
+    <!-- MODAL DE GESTIÓN DE PORTAFOLIO DIGITAL (GITHUB Y NOTION)     -->
+    <!-- ============================================================ -->
+    <dialog id="portafolio-modal" class="app-modal-overlay" aria-modal="true" aria-labelledby="portafolio-modal-title">
+        <div class="portafolio-modal-shell app-modal-content">
+            <header class="app-modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="font-size: 1.4rem;" aria-hidden="true">💼</span>
+                    <div>
+                        <h2 id="portafolio-modal-title" style="margin: 0; font-size: 1.25rem;">Mi Portafolio Digital</h2>
+                        <p class="text-muted small" style="margin: 0;">Enlaces oficiales para revisión académica de los instructores</p>
+                    </div>
+                </div>
+                <button type="button" class="app-modal-close" data-close-portafolio-modal aria-label="Cerrar ventana">&times;</button>
+            </header>
+
+            <form id="form-portafolio-aprendiz" method="POST" action="{{ url_for('aprendiz.guardar_portafolio', ficha_id=ficha.id) }}" class="app-modal-body">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div id="portafolio-feedback-msg" class="alert alert-danger" style="display: none; margin-bottom: 1rem;" role="alert"></div>
+
+                <div class="form-group mb-3">
+                    <label for="input-enlace-github" class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                        <span>🐱 Repositorio o Perfil en GitHub</span>
+                        <span class="badge badge-secondary" style="font-size: 0.72rem;">Código y Proyectos</span>
+                    </label>
+                    <div class="input-with-icon" style="position: relative;">
+                        <input type="url" id="input-enlace-github" name="enlace_github" class="form-control"
+                               placeholder="https://github.com/tu-usuario"
+                               value="{{ aprendiz.enlace_github or '' }}" maxlength="500">
+                    </div>
+                    <small class="text-muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">
+                        Ingresa el enlace público de tu perfil de GitHub o del repositorio de tu proyecto formativo.
+                    </small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="input-enlace-notion" class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                        <span>📓 Bitácora o Portafolio en Notion</span>
+                        <span class="badge badge-secondary" style="font-size: 0.72rem;">Bitácora de Evidencias</span>
+                    </label>
+                    <div class="input-with-icon" style="position: relative;">
+                        <input type="url" id="input-enlace-notion" name="enlace_notion" class="form-control"
+                               placeholder="https://tu-bitacora.notion.site/..."
+                               value="{{ aprendiz.enlace_notion or '' }}" maxlength="500">
+                    </div>
+                    <small class="text-muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">
+                        Verifica que en Notion tu página tenga activada la opción <em>«Compartir en la web»</em> para que tus instructores puedan visualizarla sin requerir inicio de sesión.
+                    </small>
+                </div>
+
+                <div class="portafolio-modal-notice" style="background: var(--surface-2, rgba(0,0,0,0.03)); border-radius: var(--radius-sm, 8px); padding: 0.75rem 1rem; margin-top: 1rem; border-left: 3px solid var(--accent-primary, #39a900);">
+                    <strong style="font-size: 0.82rem; display: block; margin-bottom: 2px;">📌 Importante para tu evaluación:</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-muted);">
+                        Los instructores revisan estos enlaces al verificar juicios evaluativos y avances de etapa práctica. Mantén tus repositorios y notas organizados.
+                    </span>
+                </div>
+
+                <footer class="app-modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));">
+                    <button type="button" class="btn btn-ghost" data-close-portafolio-modal>Cancelar</button>
+                    <button type="submit" id="btn-save-portafolio" class="btn btn-primary">
+                        <span id="btn-save-portafolio-text">Guardar enlaces</span>
+                    </button>
+                </footer>
+            </form>
+        </div>
+    </dialog>
+
+    <!-- ============================================================ -->
     <!-- ESTILOS COMPLETOS DEL PANEL MODERNIZADO DEL APRENDIZ          -->
     <!-- ============================================================ -->
     <style>
@@ -4266,6 +4466,93 @@
         closeBtns.forEach(b => b.addEventListener('click', closeCustomizerModal));
         if (modalEl) {
             modalEl.addEventListener('click', e => { if (e.target === modalEl) closeCustomizerModal(); });
+        }
+
+        // -------------------------------------------------------------
+        // GESTIÓN DE PORTAFOLIO DIGITAL (GITHUB Y NOTION)
+        // -------------------------------------------------------------
+        const portafolioModal = document.getElementById('portafolio-modal');
+        const btnOpenPortafolio = document.getElementById('btn-open-portafolio-modal');
+        const btnEditPortafolioCards = document.querySelectorAll('.btn-open-portafolio-modal');
+        const closePortafolioBtns = document.querySelectorAll('[data-close-portafolio-modal]');
+        const formPortafolio = document.getElementById('form-portafolio-aprendiz');
+        const portafolioFeedback = document.getElementById('portafolio-feedback-msg');
+
+        function openPortafolioModal(prefocus) {
+            if (!portafolioModal) return;
+            if (portafolioFeedback) portafolioFeedback.style.display = 'none';
+            window.abrirModal(portafolioModal);
+            if (prefocus === 'github') {
+                const ig = document.getElementById('input-enlace-github');
+                if (ig) ig.focus();
+            } else if (prefocus === 'notion') {
+                const inot = document.getElementById('input-enlace-notion');
+                if (inot) inot.focus();
+            }
+        }
+
+        function closePortafolioModal() {
+            if (!portafolioModal) return;
+            window.cerrarModal(portafolioModal);
+        }
+
+        if (btnOpenPortafolio) {
+            btnOpenPortafolio.addEventListener('click', () => openPortafolioModal());
+        }
+        btnEditPortafolioCards.forEach(b => {
+            b.addEventListener('click', () => {
+                const target = b.getAttribute('data-target-input');
+                openPortafolioModal(target);
+            });
+        });
+        closePortafolioBtns.forEach(b => b.addEventListener('click', closePortafolioModal));
+        if (portafolioModal) {
+            portafolioModal.addEventListener('click', e => {
+                if (e.target === portafolioModal) closePortafolioModal();
+            });
+        }
+
+        if (formPortafolio) {
+            formPortafolio.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btnSave = document.getElementById('btn-save-portafolio');
+                const btnText = document.getElementById('btn-save-portafolio-text');
+                const githubVal = document.getElementById('input-enlace-github').value.trim();
+                const notionVal = document.getElementById('input-enlace-notion').value.trim();
+                const csrfToken = formPortafolio.querySelector('input[name="csrf_token"]').value;
+
+                if (btnSave) btnSave.disabled = true;
+                if (btnText) btnText.textContent = 'Guardando...';
+                if (portafolioFeedback) portafolioFeedback.style.display = 'none';
+
+                try {
+                    const resp = await fetch(formPortafolio.action, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            enlace_github: githubVal,
+                            enlace_notion: notionVal,
+                            csrf_token: csrfToken
+                        })
+                    });
+                    const resJson = await resp.json();
+                    if (!resp.ok || !resJson.ok) {
+                        throw new Error(resJson.error || 'Error al guardar los enlaces.');
+                    }
+                    window.location.reload();
+                } catch (err) {
+                    if (portafolioFeedback) {
+                        portafolioFeedback.textContent = err.message || 'Error inesperado.';
+                        portafolioFeedback.style.display = 'block';
+                    }
+                    if (btnSave) btnSave.disabled = false;
+                    if (btnText) btnText.textContent = 'Guardar enlaces';
+                }
+            });
         }
 
         avatarBtns.forEach(btn => {
