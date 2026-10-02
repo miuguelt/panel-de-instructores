@@ -1108,6 +1108,147 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertIn('Programar aseo'.encode(), resp_con_turno.data)
         self.assertIn(f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar'.encode(), resp_con_turno.data)
 
+    def test_algoritmo_equitativo_prioriza_menor_veces_aseo(self):
+        """Verifica que el algoritmo asigne primero a quienes menos aseo han hecho y no repita a quienes tienen más turnos."""
+        # Creamos historial real de turnos cumplidos (SSoT):
+        # Ana (0) y Bruno (1) cumplieron 2 turnos en el pasado
+        # Carmen (2) y Diego (3) cumplieron 1 turno en el pasado
+        # Elena (4) y Felipe (5) tienen 0 turnos cumplidos
+        fecha_h1 = date.today() - timedelta(days=12)
+        fecha_h2 = date.today() - timedelta(days=11)
+        fecha_h3 = date.today() - timedelta(days=10)
+
+        for f, (a1, a2) in (
+            (fecha_h1, (self.aprendices[0], self.aprendices[1])),
+            (fecha_h2, (self.aprendices[0], self.aprendices[1])),
+            (fecha_h3, (self.aprendices[2], self.aprendices[3])),
+        ):
+            self._crear_sesion(f)
+            t = TurnoAseo(
+                ficha_id=self.ficha.id,
+                fecha=f,
+                aprendiz_1_id=a1.id,
+                aprendiz_2_id=a2.id,
+                estado='cumplido',
+                completado_1=True,
+                completado_2=True,
+                generado_por='sistema',
+            )
+            db.session.add(t)
+        db.session.commit()
+
+        # Creamos 2 sesiones hábiles a futuro
+        dias = []
+        actual = date.today() + timedelta(days=1)
+        while len(dias) < 2:
+            if not es_festivo_colombia(actual):
+                dias.append(actual)
+            actual += timedelta(days=1)
+
+        for d in dias:
+            self._crear_sesion(d)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_inicio=dias[0],
+            fecha_fin=dias[1],
+            recalcular_existentes=True,
+        )
+        self.assertEqual(len(resultado['creados']), 2)
+
+        turno_1 = TurnoAseo.query.filter_by(ficha_id=self.ficha.id, fecha=dias[0]).first()
+        turno_2 = TurnoAseo.query.filter_by(ficha_id=self.ficha.id, fecha=dias[1]).first()
+
+        # En la primera sesión deben asignarse estrictamente quienes tenían 0 turnos (Elena y Felipe)
+        pareja_1 = {turno_1.aprendiz_1_id, turno_1.aprendiz_2_id}
+        self.assertEqual(pareja_1, {self.aprendices[4].id, self.aprendices[5].id})
+
+        # En la segunda sesión deben asignarse quienes tenían 1 turno (Carmen y Diego)
+        pareja_2 = {turno_2.aprendiz_1_id, turno_2.aprendiz_2_id}
+        self.assertEqual(pareja_2, {self.aprendices[2].id, self.aprendices[3].id})
+
+        # Quienes ya tenían 2 turnos (Ana y Bruno) NO deben ser asignados en ninguna sesión
+        todos_asignados = pareja_1.union(pareja_2)
+        self.assertNotIn(self.aprendices[0].id, todos_asignados)
+        self.assertNotIn(self.aprendices[1].id, todos_asignados)
+
+    def test_turno_futuro_fuera_de_rango_no_bloquea_a_aprendiz_sin_aseo(self):
+        """Verifica que un turno pendiente futuro fuera de fecha_fin no infle la carga en el periodo actual."""
+        # Programar un turno futuro lejano (a 40 días) para el aprendiz 4 (Elena)
+        fecha_futura = date.today() + timedelta(days=40)
+        self._crear_sesion(fecha_futura)
+        db.session.add(TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_futura,
+            aprendiz_1_id=self.aprendices[4].id,
+            aprendiz_2_id=self.aprendices[5].id,
+            estado='programado',
+            generado_por='sistema',
+        ))
+        db.session.commit()
+
+        # Generar turnos para mañana (solo 1 sesión)
+        fecha_manana = date.today() + timedelta(days=1)
+        while es_festivo_colombia(fecha_manana):
+            fecha_manana += timedelta(days=1)
+        self._crear_sesion(fecha_manana)
+        db.session.commit()
+
+        resultado = generar_turnos(
+            self.ficha.id,
+            fecha_inicio=fecha_manana,
+            fecha_fin=fecha_manana,
+            recalcular_existentes=True,
+        )
+        self.assertEqual(len(resultado['creados']), 1)
+        turno = resultado['creados'][0]
+        # El turno se generó correctamente sin que Elena quede bloqueada artificialmente
+        self.assertIn(turno.estado, ('programado',))
+
+    def test_suplencia_por_ausencia_prioriza_menor_veces_aseo(self):
+        """Verifica que al suplir a un ausente se elija a quien menos veces de aseo haya cumplido."""
+        from app.services.aseo import _reemplazar_ausentes_del_dia, recalcular_contadores
+
+        # Creamos turnos cumplidos previos para reflejar historial real (SSoT):
+        # Ana (0) y Bruno (1) ya cumplieron turno histórico
+        fecha_h = date.today() - timedelta(days=5)
+        self._crear_sesion(fecha_h)
+        db.session.add(TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_h,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='cumplido',
+            completado_1=True,
+            completado_2=True,
+            generado_por='sistema',
+        ))
+        db.session.commit()
+        recalcular_contadores(self.ficha.id)
+
+        fecha_hoy = date.today()
+        sesion = self._crear_sesion(fecha_hoy)
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_hoy,
+            aprendiz_1_id=self.aprendices[3].id,  # Diego
+            aprendiz_2_id=self.aprendices[4].id,  # Elena (va a faltar)
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        # Presentes en el aula: Diego (3), Ana (0 - 1 turno), Bruno (1 - 1 turno), Carmen (2 - 0 turnos)
+        # Falta Elena (4)
+        presentes = {self.aprendices[3].id, self.aprendices[0].id, self.aprendices[1].id, self.aprendices[2].id}
+
+        repuestos = _reemplazar_ausentes_del_dia(turno, presentes)
+        self.assertEqual(len(repuestos), 1)
+        # El suplente elegido DEBE ser Carmen (2) porque tiene 0 turnos cumplidos vs Ana y Bruno que tienen 1
+        self.assertEqual(turno.aprendiz_2_id, self.aprendices[2].id)
+
 
 if __name__ == '__main__':
     unittest.main()

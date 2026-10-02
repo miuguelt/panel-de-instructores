@@ -78,10 +78,12 @@ from app.services.fases_dashboard import obtener_seguimiento_fases_dashboard
 from app.services.tareas import (
     DatosTareaInvalidos,
     agrupar_tareas_por_corte_e_instructor,
+    agrupar_tareas_por_instructor,
     conceder_prorroga_tarea,
     eliminar_tarea_con_archivos,
     guardar_material_apoyo,
     leer_datos_tarea,
+    obtener_estadisticas_entregas_tareas,
     obtener_planes_de_tarea,
     obtener_prorrogas_tarea,
     obtener_tarea_gestionable,
@@ -932,12 +934,12 @@ def alternar_estado_activo_aprendiz(ficha_id, aprendiz_id):
         db.session.commit()
         if aprendiz.activo:
             flash(
-                f'{aprendiz.nombre_completo} ha sido habilitado para ranking y turnos de aseo.',
+                f'{aprendiz.nombre_completo} ha sido habilitado para ranking, grupos, turnos de aseo y llamado a lista.',
                 'success',
             )
         else:
             flash(
-                f'{aprendiz.nombre_completo} ha sido deshabilitado. No aparecerá en el ranking ni en los turnos de aseo.',
+                f'{aprendiz.nombre_completo} ha sido deshabilitado. No aparecerá en el ranking, grupos, turnos de aseo ni en el llamado a lista.',
                 'info',
             )
     except ValueError as exc:
@@ -1880,11 +1882,24 @@ def tareas(ficha_id):
         Corte.fecha_inicio.desc(), Corte.id.desc()
     ).all()
 
+    now = datetime.utcnow()
+
+    # Agrupación por instructor para el tablero
+    grupos_instructor = agrupar_tareas_por_instructor(
+        lista_tareas,
+        current_user_id=current_user.id,
+        ahora=now,
+    )
+
     # Tablero agrupado: se activa en la vista de todos los cortes o al ver
     # las tareas de todos los instructores; separa por corte y por responsable.
     grupos = None
     if modo_todos or ver_todas:
-        grupos = agrupar_tareas_por_corte_e_instructor(lista_tareas, cortes_lista)
+        grupos = agrupar_tareas_por_corte_e_instructor(
+            lista_tareas,
+            cortes_lista,
+            ahora=now,
+        )
 
     cortes_editables = [c for c in cortes_lista if puede_crear_tarea_en_corte(c, ficha)] if modo_todos else []
 
@@ -1893,16 +1908,38 @@ def tareas(ficha_id):
         ficha_id, instructor_id=current_user.id, categorias={CAT_TAREAS},
     )
 
+    metricas_resumen = {
+        'total_tareas': len(lista_tareas),
+        'tareas_activas': sum(
+            1 for t in lista_tareas
+            if t.progreso_tiempo['estado'] in ('normal', 'atencion', 'urgente')
+        ),
+        'tareas_urgentes': sum(
+            1 for t in lista_tareas
+            if t.progreso_tiempo['estado'] == 'urgente'
+        ),
+        'tareas_vencidas': sum(
+            1 for t in lista_tareas
+            if t.progreso_tiempo['estado'] == 'vencida'
+        ),
+        'tareas_sin_limite': sum(
+            1 for t in lista_tareas
+            if t.progreso_tiempo['estado'] == 'sin_limite'
+        ),
+    }
+
     return render_template(
         'tareas.html',
         ficha=ficha,
         tareas=lista_tareas,
-        now=datetime.utcnow(),
+        now=now,
         cortes=cortes_lista,
         corte_actual=corte,
         modo_todos=modo_todos,
         cortes_editables=cortes_editables,
         grupos=grupos,
+        grupos_instructor=grupos_instructor,
+        metricas_resumen=metricas_resumen,
         puede_editar_corte=puede_crear_tarea_en_corte(corte, ficha),
         filtro_instructor=filtro_instructor,
         instructores_ficha=instructores_ficha,

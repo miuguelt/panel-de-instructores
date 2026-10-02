@@ -51,11 +51,11 @@
 </div>
 
 <div class="card" style="max-width: 760px; margin-top: 1.5rem;">
-    <h2>Participación en ranking y turnos de aseo</h2>
+    <h2>Participación en ranking, turnos de aseo, llamado a lista y asignación de grupos</h2>
     <p class="text-muted">
-        Puedes deshabilitar aprendices específicos para que no se incluyan en el ranking
-        ni se les asignen turnos de aseo. El aprendiz conservará su historial de asistencia,
-        juicios evaluativos y evidencias registradas.
+        Puedes deshabilitar aprendices específicos para que no se incluyan en el ranking,
+        en los turnos de aseo, en el llamado a lista ni en la asignación de grupos. El aprendiz
+        conservará su historial de asistencia, juicios evaluativos y evidencias registradas.
     </p>
 
     {% if todos_aprendices %}
@@ -93,7 +93,7 @@
                             {% if ap.activo %}
                             <input type="hidden" name="accion" value="deshabilitar">
                             <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);"
-                                data-confirm="¿Desea deshabilitar a este aprendiz del ranking y de los turnos de aseo?"
+                                data-confirm="¿Desea deshabilitar a este aprendiz del ranking, turnos de aseo, llamado a lista y asignación de grupos?"
                                 data-confirm-title="Deshabilitar aprendiz"
                                 data-confirm-label="Deshabilitar"
                                 data-confirm-intent="danger">

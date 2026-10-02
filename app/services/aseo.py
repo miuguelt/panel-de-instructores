@@ -268,19 +268,18 @@ def generar_turnos(
     ultimo_turno_asignado = {}
     hoy = date.today()
 
-    # Si hay turnos pendientes fuera del rango que se está calculando, sumamos sus cargas
-    turnos_pendientes_fuera = TurnoAseo.query.filter(
+    # Si hay turnos pendientes anteriores al rango que se está calculando, sumamos sus cargas
+    turnos_pendientes_anteriores = TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
         TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
-        db.or_(TurnoAseo.fecha < fecha_inicio, TurnoAseo.fecha > fecha_fin),
+        TurnoAseo.fecha < fecha_inicio,
     ).all()
-    for turno in turnos_pendientes_fuera:
+    for turno in turnos_pendientes_anteriores:
         for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
             cargas_programadas[aprendiz_id] += 1
-            if turno.fecha < fecha_inicio:
-                ultimo_turno_asignado[aprendiz_id] = _ultima_fecha(
-                    ultimo_turno_asignado.get(aprendiz_id), turno.fecha
-                )
+            ultimo_turno_asignado[aprendiz_id] = _ultima_fecha(
+                ultimo_turno_asignado.get(aprendiz_id), turno.fecha
+            )
 
     # Si se respetan asignaciones manuales o turnos no recalculables dentro del rango
     for fecha, turno in existentes.items():
@@ -356,7 +355,13 @@ def generar_turnos(
             contadores[aprendiz.id].veces_aseo for aprendiz in candidatos
         )
 
-        # 1. Selección del primer aprendiz (carga mínima + anti-consecutivo + antigüedad)
+        def _fecha_referencia(aprendiz_id):
+            return _ultima_fecha(
+                contadores[aprendiz_id].ultima_vez_aseo,
+                ultimo_turno_asignado.get(aprendiz_id),
+            ) or date.min
+
+        # 1. Selección del primer aprendiz (carga mínima + anti-consecutivo + antigüedad + menor cumplidos)
         cargas_1 = {
             a.id: contadores[a.id].veces_aseo + cargas_programadas[a.id]
             for a in candidatos
@@ -371,17 +376,19 @@ def generar_turnos(
             if sin_consecutivos_1:
                 pool_1 = sin_consecutivos_1
 
-        min_fecha_1 = min(
-            (ultimo_turno_asignado.get(a.id) or contadores[a.id].ultima_vez_aseo or date.min)
-            for a in pool_1
-        )
+        min_fecha_1 = min(_fecha_referencia(a.id) for a in pool_1)
         pool_antiguedad_1 = [
             a for a in pool_1
-            if (ultimo_turno_asignado.get(a.id) or contadores[a.id].ultima_vez_aseo or date.min) == min_fecha_1
+            if _fecha_referencia(a.id) == min_fecha_1
         ]
+        if len(pool_antiguedad_1) > 1:
+            min_cumplidas_1 = min(contadores[a.id].veces_aseo for a in pool_antiguedad_1)
+            pool_antiguedad_1 = [
+                a for a in pool_antiguedad_1 if contadores[a.id].veces_aseo == min_cumplidas_1
+            ]
         elegido_1 = aleatorio.choice(pool_antiguedad_1)
 
-        # 2. Selección del segundo aprendiz (compañero para elegido_1 con diversidad de parejas)
+        # 2. Selección del segundo aprendiz (compañero para elegido_1 con diversidad de parejas y equidad)
         disponibles_2 = [a for a in candidatos if a.id != elegido_1.id]
         cargas_2 = {
             a.id: contadores[a.id].veces_aseo + cargas_programadas[a.id]
@@ -426,14 +433,16 @@ def generar_turnos(
                 if _score_conflicto_residuo(a) == min_conflicto
             ]
 
-        min_fecha_2 = min(
-            (ultimo_turno_asignado.get(a.id) or contadores[a.id].ultima_vez_aseo or date.min)
-            for a in pool_parejas_2
-        )
+        min_fecha_2 = min(_fecha_referencia(a.id) for a in pool_parejas_2)
         pool_antiguedad_2 = [
             a for a in pool_parejas_2
-            if (ultimo_turno_asignado.get(a.id) or contadores[a.id].ultima_vez_aseo or date.min) == min_fecha_2
+            if _fecha_referencia(a.id) == min_fecha_2
         ]
+        if len(pool_antiguedad_2) > 1:
+            min_cumplidas_2 = min(contadores[a.id].veces_aseo for a in pool_antiguedad_2)
+            pool_antiguedad_2 = [
+                a for a in pool_antiguedad_2 if contadores[a.id].veces_aseo == min_cumplidas_2
+            ]
         elegido_2 = aleatorio.choice(pool_antiguedad_2)
 
         pareja_clave = tuple(sorted((elegido_1.id, elegido_2.id)))
@@ -547,6 +556,13 @@ def _elegir_por_cola_justa(
         aprendiz for aprendiz in disponibles if cargas[aprendiz.id] == carga_minima
     ]
 
+    # Prioridad de equidad: entre empatados en carga, priorizar a quien menos turnos cumplidos reales tiene
+    min_cumplidas = min(contadores[a.id].veces_aseo for a in empatados_carga)
+    empatados_carga = [
+        a for a in empatados_carga
+        if contadores[a.id].veces_aseo == min_cumplidas
+    ]
+
     if companero_id and historial_parejas is not None and len(empatados_carga) > 1:
         min_pareja = min(
             historial_parejas.get(tuple(sorted((companero_id, a.id))), 0)
@@ -627,6 +643,8 @@ def _proxima_fecha_disponible(ficha_id, despues_de):
 
 def _programar_reposicion(ficha_id, aprendiz, desde_fecha):
     """Guarda el próximo turno del ausente para equilibrar la cola justa."""
+    if not aprendiz or not aprendiz.activo or aprendiz.estado not in ESTADOS_ACTIVOS:
+        return None
     if TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
         TurnoAseo.fecha > desde_fecha,
@@ -659,7 +677,8 @@ def _programar_reposicion(ficha_id, aprendiz, desde_fecha):
             (turno.aprendiz_1, turno.aprendiz_2),
             key=lambda item: (
                 contadores[item.id].veces_aseo + cargas_prog[item.id],
-                contadores[item.id].ultima_vez_aseo or date.min,
+                contadores[item.id].veces_aseo,
+                _ultima_fecha(contadores[item.id].ultima_vez_aseo, ultima_prog.get(item.id)) or date.min,
                 item.id,
             ),
         )
@@ -989,6 +1008,15 @@ def reemplazar_aprendices(
 
 def desvincular_aprendiz_de_turnos_futuros(ficha_id, aprendiz_id):
     """Reemplaza al aprendiz deshabilitado en turnos pendientes futuros o cancela el turno si no hay candidatos."""
+    IntercambioAseo.query.filter(
+        IntercambioAseo.turno.has(ficha_id=ficha_id),
+        IntercambioAseo.estado == 'pendiente',
+        db.or_(
+            IntercambioAseo.aprendiz_solicita_id == aprendiz_id,
+            IntercambioAseo.aprendiz_recibe_id == aprendiz_id,
+        ),
+    ).update({'estado': 'rechazado'}, synchronize_session='fetch')
+
     hoy = date.today()
     turnos_futuros = TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
@@ -1070,6 +1098,9 @@ def aceptar_intercambio(intercambio):
     turno = intercambio.turno
     if turno.estado not in ESTADOS_PENDIENTES:
         raise ValueError('El turno ya no admite intercambios.')
+
+    if not intercambio.aprendiz_solicita or not intercambio.aprendiz_solicita.activo or not intercambio.aprendiz_recibe or not intercambio.aprendiz_recibe.activo:
+        raise ValueError('Uno de los aprendices se encuentra deshabilitado.')
 
     solicitante_id = intercambio.aprendiz_solicita_id
     receptor_id = intercambio.aprendiz_recibe_id

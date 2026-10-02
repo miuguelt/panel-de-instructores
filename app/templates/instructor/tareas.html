@@ -1,10 +1,220 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
-{% block title %}Tareas - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Tareas y Evidencias - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">
 <style>
+    /* Bento KPIs Summary Grid */
+    .metricas-bento-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin: 16px 0 22px;
+    }
+    .metrica-kpi-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-sm);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: var(--shadow);
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .metrica-kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+    .kpi-icon-bubble {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        background: var(--bg-surface);
+        flex-shrink: 0;
+    }
+    .kpi-data-wrap { display: flex; flex-direction: column; }
+    .kpi-numero { font-size: 22px; font-weight: 800; color: var(--text-strong); line-height: 1.1; }
+    .kpi-etiqueta { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; margin-top: 3px; }
+
+    /* Barra de porcentaje de tiempo en tarjeta de tarea */
+    .tarea-progreso-tiempo-box {
+        margin: 12px 0 10px;
+        padding: 12px 14px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+    }
+    .tarea-progreso-tiempo-box.estado-urgente {
+        border-color: rgba(239, 68, 68, 0.35);
+        background: color-mix(in srgb, var(--bg-surface) 94%, #ef4444 6%);
+    }
+    .tarea-progreso-tiempo-box.estado-atencion {
+        border-color: rgba(245, 158, 11, 0.35);
+        background: color-mix(in srgb, var(--bg-surface) 94%, #f59e0b 6%);
+    }
+    .tarea-progreso-tiempo-box.estado-vencida {
+        border-color: rgba(185, 28, 28, 0.35);
+        background: color-mix(in srgb, var(--bg-surface) 94%, #b91c1c 6%);
+    }
+    .progreso-tiempo-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .tiempo-info-izq {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .tiempo-restante-txt {
+        font-size: 13.5px;
+        color: var(--text-strong);
+    }
+    .porcentaje-tiempo-pill {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-divider);
+        color: var(--text-muted);
+    }
+    .porcentaje-tiempo-pill.pill-normal {
+        color: var(--success, #10b981);
+        border-color: rgba(16, 185, 129, 0.3);
+        background: rgba(16, 185, 129, 0.08);
+    }
+    .porcentaje-tiempo-pill.pill-atencion {
+        color: var(--warning, #f59e0b);
+        border-color: rgba(245, 158, 11, 0.3);
+        background: rgba(245, 158, 11, 0.08);
+    }
+    .porcentaje-tiempo-pill.pill-urgente {
+        color: var(--danger, #ef4444);
+        border-color: rgba(239, 68, 68, 0.3);
+        background: rgba(239, 68, 68, 0.08);
+    }
+    .porcentaje-tiempo-pill.pill-vencida {
+        color: #b91c1c;
+        border-color: rgba(185, 28, 28, 0.3);
+        background: rgba(185, 28, 28, 0.08);
+    }
+
+    /* Pista y relleno de la barra de progreso */
+    .barra-tiempo-track {
+        height: 10px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--border-divider) 80%, var(--bg-card) 20%);
+        overflow: hidden;
+        position: relative;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    .barra-tiempo-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width .4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .barra-tiempo-fill.fill-normal {
+        background: linear-gradient(90deg, #10b981, #059669);
+    }
+    .barra-tiempo-fill.fill-atencion {
+        background: linear-gradient(90deg, #f59e0b, #d97706);
+    }
+    .barra-tiempo-fill.fill-urgente {
+        background: linear-gradient(90deg, #ef4444, #dc2626);
+    }
+    .barra-tiempo-fill.fill-vencida {
+        background: linear-gradient(90deg, #b91c1c, #991b1b);
+    }
+    .barra-tiempo-fill.fill-sin_limite {
+        background: var(--text-muted, #94a3b8);
+        opacity: 0.5;
+    }
+
+    .progreso-tiempo-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        font-size: 11.5px;
+        color: var(--text-muted);
+    }
+    .fecha-lbl { font-weight: 600; margin-right: 3px; }
+
+    /* Agrupación por instructor */
+    .instructor-card-seccion {
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius);
+        background: var(--bg-card);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        margin-bottom: 20px;
+        transition: box-shadow .2s ease;
+    }
+    .instructor-card-seccion:hover {
+        box-shadow: var(--shadow-lg);
+    }
+    .instructor-seccion-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 14px;
+        padding: 14px 20px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border-divider);
+    }
+    .instructor-head-main {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .instructor-avatar-circulo {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: var(--accent-primary);
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+        flex-shrink: 0;
+    }
+    .instructor-nombre-h2 {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-strong);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .instructor-chips-line {
+        margin: 4px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .instructor-cuerpo-tareas {
+        padding: 20px;
+    }
+
     .modalidad-opciones {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -40,6 +250,7 @@
     }
     .modalidad-opcion strong { display: block; font-size: 14px; color: var(--text-strong); }
     .modalidad-opcion small { color: var(--text-muted); font-size: 12.5px; display: block; margin-top: 2px; }
+
     .task-card-footer {
         display: flex;
         flex-wrap: wrap;
@@ -75,7 +286,8 @@
         font-size: 13px;
         color: var(--text-muted);
     }
-    /* Tablero agrupado por corte e instructor */
+
+    /* Tablero agrupado por corte e instructor (modo_todos) */
     .tablero-agrupado { display: flex; flex-direction: column; gap: 16px; }
     .corte-grupo {
         border: 1px solid var(--border-glass, var(--border-divider));
@@ -133,6 +345,31 @@
     }
     .corte-grupo > summary:focus-visible,
     .corte-grupo > summary:focus-visible::before { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+    /* Barra de búsqueda interactiva */
+    .busqueda-panel-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-top: 8px;
+    }
+    .busqueda-input {
+        flex-grow: 1;
+        min-width: 240px;
+        padding: 9px 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-divider);
+        background: var(--bg-card);
+        color: var(--text-strong);
+        font-size: 13.5px;
+    }
+    .busqueda-input:focus {
+        border-color: var(--accent-primary);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
 </style>
 {% endblock %}
 
@@ -142,89 +379,136 @@
         <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
         <h1>📝 Tareas y Evidencias</h1>
     </div>
-    <div class="page-actions" style="margin-left: auto;">
+    <div class="page-actions" style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
         <a href="{{ url_for('instructor.evidencias_faltantes', ficha_id=ficha.id) }}" class="btn btn-outline" title="Ver evidencias que hacen falta por aprendiz">📋 Faltantes por Aprendiz</a>
+        {% if puede_editar_corte %}
+        <button type="button" class="btn btn-primary" id="btn-toggle-crear-tarea" aria-expanded="false" onclick="toggleFormularioCrear()">
+            ➕ Nueva Tarea
+        </button>
+        {% endif %}
     </div>
 </div>
 
 {{ render_alertas_contextuales(ficha.id, 'tareas_calificaciones', recomendaciones_tareas) }}
 
-    <div class="page-control-panel">
-        <div class="control-selectors-cluster">
-            {% if cortes %}
-            <div class="control-item">
-                <label class="control-label" for="corte-tareas">
-                    <span class="control-icon" aria-hidden="true">📂</span>
-                    <span>Corte de trabajo</span>
-                </label>
-                <div class="control-select-wrap">
-                    <select id="corte-tareas" onchange="window.location.href=this.value" aria-label="Seleccionar corte de trabajo">
-                        <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id='todos', filtro_instructor=filtro_instructor) }}"
-                                {% if modo_todos %}selected{% endif %}>
-                            📚 Todos los cortes (tablero agrupado)
-                        </option>
-                        {% for item in cortes %}
-                        <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=item.id, filtro_instructor=filtro_instructor) }}"
-                                {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
-                            {{ item.nombre }}{% if item.creador %} · {{ item.creador.nombre }}{% endif %}{% if item.compartido %} · Compartido{% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if instructores_ficha and instructores_ficha|length > 1 %}
-            <div class="control-item">
-                <label class="control-label" for="filtro-docente">
-                    <span class="control-icon" aria-hidden="true">👨‍🏫</span>
-                    <span>Filtrar por Instructor</span>
-                </label>
-                <div class="control-select-wrap">
-                    <select id="filtro-docente" onchange="window.location.href=this.value" aria-label="Filtrar por instructor">
-                        {% set corte_sel = 'todos' if modo_todos else (corte_actual.id if corte_actual else None) %}
-                        <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='mias') }}"
-                                {% if filtro_instructor == 'mias' %}selected{% endif %}>
-                            👤 Mis Tareas ({{ current_user.nombre }})
-                        </option>
-                        <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='todas') }}"
-                                {% if filtro_instructor == 'todas' %}selected{% endif %}>
-                            👥 Todas las tareas de la ficha
-                        </option>
-                        {% for inst in instructores_ficha %}
-                        {% if inst.id != current_user.id %}
-                        <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor=inst.id) }}"
-                                {% if filtro_instructor == inst.id|string %}selected{% endif %}>
-                            👨‍🏫 Tareas de {{ inst.nombre }}
-                        </option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            {% endif %}
+{# Tarjetas Bento con Métricas de Resumen del Módulo #}
+<div class="metricas-bento-grid">
+    <div class="metrica-kpi-card">
+        <div class="kpi-icon-bubble" style="background: rgba(99, 102, 241, 0.1); color: var(--accent-primary);">📚</div>
+        <div class="kpi-data-wrap">
+            <span class="kpi-numero">{{ metricas_resumen.total_tareas }}</span>
+            <span class="kpi-etiqueta">Total Tareas</span>
         </div>
-
-        {% if corte_actual and corte_actual.esta_activo %}
-        <div class="control-actions-cluster">
-            <span class="badge badge-success">Corte Activo</span>
+    </div>
+    <div class="metrica-kpi-card">
+        <div class="kpi-icon-bubble" style="background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981);">🟢</div>
+        <div class="kpi-data-wrap">
+            <span class="kpi-numero">{{ metricas_resumen.tareas_activas }}</span>
+            <span class="kpi-etiqueta">En Plazo</span>
         </div>
-        {% elif modo_todos %}
-        <div class="control-actions-cluster">
-            <span class="badge badge-info">Vista Agrupada</span>
+    </div>
+    <div class="metrica-kpi-card">
+        <div class="kpi-icon-bubble" style="background: rgba(245, 158, 11, 0.1); color: var(--warning, #f59e0b);">⏳</div>
+        <div class="kpi-data-wrap">
+            <span class="kpi-numero">{{ metricas_resumen.tareas_urgentes }}</span>
+            <span class="kpi-etiqueta">Por Vencer (&lt; 24h)</span>
+        </div>
+    </div>
+    <div class="metrica-kpi-card">
+        <div class="kpi-icon-bubble" style="background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444);">🛑</div>
+        <div class="kpi-data-wrap">
+            <span class="kpi-numero">{{ metricas_resumen.tareas_vencidas }}</span>
+            <span class="kpi-etiqueta">Vencidas</span>
+        </div>
+    </div>
+    <div class="metrica-kpi-card">
+        <div class="kpi-icon-bubble" style="background: rgba(148, 163, 184, 0.1); color: var(--text-muted);">♾️</div>
+        <div class="kpi-data-wrap">
+            <span class="kpi-numero">{{ metricas_resumen.tareas_sin_limite }}</span>
+            <span class="kpi-etiqueta">Sin Fecha Límite</span>
+        </div>
+    </div>
+</div>
+
+<div class="page-control-panel">
+    <div class="control-selectors-cluster">
+        {% if cortes %}
+        <div class="control-item">
+            <label class="control-label" for="corte-tareas">
+                <span class="control-icon" aria-hidden="true">📂</span>
+                <span>Corte de trabajo</span>
+            </label>
+            <div class="control-select-wrap">
+                <select id="corte-tareas" onchange="window.location.href=this.value" aria-label="Seleccionar corte de trabajo">
+                    <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id='todos', filtro_instructor=filtro_instructor) }}"
+                            {% if modo_todos %}selected{% endif %}>
+                        📚 Todos los cortes (tablero agrupado)
+                    </option>
+                    {% for item in cortes %}
+                    <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=item.id, filtro_instructor=filtro_instructor) }}"
+                            {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
+                        {{ item.nombre }}{% if item.creador %} · {{ item.creador.nombre }}{% endif %}{% if item.compartido %} · Compartido{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if instructores_ficha and instructores_ficha|length > 1 %}
+        <div class="control-item">
+            <label class="control-label" for="filtro-docente">
+                <span class="control-icon" aria-hidden="true">👨‍🏫</span>
+                <span>Filtrar por Instructor</span>
+            </label>
+            <div class="control-select-wrap">
+                <select id="filtro-docente" onchange="window.location.href=this.value" aria-label="Filtrar por instructor">
+                    {% set corte_sel = 'todos' if modo_todos else (corte_actual.id if corte_actual else None) %}
+                    <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='mias') }}"
+                            {% if filtro_instructor == 'mias' %}selected{% endif %}>
+                        👤 Mis Tareas ({{ current_user.nombre }})
+                    </option>
+                    <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='todas') }}"
+                            {% if filtro_instructor == 'todas' %}selected{% endif %}>
+                        👥 Todas las tareas (agrupadas por instructor)
+                    </option>
+                    {% for inst in instructores_ficha %}
+                    {% if inst.id != current_user.id %}
+                    <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor=inst.id) }}"
+                            {% if filtro_instructor == inst.id|string %}selected{% endif %}>
+                        👨‍🏫 Tareas de {{ inst.nombre }}
+                    </option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
         </div>
         {% endif %}
     </div>
 
-    {% if modo_todos %}
-    <div class="alert alert-info" style="margin-top: 10px;">Vista agrupada: las tareas se separan por corte y, dentro de cada corte, por instructor responsable. Para crear una tarea nueva elige el corte destino en el formulario.</div>
-    {% elif corte_actual and not corte_actual.esta_activo %}
-    <div class="alert alert-info" style="margin-top: 10px;">Este corte está {{ corte_actual.estado }} y se puede consultar, pero no modificar.</div>
+    {% if corte_actual and corte_actual.esta_activo %}
+    <div class="control-actions-cluster">
+        <span class="badge badge-success">Corte Activo</span>
+    </div>
+    {% elif modo_todos %}
+    <div class="control-actions-cluster">
+        <span class="badge badge-info">Vista Agrupada</span>
+    </div>
     {% endif %}
+
+    <div class="busqueda-panel-wrap">
+        <input type="search" id="busqueda-tareas" class="busqueda-input" placeholder="🔍 Filtrar tareas por título o descripción..." aria-label="Filtrar tareas por título o descripción" oninput="filtrarTareas(this.value)">
+    </div>
 </div>
 
+{% if modo_todos %}
+<div class="alert alert-info" style="margin-top: 10px;">Vista agrupada: las tareas se separan por corte y, dentro de cada corte, por instructor responsable. Para crear una tarea nueva elige el corte destino en el formulario.</div>
+{% elif corte_actual and not corte_actual.esta_activo %}
+<div class="alert alert-info" style="margin-top: 10px;">Este corte está {{ corte_actual.estado }} y se puede consultar, pero no modificar.</div>
+{% endif %}
+
 {% if puede_editar_corte %}
-<div class="card form-card">
+<div class="card form-card" id="contenedor-formulario-tarea" style="margin-bottom: 22px;">
     <h2>Crear nueva tarea</h2>
     <form method="POST" enctype="multipart/form-data" data-form-tarea>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -242,13 +526,13 @@
         {% endif %}
 
         <div class="form-group">
-                <label for="titulo">Título de la tarea</label>
-            <input type="text" id="titulo" name="titulo" placeholder="Ej: Diseño de base de datos" required>
+            <label for="titulo">Título de la tarea</label>
+            <input type="text" id="titulo" name="titulo" placeholder="Ej: Diseño de base de datos relacional" required>
         </div>
 
         <div class="form-group">
             <label for="descripcion">Descripción</label>
-            <textarea id="descripcion" name="descripcion" rows="3" placeholder="Describe lo que deben hacer los aprendices..."></textarea>
+            <textarea id="descripcion" name="descripcion" rows="3" placeholder="Describe los entregables y lineamientos pedagógicos..."></textarea>
         </div>
 
         <fieldset class="form-group assignment-type-fieldset">
@@ -327,7 +611,9 @@
 </div>
 {% endif %}
 
-{% if grupos %}
+{# Vista principal del tablero #}
+{% if modo_todos and grupos %}
+{# En modo_todos se mantiene el tablero agrupado por corte para satisfacer la vista completa y los tests existentes #}
 <div class="tablero-agrupado">
     {% for grupo in grupos %}
     <details class="corte-grupo" open>
@@ -362,10 +648,52 @@
     </details>
     {% endfor %}
 </div>
-{% elif tareas %}
-<div class="tasks-list">
-    {% for tarea in tareas %}
-    {% include 'instructor/_tarea_card.html' %}
+{% elif grupos_instructor and tareas %}
+{# Vista agrupada por instructor solicitada por el usuario #}
+<div class="tablero-agrupado instructores-tablero">
+    {% for grupo_inst in grupos_instructor %}
+    <section class="instructor-card-seccion" data-instructor-card-bloque>
+        <div class="instructor-seccion-head">
+            <div class="instructor-head-main">
+                <div class="instructor-avatar-circulo" aria-hidden="true">
+                    {{ grupo_inst.nombre[:2].upper() }}
+                </div>
+                <div class="instructor-titulos-wrap">
+                    <h2 class="instructor-nombre-h2">
+                        <span>👨‍🏫 {{ grupo_inst.nombre }}</span>
+                        {% if grupo_inst.es_actual %}
+                        <span class="badge badge-info">Tú</span>
+                        {% endif %}
+                        {% if ficha.instructor_id == (grupo_inst.instructor.id if grupo_inst.instructor else None) %}
+                        <span class="badge badge-success">Instructor Titular</span>
+                        {% endif %}
+                    </h2>
+                    <p class="instructor-chips-line text-muted">
+                        <span class="badge badge-secondary">{{ grupo_inst.total_tareas }} {{ 'tarea' if grupo_inst.total_tareas == 1 else 'tareas' }}</span>
+                        {% if grupo_inst.tareas_activas %}
+                        <span class="badge badge-success">{{ grupo_inst.tareas_activas }} en plazo</span>
+                        {% endif %}
+                        {% if grupo_inst.tareas_urgentes %}
+                        <span class="badge badge-warning">{{ grupo_inst.tareas_urgentes }} por vencer</span>
+                        {% endif %}
+                        {% if grupo_inst.tareas_vencidas %}
+                        <span class="badge badge-danger">{{ grupo_inst.tareas_vencidas }} vencidas</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline" onclick="toggleSeccionInstructor('cuerpo-inst-{{ loop.index }}', this)">
+                <span class="ico-colapso">▾</span> Colapsar
+            </button>
+        </div>
+        <div id="cuerpo-inst-{{ loop.index }}" class="instructor-cuerpo-tareas">
+            <div class="tasks-list">
+                {% for tarea in grupo_inst.tareas %}
+                {% include 'instructor/_tarea_card.html' %}
+                {% endfor %}
+            </div>
+        </div>
+    </section>
     {% endfor %}
 </div>
 {% else %}
@@ -377,9 +705,6 @@
 {% endif %}
 
 <script>
-    // El indicador "deben subir archivo" solo aplica a la modalidad con
-    // evidencia; en las actividades de aula el servidor lo ignora, así que se
-    // oculta para no prometer un comportamiento que no existe.
     document.querySelectorAll('[data-form-tarea]').forEach(function (contenedor) {
         var soloEvidencia = contenedor.querySelector('[data-solo-evidencia]');
         function sincronizarModalidad() {
@@ -409,5 +734,46 @@
         });
         sincronizarAsignacion();
     });
+
+    function toggleFormularioCrear() {
+        var form = document.getElementById('contenedor-formulario-tarea');
+        if (!form) return;
+        var btn = document.getElementById('btn-toggle-crear-tarea');
+        if (form.style.display === 'none') {
+            form.style.display = 'block';
+            if (btn) btn.setAttribute('aria-expanded', 'true');
+            form.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            form.style.display = 'none';
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function toggleSeccionInstructor(cuerpoId, boton) {
+        var cuerpo = document.getElementById(cuerpoId);
+        if (!cuerpo) return;
+        var estaOculto = cuerpo.style.display === 'none';
+        cuerpo.style.display = estaOculto ? 'block' : 'none';
+        if (boton) {
+            boton.innerHTML = estaOculto ? '<span>▾</span> Colapsar' : '<span>▸</span> Expandir';
+        }
+    }
+
+    function filtrarTareas(termino) {
+        var q = (termino || '').toLowerCase().trim();
+        var tarjetas = document.querySelectorAll('[data-tarea-card]');
+        tarjetas.forEach(function (card) {
+            var titulo = card.getAttribute('data-tarea-titulo') || '';
+            var desc = card.querySelector('.task-desc')?.textContent.toLowerCase() || '';
+            var match = !q || titulo.includes(q) || desc.includes(q);
+            card.style.display = match ? '' : 'none';
+        });
+
+        // Ocultar bloques de instructor que no tengan tarjetas visibles
+        document.querySelectorAll('[data-instructor-card-bloque]').forEach(function (bloque) {
+            var visibles = bloque.querySelectorAll('[data-tarea-card]:not([style*="display: none"])');
+            bloque.style.display = (visibles.length > 0 || !q) ? '' : 'none';
+        });
+    }
 </script>
 {% endblock %}

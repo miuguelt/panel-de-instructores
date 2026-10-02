@@ -1,48 +1,136 @@
 {# Tarjeta de una tarea/evidencia del tablero. Espera la variable `tarea` en contexto. #}
-<div class="card task-card">
+{% set p = tarea.progreso_tiempo %}
+<div class="card task-card" data-tarea-card data-tarea-id="{{ tarea.id }}" data-tarea-titulo="{{ tarea.titulo|lower }}" data-tarea-modalidad="{{ tarea.modalidad }}">
     <div class="task-header">
-        <h3>{{ tarea.titulo }}</h3>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+        <h3 class="task-title">{{ tarea.titulo }}</h3>
+        <div class="task-badges-cluster">
             {% if tarea.es_grupal %}
             <span class="badge badge-info">👥 Entrega grupal</span>
             {% else %}
             <span class="badge badge-secondary">👤 Entrega individual</span>
             {% endif %}
+
             {% if tarea.es_actividad_clase %}
-            <span class="badge badge-info">Se revisa en clase</span>
+            <span class="badge badge-info">🏫 Se revisa en clase</span>
             {% else %}
-            <span class="badge badge-secondary">Con evidencia</span>
+            <span class="badge badge-secondary">📝 Con evidencia</span>
             {% endif %}
-            {% if tarea.fecha_limite %}
-            <span class="badge badge-{{ 'danger' if tarea.fecha_limite < now else 'info' }}">
-                Límite: {{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}
+
+            {% if tarea.corte %}
+            <span class="badge badge-outline">📂 {{ tarea.corte.nombre }}</span>
+            {% endif %}
+
+            {% if p.estado == 'vencida' %}
+            <span class="badge badge-danger">🛑 Vencida</span>
+            {% elif p.estado == 'urgente' %}
+            <span class="badge badge-danger">🔴 Urgente (&lt; 24 h)</span>
+            {% elif p.estado == 'atencion' %}
+            <span class="badge badge-warning">🟡 Atención (&lt; 48 h)</span>
+            {% elif p.estado == 'sin_limite' %}
+            <span class="badge badge-secondary">⚪ Sin fecha límite</span>
+            {% else %}
+            <span class="badge badge-success">🟢 En plazo</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if tarea.creador %}
+    <p class="task-author-line text-muted">
+        <span>👨‍🏫 <strong>{{ tarea.creador.nombre }}</strong></span>
+        {% if tarea.corte and tarea.corte.compartido %}<span>· Información compartida</span>{% endif %}
+    </p>
+    {% endif %}
+
+    {% if tarea.es_grupal and tarea.grupos %}
+    <p class="group-assignment-names">
+        <strong>Grupos responsables:</strong>
+        {% for grupo in tarea.grupos %}<span>{{ grupo.nombre }}</span>{% if not loop.last %}<span aria-hidden="true">·</span>{% endif %}{% endfor %}
+    </p>
+    {% endif %}
+
+    {# Barra de porcentaje que representa el tiempo para finalizar la tarea #}
+    <div class="tarea-progreso-tiempo-box estado-{{ p.estado }}">
+        <div class="progreso-tiempo-top">
+            <div class="tiempo-info-izq">
+                {% if p.estado == 'vencida' %}
+                <span class="tiempo-ico" aria-hidden="true">🛑</span>
+                {% elif p.estado == 'urgente' %}
+                <span class="tiempo-ico" aria-hidden="true">⚠️</span>
+                {% elif p.estado == 'atencion' %}
+                <span class="tiempo-ico" aria-hidden="true">⏳</span>
+                {% elif p.estado == 'sin_limite' %}
+                <span class="tiempo-ico" aria-hidden="true">♾️</span>
+                {% else %}
+                <span class="tiempo-ico" aria-hidden="true">⏱️</span>
+                {% endif %}
+                <strong class="tiempo-restante-txt">{{ p.texto_tiempo }}</strong>
+            </div>
+            <div class="tiempo-info-der">
+                <span class="porcentaje-tiempo-pill pill-{{ p.estado }}">
+                    {% if p.sin_limite %}
+                    Sin vencimiento
+                    {% else %}
+                    {{ p.porcentaje }}% transcurrido
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="barra-tiempo-track"
+             role="progressbar"
+             aria-valuenow="{{ p.porcentaje }}"
+             aria-valuemin="0"
+             aria-valuemax="100"
+             aria-label="Tiempo transcurrido para finalizar la tarea: {{ p.porcentaje }}%">
+            <div class="barra-tiempo-fill fill-{{ p.estado }}"
+                 style="width: {{ p.porcentaje }}%;"></div>
+        </div>
+
+        <div class="progreso-tiempo-bottom">
+            <span class="fecha-punto">
+                <span class="fecha-lbl">Asignada:</span>
+                <span class="fecha-val">{{ tarea.creada_en.strftime('%d/%m/%Y %H:%M') if tarea.creada_en else 'N/A' }}</span>
+            </span>
+            {% if not p.sin_limite and tarea.fecha_limite %}
+            <span class="fecha-punto text-right">
+                <span class="fecha-lbl">Límite:</span>
+                <span class="fecha-val">{{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</span>
+            </span>
+            {% else %}
+            <span class="fecha-punto text-right text-muted">
+                <span>Plazo abierto</span>
             </span>
             {% endif %}
         </div>
     </div>
-    {% if tarea.creador %}
-    <p class="text-muted">Instructor responsable: {{ tarea.creador.nombre }}{% if tarea.corte and tarea.corte.compartido %} · Información compartida{% endif %}</p>
-    {% endif %}
-    {% if tarea.es_grupal and tarea.grupos %}
-    <p class="group-assignment-names"><strong>Grupos responsables:</strong>
-        {% for grupo in tarea.grupos %}<span>{{ grupo.nombre }}</span>{% if not loop.last %}<span aria-hidden="true">·</span>{% endif %}{% endfor %}
-    </p>
-    {% endif %}
+
     {% if tarea.descripcion %}
     <p class="task-desc">{{ tarea.descripcion }}</p>
     {% endif %}
-    {% if tarea.enlace_externo %}
-    <a href="{{ tarea.enlace_externo }}" target="_blank" class="link-external">Enlace externo &rarr;</a>
-    {% endif %}
+
+    <div class="task-links-row">
+        {% if tarea.enlace_externo %}
+        <a href="{{ tarea.enlace_externo }}" target="_blank" rel="noopener noreferrer" class="link-external">
+            🔗 Enlace de actividad &rarr;
+        </a>
+        {% endif %}
+        {% if tarea.material_apoyo_url %}
+        <a href="{{ url_for('static', filename=tarea.material_apoyo_url) }}" target="_blank" class="link-material">
+            📎 Material de apoyo adjunto
+        </a>
+        {% endif %}
+    </div>
+
     {% if tarea.actualizada_en %}
-    <p class="text-muted" style="font-size: 12px;">Editada el {{ tarea.actualizada_en.strftime('%d/%m/%Y %H:%M') }}</p>
+    <p class="text-muted" style="font-size: 12px; margin-top: 6px;">Editada el {{ tarea.actualizada_en.strftime('%d/%m/%Y %H:%M') }}</p>
     {% endif %}
 
     <div class="task-card-footer">
         <a href="{{ url_for('instructor.ver_entregas', tarea_id=tarea.id) }}" class="btn btn-sm btn-primary">
             {% if tarea.es_actividad_clase %}Aprobar cumplimiento{% else %}Ver Entregas{% endif %}
         </a>
-        {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}<form method="POST"
+        {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}
+        <form method="POST"
               action="{{ url_for('instructor.eliminar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
               data-confirm="Se eliminará la tarea «{{ tarea.titulo|e }}» junto con sus entregas, calificaciones y archivos. Esta acción no se puede deshacer. ¿Desea continuar?"
               data-confirm-title="Eliminar tarea" data-confirm-label="Eliminar tarea" data-confirm-intent="danger"
@@ -50,10 +138,12 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             {% if tarea.corte_id %}<input type="hidden" name="corte_id" value="{{ tarea.corte_id }}">{% endif %}
             <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-        </form>{% endif %}
+        </form>
+        {% endif %}
     </div>
 
-    {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}<details class="task-edit-form" data-form-tarea>
+    {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}
+    <details class="task-edit-form" data-form-tarea>
         <summary>✏️ Editar tarea</summary>
         <form method="POST"
               action="{{ url_for('instructor.editar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
@@ -153,5 +243,8 @@
 
             <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
         </form>
-    </details>{% else %}<small class="text-muted">Solo lectura para instructores vinculados.</small>{% endif %}
+    </details>
+    {% else %}
+    <small class="text-muted">Solo lectura para instructores vinculados.</small>
+    {% endif %}
 </div>

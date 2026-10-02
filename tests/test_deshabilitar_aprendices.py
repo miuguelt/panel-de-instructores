@@ -6,7 +6,10 @@ from app.models import (
     Aprendiz,
     ConfiguracionRanking,
     Ficha,
+    Grupo,
+    GrupoAprendiz,
     Instructor,
+    IntercambioAseo,
     TurnoAseo,
 )
 from app.models.aseo import ContadorAseo
@@ -17,6 +20,12 @@ from app.services.aseo import (
     desvincular_aprendiz_de_turnos_futuros,
     generar_turnos,
     reemplazar_aprendices,
+)
+from app.services.grupo_service import (
+    crear_grupo_manual,
+    crear_grupos_aleatorios,
+    desvincular_aprendiz_de_grupos,
+    editar_grupo,
 )
 from app.services.permisos import (
     cambiar_estado_activo_aprendiz,
@@ -338,7 +347,7 @@ class DeshabilitarAprendicesTestCase(unittest.TestCase):
         resp_cfg = cliente.get(f'/instructor/fichas/{self.ficha.id}/aprendices/configuracion')
         self.assertEqual(resp_cfg.status_code, 200)
         cuerpo_cfg = resp_cfg.get_data(as_text=True)
-        self.assertIn('Participación en ranking y turnos de aseo', cuerpo_cfg)
+        self.assertIn('Participación en ranking', cuerpo_cfg)
         self.assertIn('Deshabilitado', cuerpo_cfg)
 
     def test_aprendiz_admin_autorizado_en_rutas_aseo(self):
@@ -365,6 +374,132 @@ class DeshabilitarAprendicesTestCase(unittest.TestCase):
             session['aprendiz_documento'] = self.ap1.documento
             session['aprendiz_ficha_id'] = self.ficha.id
             self.assertIsNone(_aprendiz_admin_autorizado(self.ficha.id))
+
+    def test_query_llamado_lista_excluye_deshabilitados_por_defecto(self):
+        llamado_inicio = Aprendiz.query_llamado_lista(self.ficha.id).all()
+        self.assertEqual(len(llamado_inicio), 3)
+
+        cambiar_estado_activo_aprendiz(self.ficha.id, self.ap2.id, activo=False)
+        db.session.commit()
+
+        llamado_desp = Aprendiz.query_llamado_lista(self.ficha.id).all()
+        self.assertEqual([a.id for a in llamado_desp], [self.ap1.id, self.ap3.id])
+
+        llamado_todos = Aprendiz.query_llamado_lista(self.ficha.id, solo_activos=False).all()
+        self.assertEqual(len(llamado_todos), 3)
+
+    def test_llamado_a_lista_http_excluye_aprendiz_deshabilitado(self):
+        cliente = self._cliente_autenticado()
+
+        cambiar_estado_activo_aprendiz(self.ficha.id, self.ap2.id, activo=False)
+        db.session.commit()
+
+        resp_get = cliente.get(f'/instructor/fichas/{self.ficha.id}/asistencia')
+        self.assertEqual(resp_get.status_code, 200)
+        cuerpo_get = resp_get.get_data(as_text=True)
+        self.assertIn(self.ap1.nombre, cuerpo_get)
+        self.assertIn(self.ap3.nombre, cuerpo_get)
+        self.assertNotIn(f'name="asistencia_{self.ap2.id}"', cuerpo_get)
+
+        resp_post = cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/asistencia',
+            data={
+                'fecha': date.today().isoformat(),
+                f'asistencia_{self.ap1.id}': 'ASISTE',
+                f'asistencia_{self.ap3.id}': 'ASISTE',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(resp_post.status_code, 200)
+        cuerpo_post = resp_post.get_data(as_text=True)
+        self.assertIn('Asistencia guardada correctamente', cuerpo_post)
+
+    def test_deshabilitar_aprendiz_desvincula_de_grupos(self):
+        grupo = Grupo(ficha_id=self.ficha.id, nombre='Equipo 1', activo=True)
+        db.session.add(grupo)
+        db.session.flush()
+        db.session.add(GrupoAprendiz(grupo_id=grupo.id, aprendiz_id=self.ap1.id))
+        db.session.add(GrupoAprendiz(grupo_id=grupo.id, aprendiz_id=self.ap2.id))
+        db.session.commit()
+
+        self.assertEqual(len(grupo.aprendices), 2)
+        self.assertIn(self.ap2, grupo.aprendices)
+
+        cambiar_estado_activo_aprendiz(self.ficha.id, self.ap2.id, activo=False)
+        db.session.commit()
+
+        db.session.refresh(grupo)
+        self.assertEqual(len(grupo.aprendices), 1)
+        self.assertNotIn(self.ap2, grupo.aprendices)
+        self.assertIn(self.ap1, grupo.aprendices)
+
+    def test_no_se_puede_asignar_aprendiz_deshabilitado_a_grupos(self):
+        self.ap2.deshabilitar()
+        db.session.commit()
+
+        with self.assertRaisesRegex(ValueError, 'deshabilitados'):
+            crear_grupos_aleatorios(self.ficha.id, [self.ap1.id, self.ap2.id], tamano_grupo=2)
+
+        with self.assertRaisesRegex(ValueError, 'deshabilitados'):
+            crear_grupo_manual(self.ficha.id, 'Equipo Beta', [self.ap1.id, self.ap2.id])
+
+        grupo = Grupo(ficha_id=self.ficha.id, nombre='Equipo Gamma', activo=True)
+        db.session.add(grupo)
+        db.session.flush()
+        db.session.add(GrupoAprendiz(grupo_id=grupo.id, aprendiz_id=self.ap1.id))
+        db.session.commit()
+
+        with self.assertRaisesRegex(ValueError, 'deshabilitados'):
+            editar_grupo(grupo.id, 'Equipo Gamma', [self.ap1.id, self.ap2.id])
+
+    def test_rutas_grupos_excluyen_y_rechazan_aprendices_deshabilitados(self):
+        cliente = self._cliente_autenticado()
+        self.ap3.deshabilitar()
+        db.session.commit()
+
+        resp = cliente.get(f'/instructor/fichas/{self.ficha.id}/grupos')
+        self.assertEqual(resp.status_code, 200)
+        cuerpo = resp.get_data(as_text=True)
+        self.assertIn(self.ap1.nombre, cuerpo)
+        self.assertNotIn(self.ap3.nombre, cuerpo)
+        self.assertNotIn(f'name="aprendices_ids[]" value="{self.ap3.id}"', cuerpo)
+
+        resp_post = cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/grupos/generar',
+            data={
+                'tamano_grupo': '2',
+                'aprendices_ids[]': [self.ap1.id, self.ap3.id],
+            },
+            follow_redirects=True,
+        )
+        self.assertIn('No se pueden asignar aprendices deshabilitados', resp_post.get_data(as_text=True))
+
+    def test_deshabilitar_aprendiz_cancela_intercambios_pendientes_aseo(self):
+        hoy = date.today()
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=hoy + timedelta(days=3),
+            aprendiz_1_id=self.ap1.id,
+            aprendiz_2_id=self.ap2.id,
+            estado='programado',
+        )
+        db.session.add(turno)
+        db.session.flush()
+
+        intercambio = IntercambioAseo(
+            turno_id=turno.id,
+            aprendiz_solicita_id=self.ap1.id,
+            aprendiz_recibe_id=self.ap3.id,
+            estado='pendiente',
+        )
+        db.session.add(intercambio)
+        db.session.commit()
+
+        cambiar_estado_activo_aprendiz(self.ficha.id, self.ap1.id, activo=False)
+        db.session.commit()
+
+        db.session.refresh(intercambio)
+        self.assertEqual(intercambio.estado, 'rechazado')
 
 
 if __name__ == '__main__':

@@ -58,6 +58,23 @@ class Tarea(db.Model):
         """La actividad se aprueba en el aula y no admite entregas del aprendiz."""
         return self.modalidad == MODALIDAD_CLASE
 
+    @property
+    def progreso_tiempo(self):
+        """Progreso temporal respecto a su fecha límite para indicadores y barras de avance."""
+        if hasattr(self, '_progreso_tiempo_cache'):
+            return self._progreso_tiempo_cache
+        from app.services.tareas import calcular_progreso_tiempo_tarea
+        return calcular_progreso_tiempo_tarea(self)
+
+    @property
+    def resumen_entregas(self):
+        """Métricas de entregas asociadas a la tarea."""
+        if hasattr(self, 'stats_entregas'):
+            return self.stats_entregas
+        total = self.entregas.count()
+        calificadas = self.entregas.filter_by(calificada=True).count()
+        return {'total': total, 'calificadas': calificadas, 'pendientes': max(0, total - calificadas)}
+
     def __repr__(self):
         return f'<Tarea {self.titulo}>'
 

@@ -29,6 +29,8 @@ def crear_grupos_aleatorios(ficha_id, aprendiz_ids, tamano_grupo, prefijo_nombre
     ).all()
     if len(aprendices) != len(ids_unicos):
         raise ValueError('Todos los aprendices deben pertenecer a la ficha seleccionada.')
+    if any(a.deshabilitado for a in aprendices):
+        raise ValueError('No se pueden asignar aprendices deshabilitados a grupos.')
 
     # Mezclar aleatoriamente
     random.shuffle(aprendices)
@@ -88,6 +90,24 @@ def archivar_grupos_de_ficha(ficha_id):
     db.session.commit()
 
 
+def desvincular_aprendiz_de_grupos(ficha_id, aprendiz_id):
+    """
+    Retira al aprendiz de cualquier grupo al que pertenezca en la ficha.
+    """
+    rels = (
+        GrupoAprendiz.query
+        .join(Grupo, Grupo.id == GrupoAprendiz.grupo_id)
+        .filter(
+            Grupo.ficha_id == ficha_id,
+            GrupoAprendiz.aprendiz_id == aprendiz_id,
+        )
+        .all()
+    )
+    for rel in rels:
+        db.session.delete(rel)
+    db.session.flush()
+
+
 def editar_grupo(grupo_id, nombre, aprendiz_ids=None):
     """
     Actualiza el nombre y la asignación manual de aprendices para un grupo.
@@ -129,6 +149,8 @@ def editar_grupo(grupo_id, nombre, aprendiz_ids=None):
         ).all()
         if len(aprendices_ficha) != len(ids_unicos):
             raise ValueError('Todos los aprendices deben pertenecer a la ficha seleccionada.')
+        if any(a.deshabilitado for a in aprendices_ficha):
+            raise ValueError('No se pueden asignar aprendices deshabilitados a grupos.')
 
     # 1. Desvincular de otros grupos activos de la misma ficha si estaban asignados
     if ids_unicos:

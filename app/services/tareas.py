@@ -12,7 +12,9 @@ from app.models.ficha import Ficha
 from app.models.corte import Corte
 from app.models.aprendiz import Aprendiz
 from app.models.alertas import PlanMejoramiento
+from sqlalchemy import case, func
 from app.models.tarea import (
+    Entrega,
     MODALIDAD_EVIDENCIA,
     MODALIDADES_TAREA,
     ProrrogaTarea,
@@ -77,11 +79,250 @@ def obtener_tarea_gestionable(ficha_id: int, tarea_id: int) -> Tuple[Optional[Fi
     return ficha, tarea
 
 
+
+def formatear_tiempo_humano(segundos: float) -> str:
+    """Formatea una cantidad de segundos en una expresión legible en español de Colombia."""
+    segundos_pos = max(0.0, float(segundos))
+    if segundos_pos >= 86400:
+        dias = int(segundos_pos // 86400)
+        horas = int((segundos_pos % 86400) // 3600)
+        texto_dias = f'{dias} día' if dias == 1 else f'{dias} días'
+        if horas > 0:
+            texto_horas = f'{horas} hora' if horas == 1 else f'{horas} horas'
+            return f'{texto_dias} y {texto_horas}'
+        return texto_dias
+    elif segundos_pos >= 3600:
+        horas = int(segundos_pos // 3600)
+        minutos = int((segundos_pos % 3600) // 60)
+        texto_horas = f'{horas} hora' if horas == 1 else f'{horas} horas'
+        if minutos > 0:
+            return f'{texto_horas} y {minutos} min'
+        return texto_horas
+    elif segundos_pos >= 60:
+        minutos = int(segundos_pos // 60)
+        return f'{minutos} minuto' if minutos == 1 else f'{minutos} minutos'
+    else:
+        return 'menos de un minuto'
+
+
+def calcular_progreso_tiempo_tarea(
+    tarea: Any,
+    ahora: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Calcula el porcentaje de tiempo transcurrido y tiempo restante para finalizar la tarea."""
+    if ahora is None:
+        ahora = utc_now()
+
+    fecha_limite = getattr(tarea, 'fecha_limite', None)
+    creada_en = getattr(tarea, 'creada_en', None) or ahora
+
+    if not fecha_limite:
+        return {
+            'porcentaje': 0,
+            'porcentaje_restante': 100,
+            'estado': 'sin_limite',
+            'texto_tiempo': 'Sin fecha límite',
+            'detalle': 'Esta actividad no tiene fecha límite programada',
+            'vencida': False,
+            'sin_limite': True,
+            'tiempo_restante_segundos': None,
+            'fecha_inicio': creada_en,
+            'fecha_limite': None,
+        }
+
+    if ahora >= fecha_limite:
+        segundos_vencida = (ahora - fecha_limite).total_seconds()
+        texto_pasado = formatear_tiempo_humano(segundos_vencida)
+        return {
+            'porcentaje': 100,
+            'porcentaje_restante': 0,
+            'estado': 'vencida',
+            'texto_tiempo': f'Vencida hace {texto_pasado}',
+            'detalle': 'El plazo de entrega ya expiró (100% transcurrido)',
+            'vencida': True,
+            'sin_limite': False,
+            'tiempo_restante_segundos': 0.0,
+            'fecha_inicio': creada_en,
+            'fecha_limite': fecha_limite,
+        }
+
+    duracion_total = (fecha_limite - creada_en).total_seconds()
+    if duracion_total <= 0:
+        return {
+            'porcentaje': 100,
+            'porcentaje_restante': 0,
+            'estado': 'vencida',
+            'texto_tiempo': 'Plazo finalizado',
+            'detalle': 'Fecha límite alcanzada',
+            'vencida': True,
+            'sin_limite': False,
+            'tiempo_restante_segundos': 0.0,
+            'fecha_inicio': creada_en,
+            'fecha_limite': fecha_limite,
+        }
+
+    if ahora < creada_en:
+        segundos_restantes = (fecha_limite - ahora).total_seconds()
+        return {
+            'porcentaje': 0,
+            'porcentaje_restante': 100,
+            'estado': 'normal',
+            'texto_tiempo': f'Quedan {formatear_tiempo_humano(segundos_restantes)}',
+            'detalle': 'Plazo completo disponible (0% transcurrido)',
+            'vencida': False,
+            'sin_limite': False,
+            'tiempo_restante_segundos': segundos_restantes,
+            'fecha_inicio': creada_en,
+            'fecha_limite': fecha_limite,
+        }
+
+    transcurrido = (ahora - creada_en).total_seconds()
+    restante = (fecha_limite - ahora).total_seconds()
+    porcentaje = min(100, max(0, round((transcurrido / duracion_total) * 100)))
+    porcentaje_restante = max(0, 100 - porcentaje)
+
+    if restante <= 86400 or porcentaje >= 85:
+        estado = 'urgente'
+    elif restante <= 172800 or porcentaje >= 65:
+        estado = 'atencion'
+    else:
+        estado = 'normal'
+
+    texto_restante = formatear_tiempo_humano(restante)
+    return {
+        'porcentaje': porcentaje,
+        'porcentaje_restante': porcentaje_restante,
+        'estado': estado,
+        'texto_tiempo': f'Quedan {texto_restante}',
+        'detalle': f'{porcentaje}% del tiempo transcurrido ({porcentaje_restante}% restante)',
+        'vencida': False,
+        'sin_limite': False,
+        'tiempo_restante_segundos': restante,
+        'fecha_inicio': creada_en,
+        'fecha_limite': fecha_limite,
+    }
+
+
+def obtener_estadisticas_entregas_tareas(
+    tareas_ids: List[int],
+) -> Dict[int, Dict[str, int]]:
+    """Calcula en una sola consulta las estadísticas de entregas para un conjunto de tareas."""
+    if not tareas_ids:
+        return {}
+
+    filas = db.session.query(
+        Entrega.tarea_id,
+        func.count(Entrega.id).label('total'),
+        func.sum(case((Entrega.calificada.is_(True), 1), else_=0)).label('calificadas'),
+        func.sum(case((Entrega.calificada.is_(False), 1), else_=0)).label('pendientes'),
+    ).filter(
+        Entrega.tarea_id.in_(tareas_ids)
+    ).group_by(
+        Entrega.tarea_id
+    ).all()
+
+    return {
+        int(fila.tarea_id): {
+            'total': int(fila.total or 0),
+            'calificadas': int(fila.calificadas or 0),
+            'pendientes': int(fila.pendientes or 0),
+        }
+        for fila in filas
+    }
+
+
+def agrupar_tareas_por_instructor(
+    lista_tareas: List[Tarea],
+    current_user_id: Optional[int] = None,
+    estadisticas_entregas: Optional[Dict[int, Dict[str, int]]] = None,
+    ahora: Optional[datetime] = None,
+) -> List[Dict[str, Any]]:
+    """Agrupa tareas por instructor responsable, ordenando al usuario actual de primero."""
+    if ahora is None:
+        ahora = utc_now()
+    if estadisticas_entregas is None:
+        estadisticas_entregas = {}
+
+    for tarea in lista_tareas:
+        if not hasattr(tarea, '_progreso_tiempo_cache'):
+            tarea._progreso_tiempo_cache = calcular_progreso_tiempo_tarea(tarea, ahora=ahora)
+        tarea.stats_entregas = estadisticas_entregas.get(
+            tarea.id, {'total': 0, 'calificadas': 0, 'pendientes': 0}
+        )
+
+    def _clave_orden(t: Tarea):
+        es_mio = 0 if (current_user_id and t.instructor_id == current_user_id) else 1
+        nombre_inst = (t.creador.nombre or '').lower() if t.creador else 'zzzz'
+        limite_ts = t.fecha_limite.timestamp() if t.fecha_limite else float('inf')
+        return (es_mio, nombre_inst, limite_ts, -(t.creada_en.timestamp() if t.creada_en else 0.0))
+
+    tareas_ordenadas = sorted(lista_tareas, key=_clave_orden)
+
+    grupos: List[Dict[str, Any]] = []
+    for _inst_id, tareas_inst_iter in groupby(tareas_ordenadas, key=lambda t: t.instructor_id):
+        tareas_inst = list(tareas_inst_iter)
+        instructor = tareas_inst[0].creador
+        es_actual = bool(current_user_id and instructor and instructor.id == current_user_id)
+
+        total_tareas = len(tareas_inst)
+        tareas_activas = sum(
+            1 for t in tareas_inst
+            if getattr(t, '_progreso_tiempo_cache', {}).get('estado') in ('normal', 'atencion', 'urgente')
+        )
+        tareas_urgentes = sum(
+            1 for t in tareas_inst
+            if getattr(t, '_progreso_tiempo_cache', {}).get('estado') == 'urgente'
+        )
+        tareas_vencidas = sum(
+            1 for t in tareas_inst
+            if getattr(t, '_progreso_tiempo_cache', {}).get('estado') == 'vencida'
+        )
+        tareas_sin_limite = sum(
+            1 for t in tareas_inst
+            if getattr(t, '_progreso_tiempo_cache', {}).get('estado') == 'sin_limite'
+        )
+        total_entregas = sum(t.stats_entregas.get('total', 0) for t in tareas_inst)
+        pendientes_calificar = sum(t.stats_entregas.get('pendientes', 0) for t in tareas_inst)
+        calificadas = sum(t.stats_entregas.get('calificadas', 0) for t in tareas_inst)
+
+        grupos.append({
+            'instructor': instructor,
+            'es_actual': es_actual,
+            'nombre': instructor.nombre if instructor else 'Instructor no asignado',
+            'email': getattr(instructor, 'email', '') if instructor else '',
+            'total_tareas': total_tareas,
+            'tareas_activas': tareas_activas,
+            'tareas_urgentes': tareas_urgentes,
+            'tareas_vencidas': tareas_vencidas,
+            'tareas_sin_limite': tareas_sin_limite,
+            'total_entregas': total_entregas,
+            'pendientes_calificar': pendientes_calificar,
+            'calificadas': calificadas,
+            'tareas': tareas_inst,
+        })
+
+    return grupos
+
+
 def agrupar_tareas_por_corte_e_instructor(
     lista_tareas: List[Tarea],
     cortes_lista: List[Corte],
+    estadisticas_entregas: Optional[Dict[int, Dict[str, int]]] = None,
+    ahora: Optional[datetime] = None,
 ) -> List[Dict[str, Any]]:
     """Agrupa tareas por corte pedagógico y por instructor responsable para el tablero agrupado."""
+    if ahora is None:
+        ahora = utc_now()
+    if estadisticas_entregas is None:
+        estadisticas_entregas = {}
+
+    for tarea in lista_tareas:
+        if not hasattr(tarea, '_progreso_tiempo_cache'):
+            tarea._progreso_tiempo_cache = calcular_progreso_tiempo_tarea(tarea, ahora=ahora)
+        tarea.stats_entregas = estadisticas_entregas.get(
+            tarea.id, {'total': 0, 'calificadas': 0, 'pendientes': 0}
+        )
+
     orden_cortes = {c.id: i for i, c in enumerate(cortes_lista)}
     tareas_ordenadas = sorted(
         lista_tareas,

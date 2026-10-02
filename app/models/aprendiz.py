@@ -128,9 +128,9 @@ class Aprendiz(db.Model):
         return consulta
 
     @classmethod
-    def query_llamado_lista(cls, ficha_id, solo_activos=False):
+    def query_llamado_lista(cls, ficha_id, solo_activos=True):
         """Query de aprendices que participan en el llamado a lista:
-        en formacion y condicionados (siguen asistiendo a clase)."""
+        en formacion y condicionados (siguen asistiendo a clase), excluyendo deshabilitados."""
         consulta = cls.query.filter(
             cls.ficha_id == ficha_id,
             cls.estado.in_(ESTADOS_LLAMADO_LISTA),
@@ -145,15 +145,15 @@ class Aprendiz(db.Model):
 
     @property
     def deshabilitado(self):
-        """Indica si el aprendiz ha sido excluido de ranking y turnos de aseo."""
+        """Indica si el aprendiz ha sido excluido de ranking, aseo, llamado a lista y grupos."""
         return not self.activo
 
     def deshabilitar(self):
-        """Deshabilita al aprendiz para que no participe en ranking ni aseo."""
+        """Deshabilita al aprendiz para que no participe en ranking, aseo, llamado a lista ni grupos."""
         self.activo = False
 
     def habilitar(self):
-        """Habilita al aprendiz para que participe en ranking y aseo."""
+        """Habilita al aprendiz para que participe en ranking, aseo, llamado a lista y grupos."""
         self.activo = True
 
     @property

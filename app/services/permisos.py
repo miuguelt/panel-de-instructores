@@ -157,8 +157,9 @@ def configurar_rol_aprendiz(ficha_id, aprendiz_id, habilitar=True):
 
 
 def cambiar_estado_activo_aprendiz(ficha_id, aprendiz_id, activo=None):
-    """Habilita o deshabilita a un aprendiz para su participación en ranking y aseo."""
+    """Habilita o deshabilita a un aprendiz para su participación en ranking, aseo, llamado a lista y grupos."""
     from app.services.aseo import desvincular_aprendiz_de_turnos_futuros
+    from app.services.grupo_service import desvincular_aprendiz_de_grupos
 
     aprendiz = Aprendiz.query.filter_by(
         id=aprendiz_id,
@@ -174,6 +175,7 @@ def cambiar_estado_activo_aprendiz(ficha_id, aprendiz_id, activo=None):
         if aprendiz.rol_administrativo:
             aprendiz.rol_administrativo = False
         desvincular_aprendiz_de_turnos_futuros(ficha_id, aprendiz_id)
+        desvincular_aprendiz_de_grupos(ficha_id, aprendiz_id)
 
     db.session.flush()
     return aprendiz

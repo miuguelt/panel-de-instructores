@@ -29,7 +29,14 @@ def listar_grupos(ficha_id):
     grupos = Grupo.query.filter_by(ficha_id=ficha_id, activo=True).order_by(Grupo.creado_en.desc()).all()
     
     # Aprendices disponibles para agrupar
-    aprendices = ficha.aprendices.filter(Aprendiz.estado.in_(ESTADOS_EN_FORMACION)).order_by(Aprendiz.nombre).all()
+    aprendices = (
+        ficha.aprendices.filter(
+            Aprendiz.estado.in_(ESTADOS_EN_FORMACION),
+            Aprendiz.activo.is_(True),
+        )
+        .order_by(Aprendiz.nombre)
+        .all()
+    )
 
     # Obtener insignias disponibles para la ficha
     insignias = Insignia.query.filter_by(ficha_id=ficha_id, activa=True).order_by(Insignia.nombre).all()
@@ -84,6 +91,9 @@ def generar_grupos(ficha_id):
         ).all()
         if len(aprendices_ficha) != len(ids_unicos) or len(ids_unicos) != len(ids_seleccionados):
             flash('Selecciona aprendices distintos que pertenezcan a esta ficha.', 'error')
+            return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
+        if any(a.deshabilitado for a in aprendices_ficha):
+            flash('No se pueden asignar aprendices deshabilitados a grupos.', 'error')
             return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
 
         # Archivar los grupos anteriores solo después de validar la selección.

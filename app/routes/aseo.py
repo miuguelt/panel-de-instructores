@@ -78,7 +78,7 @@ def _aprendiz_autorizado(ficha_id):
             aprendiz = Aprendiz.query.filter_by(
                 ficha_id=ficha_id, documento=doc
             ).first()
-    if not aprendiz or aprendiz.estado not in ESTADOS_ACTIVOS:
+    if not aprendiz or aprendiz.estado not in ESTADOS_ACTIVOS or not aprendiz.activo:
         return None
     return aprendiz
 
@@ -752,6 +752,7 @@ def proponer_intercambio(ficha_id, turno_id):
     )
     if (
         not aprendiz
+        or not aprendiz.activo
         or not turno
         or turno.ficha_id != ficha_id
         or not turno.incluye(aprendiz.id)
@@ -767,6 +768,7 @@ def proponer_intercambio(ficha_id, turno_id):
         not receptor
         or receptor.ficha_id != ficha_id
         or receptor.estado not in ESTADOS_ACTIVOS
+        or not receptor.activo
         or receptor.id == aprendiz.id
         or turno.incluye(receptor.id)
     ):
