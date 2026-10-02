@@ -60,6 +60,57 @@ def _resultado_resumido(resultado):
     } | {'errores': len(resultado.get('errores', []))}
 
 
+def _encolar_precargas_diarias(hoy=None):
+    """Encola los panoramas de las fichas para que la primera visita no los calcule."""
+    from app.models.archivo_ficha import TIPO_PLANEACION
+    from app.services.importacion_jobs import encolar_recalculo_resumen
+    from app.services.resultados_persistidos import fecha_corte_bogota
+
+    fecha = hoy or fecha_corte_bogota()
+    with app.app_context():
+        fichas = (
+            db.session.query(Ficha.id, Ficha.instructor_id)
+            .join(ArchivoFichaVersion, ArchivoFichaVersion.ficha_id == Ficha.id)
+            .filter(
+                ArchivoFichaVersion.tipo == TIPO_PLANEACION,
+                ArchivoFichaVersion.estado == 'procesado',
+            )
+            .distinct()
+            .all()
+        )
+
+        encoladas = 0
+        for ficha_id, instructor_id in fichas:
+            try:
+                trabajo = encolar_recalculo_resumen(ficha_id, instructor_id)
+                encoladas += trabajo.estado == 'encolado'
+                if trabajo.estado != 'encolado':
+                    log.warning(
+                        'No quedó encolada la precarga diaria de la ficha %s (estado=%s).',
+                        ficha_id, trabajo.estado,
+                    )
+            except Exception:
+                db.session.rollback()
+                log.exception('No se pudo programar la precarga diaria de la ficha %s.', ficha_id)
+
+        log.info(
+            'Precarga diaria de panoramas: fecha=%s fichas=%s trabajos_encolados=%s',
+            fecha.isoformat(), len(fichas), encoladas,
+        )
+        return encoladas
+
+
+def _programar_precargas_si_nuevo_dia(ultima_fecha):
+    """Encola la precarga una sola vez por día de Colombia mientras vive el worker."""
+    from app.services.resultados_persistidos import fecha_corte_bogota
+
+    fecha = fecha_corte_bogota()
+    if fecha == ultima_fecha:
+        return ultima_fecha
+    _encolar_precargas_diarias(fecha)
+    return fecha
+
+
 def _conectar_redis():
     """Espera Redis al arrancar y deja el error completo en los logs."""
     max_intentos = int(os.getenv('WORKER_REDIS_RETRIES', '12'))
@@ -192,7 +243,14 @@ def main():
         WORKER_BLPOP_TIMEOUT, WORKER_SOCKET_TIMEOUT,
     )
     ultima_revision_tyt = -300
+    ultima_fecha_precarga = None
     while True:
+        try:
+            ultima_fecha_precarga = _programar_precargas_si_nuevo_dia(ultima_fecha_precarga)
+        except Exception:
+            db.session.rollback()
+            log.exception('No se pudieron programar las precargas diarias.')
+
         if time.monotonic() - ultima_revision_tyt >= 300:
             from app.tyt.revision import revisar_hitos
             with app.app_context():

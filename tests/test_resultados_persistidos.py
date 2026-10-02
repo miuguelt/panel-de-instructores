@@ -300,6 +300,46 @@ class ResultadosPersistidosTestCase(unittest.TestCase):
         self.assertEqual(fallido_db.estado, 'error')
         self.assertIn('fuente ilegible', fallido_db.error)
 
+    def test_worker_programa_precarga_diaria_solo_para_fichas_con_planeacion_lista(self):
+        from worker import _encolar_precargas_diarias
+
+        sin_planeacion = Ficha(
+            codigo='700101', codigo_ficha='700101', codigo_programa='228118',
+            nombre_programa='Tecnología de prueba', instructor_id=self.ficha.instructor_id,
+        )
+        db.session.add(sin_planeacion)
+        db.session.flush()
+        db.session.add(ArchivoFichaVersion(
+            ficha_id=sin_planeacion.id, instructor_id=self.ficha.instructor_id,
+            tipo='planeacion', version=1, nombre_archivo='pendiente.xlsx',
+            ruta_archivo='pendiente.xlsx', tamano_bytes=10, estado='pendiente',
+        ))
+        db.session.commit()
+
+        with patch('worker.app', self.app), patch(
+            'app.services.importacion_jobs.encolar_recalculo_resumen',
+            return_value=SimpleNamespace(estado='encolado'),
+        ) as encolar:
+            programadas = _encolar_precargas_diarias(date(2026, 10, 1))
+
+        self.assertEqual(programadas, 1)
+        encolar.assert_called_once_with(self.ficha.id, self.version.instructor_id)
+
+    def test_worker_encola_precarga_una_vez_por_dia_de_colombia(self):
+        from worker import _programar_precargas_si_nuevo_dia
+
+        ayer = date(2026, 9, 30)
+        hoy = date(2026, 10, 1)
+        with patch(
+            'app.services.resultados_persistidos.fecha_corte_bogota', return_value=hoy,
+        ), patch('worker._encolar_precargas_diarias') as encolar:
+            ultima_fecha = _programar_precargas_si_nuevo_dia(ayer)
+            mismo_dia = _programar_precargas_si_nuevo_dia(ultima_fecha)
+
+        self.assertEqual(ultima_fecha, hoy)
+        self.assertEqual(mismo_dia, hoy)
+        encolar.assert_called_once_with(hoy)
+
 
 if __name__ == '__main__':
     unittest.main()
