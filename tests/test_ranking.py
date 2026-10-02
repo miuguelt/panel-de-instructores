@@ -1,5 +1,7 @@
 import unittest
 from datetime import date, datetime, timedelta
+from io import BytesIO
+from pypdf import PdfReader
 
 from app import create_app, db
 from app.models import (
@@ -185,6 +187,31 @@ class RankingTestCase(unittest.TestCase):
                 self.assertEqual(cliente.get(ruta, follow_redirects=True).status_code, 200)
 
         self.assertEqual(Insignia.query.filter_by(ficha_id=self.ficha.id).count(), 9)
+
+    def test_pdf_de_ranking_agrupa_54_aprendices_en_maximo_dos_paginas(self):
+        db.session.add_all([
+            Aprendiz(
+                documento=f'2000{numero:04d}',
+                nombre='Aprendiz',
+                apellidos=f'Prueba {numero:02d}',
+                ficha_id=self.ficha.id,
+            )
+            for numero in range(52)
+        ])
+        db.session.commit()
+
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['_user_id'] = str(self.instructor.id)
+            sesion['_fresh'] = True
+
+        respuesta = cliente.get(
+            f'/instructor/fichas/{self.ficha.id}/ranking/exportar?formato=pdf'
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.mimetype, 'application/pdf')
+        self.assertLessEqual(len(PdfReader(BytesIO(respuesta.data)).pages), 2)
 
     def test_ranking_expone_estructura_mobile_first_accesible(self):
         actualizar_participacion_ficha(self.ficha.id)

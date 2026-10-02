@@ -237,51 +237,6 @@
             });
         })();
 
-        // 3. Pre-carga después de confirmar intención de navegación
-        (function() {
-            const prefetched = new Set();
-            let prefetchTimer = null;
-            let pendingLink = null;
-
-            function prefetch(url) {
-                if (!url || prefetched.has(url) || url.startsWith('#') || url.startsWith('javascript:')) return;
-                if (url.includes('/descargar') || url.includes('/logout') || url.includes('/exportar') || url.includes('/plantilla')) return;
-                try {
-                    const l = document.createElement('link');
-                    l.rel = 'prefetch';
-                    l.href = url;
-                    l.as = 'document';
-                    document.head.appendChild(l);
-                    prefetched.add(url);
-                } catch (e) {}
-            }
-
-            function cancelPendingPrefetch() {
-                if (prefetchTimer !== null) window.clearTimeout(prefetchTimer);
-                prefetchTimer = null;
-                pendingLink = null;
-            }
-
-            document.addEventListener('pointerover', function(e) {
-                if (e.pointerType && e.pointerType !== 'mouse') return;
-                const a = e.target.closest('a');
-                if (!a || !a.href) return;
-                if (a.origin !== window.location.origin || a.hasAttribute('download') || a.target === '_blank' || a.getAttribute('hx-boost') === 'false') return;
-                if (pendingLink === a) return;
-
-                cancelPendingPrefetch();
-                pendingLink = a;
-                prefetchTimer = window.setTimeout(function() {
-                    if (pendingLink === a && a.matches(':hover')) prefetch(a.href);
-                    cancelPendingPrefetch();
-                }, 180);
-            }, { passive: true });
-
-            document.addEventListener('pointerout', function(e) {
-                const a = e.target.closest('a');
-                if (a && !a.contains(e.relatedTarget) && pendingLink === a) cancelPendingPrefetch();
-            }, { passive: true });
-        })();
     </script>
     <script>
         function setTheme(themeName) {

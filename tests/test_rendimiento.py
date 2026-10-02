@@ -178,12 +178,18 @@ class CacheEstaticosTestCase(BaseRendimiento):
         self.assertIn('/static/css/styles.css?v=', html)
         self.assertIn('/static/js/table-filters.js?v=', html)
 
+    def test_paginas_privadas_no_se_precargan_ni_se_guardan_en_cache_http(self):
+        respuesta = self.cliente.get('/instructor/fichas')
+        html = respuesta.get_data(as_text=True)
+        self.assertEqual(respuesta.headers['Cache-Control'], 'private, no-store, max-age=0')
+        self.assertNotRegex(html, r'<link\b[^>]*rel=["\']prefetch["\']')
+
     def test_dependencias_externas_no_bloquean_la_primera_pintura(self):
         html = self.cliente.get('/instructor/fichas').get_data(as_text=True)
         self.assertIn('rel="preload"', html)
         self.assertIn('fonts.googleapis.com/css2', html)
         self.assertIn('onload="this.onload=null;this.rel=\'stylesheet\'"', html)
-        self.assertRegex(html, r'src="/static/vendor/htmx/htmx\.min\.js\?v=\d+" defer')
+        self.assertRegex(html, r'src="/static/vendor/htmx/htmx\.min\.js\?v=[a-f0-9]+" defer')
         self.assertNotIn('src="https://unpkg.com/htmx.org', html)
 
     def test_html_se_entrega_comprimido_para_navegadores_compatibles(self):

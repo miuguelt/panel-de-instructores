@@ -1,6 +1,10 @@
 from app.helpers import utc_now
 
 from app import db
+from sqlalchemy.dialects.postgresql import JSONB
+
+
+TIPO_JSON_ESTRUCTURADO = db.JSON().with_variant(JSONB, 'postgresql')
 
 
 TIPO_PLANEACION = 'planeacion'
@@ -31,6 +35,10 @@ class ArchivoFichaVersion(db.Model):
     estado = db.Column(db.String(20), nullable=False, default='procesado')
     detalle = db.Column(db.Text, nullable=True)
     metadata_json = db.Column(db.Text, nullable=True)
+    # Resultado estructurado del parser. El archivo original permanece en el
+    # volumen compartido para descarga; las vistas consultan este contenido.
+    contenido_extraido_json = db.Column(TIPO_JSON_ESTRUCTURADO, nullable=True)
+    contenido_extraido_version = db.Column(db.String(40), nullable=True)
     creado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     ficha = db.relationship('Ficha', back_populates='archivos_versionados')

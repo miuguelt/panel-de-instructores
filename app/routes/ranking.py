@@ -354,7 +354,14 @@ def _ranking_pdf(ficha, filas, periodo):
     from reportlab.lib.enums import TA_CENTER
     
     salida = io.BytesIO()
-    doc = SimpleDocTemplate(salida, pagesize=landscape(letter), rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    doc = SimpleDocTemplate(
+        salida,
+        pagesize=landscape(letter),
+        rightMargin=32,
+        leftMargin=32,
+        topMargin=32,
+        bottomMargin=32,
+    )
     estilos = getSampleStyleSheet()
     estilos['Title'].alignment = TA_CENTER
     estilos['Normal'].alignment = TA_CENTER
@@ -390,7 +397,10 @@ def _ranking_pdf(ficha, filas, periodo):
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('LEADING', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),

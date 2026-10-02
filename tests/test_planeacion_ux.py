@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from app import create_app, db
 from app.models import Aprendiz, Ficha, Instructor, JuicioEvaluativo
+from app.models import ArchivoFichaVersion, ResultadoCalculadoFicha, TIPO_PLANEACION
 from tests.apoyo_planeacion import crear_planeacion_xlsx
 
 
@@ -177,6 +178,13 @@ class PlaneacionUXTestCase(unittest.TestCase):
 
     def test_error_de_lectura_anuncia_el_problema_y_ofrece_reintento(self):
         self.pagina(con_planeacion=True)
+        from app.models import ArchivoFichaVersion, TIPO_PLANEACION
+        version = ArchivoFichaVersion.query.filter_by(
+            ficha_id=self.ficha.id, tipo=TIPO_PLANEACION
+        ).one()
+        version.contenido_extraido_json = None
+        version.contenido_extraido_version = None
+        db.session.commit()
         with patch('app.routes.planeacion.parsear_planeacion', side_effect=ValueError('Archivo no legible')):
             html = self.pagina()
         alerta = re.search(r'<div[^>]*role="alert"[^>]*>(.*?)</div>\s*</div>', html, re.S)
@@ -185,3 +193,20 @@ class PlaneacionUXTestCase(unittest.TestCase):
         self.assertIn('Archivo no legible', alerta.group(1))
         self.assertIn('Reintentar', alerta.group(1))
         self.assertIn(f'href="/instructor/fichas/{self.ficha.id}/planeacion"', alerta.group(1))
+
+    def test_analisis_reutiliza_extraccion_y_panorama_persistidos(self):
+        self.pagina(con_planeacion=True)
+        version = ArchivoFichaVersion.query.filter_by(
+            ficha_id=self.ficha.id, tipo=TIPO_PLANEACION
+        ).one()
+        self.assertTrue(version.contenido_extraido_json)
+        self.assertEqual(version.contenido_extraido_version, 'planeacion-v1')
+        self.assertEqual(ResultadoCalculadoFicha.query.filter_by(tipo='panorama').count(), 1)
+
+        with (
+            patch('app.routes.planeacion.parsear_planeacion', side_effect=AssertionError('No debe abrir el Excel')),
+            patch('app.routes.planeacion.construir_panorama', side_effect=AssertionError('No debe recalcular el panorama')),
+        ):
+            respuesta = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/planeacion')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(ResultadoCalculadoFicha.query.filter_by(tipo='panorama').count(), 1)

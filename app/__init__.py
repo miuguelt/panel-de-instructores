@@ -184,7 +184,7 @@ def _inventario_uploads(carpeta, tope=5000):
 
 
 def _registrar_cache_estaticos(app):
-    """Sirve /static/ con caducidad larga y cache-busting por mtime.
+    """Sirve /static/ con caducidad larga y cache-busting por contenido.
 
     El fingerprint se calcula una sola vez por archivo y se memoriza: en
     produccion los estaticos no cambian mientras el contenedor vive, y hacer un
@@ -198,8 +198,14 @@ def _registrar_cache_estaticos(app):
             return ''
         ruta = os.path.join(app.static_folder, filename)
         try:
-            return str(int(os.stat(ruta).st_mtime))
-        except OSError:
+            import hashlib
+
+            digest = hashlib.sha256()
+            with open(ruta, 'rb') as archivo:
+                for bloque in iter(lambda: archivo.read(128 * 1024), b''):
+                    digest.update(bloque)
+            return digest.hexdigest()[:16]
+        except (OSError, ValueError):
             # Nombre inexistente o path traversal: se devuelve la URL sin ?v=
             # en vez de romper el render de la plantilla.
             return ''
@@ -223,12 +229,19 @@ def _registrar_cache_estaticos(app):
 
     @app.after_request
     def _cachear_estaticos(response):
-        # Solo el endpoint 'static': las descargas de uploads y los reportes
-        # generados siguen con la politica por defecto.
+        # Los archivos estaticos versionados se pueden cachear por largo tiempo.
+        # El resto de las respuestas puede contener datos personales o variar
+        # por sesion, por eso se marca como privado y no almacenable.
         if request.endpoint == 'static' and response.status_code < 400:
             response.headers['Cache-Control'] = (
                 f'public, max-age={STATIC_MAX_AGE}, immutable'
             )
+        elif request.endpoint != 'static':
+            # Las vistas pueden incluir datos de instructor, aprendiz o una
+            # sesión temporal. Evita cachearlas sin disparar la carga de usuario.
+            politica = response.headers.get('Cache-Control', '').lower()
+            if 'no-store' not in politica:
+                response.headers['Cache-Control'] = 'private, no-store, max-age=0'
         return response
 
 
@@ -252,6 +265,8 @@ def create_app(test_config=None):
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_opts
 
     db.init_app(app)
+    # Registra la revisión automática de snapshots cuando cambian los datos fuente.
+    from . import events as _events  # noqa: F401
     from app.http_timing import registrar_tiempos_http
     registrar_tiempos_http(app, db)
     login_manager.init_app(app)
@@ -287,7 +302,7 @@ def create_app(test_config=None):
     # porque SEND_FILE_MAX_AGE_DEFAULT=0 emite `Cache-Control: no-cache`: el
     # navegador revalida en cada clic y el worker gasta I/O en devolver bytes
     # identicos. Se sirve con caducidad larga y se invalida por contenido: cada
-    # url_for('static') lleva ?v=<mtime>, que cambia solo al editar el archivo.
+    # url_for('static') lleva ?v=<sha256>, que cambia al cambiar el contenido.
     _registrar_cache_estaticos(app)
 
     # --- Almacenamiento de archivos ---
@@ -424,13 +439,16 @@ def create_app(test_config=None):
                     log.warning('No se pudo contar notificaciones; se muestra 0.', exc_info=True)
                     db.session.rollback()
 
-        # Evita hacer os.stat() a disco en cada render de plantilla
+        # Evita leer el CSS en cada render de plantilla
         static_v = _static_v_cache.get('v')
         if static_v is None or app.debug:
             try:
+                import hashlib
+
                 css_file = os.path.join(app.root_path, 'static', 'css', 'styles.css')
                 if os.path.isfile(css_file):
-                    static_v = str(int(os.path.getmtime(css_file)))
+                    with open(css_file, 'rb') as archivo:
+                        static_v = hashlib.sha256(archivo.read()).hexdigest()[:16]
                     _static_v_cache['v'] = static_v
                 else:
                     static_v = '1.0'

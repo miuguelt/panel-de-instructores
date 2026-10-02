@@ -94,6 +94,9 @@ def _procesar(job_id):
         job = db.session.get(ImportacionJob, int(job_id))
         if not job or job.estado != 'encolado':
             return
+        if job.tipo_trabajo == 'resumen_ficha':
+            _procesar_resumen(job)
+            return
         archivo_path = job.archivo_path
 
         job.estado = 'procesando'
@@ -129,6 +132,12 @@ def _procesar(job_id):
             job.terminado_en = datetime.utcnow()
             db.session.commit()
             log.info('Importación #%s completada: %s', job.id, job.resultado)
+            try:
+                from app.services.resultados_persistidos import precargar_resultados_ficha
+
+                precargar_resultados_ficha(ficha.id)
+            except Exception:
+                log.exception('La importación #%s quedó lista, pero falló el resumen previo.', job.id)
         except Exception as exc:
             db.session.rollback()
             job = db.session.get(ImportacionJob, int(job_id))
@@ -150,6 +159,28 @@ def _procesar(job_id):
             except OSError:
                 log.warning('No se pudo eliminar el archivo temporal del trabajo %s', job_id)
             db.session.remove()
+
+
+def _procesar_resumen(job):
+    """Genera snapshots persistentes dentro del worker, no en Gunicorn."""
+    job.estado = 'procesando'
+    job.iniciado_en = datetime.utcnow()
+    db.session.commit()
+    try:
+        from app.services.resultados_persistidos import precargar_resultados_ficha
+
+        resultado = precargar_resultados_ficha(job.ficha_id)
+        job.estado = 'completado'
+        job.resultado = json.dumps(resultado, ensure_ascii=False)
+    except Exception as exc:
+        db.session.rollback()
+        job = db.session.get(ImportacionJob, job.id)
+        job.estado = 'error'
+        job.error = f'{type(exc).__name__}: {exc}'
+        log.exception('Falló el recálculo de resúmenes de la ficha %s', job.ficha_id)
+    job.terminado_en = datetime.utcnow()
+    db.session.commit()
+    db.session.remove()
 
 
 def main():

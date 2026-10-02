@@ -28,10 +28,15 @@ from app.services.importacion_ficha import (
     leer_metadata_archivo,
     validar_reporte_ficha,
 )
-from app.services.importacion_jobs import ColaImportacionesNoDisponible, encolar_importacion
+from app.services.importacion_jobs import (
+    ColaImportacionesNoDisponible,
+    encolar_importacion,
+    encolar_recalculo_resumen,
+)
 from app.services.planeacion import comparar_fuentes, parsear_planeacion
 from app.services.programa_formacion import parsear_programa
 from app.services.ranking import actualizar_participacion_ficha
+from app.services.resultados_persistidos import guardar_contenido_documento
 from app.services.versiones_archivos import actualizar_estado, crear_version
 
 
@@ -62,6 +67,7 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
 
     mensajes_exito = []
     versiones_creadas = []
+    reporte_en_worker = False
 
     try:
         # 1. Planeación Pedagógica
@@ -81,6 +87,7 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                 motivos.append(f'La ficha {ficha.codigo} no tiene registrado el código del programa.')
             if motivos:
                 raise ErrorImportacion(f'La planeación pedagógica GFPI-F-134 no corresponde a la ficha {ficha.codigo}: ' + ' '.join(motivos))
+            guardar_contenido_documento(ver_plan, contenido_plan, 'planeacion-v1')
             actualizar_estado(ver_plan, 'procesado', metadata=contenido_plan['metadata'])
             mensajes_exito.append(f'Planeación v{ver_plan.version} ({contenido_plan["resumen"]["resultados"]} resultados)')
 
@@ -96,6 +103,7 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
             alineacion_prog = comparar_fuentes(programa_data['metadata'], metadata_ficha(ficha))
             if not alineacion_prog['alineado']:
                 raise ErrorImportacion(f'El Programa de Formación no corresponde a la ficha {ficha.codigo}: ' + ' '.join(alineacion_prog['motivos']))
+            guardar_contenido_documento(ver_prog, programa_data, 'programa-v1')
             actualizar_estado(ver_prog, 'procesado', metadata=programa_data['metadata'])
             mensajes_exito.append(f'Programa v{ver_prog.version} ({programa_data["resumen"]["competencias"]} competencias)')
 
@@ -129,6 +137,7 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                 db.session.commit()
                 try:
                     encolar_importacion(job.id, current_app.config['IMPORT_QUEUE_NAME'])
+                    reporte_en_worker = True
                     mensajes_exito.append(f'Reporte de juicios v{ver_rep.version} encolado (trabajo #{job.id})')
                 except ColaImportacionesNoDisponible:
                     job.estado = 'error'
@@ -144,6 +153,8 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                 mensajes_exito.append(f'Reporte de juicios v{ver_rep.version} procesado ({res_imp.get("nuevos", 0)} aprendices)')
 
         db.session.commit()
+        if not reporte_en_worker:
+            encolar_recalculo_resumen(ficha.id, instructor_id)
         return True, 'Análisis actualizado con éxito. ' + ' · '.join(mensajes_exito), 200
 
     except (ErrorArchivo, ErrorImportacion, ValueError, OSError) as exc:

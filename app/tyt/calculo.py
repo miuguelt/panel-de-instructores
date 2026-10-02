@@ -1,6 +1,7 @@
 """Pure progress calculation; result identity and thresholds never use rounded values."""
 
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 import unicodedata
 
 
@@ -27,7 +28,12 @@ def _tiempo(inicio, fin, hoy):
 
 
 def _texto(valor):
-    texto = unicodedata.normalize('NFKD', str(valor or ''))
+    return _normalizar_texto(str(valor or ''))
+
+
+@lru_cache(maxsize=4096)
+def _normalizar_texto(texto):
+    texto = unicodedata.normalize('NFKD', texto)
     return ' '.join(''.join(c for c in texto if not unicodedata.combining(c)).upper().split())
 
 

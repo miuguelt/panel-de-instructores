@@ -14,6 +14,7 @@ class Ficha(db.Model):
     fecha_inicio = db.Column(db.Date, nullable=True)
     fecha_fin = db.Column(db.Date, nullable=True)
     duracion_productiva_meses = db.Column(db.Integer, nullable=False, default=6)
+    revision_calculos = db.Column(db.Integer, nullable=False, default=1, server_default='1')
     creada_en = db.Column(db.DateTime, default=utc_now)
 
     __table_args__ = (

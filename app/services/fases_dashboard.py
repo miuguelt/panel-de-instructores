@@ -11,7 +11,6 @@ según los archivos disponibles:
 from __future__ import annotations
 
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from flask import current_app
@@ -26,10 +25,15 @@ from app.services.calendario_formacion import construir_calendario
 from app.services.cronograma import obtener_cronograma
 from app.services.linea_tiempo import construir_linea_tiempo
 from app.services.planeacion import parsear_planeacion
+from app.services.resultados_persistidos import (
+    fecha_corte_bogota,
+    obtener_contenido_documento,
+    obtener_resultado_persistido,
+)
 from app.services.seguimiento_fases import FASES_PROYECTO, construir_seguimiento_fases
 from app.services.versiones_archivos import ultima_version
 
-# Caché en memoria para evitar re-parsear archivos Excel de planeación en cada petición HTTP
+# Memoización por proceso; la extracción primaria ya vive en PostgreSQL.
 _CACHE_PLANEACION_PARSED: Dict[tuple, Dict[str, Any]] = {}
 
 # Distribución estándar de fases por porcentaje de etapa lectiva en proyectos SENA
@@ -71,10 +75,9 @@ def _obtener_planeacion_parseada(version: ArchivoFichaVersion) -> Optional[Dict[
         return _CACHE_PLANEACION_PARSED[clave_cache]
 
     try:
-        ruta = Path(current_app.config['UPLOAD_FOLDER']) / version.ruta_archivo
-        if not ruta.is_file():
-            return None
-        contenido = parsear_planeacion(ruta)
+        contenido = obtener_contenido_documento(
+            version, parsear_planeacion, parser_version='planeacion-v1',
+        )
         _CACHE_PLANEACION_PARSED[clave_cache] = contenido
         return contenido
     except Exception:
@@ -89,7 +92,9 @@ def _calcular_con_planeacion(
     hoy: date,
 ) -> Dict[str, Any]:
     """Calcula el seguimiento exacto de fases cruzando GFPI-F-134 con los juicios."""
-    version_reporte = ultima_version(ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True)
+    version_reporte = ultima_version(
+        ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True, recuperar_reporte=False,
+    )
     analisis = construir_analisis(
         ficha,
         contenido_planeacion,
@@ -372,21 +377,28 @@ def obtener_seguimiento_fases_dashboard(
     hoy: Optional[date] = None,
 ) -> Dict[str, Any]:
     """Punto de entrada principal para el estado de fases del proyecto en la tarjeta."""
-    hoy = hoy or date.today()
+    hoy = hoy or fecha_corte_bogota()
     if cronograma is None:
         cronograma = obtener_cronograma(ficha, hoy)
 
     version_plan = _buscar_version_planeacion(ficha)
-    if version_plan:
-        contenido = _obtener_planeacion_parseada(version_plan)
-        if contenido and contenido.get('unidades'):
-            try:
-                return _calcular_con_planeacion(ficha, version_plan, contenido, hoy)
-            except Exception:
-                current_app.logger.exception(
-                    'Error calculando fases con planeación para ficha %s, usando fallback de juicios',
-                    ficha.id,
-                )
+    version_reporte = ultima_version(
+        ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True, recuperar_reporte=False,
+    )
 
-    # Fallback seguro: degradación elegante con juicios y cronograma
-    return _calcular_estimado_por_juicios(ficha, cronograma, hoy)
+    def _construir():
+        if version_plan:
+            contenido = _obtener_planeacion_parseada(version_plan)
+            if contenido and contenido.get('unidades'):
+                try:
+                    return _calcular_con_planeacion(ficha, version_plan, contenido, hoy)
+                except Exception:
+                    current_app.logger.exception(
+                        'Error calculando fases con planeación para ficha %s, usando fallback de juicios',
+                        ficha.id,
+                    )
+        return _calcular_estimado_por_juicios(ficha, cronograma, hoy)
+
+    return obtener_resultado_persistido(
+        ficha, 'fases', hoy, [version_plan, version_reporte], _construir,
+    )

@@ -83,3 +83,35 @@ def encolar_importacion(job_id: int, queue_name: str) -> None:
         raise ColaImportacionesNoDisponible(
             f'No se pudo publicar el trabajo en Redis: {exc}'
         ) from exc
+
+
+def encolar_recalculo_resumen(ficha_id: int, instructor_id: int):
+    """Encola el snapshot de una ficha después de aceptar sus documentos."""
+    from datetime import datetime
+
+    from flask import current_app
+
+    from app import db
+    from app.models import ImportacionJob
+
+    trabajo = ImportacionJob(
+        ficha_id=ficha_id,
+        instructor_id=instructor_id,
+        tipo_trabajo='resumen_ficha',
+        archivo_path='',
+        nombre_archivo='resumen calculado',
+        estado='encolado',
+    )
+    db.session.add(trabajo)
+    db.session.commit()
+    try:
+        encolar_importacion(trabajo.id, current_app.config['IMPORT_QUEUE_NAME'])
+    except ColaImportacionesNoDisponible as exc:
+        trabajo.estado = 'error'
+        trabajo.error = str(exc)
+        trabajo.terminado_en = datetime.utcnow()
+        db.session.commit()
+        current_app.logger.warning(
+            'No se pudo encolar el resumen de ficha %s: %s', ficha_id, exc,
+        )
+    return trabajo

@@ -275,7 +275,7 @@ def _parse_rows(rows):
     return registros
 
 
-def _leer_archivo(archivo):
+def _leer_archivo(archivo, solo_metadata=False):
     contenido = archivo.read()
     extension = (archivo.filename or '').lower().rsplit('.', 1)[-1]
     if extension == 'xls':
@@ -284,14 +284,18 @@ def _leer_archivo(archivo):
         except ImportError as exc:
             raise RuntimeError('Para cargar reportes .xls instala la dependencia xlrd==2.0.1.') from exc
         try:
-            libro = xlrd.open_workbook(file_contents=contenido)
+            libro = xlrd.open_workbook(file_contents=contenido, on_demand=solo_metadata)
         except Exception as exc:
             raise ErrorImportacion(
                 'El archivo .xls no es válido o está dañado.'
             ) from exc
-        hoja = libro.sheet_by_index(0)
-        filas = [hoja.row_values(i) for i in range(hoja.nrows)]
-        return _extraer_metadata(filas), _parse_rows(filas)
+        try:
+            hoja = libro.sheet_by_index(0)
+            limite = min(hoja.nrows, 20) if solo_metadata else hoja.nrows
+            filas = [hoja.row_values(i) for i in range(limite)]
+            return _extraer_metadata(filas), [] if solo_metadata else _parse_rows(filas)
+        finally:
+            libro.release_resources()
 
     try:
         libro = openpyxl.load_workbook(io.BytesIO(contenido), read_only=True, data_only=True)
@@ -299,11 +303,13 @@ def _leer_archivo(archivo):
         raise ErrorImportacion(
             'El archivo no es un Excel válido o está dañado.'
         ) from exc
-    hoja = libro.active
-    filas = list(hoja.iter_rows(values_only=True))
-    metadata = _extraer_metadata(filas)
-    libro.close()
-    return metadata, _parse_rows(filas)
+    try:
+        hoja = libro.active
+        filas = list(hoja.iter_rows(max_row=20 if solo_metadata else None, values_only=True))
+        metadata = _extraer_metadata(filas)
+        return metadata, [] if solo_metadata else _parse_rows(filas)
+    finally:
+        libro.close()
 
 
 def leer_metadata_archivo(archivo):
@@ -311,7 +317,7 @@ def leer_metadata_archivo(archivo):
     stream = archivo.stream
     posicion = stream.tell()
     try:
-        metadata, _registros = _leer_archivo(archivo)
+        metadata, _registros = _leer_archivo(archivo, solo_metadata=True)
         return metadata
     finally:
         stream.seek(posicion)
@@ -715,6 +721,11 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
             )
             sesiones_creadas = len(sesiones_pendientes)
 
+    from app.services.resultados_persistidos import invalidar_resultados_ficha
+
+    # Las filas nuevas de este importador se insertan en bloque y no pasan por
+    # los eventos ORM. Este incremento asegura que los snapshots queden vencidos.
+    invalidar_resultados_ficha(ficha.id)
     return {
         'ficha': ficha, 'ficha_creada': ficha_creada,
         'metadata': metadata, 'nuevos': nuevos,

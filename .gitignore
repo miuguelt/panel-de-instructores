@@ -195,6 +195,7 @@ logs/
 test-results/
 docker-compose.override.yml
 node_modules/
+tmp/
 # --- end DevBrain repo hygiene ---
 
 # --- DevBrain: rastros de agentes IA (bloque gestionado) ---

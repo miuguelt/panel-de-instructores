@@ -33,6 +33,7 @@ from app.models.archivo_ficha import (
     TIPO_REPORTE_JUICIOS,
 )
 from app.models.observador import NotaObservador
+from app.models.resultado_calculado import ResultadoCalculadoFicha
 
 __all__ = [
     'Instructor', 'Ficha', 'Corte', 'Aprendiz',
@@ -47,4 +48,5 @@ __all__ = [
     'ConfiguracionAseo', 'ContadorAseo', 'TurnoAseo', 'IntercambioAseo',
     'MaterialFicha', 'ImportacionJob', 'ArchivoFichaVersion',
     'TIPO_PLANEACION', 'TIPO_REPORTE_JUICIOS', 'TIPO_PROGRAMA', 'ETIQUETAS_TIPO', 'NotaObservador',
+    'ResultadoCalculadoFicha',
 ]

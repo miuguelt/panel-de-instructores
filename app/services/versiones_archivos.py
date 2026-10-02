@@ -370,8 +370,9 @@ def versiones_ficha(ficha_id, tipo=None):
     ).all()
 
 
-def ultima_version(ficha_id, tipo, solo_procesadas=False):
-    if tipo == TIPO_REPORTE_JUICIOS:
+def ultima_version(ficha_id, tipo, solo_procesadas=False, recuperar_reporte=True):
+    """Consulta la versión registrada; permite omitir la recuperación de archivos heredados."""
+    if tipo == TIPO_REPORTE_JUICIOS and recuperar_reporte:
         asegurar_version_reporte(ficha_id)
     consulta = ArchivoFichaVersion.query.filter_by(ficha_id=ficha_id, tipo=tipo)
     if solo_procesadas:

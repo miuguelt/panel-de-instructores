@@ -11,6 +11,10 @@ class ImportacionJob(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=False, index=True)
+    tipo_trabajo = db.Column(
+        db.String(30), nullable=False, default='importar_reporte',
+        server_default='importar_reporte',
+    )
     aprendiz_administrativo_id = db.Column(
         db.Integer, db.ForeignKey('aprendices.id'), nullable=True, index=True
     )

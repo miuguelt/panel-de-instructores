@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections import defaultdict
+from collections import Counter, defaultdict
 from difflib import SequenceMatcher
+from functools import lru_cache
 
 
 SIMILITUD_MINIMA = 0.9
@@ -25,7 +26,13 @@ def texto_limpio(valor):
 
 def clave_resultado(valor):
     """Normaliza el texto quitando tildes, código inicial y signos."""
-    texto = unicodedata.normalize('NFKD', texto_limpio(valor))
+    return _normalizar_clave(texto_limpio(valor))
+
+
+@lru_cache(maxsize=4096)
+def _normalizar_clave(texto):
+    """Reutiliza únicamente transformaciones de texto, sin guardar datos derivados de la BD."""
+    texto = unicodedata.normalize('NFKD', texto)
     texto = ''.join(c for c in texto if not unicodedata.combining(c)).lower()
     texto = re.sub(r'^\s*\d{4,}\s*[-:]\s*', '', texto)
     return re.sub(r'[^a-z0-9]+', ' ', texto).strip()
@@ -72,8 +79,19 @@ def juicios_de(unidad, por_clave, por_codigo):
         return exactos
     # Solo se acepta una similitud alta y un único candidato para evitar que
     # textos parecidos de resultados distintos se mezclen en el avance.
-    candidatos = [
-        registros for otra_clave, registros in por_clave.items()
-        if SequenceMatcher(None, clave, otra_clave).ratio() >= SIMILITUD_MINIMA
-    ]
-    return candidatos[0] if len(candidatos) == 1 else []
+    candidato = None
+    caracteres = Counter(clave)
+    for otra_clave, registros in por_clave.items():
+        longitud = len(clave) + len(otra_clave)
+        # Las mismas cotas de real_quick_ratio y quick_ratio descartan
+        # imposibles antes de construir el índice costoso de SequenceMatcher.
+        if longitud and 2.0 * min(len(clave), len(otra_clave)) / longitud < SIMILITUD_MINIMA:
+            continue
+        comunes = sum((caracteres & Counter(otra_clave)).values())
+        if longitud and 2.0 * comunes / longitud < SIMILITUD_MINIMA:
+            continue
+        if SequenceMatcher(None, clave, otra_clave).ratio() >= SIMILITUD_MINIMA:
+            if candidato is not None:
+                return []
+            candidato = registros
+    return candidato if candidato is not None else []

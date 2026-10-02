@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
@@ -20,10 +21,17 @@ from app.models import (
 from app.services.archivos import ArchivoService, ErrorArchivo, resolver_archivo_subido
 from app.services.carga_documentos import procesar_carga_unificada
 from app.services.importacion_ficha import ErrorImportacion
+from app.services.importacion_jobs import encolar_recalculo_resumen
 from app.services.panorama_planeacion import construir_panorama
 from app.services.permisos import puede_gestionar_ficha
 from app.services.planeacion import comparar_fuentes, parsear_planeacion
 from app.services.programa_formacion import parsear_programa
+from app.services.resultados_persistidos import (
+    fecha_corte_bogota,
+    guardar_contenido_documento,
+    obtener_contenido_documento,
+    obtener_resultado_persistido,
+)
 from app.services.versiones_archivos import (
     actualizar_estado,
     asegurar_version_reporte,
@@ -48,26 +56,14 @@ def _metadata_ficha(ficha):
     }
 
 
-_CACHE_PROGRAMA_PARSED: dict[tuple, dict] = {}
-
-
 def _programa_vigente(version_programa):
     """Lee el programa cargado sin tumbar la vista si el PDF quedó ilegible."""
     if not version_programa:
         return None
-    clave = (
-        getattr(version_programa, 'id', None),
-        getattr(version_programa, 'tamano_bytes', None),
-        getattr(version_programa, 'hash_sha256', None),
-    )
-    if clave in _CACHE_PROGRAMA_PARSED:
-        return _CACHE_PROGRAMA_PARSED[clave]
     try:
-        ruta = Path(current_app.config['UPLOAD_FOLDER']) / version_programa.ruta_archivo
-        programa = parsear_programa(ruta)
-        if clave[0] is not None:
-            _CACHE_PROGRAMA_PARSED[clave] = programa
-        return programa
+        return obtener_contenido_documento(
+            version_programa, parsear_programa, parser_version='programa-v1',
+        )
     except Exception:
         current_app.logger.exception(
             'No se pudo leer el programa de formación de la versión %s', version_programa.id
@@ -107,14 +103,23 @@ def analisis(ficha_id):
     error_planeacion = None
     if version_planeacion:
         try:
-            ruta = Path(current_app.config['UPLOAD_FOLDER']) / version_planeacion.ruta_archivo
-            contenido = parsear_planeacion(ruta)
-            panorama = construir_panorama(
+            contenido = obtener_contenido_documento(
+                version_planeacion, parsear_planeacion, parser_version='planeacion-v1',
+            )
+            fecha_corte = fecha_corte_bogota()
+            panorama = obtener_resultado_persistido(
                 ficha,
-                contenido,
-                version_planeacion=version_planeacion,
-                version_reporte=version_reporte,
-                programa=programa,
+                'panorama',
+                fecha_corte,
+                [version_planeacion, version_reporte, version_programa],
+                lambda: construir_panorama(
+                    ficha,
+                    contenido,
+                    version_planeacion=version_planeacion,
+                    version_reporte=version_reporte,
+                    programa=programa,
+                    hoy=fecha_corte,
+                ),
             )
         except (OSError, ValueError, KeyError) as exc:
             error_planeacion = f'No se pudo leer la última planeación: {exc}'
@@ -199,8 +204,10 @@ def cargar_planeacion(ficha_id):
                 f'corresponde a la ficha {ficha.codigo}: '
                 + ' '.join(motivos_alineacion)
             )
+        guardar_contenido_documento(version, contenido, 'planeacion-v1')
         actualizar_estado(version, 'procesado', metadata=contenido['metadata'])
         db.session.commit()
+        encolar_recalculo_resumen(ficha.id, current_user.id)
         mensaje = (
             f'Planeación cargada como versión {version.version}. '
             f'Se identificaron {contenido["resumen"]["resultados"]} resultados y '
@@ -253,8 +260,10 @@ def cargar_programa(ficha_id):
                 'Carga bloqueada para proteger los datos. El programa cargado no '
                 'corresponde al de la ficha: ' + ' '.join(alineacion['motivos'])
             )
+        guardar_contenido_documento(version, programa, 'programa-v1')
         actualizar_estado(version, 'procesado', metadata=programa['metadata'])
         db.session.commit()
+        encolar_recalculo_resumen(ficha.id, current_user.id)
         mensaje = (
             f'Programa de formación cargado como versión {version.version}. '
             f'Se leyeron {programa["resumen"]["competencias"]} competencias, '
