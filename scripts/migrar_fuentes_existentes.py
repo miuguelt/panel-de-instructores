@@ -358,17 +358,27 @@ def migrar_fuentes_existentes(app, raiz, aplicar=False):
                     db.session.rollback()
                     resultado['errores'] += 1
 
-            for ficha_id, tipos in fichas_cambiadas.items():
+            fichas_con_reportes = {
+                ficha_id for (ficha_id,) in db.session.query(
+                    ArchivoFichaVersion.ficha_id.distinct(),
+                ).filter_by(tipo=TIPO_REPORTE_JUICIOS).all()
+            }
+            fichas_para_recalcular = set(fichas_cambiadas)
+            for ficha_id in fichas_con_reportes | {
+                ficha_id for ficha_id, tipos in fichas_cambiadas.items()
+                if TIPO_REPORTE_JUICIOS in tipos
+            }:
                 try:
-                    if TIPO_REPORTE_JUICIOS in tipos:
-                        importacion = _reaplicar_reporte_mas_reciente(raiz, ficha_id)
-                        if importacion is not None:
-                            resultado['reportes_reaplicados'] += 1
-                            resultado['filas_con_error'] += len(importacion.get('errores') or [])
+                    importacion = _reaplicar_reporte_mas_reciente(raiz, ficha_id)
+                    if importacion is not None:
+                        resultado['reportes_reaplicados'] += 1
+                        resultado['filas_con_error'] += len(importacion.get('errores') or [])
+                        fichas_para_recalcular.add(ficha_id)
+                    if ficha_id in fichas_para_recalcular:
                         actualizar_alertas_ficha(ficha_id)
                         actualizar_participacion_ficha(ficha_id)
-                    precargar_resultados_ficha(ficha_id)
-                    db.session.commit()
+                        precargar_resultados_ficha(ficha_id)
+                        db.session.commit()
                 except Exception:
                     db.session.rollback()
                     resultado['errores'] += 1
