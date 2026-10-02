@@ -364,6 +364,21 @@ def panel(ficha_id):
         Grupo.activo.is_(True), Grupo.ficha_id == ficha_id
     ).first()
     trabajos_grupo = obtener_trabajos_grupales(aprendiz)
+    from app.services.liga_grupos import obtener_liga_grupos, obtener_resumen_escuadron
+    liga_grupos = obtener_liga_grupos(ficha_id, aprendiz_id=aprendiz.id)
+    mi_escuadron = obtener_resumen_escuadron(ficha_id, aprendiz.id)
+    otorgamientos_grupo = []
+    if grupo_actual:
+        otorgamientos_grupo = (
+            InsigniaOtorgada.query.join(Insignia).options(
+                joinedload(InsigniaOtorgada.insignia)
+            ).filter(
+                InsigniaOtorgada.grupo_id == grupo_actual.id,
+                Insignia.ficha_id == ficha_id,
+            ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
+        )
+        for og in otorgamientos_grupo:
+            ids_obtenidas.add(og.insignia_id)
     from app.models.aseo import TurnoAseo
     turno_hoy = TurnoAseo.query.filter_by(
         ficha_id=ficha_id, fecha=date.today()
@@ -651,6 +666,9 @@ def panel(ficha_id):
                            instructores_aprendiz=instructores_aprendiz,
                            resumen_aprendiz=stats_resumen_aprendiz,
                            grupo_actual=grupo_actual,
+                           liga_grupos=liga_grupos,
+                           mi_escuadron=mi_escuadron,
+                           otorgamientos_grupo=otorgamientos_grupo,
                            trabajos_grupo=trabajos_grupo,
                            curva_rendimiento=curva_rendimiento,
                            advertencias_rendimiento=advertencias_rendimiento,

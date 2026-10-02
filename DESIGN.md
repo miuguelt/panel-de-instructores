@@ -1,9 +1,19 @@
 # Diseño de SENA Control
 
+## Contrato de diseño — cronograma compacto y eventos interactivos (1 de octubre de 2026)
+
+- Dirección visual: visualización de datos integrada al tablero Bento; superficies sólidas y colores del tema vigente.
+- Jerarquía: filtros y leyenda breve → escala temporal con meses y años → fases → resumen compacto y línea de tiempo por competencia.
+- Densidad: el resumen ocupa entre 15 y 19 rem en escritorio. La línea de tiempo recibe el ancho restante; el nombre completo puede ocupar varias líneas. Conteos, acciones y RAP aparecen en el detalle del evento.
+- Interacción: toda la línea de tiempo es un botón accesible. Un clic, Enter o la barra espaciadora abre el detalle del tramo, con fechas planeadas, primera aprobación, cierre real, evaluación, RAP y accesos a aprendices y ficha pedagógica. Escape y «Cerrar» devuelven el foco al evento.
+- Lectura: la barra superior representa el periodo planeado; la inferior muestra la proporción aprobada dentro de ese periodo. El porcentaje no representa una fecha de ejecución. El trimestre actual y la etapa productiva tienen etiquetas explícitas.
+- Adaptación: una columna desde 320 px; dos columnas cuando el contenedor dispone de al menos 800 px. Escala y barras comparten anchura y origen. Los filtros anuncian el conteo, ocultan fases sin coincidencias y permiten restablecer una búsqueda vacía.
+- Verificación: pruebas de renderizado, interacción y cobertura del 100 % de funciones del módulo; revisión en navegador a 320, 390, 768, 1440, 1920 y 2560 px, nombres largos y ancho disponible al 200 %.
+
 ## Contrato de diseño — seguimiento de evaluaciones por tramo (1 de octubre de 2026)
 
 - Dirección visual: tablero Bento con tarjetas operativas, superficies sólidas y tokens institucionales existentes.
-- Jerarquía: competencia y periodo → aprendices evaluados y pendientes → acciones → RAP desplegables con actividad, código y conteos.
+- Jerarquía en el detalle del evento: competencia y periodo → aprendices evaluados y pendientes → acciones → RAP desplegables con actividad, código y conteos.
 - Semántica: evaluado y aprobado se consultan por separado. En un tramo, tener un RAP pendiente impide aparecer como completamente evaluado; la evaluación parcial se identifica expresamente.
 - Detalle: diálogo con selección de RAP, búsqueda por nombre o documento, filtro por instructor registrado y estados pendientes, evaluados y todos. El listado usa tarjetas en orden alfabético con juicio, instructor y fecha por RAP.
 - Celular: una columna desde 320 px; el cronograma aparece bajo el resumen y repite los trimestres. Los controles tienen altura mínima de 44 px y el diálogo cabe en el ancho y alto disponibles.
@@ -26,7 +36,7 @@
 - Jerarquía: filtros → fases y trimestres → nombre y estado de la competencia → horas, RAP y porcentaje aprobado → acción para ver la ficha.
 - Presentación: cada competencia conserva su nombre y metadatos en una tarjeta; el cronograma ocupa el carril temporal. En pantallas estrechas, el nombre de la competencia permanece visible mientras el instructor desplaza los trimestres.
 - Lectura: el porcentaje aprobado se presenta completo junto con la barra visual; las barras dejan de alojar texto que se recortaba según su longitud. El nombre del cronograma, los botones y el detalle de cada barra tienen etiquetas accesibles.
-- Interacción: solo el botón «Ver ficha» abre el detalle de la competencia. El carril desplazable recibe foco de teclado, ofrece una indicación en móvil y limita el desplazamiento al propio cronograma.
+- Interacción vigente: la línea de tiempo abre el detalle del tramo; el botón «Ver ficha», dentro del detalle, abre la ficha pedagógica.
 - Responsive: tarjetas legibles desde 320 px; filtros y acción con altura mínima de 42 px; las columnas temporales usan desplazamiento horizontal interno sin ampliar la página.
 - Alcance: no se cambian los cálculos de porcentaje, periodo, retraso o prioridad ni el filtro existente.
 

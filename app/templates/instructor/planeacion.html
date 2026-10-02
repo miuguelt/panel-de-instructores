@@ -6,8 +6,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion_workspace.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion_evaluaciones.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/planeacion_gantt.css') }}">
 <script src="{{ url_for('static', filename='js/planeacion_navegacion.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/planeacion_evaluaciones.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/planeacion_gantt.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -60,6 +62,7 @@
 
         {% include 'instructor/_planeacion_panorama.html' %}
         {% include 'instructor/_planeacion_mapa.html' %}
+        {% include 'instructor/_planeacion_gantt_detalle.html' %}
         {% include 'instructor/_planeacion_evaluaciones.html' %}
         {% include 'instructor/_planeacion_programa.html' %}
         {% include 'instructor/_planeacion_detalle.html' %}
@@ -376,30 +379,6 @@
     } catch (e) {
         console.error('Error al cargar catálogo pedagógico', e);
     }
-
-    // Filtros interactivos del Gantt
-    const filterBtns = document.querySelectorAll('.pl-filter-btn');
-    const ganttItems = document.querySelectorAll('.pl-gantt-item');
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', function () {
-            filterBtns.forEach(b => b.classList.remove('is-active'));
-            this.classList.add('is-active');
-            const f = this.getAttribute('data-filter');
-            ganttItems.forEach(item => {
-                const type = item.getAttribute('data-type');
-                const status = item.getAttribute('data-status');
-                if (f === 'all') {
-                    item.style.display = '';
-                } else if (f === 'tecnicas') {
-                    item.style.display = (type === 'tecnicas') ? '' : 'none';
-                } else if (f === 'atrasadas') {
-                    item.style.display = (status === 'atrasadas') ? '' : 'none';
-                } else if (f === 'flexibles') {
-                    item.style.display = (type === 'flexibles') ? '' : 'none';
-                }
-            });
-        });
-    });
 
     function normalizarClave(texto) {
         return (texto || '')

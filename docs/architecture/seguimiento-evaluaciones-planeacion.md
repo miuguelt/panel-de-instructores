@@ -30,8 +30,20 @@ El cronograma conserva el orden pedagógico, las fases y el periodo de cada tram
 
 ## Interfaz y verificación
 
-Las tarjetas muestran primero la competencia, el periodo, los conteos de personas y las acciones. Los RAP se despliegan bajo demanda con actividad, código, denominación, conteos e instructores previstos. En celular, el carril temporal se apila bajo la información y repite las etiquetas de trimestre.
+Las tarjetas muestran un resumen compacto con competencia, periodo, estado y aprobación. Toda la línea de tiempo abre el detalle del tramo; allí se consultan fechas, conteos de personas, acciones y RAP con actividad, código, denominación, conteos e instructores previstos. En celular, el carril temporal se apila bajo el resumen y repite las etiquetas de trimestre.
+
+`planeacion_gantt.js` controla el diálogo de eventos y los filtros del cronograma. `_planeacion_gantt_detalle.html` conserva cada tramo en un panel oculto con clave única por fase y posición; no clona controles ni modifica el catálogo de seguimiento. `planeacion_gantt.css` aplica la distribución según el ancho del contenedor. El detalle de aprendices se abre sobre el evento y regresa a su acción al cerrarse. La ficha pedagógica cierra primero el evento para usar el modal compartido de la aplicación.
+
+El paso a la ficha pedagógica espera dos cuadros de renderizado antes de ajustar el foco. Así se completa el cierre nativo y el nuevo control queda disponible; al cerrar la ficha, el foco vuelve al evento. Las pruebas de navegador verifican ambos recorridos y la suite unitaria controla estos cuadros de forma determinista.
 
 El diálogo nativo conserva el foco y el cierre con Escape. Inicia en pendientes, permite seleccionar un RAP, filtrar por evaluador y buscar por nombre o documento sin depender de tildes. Las listas mantienen orden alfabético y el contador anuncia el resultado de los filtros. La ausencia de coincidencias y los errores de lectura tienen mensajes accionables.
 
 Las pruebas de servicio cubren estados, duplicados y agrupación. Las pruebas Flask comprueban la carga real del Excel, datos persistidos, renderizado, actualización y permisos. La suite JavaScript verifica filtros, apertura, cambio de RAP, cierre, datos corruptos y texto seguro; CI exige el 100 % de funciones del módulo y mantiene la compuerta global de Python.
+
+### Criterios del cronograma compacto
+
+1. Dado un tramo, cuando se hace clic en cualquier punto de su línea de tiempo o se activa por teclado, entonces se abre solo su detalle y se conservan sus RAP y evaluaciones.
+2. Dado el detalle abierto, cuando se cierra con Escape, el botón o el fondo, entonces el foco regresa a la línea de tiempo que lo abrió.
+3. Dada una categoría sin coincidencias, cuando se filtra, entonces desaparecen las fases vacías y «Mostrar todas» restablece el cronograma.
+4. Dado un contenedor ancho, cuando se renderiza el cronograma, entonces la línea de tiempo ocupa al menos el doble de ancho que el resumen, se alinea con la escala y la tarjeta de nombre breve no supera 150 px de altura.
+5. Dado un nombre largo, un celular o el ancho disponible al 200 %, cuando se consulta el cronograma, entonces el contenido se ajusta sin desbordar la página.

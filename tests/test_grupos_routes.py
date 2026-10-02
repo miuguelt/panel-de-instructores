@@ -247,3 +247,123 @@ class TestGruposRoutes(unittest.TestCase):
         )
         self.assertEqual(response_sin_datos.status_code, 200)
         self.assertIn(b'Faltan datos', response_sin_datos.data)
+
+    def test_editar_grupo_route_exitoso(self):
+        instructor, ficha = self._crear_instructor_con_ficha('a@example.com', 'A')
+        a1 = Aprendiz(ficha_id=ficha.id, documento='1', nombre='A1', apellidos='B', estado='En formación')
+        a2 = Aprendiz(ficha_id=ficha.id, documento='2', nombre='A2', apellidos='B', estado='En formación')
+        grupo = Grupo(ficha_id=ficha.id, nombre='Grupo 1', activo=True)
+        db.session.add_all([a1, a2, grupo])
+        db.session.flush()
+        db.session.add(GrupoAprendiz(grupo_id=grupo.id, aprendiz_id=a1.id))
+        db.session.commit()
+        self._iniciar_sesion(instructor)
+
+        url = f'/instructor/fichas/{ficha.id}/grupos/{grupo.id}/editar'
+        response = self.client.post(url, data={
+            'nombre': 'Equipo Titanes',
+            'aprendices_ids[]': [str(a2.id)],
+        }, follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Equipo actualizado exitosamente.', response.data)
+        g_act = db.session.get(Grupo, grupo.id)
+        self.assertEqual(g_act.nombre, 'Equipo Titanes')
+        self.assertEqual({ap.id for ap in g_act.aprendices}, {a2.id})
+
+    def test_editar_grupo_route_rechaza_instructor_ajeno_y_grupo_inexistente(self):
+        instructor_a, ficha_a = self._crear_instructor_con_ficha('a@example.com', 'A')
+        _, ficha_b = self._crear_instructor_con_ficha('b@example.com', 'B')
+        grupo_b = Grupo(ficha_id=ficha_b.id, nombre='Grupo B', activo=True)
+        db.session.add(grupo_b)
+        db.session.commit()
+        self._iniciar_sesion(instructor_a)
+
+        # Ficha ajena
+        url_ajena = f'/instructor/fichas/{ficha_b.id}/grupos/{grupo_b.id}/editar'
+        resp_ajena = self.client.post(url_ajena, data={'nombre': 'Nuevo'})
+        self.assertEqual(resp_ajena.status_code, 404)
+
+        # Grupo inexistente
+        url_inexistente = f'/instructor/fichas/{ficha_a.id}/grupos/9999/editar'
+        resp_inexistente = self.client.post(url_inexistente, data={'nombre': 'Nuevo'})
+        self.assertEqual(resp_inexistente.status_code, 404)
+
+    def test_editar_grupo_route_datos_invalidos(self):
+        instructor, ficha = self._crear_instructor_con_ficha('a@example.com', 'A')
+        grupo = Grupo(ficha_id=ficha.id, nombre='Grupo Original', activo=True)
+        db.session.add(grupo)
+        db.session.commit()
+        self._iniciar_sesion(instructor)
+
+        url = f'/instructor/fichas/{ficha.id}/grupos/{grupo.id}/editar'
+        # Nombre vacío
+        response_vacio = self.client.post(url, data={'nombre': '   '}, follow_redirects=True)
+        self.assertEqual(response_vacio.status_code, 200)
+        self.assertIn(b'nombre del grupo no puede estar', response_vacio.data)
+        self.assertEqual(db.session.get(Grupo, grupo.id).nombre, 'Grupo Original')
+
+        # Aprendiz inválido
+        response_inv = self.client.post(url, data={
+            'nombre': 'Valido',
+            'aprendices_ids[]': ['no-numero'],
+        }, follow_redirects=True)
+        self.assertEqual(response_inv.status_code, 200)
+        self.assertIn(b'selecci\xc3\xb3n de aprendices no es v\xc3\xa1lida', response_inv.data)
+
+    def test_crear_grupo_manual_route_exitoso_y_errores(self):
+        instructor, ficha = self._crear_instructor_con_ficha('a@example.com', 'A')
+        _, ficha_b = self._crear_instructor_con_ficha('b@example.com', 'B')
+        a1 = Aprendiz(ficha_id=ficha.id, documento='1', nombre='A1', apellidos='B', estado='En formación')
+        db.session.add(a1)
+        db.session.commit()
+        self._iniciar_sesion(instructor)
+
+        # Crear grupo exitoso con aprendiz
+        url = f'/instructor/fichas/{ficha.id}/grupos/crear'
+        response = self.client.post(url, data={
+            'nombre': 'Equipo Fénix',
+            'aprendices_ids[]': [str(a1.id)],
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Equipo creado exitosamente.', response.data)
+        grupo_creado = Grupo.query.filter_by(ficha_id=ficha.id, nombre='Equipo Fénix').first()
+        self.assertIsNotNone(grupo_creado)
+        self.assertEqual(len(grupo_creado.aprendices), 1)
+
+        # Error en nombre
+        resp_err = self.client.post(url, data={'nombre': ' '}, follow_redirects=True)
+        self.assertEqual(resp_err.status_code, 200)
+        self.assertIn(b'nombre del grupo no puede estar', resp_err.data)
+
+        # Instructor ajeno
+        resp_ajena = self.client.post(f'/instructor/fichas/{ficha_b.id}/grupos/crear', data={'nombre': 'Test'})
+        self.assertEqual(resp_ajena.status_code, 404)
+
+    def test_archivar_grupo_route_exitoso_y_permisos(self):
+        instructor, ficha = self._crear_instructor_con_ficha('a@example.com', 'A')
+        _, ficha_b = self._crear_instructor_con_ficha('b@example.com', 'B')
+        grupo = Grupo(ficha_id=ficha.id, nombre='Grupo Eliminar', activo=True)
+        db.session.add(grupo)
+        db.session.commit()
+        self._iniciar_sesion(instructor)
+
+        # Archivar exitoso
+        url = f'/instructor/fichas/{ficha.id}/grupos/{grupo.id}/archivar'
+        response = self.client.post(url, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Equipo archivado exitosamente.', response.data)
+        self.assertFalse(db.session.get(Grupo, grupo.id).activo)
+
+        # Permiso denegado para otra ficha
+        grupo_b = Grupo(ficha_id=ficha_b.id, nombre='Grupo B', activo=True)
+        db.session.add(grupo_b)
+        db.session.commit()
+        resp_ajena = self.client.post(f'/instructor/fichas/{ficha_b.id}/grupos/{grupo_b.id}/archivar')
+        self.assertEqual(resp_ajena.status_code, 404)
+
+        # Grupo inexistente en ficha autorizada
+        resp_inexistente = self.client.post(f'/instructor/fichas/{ficha.id}/grupos/9999/archivar')
+        self.assertEqual(resp_inexistente.status_code, 404)
+
+

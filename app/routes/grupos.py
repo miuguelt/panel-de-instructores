@@ -1,5 +1,5 @@
 from flask import Blueprint, abort, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import func
 from app import db
 from app.models.ficha import Ficha
@@ -7,7 +7,14 @@ from app.models.grupo import Grupo
 from app.models.aprendiz import Aprendiz, ESTADOS_EN_FORMACION
 from app.models.insignia import Insignia, InsigniaOtorgada
 from app.services.permisos import puede_gestionar_ficha
-from app.services.grupo_service import crear_grupos_aleatorios, archivar_grupos_de_ficha
+from app.services.liga_grupos import obtener_liga_grupos
+from app.services.grupo_service import (
+    crear_grupos_aleatorios,
+    archivar_grupos_de_ficha,
+    archivar_grupo,
+    editar_grupo as editar_grupo_service,
+    crear_grupo_manual as crear_grupo_manual_service,
+)
 
 grupos_bp = Blueprint('grupos', __name__, template_folder='../templates/grupos')
 
@@ -27,7 +34,23 @@ def listar_grupos(ficha_id):
     # Obtener insignias disponibles para la ficha
     insignias = Insignia.query.filter_by(ficha_id=ficha_id, activa=True).order_by(Insignia.nombre).all()
 
-    return render_template('listar_grupos.html', ficha=ficha, grupos=grupos, aprendices=aprendices, insignias=insignias)
+    # Mapa de asignaciones actuales por aprendiz
+    mapa_asignaciones = {}
+    for g in grupos:
+        for ap in g.aprendices:
+            mapa_asignaciones[ap.id] = {
+                'grupo_id': g.id,
+                'grupo_nombre': g.nombre,
+            }
+
+    return render_template(
+        'listar_grupos.html',
+        ficha=ficha,
+        grupos=grupos,
+        aprendices=aprendices,
+        insignias=insignias,
+        mapa_asignaciones=mapa_asignaciones,
+    )
 
 @grupos_bp.route('/fichas/<int:ficha_id>/grupos/generar', methods=['POST'])
 @login_required
@@ -112,11 +135,27 @@ def otorgar_insignia_grupo(ficha_id):
         flash('Esta insignia ya fue otorgada a este grupo.', 'info')
         return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
 
+    inst_id = getattr(current_user, 'id', None)
     io = InsigniaOtorgada(
         grupo_id=grupo.id,
         insignia_id=insignia.id,
+        otorgada_por='instructor',
+        instructor_id=inst_id,
     )
     db.session.add(io)
+
+    from app.services.alertas import registrar_notificacion
+    for ap in grupo.aprendices:
+        registrar_notificacion(
+            destinatario_tipo='aprendiz',
+            destinatario_id=ap.id,
+            mensaje=f'¡Tu equipo "{grupo.nombre}" fue reconocido con la medalla {insignia.icono} {insignia.nombre}!',
+            tipo='logro',
+            clave=f'insignia_grupo_{grupo.id}_{insignia.id}_{ap.id}',
+            ficha_id=ficha_id,
+            url=url_for('aprendiz.panel', ficha_id=ficha_id),
+        )
+
     db.session.commit()
 
     flash('Insignia otorgada al grupo correctamente.', 'success')
@@ -129,20 +168,65 @@ def podio_grupos(ficha_id):
     if not ficha or not puede_gestionar_ficha(ficha):
         abort(404)
 
-    # Calcular podio: sumar el número de insignias otorgadas a cada grupo activo
-    grupos_query = db.session.query(
-        Grupo, 
-        func.count(InsigniaOtorgada.id).label('total_insignias')
-    ).outerjoin(
-        InsigniaOtorgada, Grupo.id == InsigniaOtorgada.grupo_id
-    ).filter(
-        Grupo.ficha_id == ficha_id,
-        Grupo.activo == True
-    ).group_by(
-        Grupo.id
-    ).order_by(
-        func.count(InsigniaOtorgada.id).desc()
-    ).all()
+    ranking_grupos = obtener_liga_grupos(ficha_id)
+    return render_template('podio_grupos.html', ficha=ficha, ranking_grupos=ranking_grupos)
 
-    return render_template('podio_grupos.html', ficha=ficha, ranking_grupos=grupos_query)
+
+@grupos_bp.route('/fichas/<int:ficha_id>/grupos/<int:grupo_id>/editar', methods=['POST'])
+@login_required
+def editar_grupo(ficha_id, grupo_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not ficha or not puede_gestionar_ficha(ficha):
+        abort(404)
+
+    grupo = Grupo.query.filter_by(id=grupo_id, ficha_id=ficha.id, activo=True).first()
+    if not grupo:
+        abort(404)
+
+    nombre = request.form.get('nombre')
+    aprendices_ids = request.form.getlist('aprendices_ids[]')
+
+    try:
+        editar_grupo_service(grupo.id, nombre, aprendices_ids)
+        flash('Equipo actualizado exitosamente.', 'success')
+    except ValueError as exc:
+        flash(str(exc), 'error')
+
+    return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
+
+
+@grupos_bp.route('/fichas/<int:ficha_id>/grupos/crear', methods=['POST'])
+@login_required
+def crear_grupo(ficha_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not ficha or not puede_gestionar_ficha(ficha):
+        abort(404)
+
+    nombre = request.form.get('nombre')
+    aprendices_ids = request.form.getlist('aprendices_ids[]')
+
+    try:
+        crear_grupo_manual_service(ficha.id, nombre, aprendices_ids)
+        flash('Equipo creado exitosamente.', 'success')
+    except ValueError as exc:
+        flash(str(exc), 'error')
+
+    return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
+
+
+@grupos_bp.route('/fichas/<int:ficha_id>/grupos/<int:grupo_id>/archivar', methods=['POST'])
+@login_required
+def archivar_grupo_route(ficha_id, grupo_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not ficha or not puede_gestionar_ficha(ficha):
+        abort(404)
+
+    grupo = Grupo.query.filter_by(id=grupo_id, ficha_id=ficha.id, activo=True).first()
+    if not grupo:
+        abort(404)
+
+    archivar_grupo(grupo.id)
+    flash('Equipo archivado exitosamente.', 'success')
+    return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
+
 

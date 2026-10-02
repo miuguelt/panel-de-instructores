@@ -12,73 +12,13 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from app.models.ranking import PuntajeHistorico
+from app.services.curva_diagnostico import (
+    generar_diagnostico_curva,
+    obtener_ruta_recuperacion_formativa,
+)
 
 
-def construir_curva_svg_aprendiz(
-    puntos: List[Dict[str, Any]],
-    meta_pct: float = 70.0,
-    ancho: float = 600.0,
-    alto: float = 210.0,
-) -> Dict[str, Any]:
-    """Genera coordenadas vectoriales SVG y métricas de renderizado para la curva."""
-    if not puntos:
-        return {
-            'linea_puntaje': '',
-            'poligono_area': '',
-            'y_meta': 70.0,
-            'viewbox': f'0 0 {int(ancho)} {int(alto)}',
-            'marcas_y': [],
-            'x_start': 50.0,
-            'x_end': ancho - 35.0,
-            'y_zero': alto - 35.0,
-            'y_full': 25.0,
-        }
-
-    x_start = 50.0
-    x_end = ancho - 35.0
-    y_zero = alto - 35.0   # 175px para 0%
-    y_full = 25.0          # 25px para 100%
-    y_height = y_zero - y_full  # 150px de recorrido útil
-
-    num_puntos = len(puntos)
-    paso = (x_end - x_start) / max(num_puntos - 1, 1)
-
-    for i, pt in enumerate(puntos):
-        x = round(x_start + i * paso, 1)
-        score = min(max(float(pt.get('puntaje', 0.0)), 0.0), 100.0)
-        y = round(y_zero - (score / 100.0) * y_height, 1)
-        pt['x'] = x
-        pt['y'] = y
-        pt['es_ultimo'] = (i == num_puntos - 1)
-
-    linea_puntaje = ' '.join(f"{p['x']},{p['y']}" for p in puntos)
-    poligono_area = (
-        f"{puntos[0]['x']},{round(y_zero, 1)} "
-        + linea_puntaje
-        + f" {puntos[-1]['x']},{round(y_zero, 1)}"
-    )
-    y_meta = round(y_zero - (meta_pct / 100.0) * y_height, 1)
-
-    marcas_y = [
-        {'valor': 100, 'y': round(y_full, 1)},
-        {'valor': 75, 'y': round(y_zero - 0.75 * y_height, 1)},
-        {'valor': 50, 'y': round(y_zero - 0.50 * y_height, 1)},
-        {'valor': 25, 'y': round(y_zero - 0.25 * y_height, 1)},
-        {'valor': 0, 'y': round(y_zero, 1)},
-    ]
-
-    return {
-        'linea_puntaje': linea_puntaje,
-        'poligono_area': poligono_area,
-        'y_meta': y_meta,
-        'meta_pct': meta_pct,
-        'viewbox': f'0 0 {int(ancho)} {int(alto)}',
-        'marcas_y': marcas_y,
-        'x_start': x_start,
-        'x_end': x_end,
-        'y_zero': y_zero,
-        'y_full': y_full,
-    }
+from app.services.curva_svg import construir_curva_svg_aprendiz
 
 
 def obtener_curva_rendimiento_aprendiz(
@@ -165,6 +105,9 @@ def obtener_curva_rendimiento_aprendiz(
             'distancia_meta': -70.0,
             'nivel_desempeno': 'Sin datos',
             'badge_class': 'badge-secondary',
+            'diagnostico': 'Sin registros históricos disponibles para esta ficha.',
+            'ruta_recuperacion': [],
+            'pilares': {'evidencias': 0.0, 'asistencia': 0.0, 'juicios': 0.0},
             'svg': construir_curva_svg_aprendiz([]),
         }
 
@@ -207,6 +150,8 @@ def obtener_curva_rendimiento_aprendiz(
     pt_actual = ultimo_pt['puntaje']
     distancia_meta = round(pt_actual - 70.0, 1)
     supera_meta = pt_actual >= 70.0
+    mejor_pt = max(p['puntaje'] for p in puntos_raw)
+    peor_pt = min(p['puntaje'] for p in puntos_raw)
 
     if pt_actual >= 85.0:
         nivel_desempeno = 'Excelente'
@@ -221,6 +166,23 @@ def obtener_curva_rendimiento_aprendiz(
         nivel_desempeno = 'Crítico'
         badge_class = 'badge-danger'
 
+    # Diagnóstico pedagógico empático en español de Colombia
+    diagnostico = generar_diagnostico_curva(
+        supera_meta=supera_meta,
+        pt_actual=pt_actual,
+        distancia_meta=distancia_meta,
+        dif=dif,
+        mejor_pt=mejor_pt,
+        tendencia=tendencia,
+    )
+    ruta_recuperacion = obtener_ruta_recuperacion_formativa()
+
+    pilares = {
+        'evidencias': ultimo_pt.get('evidencias', 0.0),
+        'asistencia': ultimo_pt.get('asistencia', 0.0),
+        'juicios': ultimo_pt.get('juicios', 0.0),
+    }
+
     return {
         'tiene_datos': True,
         'puntos': puntos_raw,
@@ -230,12 +192,15 @@ def obtener_curva_rendimiento_aprendiz(
         'tendencia_icono': tendencia_icono,
         'tendencia_clase': tendencia_clase,
         'diferencia_ultimo': dif,
-        'mejor_puntaje': max(p['puntaje'] for p in puntos_raw),
-        'peor_puntaje': min(p['puntaje'] for p in puntos_raw),
+        'mejor_puntaje': mejor_pt,
+        'peor_puntaje': peor_pt,
         'supera_meta': supera_meta,
         'distancia_meta': distancia_meta,
         'nivel_desempeno': nivel_desempeno,
         'badge_class': badge_class,
+        'diagnostico': diagnostico,
+        'ruta_recuperacion': ruta_recuperacion,
+        'pilares': pilares,
         'svg': svg_data,
         'ultimo_punto': ultimo_pt,
     }

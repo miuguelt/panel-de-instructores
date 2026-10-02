@@ -109,12 +109,50 @@ class PlaneacionUXTestCase(unittest.TestCase):
         tarjetas = re.findall(r'<article\b[^>]*class="pl-gantt-row[^>]*>(.*?)</article>', html, re.S)
         self.assertGreater(len(tarjetas), 0)
         for tarjeta in tarjetas:
-            self.assertRegex(tarjeta, r'<button\b[^>]*class="pl-btn-pedagogico"[^>]*aria-label="Abrir ficha pedagógica de [^"]+"')
-            self.assertIn('Ver ficha', tarjeta)
+            self.assertRegex(tarjeta, r'<button\b[^>]*class="pl-gantt-track"[^>]*data-gantt-target="[^"]+"')
+            self.assertIn('Abrir evento de', tarjeta)
             self.assertIn('pl-gantt-progress', tarjeta)
             self.assertIn('% aprobados', tarjeta)
+            self.assertNotIn('pl-gantt-evaluacion', tarjeta)
+            self.assertNotIn('pl-gantt-acciones', tarjeta)
+            self.assertNotIn('pl-gantt-resultados', tarjeta)
         self.assertIn('En celular, el periodo aparece debajo de cada competencia', html)
         self.assertNotRegex(html, r'class="pl-gantt-row[^>]*role="button"')
+
+    def test_eventos_del_cronograma_abren_un_detalle_unico_con_periodo_y_acciones(self):
+        html = self.pagina(con_planeacion=True)
+        destinos = re.findall(r'data-gantt-target="([^"]+)"', html)
+        paneles = re.findall(r'id="([^"]+)"[^>]*data-gantt-detalle', html)
+        self.assertGreater(len(destinos), 0)
+        self.assertEqual(sorted(destinos), sorted(paneles))
+        self.assertEqual(len(paneles), len(set(paneles)))
+        self.assertIn('js/planeacion_gantt.js', html)
+        self.assertRegex(html, r'<dialog[^>]*id="pl-gantt-evento"[^>]*aria-labelledby="pl-gantt-evento-titulo"')
+        self.assertIn('Periodo planeado', html)
+        self.assertIn('Primera aprobación', html)
+        self.assertIn('Ver aprendices', html)
+        self.assertIn('Ver ficha', html)
+        self.assertIn('data-gantt-reset', html)
+        self.assertRegex(html, r'data-filter="all"[^>]*aria-pressed="true"')
+        self.assertRegex(html, r'id="pl-gantt-contador"[^>]*role="status"')
+
+    def test_cronograma_sin_fechas_conserva_el_detalle_sin_inventar_un_periodo(self):
+        from flask import render_template, template_rendered
+        contexto = {}
+        def capturar(sender, template, context, **extra):
+            contexto.update(context)
+        with template_rendered.connected_to(capturar, self.app):
+            self.pagina(con_planeacion=True)
+        self.ficha.fecha_inicio = None
+        self.ficha.fecha_fin = None
+        db.session.commit()
+        from app.services.calendario_formacion import construir_calendario
+        contexto['calendario'] = construir_calendario(self.ficha)
+        with self.app.test_request_context():
+            html = render_template('instructor/_planeacion_mapa.html', **contexto)
+        self.assertIn('data-gantt-target="evento-0-0"', html)
+        self.assertIn('Sin fechas de formación', html)
+        self.assertNotIn('class="pl-gantt-hoy pl-gantt-hoy-local"', html)
 
     def test_cronograma_ofrece_rap_con_conteos_y_detalle_por_aprendiz(self):
         self.pagina(con_planeacion=True)

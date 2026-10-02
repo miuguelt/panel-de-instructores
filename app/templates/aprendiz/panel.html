@@ -1593,16 +1593,97 @@
                 <polyline class="curve-line-poly" points="{{ curva_rendimiento.svg.linea_puntaje }}"></polyline>
                 {% endif %}
 
-                <!-- Puntos en la curva -->
+                <!-- Marcas de fecha en el eje X (distribuidas limpiamente sin solapamiento) -->
+                {% if curva_rendimiento.svg.marcas_x %}
+                <g class="curve-x-axis-marks" aria-hidden="true">
+                    {% for m in curva_rendimiento.svg.marcas_x %}
+                    <line x1="{{ m.x }}" y1="{{ curva_rendimiento.svg.y_zero }}" x2="{{ m.x }}" y2="{{ curva_rendimiento.svg.y_zero + 5 }}" stroke="rgba(148, 163, 184, 0.4)" stroke-width="1"></line>
+                    <text class="curve-date-txt" x="{{ m.x }}" y="{{ curva_rendimiento.svg.y_zero + 18 }}" text-anchor="middle">{{ m.fecha_str }}</text>
+                    {% endfor %}
+                </g>
+                {% endif %}
+
+                <!-- Puntos en la curva interactivos con control de etiquetas de puntaje -->
                 {% for pt in curva_rendimiento.puntos %}
-                <g class="curve-point-item" tabindex="0" role="graphics-symbol" aria-label="Corte {{ pt.fecha_str }}: {{ pt.puntaje }} puntos (Asistencia: {{ pt.asistencia }}%, Evidencias: {{ pt.evidencias }}%)">
-                    <circle class="curve-dot {% if pt.es_ultimo %}curve-dot--current{% endif %}" cx="{{ pt.x }}" cy="{{ pt.y }}" r="{{ 6 if pt.es_ultimo else 4.5 }}"></circle>
-                    <text class="curve-date-txt" x="{{ pt.x }}" y="{{ curva_rendimiento.svg.y_zero + 16 }}" text-anchor="middle">{{ pt.fecha_str }}</text>
+                <g class="curve-point-item" tabindex="0" role="graphics-symbol"
+                   data-fecha="{{ pt.fecha_str }}"
+                   data-puntaje="{{ '%.1f'|format(pt.puntaje) }}"
+                   data-asistencia="{{ '%.0f'|format(pt.asistencia) }}"
+                   data-evidencias="{{ '%.0f'|format(pt.evidencias) }}"
+                   data-estado="{{ pt.estado }}"
+                   aria-label="Corte {{ pt.fecha_str }}: {{ '%.1f'|format(pt.puntaje) }} puntos (Asistencia: {{ '%.0f'|format(pt.asistencia) }}%, Evidencias: {{ '%.0f'|format(pt.evidencias) }}%)">
+                    <circle class="curve-dot {% if pt.es_ultimo %}curve-dot--current{% endif %}" cx="{{ pt.x }}" cy="{{ pt.y }}" r="{{ 6 if pt.es_ultimo else 4 }}"></circle>
+                    {% if pt.mostrar_etiqueta_puntaje %}
                     <text class="curve-score-txt" x="{{ pt.x }}" y="{{ pt.y - 10 }}" text-anchor="middle">{{ '%.1f'|format(pt.puntaje) }}</text>
+                    {% endif %}
                 </g>
                 {% endfor %}
             </svg>
         </div>
+
+        <!-- HUD interactivo de inspección de corte -->
+        <div class="learner-curve-inspector" id="curve-inspector-box" aria-live="polite">
+            <div class="inspector-badge-row">
+                <span class="badge badge-accent">📍 Detalle del Corte</span>
+                <span class="inspector-hint text-muted"><small>Pasa el cursor o selecciona cualquier punto en la curva para inspeccionarlo</small></span>
+            </div>
+            <div class="inspector-data-grid">
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Fecha del corte</span>
+                    <strong class="cell-val" id="inspector-fecha">{{ curva_rendimiento.puntos[-1].fecha_str if curva_rendimiento.puntos else '--' }}</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Puntaje global</span>
+                    <strong class="cell-val text-primary" id="inspector-puntaje">{{ '%.1f'|format(curva_rendimiento.puntaje_actual) }} pts</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Asistencia</span>
+                    <strong class="cell-val" id="inspector-asistencia">{{ '%.0f'|format(curva_rendimiento.puntos[-1].asistencia) if curva_rendimiento.puntos else '--' }}%</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Evidencias</span>
+                    <strong class="cell-val" id="inspector-evidencias">{{ '%.0f'|format(curva_rendimiento.puntos[-1].evidencias) if curva_rendimiento.puntos else '--' }}%</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Estado</span>
+                    <span class="badge badge-info" id="inspector-estado">{{ curva_rendimiento.puntos[-1].estado if curva_rendimiento.puntos else 'Normal' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnóstico Pedagógico y Ruta de Recuperación Empática -->
+        {% if curva_rendimiento.diagnostico %}
+        <div class="learner-curve-diagnosis-card diagnosis--{{ curva_rendimiento.diagnostico.nivel }}">
+            <div class="diagnosis-header">
+                <span class="diagnosis-icon" aria-hidden="true">{{ curva_rendimiento.diagnostico.icono }}</span>
+                <div class="diagnosis-heading">
+                    <span class="eyebrow">{{ curva_rendimiento.diagnostico.titulo }}</span>
+                    <h3 class="diagnosis-title">{{ curva_rendimiento.diagnostico.mensaje }}</h3>
+                </div>
+            </div>
+            <p class="diagnosis-desc">{{ curva_rendimiento.diagnostico.detalle }}</p>
+            <div class="diagnosis-action-pill">
+                <strong>🎯 Recomendación clave:</strong> {{ curva_rendimiento.diagnostico.accion }}
+            </div>
+
+            {% if curva_rendimiento.ruta_recuperacion and curva_rendimiento.ruta_recuperacion.pasos %}
+            <div class="rescue-roadmap-block">
+                <h4 class="rescue-roadmap-title">🗺️ {{ curva_rendimiento.ruta_recuperacion.titulo }}</h4>
+                <p class="rescue-roadmap-desc text-muted"><small>{{ curva_rendimiento.ruta_recuperacion.proposito }}</small></p>
+                <div class="rescue-steps-grid">
+                    {% for paso in curva_rendimiento.ruta_recuperacion.pasos %}
+                    <div class="rescue-step-card">
+                        <div class="rescue-step-badge">Paso {{ paso.paso }}</div>
+                        <h5 class="rescue-step-title">{{ paso.titulo }}</h5>
+                        <p class="rescue-step-desc">{{ paso.descripcion }}</p>
+                        <span class="rescue-step-impact">✨ {{ paso.impacto }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
 
         <!-- Advertencias sobre el Rendimiento Académico -->
         {% if advertencias_rendimiento %}
@@ -1699,6 +1780,107 @@
         </div>
     </section>
     {% endif %}
+
+    <!-- ============================================================ -->
+    <!-- LIGA DE ESCUADRONES Y RETOS EN EQUIPO                       -->
+    <!-- ============================================================ -->
+    <section class="card learner-squad-league" data-learner-tab="rendimiento" id="seccion-liga-grupos">
+        <div class="section-header compact">
+            <div>
+                <span class="eyebrow">Cooperación y Desafíos Colectivos</span>
+                <h2>🛡️ Liga de Escuadrones Formativos</h2>
+                <p class="text-muted"><small>El éxito se construye colaborando. Cada reto cumplido y medalla grupal impulsa a tu equipo en la tabla.</small></p>
+            </div>
+            {% if mi_escuadron %}
+            <span class="badge badge-primary">Tu escuadrón: {{ mi_escuadron.nombre }} {{ mi_escuadron.podio or '' }}</span>
+            {% endif %}
+        </div>
+
+        {% if mi_escuadron %}
+        <!-- Resumen de Mi Escuadrón -->
+        <div class="my-squad-spotlight">
+            <div class="my-squad-banner">
+                <div class="squad-badge-large">{{ mi_escuadron.podio or '🛡️' }}</div>
+                <div class="squad-info">
+                    <h3>{{ mi_escuadron.nombre }}</h3>
+                    <p class="text-muted"><small>Puesto #{{ mi_escuadron.posicion }} en la ficha · {{ mi_escuadron.puntaje_grupo }} pts acumulados</small></p>
+                    <div class="squad-members-chips">
+                        {% for comp in mi_escuadron.companeros %}
+                        <span class="squad-member-pill">{{ comp }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="squad-stats-pills">
+                    <div class="squad-pill-stat">
+                        <span class="stat-number">🏅 {{ mi_escuadron.medallas_count }}</span>
+                        <span class="stat-label">Medallas</span>
+                    </div>
+                    <div class="squad-pill-stat">
+                        <span class="stat-number">📋 {{ mi_escuadron.tareas_entregadas }}</span>
+                        <span class="stat-label">Retos superados</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if otorgamientos_grupo %}
+            <div class="squad-earned-badges">
+                <span class="eyebrow">Condecoraciones del Escuadrón</span>
+                <div class="squad-badges-list">
+                    {% for ot in otorgamientos_grupo %}
+                    <span class="badge badge-gold" title="{{ ot.motivo or 'Reconocimiento grupal' }}">
+                        {{ ot.insignia.icono or '🎖️' }} {{ ot.insignia.nombre }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Tabla de la Liga de Equipos -->
+        <div class="squad-league-table">
+            <div class="squad-league-header-row">
+                <span class="col-pos">Puesto</span>
+                <span class="col-name">Escuadrón</span>
+                <span class="col-stats">Retos y Medallas</span>
+                <span class="col-score">Puntaje</span>
+            </div>
+            {% for g in liga_grupos %}
+            <div class="squad-league-row {% if g.es_mi_grupo %}is-my-squad{% endif %}">
+                <span class="col-pos">
+                    {% if g.podio %}
+                    <span class="podium-medal">{{ g.podio }}</span>
+                    {% else %}
+                    <span class="pos-num">#{{ g.posicion }}</span>
+                    {% endif %}
+                </span>
+                <div class="col-name">
+                    <strong>{{ g.nombre }}</strong>
+                    {% if g.es_mi_grupo %}
+                    <span class="badge badge-accent badge-sm">Mi equipo</span>
+                    {% endif %}
+                    <small class="text-muted d-block">{{ g.miembros_count }} integrantes</small>
+                </div>
+                <div class="col-stats">
+                    <span class="badge badge-ghost" title="Retos grupales entregados">📋 {{ g.tareas_entregadas }}</span>
+                    <span class="badge badge-ghost" title="Medallas colectivas">🏅 {{ g.medallas_count }}</span>
+                    {% if g.insignias %}
+                    <div class="group-mini-medals" aria-label="Medallas ganadas">
+                        {% for ins in g.insignias[:3] %}
+                        <span title="{{ ins.nombre }}">{{ ins.icono }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-score">
+                    <strong class="score-number">{{ g.puntaje_grupo }} pts</strong>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted p-3 text-center">Aún no se han configurado escuadrones o actividades grupales en esta ficha.</p>
+            {% endfor %}
+        </div>
+    </section>
 
     {% if resumen_logros %}
         <div data-learner-tab="rendimiento">
@@ -3569,6 +3751,326 @@
         font-family: inherit;
     }
 
+    /* Inspector de cortes (HUD) */
+    .learner-curve-inspector {
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-divider, #e2e8f0);
+        border-radius: 12px;
+        padding: 0.85rem 1.1rem;
+        margin-top: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    }
+
+    .inspector-badge-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .inspector-data-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .inspector-data-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .inspector-data-cell .cell-label {
+        font-size: 0.75rem;
+        color: var(--text-muted, #64748b);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .inspector-data-cell .cell-val {
+        font-size: 1rem;
+        color: var(--text-primary, #0f172a);
+    }
+
+    /* Tarjeta de Diagnóstico y Ruta de Recuperación */
+    .learner-curve-diagnosis-card {
+        border-radius: 14px;
+        padding: 1.15rem 1.35rem;
+        margin-top: 1rem;
+        border: 1px solid transparent;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+    }
+
+    .learner-curve-diagnosis-card.diagnosis--positivo {
+        background: rgba(57, 169, 0, 0.06);
+        border-color: rgba(57, 169, 0, 0.25);
+    }
+
+    .learner-curve-diagnosis-card.diagnosis--atencion {
+        background: rgba(245, 158, 11, 0.07);
+        border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .learner-curve-diagnosis-card.diagnosis--alerta {
+        background: rgba(239, 68, 68, 0.07);
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .diagnosis-header {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+    }
+
+    .diagnosis-icon {
+        font-size: 2rem;
+        line-height: 1;
+    }
+
+    .diagnosis-heading .eyebrow {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .diagnosis-title {
+        margin: 0.15rem 0 0;
+        font-size: 1.15rem;
+        color: var(--text-primary, #0f172a);
+    }
+
+    .diagnosis-desc {
+        margin: 0;
+        font-size: 0.92rem;
+        line-height: 1.5;
+        color: var(--text-secondary, #334155);
+    }
+
+    .diagnosis-action-pill {
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-divider, #e2e8f0);
+        padding: 0.65rem 0.95rem;
+        border-radius: 8px;
+        font-size: 0.88rem;
+    }
+
+    .rescue-roadmap-block {
+        margin-top: 0.5rem;
+        padding-top: 0.85rem;
+        border-top: 1px dashed rgba(0, 0, 0, 0.1);
+    }
+
+    .rescue-roadmap-title {
+        margin: 0 0 0.2rem;
+        font-size: 1rem;
+        color: var(--text-primary, #0f172a);
+    }
+
+    .rescue-steps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .rescue-step-card {
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-divider, #e2e8f0);
+        border-radius: 10px;
+        padding: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .rescue-step-badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--accent-primary, #39a900);
+    }
+
+    .rescue-step-title {
+        margin: 0;
+        font-size: 0.92rem;
+        color: var(--text-primary, #0f172a);
+    }
+
+    .rescue-step-desc {
+        margin: 0;
+        font-size: 0.82rem;
+        color: var(--text-muted, #64748b);
+        line-height: 1.4;
+    }
+
+    .rescue-step-impact {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--success, #16a34a);
+        margin-top: auto;
+    }
+
+    /* Liga de Escuadrones y Retos en Equipo */
+    .learner-squad-league {
+        margin-top: 1.5rem;
+    }
+
+    .my-squad-spotlight {
+        margin-bottom: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .my-squad-banner {
+        background: linear-gradient(135deg, rgba(57, 169, 0, 0.08) 0%, rgba(14, 165, 233, 0.08) 100%);
+        border: 1px solid rgba(57, 169, 0, 0.2);
+        border-radius: 14px;
+        padding: 1.1rem 1.35rem;
+        display: flex;
+        align-items: center;
+        gap: 1.1rem;
+        flex-wrap: wrap;
+    }
+
+    .squad-badge-large {
+        font-size: 2.2rem;
+        line-height: 1;
+    }
+
+    .squad-info {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .squad-info h3 {
+        margin: 0 0 0.2rem;
+        font-size: 1.25rem;
+        color: var(--text-primary, #0f172a);
+    }
+
+    .squad-members-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.45rem;
+    }
+
+    .squad-member-pill {
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-divider, #e2e8f0);
+        border-radius: 999px;
+        font-size: 0.78rem;
+        padding: 0.15rem 0.6rem;
+        color: var(--text-secondary, #334155);
+    }
+
+    .squad-stats-pills {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .squad-pill-stat {
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-divider, #e2e8f0);
+        border-radius: 10px;
+        padding: 0.5rem 0.85rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .squad-pill-stat .stat-number {
+        font-weight: 700;
+        font-size: 1.05rem;
+        color: var(--text-primary, #0f172a);
+    }
+
+    .squad-pill-stat .stat-label {
+        font-size: 0.72rem;
+        color: var(--text-muted, #64748b);
+    }
+
+    .squad-earned-badges {
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-divider, #e2e8f0);
+        border-radius: 10px;
+        padding: 0.65rem 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .squad-badges-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .squad-league-table {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-divider, #e2e8f0);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .squad-league-header-row {
+        display: grid;
+        grid-template-columns: 60px 1fr 140px 90px;
+        padding: 0.65rem 1rem;
+        background: var(--bg-surface-soft, rgba(0, 0, 0, 0.03));
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-muted, #64748b);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .squad-league-row {
+        display: grid;
+        grid-template-columns: 60px 1fr 140px 90px;
+        padding: 0.75rem 1rem;
+        align-items: center;
+        border-top: 1px solid var(--border-divider, #e2e8f0);
+        background: var(--bg-surface, #ffffff);
+        transition: background 0.15s ease;
+    }
+
+    .squad-league-row:hover {
+        background: rgba(0, 0, 0, 0.015);
+    }
+
+    .squad-league-row.is-my-squad {
+        background: rgba(57, 169, 0, 0.05);
+        border-left: 3px solid var(--accent-primary, #39a900);
+    }
+
+    .podium-medal {
+        font-size: 1.3rem;
+    }
+
+    .group-mini-medals {
+        display: inline-flex;
+        gap: 0.15rem;
+        font-size: 0.95rem;
+        margin-left: 0.35rem;
+        vertical-align: middle;
+    }
+
+    .score-number {
+        font-size: 1rem;
+        color: var(--accent-primary, #39a900);
+    }
+
     .learner-perf-alerts-container,
     .learner-perf-recs-container {
         display: flex;
@@ -4044,8 +4546,37 @@
         // -------------------------------------------------------------
         // 5. INICIALIZACIÓN GENERAL
         // -------------------------------------------------------------
-        loadPreferences();
         updateChipCounts();
+
+        // -------------------------------------------------------------
+        // 4.1 INSPECTOR INTERACTIVO DE LA CURVA DE RENDIMIENTO
+        // -------------------------------------------------------------
+        const curvePoints = document.querySelectorAll('.curve-point-item');
+        const inspFecha = document.getElementById('inspector-fecha');
+        const inspPuntaje = document.getElementById('inspector-puntaje');
+        const inspAsist = document.getElementById('inspector-asistencia');
+        const inspEvid = document.getElementById('inspector-evidencias');
+        const inspEstado = document.getElementById('inspector-estado');
+
+        function updateInspector(pt) {
+            if (!pt) return;
+            const f = pt.getAttribute('data-fecha');
+            const p = pt.getAttribute('data-puntaje');
+            const a = pt.getAttribute('data-asistencia');
+            const e = pt.getAttribute('data-evidencias');
+            const est = pt.getAttribute('data-estado');
+            if (inspFecha && f) inspFecha.textContent = f;
+            if (inspPuntaje && p) inspPuntaje.textContent = p + ' pts';
+            if (inspAsist && a) inspAsist.textContent = a + '%';
+            if (inspEvid && e) inspEvid.textContent = e + '%';
+            if (inspEstado && est) inspEstado.textContent = est;
+        }
+
+        curvePoints.forEach(pt => {
+            pt.addEventListener('mouseenter', () => updateInspector(pt));
+            pt.addEventListener('focus', () => updateInspector(pt));
+            pt.addEventListener('click', () => updateInspector(pt));
+        });
 
         // Determinar pestaña inicial según hash de URL o pestaña guardada
         let initialTab = 'resumen';

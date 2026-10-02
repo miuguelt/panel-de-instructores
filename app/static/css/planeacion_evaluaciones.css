@@ -1,14 +1,4 @@
-/* Cronograma y seguimiento: tarjetas fluidas desde 320 px. */
-.pl-page .pl-gantt { min-width: 0; --pl-label: minmax(0, 40%); }
-.pl-page .pl-gantt-wrap { overflow: visible; padding: 0; border: 0; }
-.pl-page .pl-gantt-scale, .pl-page .pl-gantt-overlay { display: none; }
-.pl-page .pl-gantt-row { grid-template-columns: minmax(0, 1fr); padding: 1rem; gap: 1rem; background: var(--bg-card); border-radius: 16px; margin: .35rem 0; }
-.pl-page .pl-gantt-label { position: static; display: flex; flex-direction: column; align-items: stretch; gap: .7rem; padding: 0; container-type: normal; }
-.pl-page .pl-gantt-name { font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
-.pl-page .pl-gantt-name-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; }
-.pl-page .pl-gantt-name-row .pl-gantt-name { flex: 1 1 15rem; }
-.pl-page .pl-gantt-meta { margin: 0; gap: .4rem; }
-.pl-page .pl-gantt-meta .pl-chip { font-size: .78rem; white-space: normal; }
+/* Seguimiento de evaluaciones y detalle de resultados. */
 .pl-page .pl-badge-critico { border-color: var(--border-divider); color: var(--text-muted); background: var(--bg-surface); }
 .pl-gantt-evaluacion { display: flex; gap: .65rem 1rem; flex-wrap: wrap; padding: .8rem; border: 1px solid var(--border-divider); background: var(--bg-surface); border-radius: 10px; font-size: .86rem; color: var(--text-strong); }
 .pl-gantt-evaluacion strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
@@ -17,13 +7,6 @@
 .pl-gantt-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
 .pl-page .pl-gantt-acciones button { flex: 1 1 8rem; min-height: 44px; border-radius: 10px; white-space: normal; padding: .6rem .8rem; font-size: .86rem; }
 .pl-btn-evaluacion { border: 1px solid var(--accent-primary); background: var(--accent-primary); color: #fff; font-weight: 700; cursor: pointer; }
-.pl-gantt-carril { min-width: 0; align-self: center; }
-.pl-gantt-mobile-scale { display: grid; grid-template-columns: repeat(var(--pl-cols, 8), minmax(0, 1fr)); margin-bottom: .4rem; gap: 2px; }
-.pl-gantt-mobile-scale span { padding: .45rem .1rem; font-size: .7rem; text-align: center; color: var(--text-muted); background: var(--bg-surface); border-radius: 5px; overflow-wrap: anywhere; }
-.pl-gantt-mobile-scale .is-en_curso { color: var(--text-strong); font-weight: 700; background: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-card)); }
-.pl-gantt-carril-nota { font-size: .76rem; color: var(--text-muted); margin: .5rem 0 0; }
-.pl-page .pl-gantt-hoy-local { display: block; z-index: 3; height: 100%; top: 0; left: calc(var(--pl-hoy) * 1%); }
-.pl-page .pl-gantt-bar { min-width: 0; max-width: 100%; }
 .pl-gantt-resultados { grid-column: 1 / -1; border-top: 1px solid var(--border-divider); padding-top: .25rem; min-width: 0; }
 .pl-gantt-resultados summary { cursor: pointer; min-height: 44px; padding: .6rem 0; color: var(--text-strong); font-size: .88rem; font-weight: 600; }
 .pl-gantt-resultados summary span { margin-left: .5rem; color: var(--text-muted); font-weight: 400; }
@@ -72,12 +55,6 @@
     .pl-eval-controles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .pl-eval-busqueda { grid-column: 1 / -1; }
     .pl-eval-lista, .pl-gantt-rap-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 1100px) {
-    .pl-page .pl-gantt-scale { display: grid; }
-    .pl-page .pl-gantt-scale-title { position: static; }
-    .pl-page .pl-gantt-row { grid-template-columns: var(--pl-label) minmax(0, 1fr); padding: 1.2rem; }
-    .pl-gantt-mobile-scale { display: none; }
 }
 @media print {
     .pl-eval-dialog, .pl-gantt-acciones { display: none; }

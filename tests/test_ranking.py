@@ -23,7 +23,11 @@ from app.models import (
     Tarea,
     TurnoAseo,
 )
-from app.services.ranking import actualizar_participacion_ficha, calcular_ranking
+from app.services.ranking import (
+    CATALOGO_INSIGNIAS,
+    actualizar_participacion_ficha,
+    calcular_ranking,
+)
 
 
 class RankingTestCase(unittest.TestCase):
@@ -186,7 +190,10 @@ class RankingTestCase(unittest.TestCase):
             with self.subTest(ruta=ruta):
                 self.assertEqual(cliente.get(ruta, follow_redirects=True).status_code, 200)
 
-        self.assertEqual(Insignia.query.filter_by(ficha_id=self.ficha.id).count(), 9)
+        self.assertEqual(
+            Insignia.query.filter_by(ficha_id=self.ficha.id).count(),
+            len(CATALOGO_INSIGNIAS),
+        )
 
     def test_pdf_de_ranking_agrupa_54_aprendices_en_maximo_dos_paginas(self):
         db.session.add_all([

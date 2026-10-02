@@ -61,6 +61,9 @@ jobs:
       - name: Verificar seguimiento de evaluaciones y cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_evaluaciones.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-evaluaciones.lcov --test tests_js/planeacion_evaluaciones.test.cjs
 
+      - name: Verificar eventos del cronograma y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_gantt.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-gantt.lcov --test tests_js/planeacion_gantt.test.cjs
+
       - name: Verificar modales y ventanas emergentes
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/modal-system.js --test tests_js/modal_system.test.cjs
 
@@ -100,6 +103,7 @@ jobs:
           path: |
             coverage-planeacion.lcov
             coverage-evaluaciones.lcov
+            coverage-gantt.lcov
           if-no-files-found: error
           retention-days: 14
 

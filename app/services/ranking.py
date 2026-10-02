@@ -87,6 +87,38 @@ CATALOGO_INSIGNIAS = (
         'tipo': 'automatica',
         'condicion_json': {},
     },
+    {
+        'codigo': 'RETO_GRUPAL_ORO',
+        'nombre': 'Campeón de Reto Grupal',
+        'descripcion': 'El equipo triunfa en un reto técnico o formativo colaborativo de la ficha.',
+        'icono': '🏆',
+        'tipo': 'manual',
+        'condicion_json': {},
+    },
+    {
+        'codigo': 'SINERGIA_EQUIPO',
+        'nombre': 'Sinergia de Escuadrón',
+        'descripcion': 'El equipo logra entregas colectivas a tiempo y con alta calidad técnica.',
+        'icono': '🤝',
+        'tipo': 'manual',
+        'condicion_json': {},
+    },
+    {
+        'codigo': 'INNOVACION_COLECTIVA',
+        'nombre': 'Innovación en Equipo',
+        'descripcion': 'Desarrollo de una solución destacada por su creatividad y aporte al grupo.',
+        'icono': '💡',
+        'tipo': 'manual',
+        'condicion_json': {},
+    },
+    {
+        'codigo': 'RESURGIMIENTO_HEROICO',
+        'nombre': 'Resurgimiento Heroico',
+        'descripcion': 'Supera un momento adverso y regresa con determinación a la zona de aprobación.',
+        'icono': '🦅',
+        'tipo': 'manual',
+        'condicion_json': {},
+    },
 )
 
 
@@ -271,12 +303,43 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
     tareas_map = {tarea.id: tarea for tarea in tareas}
     entregas_por_aprendiz = defaultdict(dict)
     prorrogas_map = {}
+    from app.models.grupo import Grupo, GrupoAprendiz
+    miembros_por_grupo = defaultdict(list)
+    grupos_activos = Grupo.query.filter_by(ficha_id=ficha_id, activo=True).all()
+    if grupos_activos:
+        for ga in GrupoAprendiz.query.filter(GrupoAprendiz.grupo_id.in_([g.id for g in grupos_activos])).all():
+            miembros_por_grupo[ga.grupo_id].append(ga.aprendiz_id)
+
+    otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
+        Insignia.ficha_id == ficha_id
+    ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
+    insignias_por_aprendiz = defaultdict(list)
+    insignias_grupales_por_aprendiz = defaultdict(list)
+    for otorgamiento in otorgamientos:
+        if otorgamiento.aprendiz_id:
+            insignias_por_aprendiz[otorgamiento.aprendiz_id].append(otorgamiento.insignia)
+        elif otorgamiento.grupo_id and otorgamiento.grupo_id in miembros_por_grupo:
+            for m_id in miembros_por_grupo[otorgamiento.grupo_id]:
+                insignias_grupales_por_aprendiz[m_id].append(otorgamiento.insignia)
+
     if tareas_map:
         entregas = Entrega.query.filter(Entrega.tarea_id.in_(tareas_map)).all()
         for entrega in sorted(entregas, key=lambda item: item.fecha_entrega or ahora):
-            entregas_por_aprendiz[entrega.aprendiz_id].setdefault(
-                entrega.tarea_id, entrega
-            )
+            tarea_obj = tareas_map.get(entrega.tarea_id)
+            if (
+                tarea_obj
+                and tarea_obj.es_grupal
+                and entrega.grupo_id
+                and entrega.grupo_id in miembros_por_grupo
+            ):
+                for miembro_id in miembros_por_grupo[entrega.grupo_id]:
+                    entregas_por_aprendiz[miembro_id].setdefault(
+                        entrega.tarea_id, entrega
+                    )
+            else:
+                entregas_por_aprendiz[entrega.aprendiz_id].setdefault(
+                    entrega.tarea_id, entrega
+                )
         for pr in ProrrogaTarea.query.filter(ProrrogaTarea.tarea_id.in_(tareas_map)).all():
             prorrogas_map[(pr.tarea_id, pr.aprendiz_id)] = pr
 
@@ -463,10 +526,12 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
             if a.estado == 'activa' and a.nivel == 'roja' and a.tipo in ('comite_desercion', 'asistencia')
         )
 
+        medallas_grupo = insignias_grupales_por_aprendiz.get(aprendiz.id, [])
         merito_formativo = (
             (turnos_cumplidos * 1.5)
             + (reconocimientos * 2.0)
             + (planes_cumplidos * 2.0)
+            + (len(medallas_grupo) * 1.5)
             - (llamados_atencion * 2.0)
         )
 
@@ -539,13 +604,6 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         )
     )
 
-    otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
-        Insignia.ficha_id == ficha_id
-    ).order_by(InsigniaOtorgada.fecha_obtencion.desc()).all()
-    insignias_por_aprendiz = defaultdict(list)
-    for otorgamiento in otorgamientos:
-        insignias_por_aprendiz[otorgamiento.aprendiz_id].append(otorgamiento.insignia)
-
     for posicion, fila in enumerate(filas, start=1):
         fila['posicion'] = posicion
         fila['medalla'] = {1: '🥇', 2: '🥈', 3: '🥉'}.get(posicion)
@@ -559,7 +617,12 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         else:
             fila['tendencia'] = 'baja'
             fila['tendencia_icono'] = '↓'
-        fila['insignias'] = insignias_por_aprendiz.get(fila['aprendiz'].id, [])[:4]
+        meds_ind = insignias_por_aprendiz.get(fila['aprendiz'].id, [])
+        meds_grp = insignias_grupales_por_aprendiz.get(fila['aprendiz'].id, [])
+        fila['insignias'] = (meds_ind + meds_grp)[:4]
+        fila['insignias_individuales'] = meds_ind
+        fila['insignias_grupales'] = meds_grp
+        fila['total_insignias_grupales'] = len(meds_grp)
         if config.modo_anonimo_parcial:
             fila['alias'] = _alias_aprendiz(fila['aprendiz'])
         else:

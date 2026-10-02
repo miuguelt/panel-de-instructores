@@ -1,0 +1,64 @@
+{# Detalle bajo demanda: conserva el tramo por fase y los datos ya calculados. #}
+{% macro fecha(valor) -%}
+{{ valor.strftime('%d/%m/%Y') if valor and valor.strftime is defined else (valor or 'Sin registro') }}
+{%- endmacro %}
+<dialog id="pl-gantt-evento" class="pl-eval-dialog pl-gantt-evento" aria-labelledby="pl-gantt-evento-titulo" aria-describedby="pl-gantt-evento-contexto">
+    <div class="pl-eval-panel">
+        <header class="pl-eval-head">
+            <div>
+                <p class="pl-eyebrow">Detalle del cronograma</p>
+                <h2 id="pl-gantt-evento-titulo">Competencia</h2>
+                <p id="pl-gantt-evento-contexto"></p>
+            </div>
+            <button id="pl-gantt-evento-cerrar" type="button" class="pl-eval-close" aria-label="Cerrar detalle del evento">Cerrar</button>
+        </header>
+        {% for fase in linea.fases %}
+        {% set fase_indice = loop.index0 %}
+        {% for competencia in fase.competencias %}
+        <div id="evento-{{ fase_indice }}-{{ loop.index0 }}" data-gantt-detalle
+             data-nombre="{{ competencia.nombre }}" data-contexto="{{ fase.nombre }} · {{ competencia.etiqueta_trimestre }}" hidden>
+            <div class="pl-gantt-meta">
+                <span class="pl-chip">{{ 'Técnica' if competencia.exigible else 'Transversal · periodo sugerido' }}</span>
+                <span class="pl-chip pl-tone-{{ competencia.estado_tono }} is-tone">{{ competencia.estado_label }}</span>
+                <span class="pl-chip">{{ competencia.horas|round|int }} h · {{ competencia.resultados_total }} RAP</span>
+                <span class="pl-chip pl-gantt-progress">{{ competencia.porcentaje_avance }}% aprobados</span>
+                {% if competencia.dias_desfase > 0 %}<span class="pl-gantt-desfase-badge">{{ competencia.dias_desfase }} días de retraso</span>{% endif %}
+            </div>
+            <dl class="pl-gantt-fechas">
+                <div><dt>Periodo planeado</dt><dd>{{ fecha(competencia.fecha_plan_inicio) }} – {{ fecha(competencia.fecha_plan_fin) }}</dd></div>
+                <div><dt>Primera aprobación</dt><dd>{{ fecha(competencia.fecha_primera_aprobacion) }}</dd></div>
+                <div><dt>Cierre real</dt><dd>{{ fecha(competencia.fecha_cierre_real) }}</dd></div>
+            </dl>
+            {% if competencia.evaluacion_resumen is defined %}
+            <div class="pl-gantt-evaluacion" aria-label="Seguimiento de aprendices en este tramo">
+                <span><strong>{{ competencia.evaluacion_resumen.evaluados }}</strong> {{ 'evaluado' if competencia.evaluacion_resumen.evaluados == 1 else 'evaluados' }}</span>
+                <span class="pl-eval-pendientes"><strong>{{ competencia.evaluacion_resumen.pendientes }}</strong> {{ 'pendiente' if competencia.evaluacion_resumen.pendientes == 1 else 'pendientes' }}</span>
+                <small>de {{ competencia.evaluacion_resumen.total }} aprendices · {{ competencia.evaluacion_resumen.parciales }} con evaluación parcial</small>
+            </div>
+            {% endif %}
+            <div class="pl-gantt-acciones">
+                {% if competencia.seguimiento_id is defined %}
+                <button type="button" class="pl-btn-evaluacion" data-evaluacion-target="{{ competencia.seguimiento_id }}" aria-label="Ver aprendices y evaluaciones de {{ competencia.nombre }} en {{ fase.nombre }}">Ver aprendices</button>
+                {% endif %}
+                <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ competencia.nombre }}" aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}">Ver ficha</button>
+            </div>
+            <details class="pl-gantt-resultados">
+                <summary>Resultados de aprendizaje <span>{{ competencia.resultados_total }} RAP</span></summary>
+                <div class="pl-gantt-rap-lista">
+                    {% for resultado in competencia.resultados %}
+                    <article class="pl-gantt-rap">
+                        <small>{{ resultado.actividad }}{% if resultado.rap_codigo %} · Código {{ resultado.rap_codigo }}{% endif %}</small>
+                        <h4>{{ resultado.rap }}</h4>
+                        {% if resultado.evaluacion is defined %}
+                        <p><strong>{{ resultado.evaluacion.resumen.evaluados }}</strong> {{ 'evaluado' if resultado.evaluacion.resumen.evaluados == 1 else 'evaluados' }} · <strong>{{ resultado.evaluacion.resumen.pendientes }}</strong> {{ 'pendiente' if resultado.evaluacion.resumen.pendientes == 1 else 'pendientes' }} de {{ resultado.evaluacion.resumen.total }}</p>
+                        {% endif %}
+                        {% if resultado.instructores %}<p class="pl-note">Instructores previstos: {{ resultado.instructores|join(', ') }}</p>{% endif %}
+                    </article>
+                    {% endfor %}
+                </div>
+            </details>
+        </div>
+        {% endfor %}
+        {% endfor %}
+    </div>
+</dialog>

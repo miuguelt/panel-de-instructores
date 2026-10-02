@@ -323,6 +323,41 @@
         border-color: #f59e0b;
         background: rgba(245, 158, 11, 0.1);
     }
+    .btn-group-action {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-muted);
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        transition: transform .2s, border-color .2s, background .2s, color .2s;
+        flex-shrink: 0;
+    }
+    .btn-group-edit:hover {
+        transform: scale(1.12);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+        background: rgba(57, 169, 0, 0.1);
+    }
+    .btn-outline-danger {
+        background: transparent;
+        border: 1px solid #ef4444;
+        color: #ef4444;
+        cursor: pointer;
+        padding: 6px 12px;
+        transition: all .15s ease;
+        display: inline-flex;
+        align-items: center;
+    }
+    .btn-outline-danger:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+    }
 
     .grupo-members-list {
         padding: 12px 14px;
@@ -535,7 +570,7 @@
 
         <!-- Área Principal Derecha: Tarjetas de Grupos Formados -->
         <main>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <h2 style="font-size:1.15rem;font-weight:700;margin:0;color:var(--text-strong,inherit);">
                         Equipos Activos
@@ -546,6 +581,10 @@
                     </span>
                     {% endif %}
                 </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalCrearGrupo()" style="border-radius:50px;display:inline-flex;align-items:center;gap:6px;font-weight:600;">
+                    <i data-lucide="plus" style="width:15px;height:15px;"></i>
+                    Nuevo Equipo
+                </button>
             </div>
 
             {% if grupos %}
@@ -555,16 +594,21 @@
                 <article class="grupo-card ga-{{ gi }}">
                     <!-- Header de la Card del Grupo -->
                     <div class="grupo-card-header">
-                        <div>
-                            <h3 class="grupo-title">{{ grupo.nombre }}</h3>
+                        <div style="min-width:0;flex-grow:1;margin-right:6px;">
+                            <h3 class="grupo-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ grupo.nombre }}">{{ grupo.nombre }}</h3>
                             <div class="grupo-meta">
                                 <i data-lucide="calendar" style="width:11px;height:11px;"></i>
                                 {{ grupo.creado_en.strftime('%d/%m/%Y') }} &middot; {{ grupo.aprendices|length }} aprendices
                             </div>
                         </div>
-                        <button type="button" class="btn-medal-award" onclick="abrirModalInsignia('{{ grupo.id }}', '{{ grupo.nombre|escape }}')" title="Otorgar medalla a este equipo" aria-label="Otorgar medalla a {{ grupo.nombre }}">
-                            <i data-lucide="medal" style="width:16px;height:16px;"></i>
-                        </button>
+                        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                            <button type="button" class="btn-group-action btn-group-edit" onclick="abrirModalEditarGrupo('{{ grupo.id }}', '{{ grupo.nombre|escape }}', {{ grupo.aprendices|map(attribute='id')|list|tojson }})" title="Editar equipo y aprendices" aria-label="Editar {{ grupo.nombre }}">
+                                <i data-lucide="pencil" style="width:15px;height:15px;"></i>
+                            </button>
+                            <button type="button" class="btn-medal-award" onclick="abrirModalInsignia('{{ grupo.id }}', '{{ grupo.nombre|escape }}')" title="Otorgar medalla a este equipo" aria-label="Otorgar medalla a {{ grupo.nombre }}">
+                                <i data-lucide="medal" style="width:16px;height:16px;"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Miembros del Grupo -->
@@ -575,6 +619,10 @@
                                 {{ aprendiz.nombre[0] }}{{ aprendiz.apellidos[0] if aprendiz.apellidos else '' }}
                             </div>
                             <span class="member-name">{{ aprendiz.nombre }} {{ aprendiz.apellidos }}</span>
+                        </div>
+                        {% else %}
+                        <div style="padding:1rem 0.5rem;text-align:center;color:var(--text-muted);font-size:0.83rem;font-style:italic;">
+                            Sin aprendices asignados. Haz clic en el lápiz para agregarlos.
                         </div>
                         {% endfor %}
                     </div>
@@ -591,13 +639,19 @@
                 <h3 style="font-size:1.15rem;font-weight:700;color:var(--text-strong,inherit);margin-bottom:0.5rem;">
                     No hay equipos activos en esta ficha
                 </h3>
-                <p style="max-width:400px;font-size:0.9rem;line-height:1.55;color:var(--text-muted);margin-bottom:1.5rem;">
-                    Utiliza el generador de la izquierda para seleccionar el número de aprendices por equipo y distribuirlos aleatoriamente de forma equitativa.
+                <p style="max-width:440px;font-size:0.9rem;line-height:1.55;color:var(--text-muted);margin-bottom:1.5rem;">
+                    Puedes distribuir automáticamente los aprendices con el generador de la izquierda o crear equipos y asignar aprendices de forma manual.
                 </p>
-                <button type="button" class="btn btn-primary" onclick="document.getElementById('inputTamanoGrupo').focus()" style="border-radius:50px;padding:8px 24px;">
-                    <i data-lucide="sparkles" style="width:15px;height:15px;margin-right:6px;"></i>
-                    Comenzar distribución
-                </button>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('inputTamanoGrupo').focus()" style="border-radius:50px;padding:8px 24px;">
+                        <i data-lucide="sparkles" style="width:15px;height:15px;margin-right:6px;"></i>
+                        Comenzar distribución
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="abrirModalCrearGrupo()" style="border-radius:50px;padding:8px 20px;">
+                        <i data-lucide="plus" style="width:15px;height:15px;margin-right:6px;"></i>
+                        Crear equipo manual
+                    </button>
+                </div>
             </div>
             {% endif %}
         </main>
@@ -659,8 +713,125 @@
     </div>
 </dialog>
 
+<!-- ═══ 4. Modal Nativo para Editar / Crear Grupo Manualmente ═══ -->
+<dialog id="modalEditarGrupo" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalEditarGrupoTitulo">
+    <div class="app-modal-content" style="max-width: 580px; width: 100%;">
+        <form id="formEditarGrupo" action="" method="POST" class="app-modal-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <header class="app-modal-header">
+                <div class="app-modal-header-copy">
+                    <span class="app-modal-eyebrow" id="modalEditarEyebrow">Gestión Manual de Equipos</span>
+                    <h2 id="modalEditarGrupoTitulo" style="display:flex;align-items:center;gap:8px;">
+                        <i data-lucide="edit-3" id="iconoModalEditar" style="width:20px;height:20px;color:var(--accent-primary);"></i>
+                        <span id="textoModalEditarTitulo">Editar Equipo</span>
+                    </h2>
+                </div>
+                <button type="button" class="app-modal-close" onclick="cerrarModal('modalEditarGrupo')" aria-label="Cerrar modal">&times;</button>
+            </header>
+
+            <div class="app-modal-body">
+                <!-- Campo Nombre del Grupo -->
+                <div style="margin-bottom: 1.25rem;">
+                    <label for="editNombreGrupo" style="display:block;font-size:0.84rem;font-weight:700;color:var(--text-strong);margin-bottom:6px;">
+                        Nombre del Equipo
+                    </label>
+                    <div class="input-pill-group">
+                        <i data-lucide="users" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                        <input type="text" id="editNombreGrupo" name="nombre" required maxlength="100" placeholder="Ej: Equipo Alfa, Grupo 1..." style="font-size:0.92rem;font-weight:600;">
+                    </div>
+                </div>
+
+                <!-- Sección Asignación de Aprendices -->
+                <div style="margin-bottom: 0.75rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+                        <label style="font-size:0.84rem;font-weight:700;color:var(--text-strong);margin:0;">
+                            Asignar Aprendices al Equipo
+                        </label>
+                        <span id="contadorEditSeleccionados" class="badge" style="background:var(--accent-primary);color:white;border-radius:20px;font-size:0.75rem;padding:3px 9px;">
+                            0 seleccionados
+                        </span>
+                    </div>
+
+                    <!-- Buscador en tiempo real dentro del modal -->
+                    <div class="input-pill-group" style="margin-bottom:0.5rem;padding:3px 8px;">
+                        <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                        <input type="text" id="buscadorEditAprendices" placeholder="Buscar aprendiz..." style="font-size:0.82rem;" aria-label="Filtrar aprendices para editar equipo">
+                    </div>
+
+                    <!-- Botones de Acción Rápida -->
+                    <div style="display:flex;gap:6px;margin-bottom:0.6rem;">
+                        <button type="button" onclick="setEditSeleccionados(true)" class="btn btn-secondary btn-sm" style="flex:1;padding:4px 8px;font-size:0.75rem;border-radius:6px;">
+                            Seleccionar Todos
+                        </button>
+                        <button type="button" onclick="setEditSeleccionados(false)" class="btn btn-secondary btn-sm" style="flex:1;padding:4px 8px;font-size:0.75rem;border-radius:6px;">
+                            Deseleccionar Todos
+                        </button>
+                    </div>
+
+                    <!-- Lista de aprendices con checkboxes y estado -->
+                    <div class="aprendices-picker-box" id="listaEditAprendices" style="max-height: 240px;">
+                        {% for aprendiz in aprendices %}
+                        <label class="aprendiz-pick-row edit-aprendiz-row" id="edit-row-{{ aprendiz.id }}" data-aprendiz-id="{{ aprendiz.id }}" style="align-items:flex-start;">
+                            <input type="checkbox" class="chk-edit-aprendiz" name="aprendices_ids[]" value="{{ aprendiz.id }}" onchange="toggleEditItem(this, 'edit-row-{{ aprendiz.id }}')" style="position:absolute;opacity:0;pointer-events:none;">
+                            <div class="custom-check-box" style="margin-top:2px;" aria-hidden="true">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </div>
+                            <div style="display:flex;flex-direction:column;flex-grow:1;min-width:0;">
+                                <span class="aprendiz-pick-name edit-aprendiz-name">
+                                    {{ aprendiz.nombre }} {{ aprendiz.apellidos }}
+                                </span>
+                                <small class="edit-aprendiz-status" id="edit-status-{{ aprendiz.id }}" style="font-size:0.72rem;color:var(--text-muted);">
+                                    Sin equipo asignado
+                                </small>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Nota informativa de reasignación -->
+                <div style="display:flex;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-surface);border:1px solid var(--border-divider);margin-top:0.75rem;">
+                    <i data-lucide="info" style="width:16px;height:16px;color:var(--accent-primary);flex-shrink:0;margin-top:2px;"></i>
+                    <small style="color:var(--text-muted);font-size:0.78rem;line-height:1.4;">
+                        Los aprendices marcados pertenecerán a este equipo. Si un aprendiz ya estaba en otro equipo, se reasignará automáticamente al guardar.
+                    </small>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.25rem;gap:10px;">
+                    <!-- Botón archivar grupo en edición -->
+                    <button type="button" id="btnArchivarDesdeModal" class="btn btn-sm btn-outline-danger" style="display:none;border-radius:8px;font-size:0.8rem;" onclick="ejecutarArchivadoGrupoActual()">
+                        <i data-lucide="trash-2" style="width:14px;height:14px;margin-right:4px;"></i>
+                        Archivar Equipo
+                    </button>
+                    <div style="display:flex;gap:10px;margin-left:auto;">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalEditarGrupo')">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary" style="font-weight:700;border-radius:8px;padding:8px 18px;">
+                            <i data-lucide="check" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;"></i>
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<!-- Formulario oculto auxiliar para archivar grupo -->
+<form id="formArchivarGrupoAuxiliar" action="" method="POST" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
 <script>
 lucide.createIcons();
+
+const fichaId = {{ ficha.id }};
+const mapaAsignaciones = {{ (mapa_asignaciones or {})|tojson }};
+let grupoActualEditandoId = null;
 
 function setTamano(val, btn) {
     document.getElementById('inputTamanoGrupo').value = val;
@@ -668,12 +839,15 @@ function setTamano(val, btn) {
     btn.classList.add('active');
 }
 
-document.getElementById('inputTamanoGrupo').addEventListener('input', function () {
-    const val = parseInt(this.value);
-    document.querySelectorAll('.segmented-btn').forEach(b => {
-        b.classList.toggle('active', parseInt(b.textContent) === val);
+const inputTamano = document.getElementById('inputTamanoGrupo');
+if (inputTamano) {
+    inputTamano.addEventListener('input', function () {
+        const val = parseInt(this.value);
+        document.querySelectorAll('.segmented-btn').forEach(b => {
+            b.classList.toggle('active', parseInt(b.textContent) === val);
+        });
     });
-});
+}
 
 function toggleItem(checkbox, rowId) {
     const row = document.getElementById(rowId);
@@ -684,7 +858,7 @@ function toggleItem(checkbox, rowId) {
 }
 
 function setSeleccionados(valor) {
-    document.querySelectorAll('.chk-aprendiz').forEach(c => {
+    document.querySelectorAll('#form-grupos .chk-aprendiz').forEach(c => {
         const row = c.closest('.aprendiz-pick-row');
         if (row && row.style.display !== 'none') {
             c.checked = valor;
@@ -696,7 +870,7 @@ function setSeleccionados(valor) {
 
 function actualizarContador() {
     let visibles = 0, activos = 0;
-    document.querySelectorAll('.chk-aprendiz').forEach(c => {
+    document.querySelectorAll('#form-grupos .chk-aprendiz').forEach(c => {
         const row = c.closest('.aprendiz-pick-row');
         if (row && row.style.display !== 'none') {
             visibles++;
@@ -722,17 +896,159 @@ function abrirModalInsignia(grupoId, grupoNombre) {
     lucide.createIcons();
 }
 
+function abrirModalEditarGrupo(grupoId, grupoNombre, miembrosIds) {
+    grupoActualEditandoId = parseInt(grupoId, 10);
+    const form = document.getElementById('formEditarGrupo');
+    form.action = `/instructor/fichas/${fichaId}/grupos/${grupoId}/editar`;
+
+    document.getElementById('modalEditarEyebrow').textContent = 'Edición de Equipo';
+    document.getElementById('textoModalEditarTitulo').textContent = `Editar ${grupoNombre}`;
+    document.getElementById('editNombreGrupo').value = grupoNombre;
+
+    const btnArchivar = document.getElementById('btnArchivarDesdeModal');
+    if (btnArchivar) btnArchivar.style.display = 'inline-flex';
+
+    const buscador = document.getElementById('buscadorEditAprendices');
+    if (buscador) buscador.value = '';
+
+    const idsSet = new Set((miembrosIds || []).map(id => parseInt(id, 10)));
+
+    document.querySelectorAll('.chk-edit-aprendiz').forEach(chk => {
+        const aid = parseInt(chk.value, 10);
+        const row = document.getElementById(`edit-row-${aid}`);
+        const statusEl = document.getElementById(`edit-status-${aid}`);
+        const asignacion = mapaAsignaciones[aid];
+        const estaEnEsteGrupo = idsSet.has(aid);
+
+        chk.checked = estaEnEsteGrupo;
+        if (row) {
+            row.style.display = 'flex';
+            row.classList.toggle('selected', estaEnEsteGrupo);
+        }
+
+        if (statusEl) {
+            if (estaEnEsteGrupo) {
+                statusEl.textContent = 'Asignado a este equipo';
+                statusEl.style.color = 'var(--accent-primary)';
+            } else if (asignacion && asignacion.grupo_id !== grupoActualEditandoId) {
+                statusEl.textContent = `En ${asignacion.grupo_nombre} (se transferirá al marcar)`;
+                statusEl.style.color = '#f59e0b';
+            } else {
+                statusEl.textContent = 'Sin equipo asignado';
+                statusEl.style.color = 'var(--text-muted)';
+            }
+        }
+    });
+
+    actualizarContadorEdit();
+    abrirModal('modalEditarGrupo');
+    lucide.createIcons();
+}
+
+function abrirModalCrearGrupo() {
+    grupoActualEditandoId = null;
+    const form = document.getElementById('formEditarGrupo');
+    form.action = `/instructor/fichas/${fichaId}/grupos/crear`;
+
+    document.getElementById('modalEditarEyebrow').textContent = 'Creación Manual';
+    document.getElementById('textoModalEditarTitulo').textContent = 'Nuevo Equipo';
+    document.getElementById('editNombreGrupo').value = '';
+
+    const btnArchivar = document.getElementById('btnArchivarDesdeModal');
+    if (btnArchivar) btnArchivar.style.display = 'none';
+
+    const buscador = document.getElementById('buscadorEditAprendices');
+    if (buscador) buscador.value = '';
+
+    document.querySelectorAll('.chk-edit-aprendiz').forEach(chk => {
+        const aid = parseInt(chk.value, 10);
+        const row = document.getElementById(`edit-row-${aid}`);
+        const statusEl = document.getElementById(`edit-status-${aid}`);
+        const asignacion = mapaAsignaciones[aid];
+
+        chk.checked = false;
+        if (row) {
+            row.style.display = 'flex';
+            row.classList.remove('selected');
+        }
+
+        if (statusEl) {
+            if (asignacion) {
+                statusEl.textContent = `En ${asignacion.grupo_nombre} (se transferirá al marcar)`;
+                statusEl.style.color = '#f59e0b';
+            } else {
+                statusEl.textContent = 'Sin equipo asignado';
+                statusEl.style.color = 'var(--text-muted)';
+            }
+        }
+    });
+
+    actualizarContadorEdit();
+    abrirModal('modalEditarGrupo');
+    lucide.createIcons();
+}
+
+function toggleEditItem(checkbox, rowId) {
+    const row = document.getElementById(rowId);
+    if (row) {
+        row.classList.toggle('selected', checkbox.checked);
+    }
+    actualizarContadorEdit();
+}
+
+function setEditSeleccionados(valor) {
+    document.querySelectorAll('#listaEditAprendices .chk-edit-aprendiz').forEach(c => {
+        const row = c.closest('.edit-aprendiz-row');
+        if (row && row.style.display !== 'none') {
+            c.checked = valor;
+            row.classList.toggle('selected', valor);
+        }
+    });
+    actualizarContadorEdit();
+}
+
+function actualizarContadorEdit() {
+    let activos = 0;
+    document.querySelectorAll('.chk-edit-aprendiz').forEach(c => {
+        if (c.checked) activos++;
+    });
+    const badge = document.getElementById('contadorEditSeleccionados');
+    if (badge) {
+        badge.textContent = `${activos} seleccionados`;
+    }
+}
+
+function ejecutarArchivadoGrupoActual() {
+    if (!grupoActualEditandoId) return;
+    if (confirm('¿Deseas archivar este equipo? Los aprendices quedarán disponibles para otros equipos.')) {
+        const formAux = document.getElementById('formArchivarGrupoAuxiliar');
+        formAux.action = `/instructor/fichas/${fichaId}/grupos/${grupoActualEditandoId}/archivar`;
+        formAux.submit();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     actualizarContador();
     const buscador = document.getElementById('buscadorAprendices');
     if (buscador) {
         buscador.addEventListener('input', function () {
             const term = this.value.toLowerCase().trim();
-            document.querySelectorAll('.aprendiz-pick-row').forEach(item => {
+            document.querySelectorAll('#form-grupos .aprendiz-pick-row').forEach(item => {
                 const nombre = item.querySelector('.aprendiz-pick-name').textContent.toLowerCase();
                 item.style.display = nombre.includes(term) ? 'flex' : 'none';
             });
             actualizarContador();
+        });
+    }
+
+    const buscadorEdit = document.getElementById('buscadorEditAprendices');
+    if (buscadorEdit) {
+        buscadorEdit.addEventListener('input', function () {
+            const term = this.value.toLowerCase().trim();
+            document.querySelectorAll('.edit-aprendiz-row').forEach(item => {
+                const nombre = item.querySelector('.edit-aprendiz-name').textContent.toLowerCase();
+                item.style.display = nombre.includes(term) ? 'flex' : 'none';
+            });
         });
     }
 });
