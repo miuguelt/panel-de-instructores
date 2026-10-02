@@ -15,48 +15,176 @@
         {% for fase in linea.fases %}
         {% set fase_indice = loop.index0 %}
         {% for competencia in fase.competencias %}
-        <div id="evento-{{ fase_indice }}-{{ loop.index0 }}" data-gantt-detalle
+        {% set evento = 'evento-' ~ fase_indice ~ '-' ~ loop.index0 %}
+        <div id="{{ evento }}" data-gantt-detalle
              data-nombre="{{ competencia.nombre }}" data-contexto="{{ fase.nombre }} · {{ competencia.etiqueta_trimestre }}" hidden>
-            <div class="pl-gantt-meta">
-                <span class="pl-chip">{{ 'Técnica' if competencia.exigible else 'Transversal · periodo sugerido' }}</span>
-                <span class="pl-chip pl-tone-{{ competencia.estado_tono }} is-tone">{{ competencia.estado_label }}</span>
-                <span class="pl-chip">{{ competencia.horas|round|int }} h · {{ competencia.resultados_total }} RAP</span>
-                <span class="pl-chip pl-gantt-progress">{{ competencia.porcentaje_avance }}% aprobados</span>
-                {% if competencia.dias_desfase > 0 %}<span class="pl-gantt-desfase-badge">{{ competencia.dias_desfase }} días de retraso</span>{% endif %}
+            <div class="pl-gantt-tabs" role="tablist" aria-label="Información de la competencia">
+                {% for clave, nombre in [('resumen', 'Resumen'), ('resultados', 'Resultados'), ('aprendices', 'Aprendices'), ('pedagogia', 'Ficha pedagógica')] %}
+                <button id="{{ evento }}-{{ clave }}-tab" type="button" role="tab" data-gantt-tab="{{ clave }}" aria-controls="{{ evento }}-{{ clave }}-pane" aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ 0 if loop.first else -1 }}">{{ nombre }}</button>
+                {% endfor %}
             </div>
-            <dl class="pl-gantt-fechas">
-                <div><dt>Periodo planeado</dt><dd>{{ fecha(competencia.fecha_plan_inicio) }} – {{ fecha(competencia.fecha_plan_fin) }}</dd></div>
-                <div><dt>Primera aprobación</dt><dd>{{ fecha(competencia.fecha_primera_aprobacion) }}</dd></div>
-                <div><dt>Cierre real</dt><dd>{{ fecha(competencia.fecha_cierre_real) }}</dd></div>
-            </dl>
-            {% if competencia.evaluacion_resumen is defined %}
-            <div class="pl-gantt-evaluacion" aria-label="Seguimiento de aprendices en este tramo">
-                <span><strong>{{ competencia.evaluacion_resumen.evaluados }}</strong> {{ 'evaluado' if competencia.evaluacion_resumen.evaluados == 1 else 'evaluados' }}</span>
-                <span class="pl-eval-pendientes"><strong>{{ competencia.evaluacion_resumen.pendientes }}</strong> {{ 'pendiente' if competencia.evaluacion_resumen.pendientes == 1 else 'pendientes' }}</span>
-                <small>de {{ competencia.evaluacion_resumen.total }} aprendices · {{ competencia.evaluacion_resumen.parciales }} con evaluación parcial</small>
-            </div>
-            {% endif %}
-            <div class="pl-gantt-acciones">
-                {% if competencia.seguimiento_id is defined %}
-                <button type="button" class="pl-btn-evaluacion" data-evaluacion-target="{{ competencia.seguimiento_id }}" aria-label="Ver aprendices y evaluaciones de {{ competencia.nombre }} en {{ fase.nombre }}">Ver aprendices</button>
+
+            {# Pestaña 1: Resumen con Bento Grid y Barras de Progreso #}
+            <section id="{{ evento }}-resumen-pane" role="tabpanel" aria-labelledby="{{ evento }}-resumen-tab" data-gantt-pane="resumen" tabindex="0">
+                <div class="pl-gantt-meta">
+                    <span class="pl-chip">{{ 'Técnica' if competencia.exigible else 'Transversal · periodo sugerido' }}</span>
+                    <span class="pl-chip pl-tone-{{ competencia.estado_tono }} is-tone">{{ competencia.estado_label }}</span>
+                    <span class="pl-chip">{{ competencia.horas|round|int }} h · {{ competencia.resultados_total }} RAP</span>
+                    <span class="pl-chip pl-gantt-progress">{{ competencia.porcentaje_avance }}% aprobados</span>
+                    {% if competencia.dias_desfase > 0 %}<span class="pl-gantt-desfase-badge">{{ competencia.dias_desfase }} días de retraso</span>{% endif %}
+                </div>
+
+                <div class="pl-gantt-resumen-grid">
+                    {# Bento 1: Avance Formativo y Aprobación #}
+                    <div class="pl-gantt-bento-card">
+                        <header class="pl-bento-head">
+                            <span class="pl-bento-icon">📊</span>
+                            <h4>Avance formativo y aprobación</h4>
+                        </header>
+                        <div class="pl-gantt-progress-head">
+                            <span>Aprendices con competencia aprobada</span>
+                            <strong>{{ competencia.porcentaje_avance }}%</strong>
+                        </div>
+                        <div class="pl-gantt-progress-bar" role="progressbar" aria-valuenow="{{ competencia.porcentaje_avance }}" aria-valuemin="0" aria-valuemax="100">
+                            <div class="pl-gantt-progress-fill pl-tone-{{ competencia.estado_tono }}" style="width: {{ [competencia.porcentaje_avance, 100]|min }}%;"></div>
+                        </div>
+                        <div class="pl-bento-subinfo">
+                            <small class="pl-gantt-texto">Estado actual: <strong>{{ competencia.estado_label }}</strong></small>
+                            {% if competencia.dias_desfase > 0 %}
+                            <small class="pl-tone-danger">⚠️ {{ competencia.dias_desfase }} días de retraso respecto al calendario</small>
+                            {% else %}
+                            <small class="pl-tone-success">✓ Al día según el cronograma lectivo</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {# Bento 2: Distribución de Horas de Formación #}
+                    <div class="pl-gantt-bento-card">
+                        <header class="pl-bento-head">
+                            <span class="pl-bento-icon">⏱️</span>
+                            <h4>Dedicación horaria ({{ competencia.horas|round|int }} h)</h4>
+                        </header>
+                        {% set h_tot = competencia.horas|default(0)|round|int %}
+                        {% set h_dir = competencia.horas_directas|default(0)|round|int %}
+                        {% set h_ind = competencia.horas_independientes|default(0)|round|int %}
+                        {% set p_dir = ((h_dir / h_tot) * 100)|round|int if h_tot > 0 else 50 %}
+                        {% set p_ind = 100 - p_dir if h_tot > 0 else 50 %}
+                        <div class="pl-gantt-progress-head">
+                            <span>Horas con instructor vs trabajo autónomo</span>
+                            <strong>{{ h_dir }} h / {{ h_ind }} h</strong>
+                        </div>
+                        <div class="pl-gantt-bar-split" title="{{ h_dir }} h directas ({{ p_dir }}%) y {{ h_ind }} h autónomas ({{ p_ind }}%)">
+                            <div class="pl-split-seg pl-split-directas" style="width: {{ p_dir }}%;">{{ p_dir }}% directas</div>
+                            <div class="pl-split-seg pl-split-indep" style="width: {{ p_ind }}%;">{{ p_ind }}% autónomas</div>
+                        </div>
+                        <dl class="pl-gantt-fechas pl-fechas-compactas">
+                            <div><dt>Horas con instructor</dt><dd>{{ h_dir }} h</dd></div>
+                            <div><dt>Trabajo independiente</dt><dd>{{ h_ind }} h</dd></div>
+                        </dl>
+                    </div>
+
+                    {# Bento 3: Trazabilidad Cronológica #}
+                    <div class="pl-gantt-bento-card">
+                        <header class="pl-bento-head">
+                            <span class="pl-bento-icon">📅</span>
+                            <h4>Cronograma y periodos clave</h4>
+                        </header>
+                        <dl class="pl-gantt-fechas">
+                            <div><dt>Periodo planeado</dt><dd>{{ fecha(competencia.fecha_plan_inicio) }} – {{ fecha(competencia.fecha_plan_fin) }}</dd></div>
+                            <div><dt>Primera aprobación</dt><dd>{{ fecha(competencia.fecha_primera_aprobacion) }}</dd></div>
+                            <div><dt>Cierre real</dt><dd>{{ fecha(competencia.fecha_cierre_real) }}</dd></div>
+                        </dl>
+                    </div>
+
+                    {# Bento 4: Instructores y Resultados #}
+                    <div class="pl-gantt-bento-card">
+                        <header class="pl-bento-head">
+                            <span class="pl-bento-icon">👨‍🏫</span>
+                            <h4>Equipo ejecutor y cobertura</h4>
+                        </header>
+                        <dt class="pl-gantt-texto" style="font-weight:600;margin-bottom:.3rem;">Instructores previstos</dt>
+                        <p class="pl-gantt-texto">{{ competencia.instructores|join(', ') if competencia.instructores else 'Sin asignación registrada en la planeación.' }}</p>
+                        <p class="pl-gantt-texto" style="margin-top:.5rem;">Esta competencia comprende <strong>{{ competencia.resultados_total }} resultados de aprendizaje</strong> programados en la fase {{ fase.nombre }}.</p>
+                    </div>
+                </div>
+            </section>
+
+            {# Pestaña 2: Aprendices con Cobertura Visual de Evaluaciones #}
+            <section id="{{ evento }}-aprendices-pane" role="tabpanel" aria-labelledby="{{ evento }}-aprendices-tab" data-gantt-pane="aprendices" tabindex="0" hidden>
+                <h3>Evaluaciones de este tramo</h3>
+                {% if competencia.evaluacion_resumen is defined %}
+                {% set ev_total = competencia.evaluacion_resumen.total|default(0) %}
+                {% set ev_eval = competencia.evaluacion_resumen.evaluados|default(0) %}
+                {% set ev_pct = ((ev_eval / ev_total) * 100)|round|int if ev_total > 0 else 0 %}
+                <div class="pl-eval-cobertura-card">
+                    <div class="pl-gantt-progress-head">
+                        <span><strong>Cobertura evaluativa de aprendices</strong></span>
+                        <strong>{{ ev_pct }}% cubierto</strong>
+                    </div>
+                    <div class="pl-gantt-progress-bar" role="progressbar" aria-valuenow="{{ ev_pct }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="pl-gantt-progress-fill pl-tone-{{ 'success' if ev_pct == 100 else ('warning' if ev_pct >= 50 else 'neutral') }}" style="width: {{ [ev_pct, 100]|min }}%;"></div>
+                    </div>
+                </div>
+                <div class="pl-gantt-evaluacion" aria-label="Seguimiento de aprendices en este tramo">
+                    <span><strong>{{ competencia.evaluacion_resumen.evaluados }}</strong> {{ 'evaluado' if competencia.evaluacion_resumen.evaluados == 1 else 'evaluados' }}</span>
+                    <span class="pl-eval-pendientes"><strong>{{ competencia.evaluacion_resumen.pendientes }}</strong> {{ 'pendiente' if competencia.evaluacion_resumen.pendientes == 1 else 'pendientes' }}</span>
+                    <small>de {{ competencia.evaluacion_resumen.total }} aprendices · {{ competencia.evaluacion_resumen.parciales }} con evaluación parcial</small>
+                </div>
                 {% endif %}
-                <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ competencia.nombre }}" aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}">Ver ficha</button>
-            </div>
-            <details class="pl-gantt-resultados">
-                <summary>Resultados de aprendizaje <span>{{ competencia.resultados_total }} RAP</span></summary>
+                <p class="pl-gantt-texto">Consulte los juicios por aprendiz y resultado de aprendizaje, con su fecha y el instructor que los registró. Puede filtrar por estado, resultado o evaluador.</p>
+                <div class="pl-gantt-acciones">
+                    {% if competencia.seguimiento_id is defined %}
+                    <button type="button" class="pl-btn-evaluacion" data-evaluacion-target="{{ competencia.seguimiento_id }}" aria-label="Ver aprendices y evaluaciones de {{ competencia.nombre }} en {{ fase.nombre }}">Ver aprendices</button>
+                    {% endif %}
+                </div>
+            </section>
+
+            {# Pestaña 3: Resultados de Aprendizaje con Barras de Progreso Individuales #}
+            <section id="{{ evento }}-resultados-pane" role="tabpanel" aria-labelledby="{{ evento }}-resultados-tab" data-gantt-pane="resultados" tabindex="0" hidden>
+                <header class="pl-rap-cabecera">
+                    <h3>Resultados de aprendizaje <span class="pl-gantt-texto">{{ competencia.resultados_total }} RAP</span></h3>
+                    <p class="pl-gantt-texto">Avance individual por resultado de aprendizaje, horas curriculares y estado de juicios emitidos.</p>
+                </header>
                 <div class="pl-gantt-rap-lista">
                     {% for resultado in competencia.resultados %}
+                    {% set rap_pct = resultado.porcentaje_avance|default(0) %}
                     <article class="pl-gantt-rap">
-                        <small>{{ resultado.actividad }}{% if resultado.rap_codigo %} · Código {{ resultado.rap_codigo }}{% endif %}</small>
+                        <div class="pl-rap-head">
+                            <small class="pl-rap-actividad">{{ resultado.actividad }}{% if resultado.rap_codigo %} · Código {{ resultado.rap_codigo }}{% endif %}</small>
+                            <span class="pl-chip pl-chip-sm pl-tone-{{ resultado.estado_tono|default('neutral') }} is-tone">{{ resultado.estado_label|default('Sin evaluación') }}</span>
+                        </div>
                         <h4>{{ resultado.rap }}</h4>
+                        
+                        {# Barra de progreso visual por RAP #}
+                        <div class="pl-rap-progress-container">
+                            <div class="pl-gantt-progress-head">
+                                <span>Avance del resultado</span>
+                                <strong>{{ rap_pct }}%</strong>
+                            </div>
+                            <div class="pl-gantt-progress-bar pl-progress-sm" role="progressbar" aria-valuenow="{{ rap_pct }}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="pl-gantt-progress-fill pl-tone-{{ resultado.estado_tono|default('neutral') }}" style="width: {{ [rap_pct, 100]|min }}%;"></div>
+                            </div>
+                        </div>
+
+                        <p>{{ resultado.horas_total|default(0)|round|int }} h · {{ resultado.porcentaje_avance|default(0) }}% aprobado · {{ resultado.estado_label|default('Sin evaluación') }}</p>
                         {% if resultado.evaluacion is defined %}
                         <p><strong>{{ resultado.evaluacion.resumen.evaluados }}</strong> {{ 'evaluado' if resultado.evaluacion.resumen.evaluados == 1 else 'evaluados' }} · <strong>{{ resultado.evaluacion.resumen.pendientes }}</strong> {{ 'pendiente' if resultado.evaluacion.resumen.pendientes == 1 else 'pendientes' }} de {{ resultado.evaluacion.resumen.total }}</p>
                         {% endif %}
                         {% if resultado.instructores %}<p class="pl-note">Instructores previstos: {{ resultado.instructores|join(', ') }}</p>{% endif %}
                     </article>
+                    {% else %}<p class="pl-gantt-texto">La planeación no contiene resultados de aprendizaje para este tramo.</p>
                     {% endfor %}
                 </div>
-            </details>
+            </section>
+
+            {# Pestaña 4: Ficha Pedagógica Oficial #}
+            <section id="{{ evento }}-pedagogia-pane" role="tabpanel" aria-labelledby="{{ evento }}-pedagogia-tab" data-gantt-pane="pedagogia" tabindex="0" hidden>
+                {% set pedagogia = (catalogo_pedagogico|default({})).get(competencia.nombre, {}) %}
+                {% include 'instructor/_planeacion_gantt_pedagogia.html' %}
+                <div class="pl-gantt-acciones">
+                    <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ competencia.nombre }}" aria-label="Abrir ficha pedagógica completa de {{ competencia.nombre }}">Ver ficha completa</button>
+                </div>
+            </section>
         </div>
         {% endfor %}
         {% endfor %}

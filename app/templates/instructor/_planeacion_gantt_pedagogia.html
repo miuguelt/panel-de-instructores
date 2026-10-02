@@ -1,0 +1,159 @@
+{# Usa la correspondencia oficial del catálogo; nunca infiere por parecido de nombres. #}
+{% if pedagogia.codigo_norma or pedagogia.conocimientos_proceso or pedagogia.conocimientos_saber or pedagogia.criterios_evaluacion or pedagogia.perfil_instructor %}
+{% set criterios = pedagogia.get('criterios_evaluacion', []) %}
+{% set procesos = pedagogia.get('conocimientos_proceso', []) %}
+{% set saberes = pedagogia.get('conocimientos_saber', []) %}
+{% set perfil = pedagogia.get('perfil_instructor', {}) %}
+{% set pct_avance = competencia.porcentaje_avance|default(0) %}
+
+<div class="pl-pedagogia-cabecera">
+    <div class="pl-pedagogia-titular">
+        <h3>{{ pedagogia.norma or competencia.nombre }}</h3>
+        <p class="pl-gantt-texto">Programa de formación{% if pedagogia.codigo_norma %} · Código {{ pedagogia.codigo_norma }}{% endif %}{% if pedagogia.horas_programa %} · {{ pedagogia.horas_programa|round|int }} h{% endif %}{% if competencia.horas %} ({{ competencia.horas|round|int }} h en planeación){% endif %}</p>
+    </div>
+
+    {# Tarjetas de métricas pedagógicas con barra de progreso de la competencia #}
+    <div class="pl-pedagogia-metricas-grid">
+        <div class="pl-pedagogia-kpi">
+            <span class="pl-pedagogia-kpi-icono">🎯</span>
+            <div>
+                <strong>{{ criterios|length }}</strong>
+                <small>Criterios de evaluación</small>
+            </div>
+        </div>
+        <div class="pl-pedagogia-kpi">
+            <span class="pl-pedagogia-kpi-icono">⚙️</span>
+            <div>
+                <strong>{{ procesos|length }}</strong>
+                <small>Conocimientos de proceso</small>
+            </div>
+        </div>
+        <div class="pl-pedagogia-kpi">
+            <span class="pl-pedagogia-kpi-icono">📚</span>
+            <div>
+                <strong>{{ saberes|length }}</strong>
+                <small>Conocimientos del saber</small>
+            </div>
+        </div>
+        <div class="pl-pedagogia-kpi pl-pedagogia-kpi-progreso">
+            <div class="pl-gantt-progress-head">
+                <span><strong>Avance de aprobación</strong></span>
+                <strong>{{ pct_avance }}%</strong>
+            </div>
+            <div class="pl-gantt-progress-bar" role="progressbar" aria-valuenow="{{ pct_avance }}" aria-valuemin="0" aria-valuemax="100" title="{{ pct_avance }}% de aprendices aprobados">
+                <div class="pl-gantt-progress-fill pl-tone-{{ competencia.estado_tono|default('neutral') }}" style="width: {{ [pct_avance, 100]|min }}%;"></div>
+            </div>
+            <small class="pl-gantt-texto">{{ competencia.estado_label|default('En seguimiento') }}{% if competencia.dias_desfase > 0 %} · {{ competencia.dias_desfase }} d retraso{% endif %}</small>
+        </div>
+    </div>
+
+    {# Barra de herramientas: buscador interactivo y selector de secciones #}
+    <div class="pl-pedagogia-toolbar">
+        <div class="pl-pedagogia-search-box">
+            <span class="pl-search-icon" aria-hidden="true">🔍</span>
+            <input type="search" class="pl-pedagogia-search" placeholder="Buscar en criterios, saberes o procesos..." aria-label="Buscar en la ficha pedagógica">
+            <span class="pl-pedagogia-match-count" aria-live="polite"></span>
+        </div>
+        <div class="pl-pedagogia-filtros" role="group" aria-label="Filtrar secciones pedagógicas">
+            <button type="button" class="pl-pedagogia-filter-btn is-active" data-pedagogia-filtro="todos" aria-pressed="true">Todo el catálogo</button>
+            <button type="button" class="pl-pedagogia-filter-btn" data-pedagogia-filtro="criterios" aria-pressed="false">🎯 Criterios ({{ criterios|length }})</button>
+            <button type="button" class="pl-pedagogia-filter-btn" data-pedagogia-filtro="procesos" aria-pressed="false">⚙️ Procesos ({{ procesos|length }})</button>
+            <button type="button" class="pl-pedagogia-filter-btn" data-pedagogia-filtro="saberes" aria-pressed="false">📚 Saberes ({{ saberes|length }})</button>
+            {% if perfil.requisitos_academicos or perfil.experiencia or perfil.competencias %}
+            <button type="button" class="pl-pedagogia-filter-btn" data-pedagogia-filtro="perfil" aria-pressed="false">👨‍🏫 Perfil docente</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="pl-gantt-pedagogia">
+    {# Columna 1: Criterios de evaluación (destacada para la labor evaluativa) #}
+    <article class="pl-pedagogia-col-criterios" data-pedagogia-seccion="criterios">
+        <header class="pl-pedagogia-sec-head">
+            <h4>🎯 Criterios de evaluación</h4>
+            <span class="pl-chip pl-chip-sm">{{ criterios|length }} verificables</span>
+        </header>
+        <p class="pl-pedagogia-sec-desc">Pautas y evidencias oficiales para determinar si el aprendiz alcanzó los resultados de aprendizaje.</p>
+        <ul class="pl-pedagogia-criterios-lista">
+            {% for texto in criterios %}
+            <li class="pl-pedagogia-item pl-pedagogia-criterio-card">
+                <span class="pl-criterio-tag">Criterio {{ loop.index }}</span>
+                <p>{{ texto }}</p>
+            </li>
+            {% else %}
+            <li class="pl-pedagogia-item">Sin información registrada en el programa de formación.</li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    {# Columna 2: Conocimientos de proceso #}
+    <article data-pedagogia-seccion="procesos">
+        <header class="pl-pedagogia-sec-head">
+            <h4>⚙️ Conocimientos de proceso</h4>
+            <span class="pl-chip pl-chip-sm">{{ procesos|length }} acciones</span>
+        </header>
+        <p class="pl-pedagogia-sec-desc">Habilidades, procedimientos y destrezas prácticas que el aprendiz aplica en las actividades.</p>
+        <ul class="pl-pedagogia-lista">
+            {% for texto in procesos %}
+            {% if texto.strip().endswith(':') %}
+            <li class="pl-pedagogia-item pl-pedagogia-subtitulo"><strong>{{ texto }}</strong></li>
+            {% else %}
+            <li class="pl-pedagogia-item">{{ texto }}</li>
+            {% endif %}
+            {% else %}
+            <li class="pl-pedagogia-item">Sin información registrada en el programa de formación.</li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    {# Columna 3: Conocimientos del saber #}
+    <article data-pedagogia-seccion="saberes">
+        <header class="pl-pedagogia-sec-head">
+            <h4>📚 Conocimientos del saber</h4>
+            <span class="pl-chip pl-chip-sm">{{ saberes|length }} conceptos</span>
+        </header>
+        <p class="pl-pedagogia-sec-desc">Fundamentos conceptuales, teorías, estándares y tecnologías que sustentan el aprendizaje.</p>
+        <ul class="pl-pedagogia-lista">
+            {% for texto in saberes %}
+            {% if texto.strip().endswith(':') %}
+            <li class="pl-pedagogia-item pl-pedagogia-subtitulo"><strong>{{ texto }}</strong></li>
+            {% else %}
+            <li class="pl-pedagogia-item">{{ texto }}</li>
+            {% endif %}
+            {% else %}
+            <li class="pl-pedagogia-item">Sin información registrada en el programa de formación.</li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    {# Tarjeta completa: Perfil del instructor #}
+    <article class="pl-pedagogia-perfil-card" data-pedagogia-seccion="perfil">
+        <header class="pl-pedagogia-sec-head">
+            <h4>👨‍🏫 Perfil del instructor</h4>
+            <span class="pl-chip pl-chip-sm">Requisitos normativos</span>
+        </header>
+        <div class="pl-pedagogia-perfil-grid">
+            <div class="pl-perfil-bloque">
+                <dt>Requisitos académicos</dt>
+                <dd>{{ perfil.requisitos_academicos or 'Sin información registrada.' }}</dd>
+            </div>
+            <div class="pl-perfil-bloque">
+                <dt>Experiencia</dt>
+                <dd>{{ perfil.experiencia or 'Sin información registrada.' }}</dd>
+            </div>
+        </div>
+        {% if perfil.competencias %}
+        <div class="pl-perfil-competencias">
+            <dt>Competencias requeridas</dt>
+            <ul>{% for texto in perfil.competencias %}<li class="pl-pedagogia-item">{{ texto }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+    </article>
+</div>
+{% else %}
+<div class="pl-gantt-vacio">
+    <h3>Ficha pedagógica pendiente</h3>
+    <p>El programa de formación no tiene información pedagógica asociada a esta competencia.</p>
+    <p>Cargue el programa de formación en «Archivos» para consultar los saberes, los criterios de evaluación y el perfil del instructor.</p>
+</div>
+{% endif %}

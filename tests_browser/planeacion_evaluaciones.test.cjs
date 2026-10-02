@@ -35,6 +35,7 @@ test('El recorrido real muestra juicios, RAP, filtros y foco de teclado', async 
     page.on('pageerror', error => errores.push(error.message));
     await page.goto(url);
     await page.locator('[data-gantt-target="evento-0-0"]').click();
+    await page.locator('#evento-0-0 [data-gantt-tab="aprendices"]').click();
     await page.locator('[data-evaluacion-target="tramo-0"]').click();
     assert.equal(await page.locator('#pl-evaluaciones').evaluate(d => d.open), true, JSON.stringify(errores));
     assert.match(await page.locator('#pl-evaluaciones-contador').innerText(), /2 de 3/);
@@ -68,6 +69,7 @@ test('El recorrido real muestra juicios, RAP, filtros y foco de teclado', async 
     await page.keyboard.press('Escape');
     assert.equal(await page.evaluate(() => document.activeElement.dataset.ganttTarget), 'evento-0-0');
     await page.locator('[data-gantt-target="evento-1-0"]').click();
+    await page.locator('#evento-1-0 [data-gantt-tab="aprendices"]').click();
     await page.locator('[data-evaluacion-target="tramo-1"]').click();
     assert.match(await page.locator('#pl-evaluaciones-contexto').innerText(), /PLANEACIÓN/);
     assert.equal(await page.locator('#pl-evaluaciones-rap option').count(), 2);
@@ -82,9 +84,10 @@ test('Las tarjetas, los RAP y el diálogo caben desde 320 px y al ampliar al 200
         const page = await browser.newPage({ viewport: { width, height: 1000 } });
         await page.goto(url);
         await page.locator('[data-gantt-target="evento-0-0"]').click();
-        await page.locator('.pl-gantt-resultados').first().locator('summary').click();
+        await page.locator('#evento-0-0 [data-gantt-tab="resultados"]').click();
         assert.equal(await page.locator('.pl-gantt-rap h4').first().isVisible(), true);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `La página desborda a ${width} px: ` + JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1 && e.getBoundingClientRect().width > 0).slice(0, 15).map(e => ({ tag: e.tagName, clase: e.className, ancho: e.getBoundingClientRect().width, derecha: e.getBoundingClientRect().right })))));
+        await page.locator('#evento-0-0 [data-gantt-tab="aprendices"]').click();
         await page.locator('[data-evaluacion-target="tramo-0"]').click();
         const medidas = await page.locator('#pl-evaluaciones').evaluate(d => ({ width: d.getBoundingClientRect().width, scroll: d.scrollWidth, client: d.clientWidth }));
         assert.ok(medidas.width <= width && medidas.scroll <= medidas.client + 1, `El diálogo desborda a ${width} px`);
@@ -143,16 +146,70 @@ test('El cronograma reserva el ancho para la línea de tiempo y abre eventos des
     await page.locator('#pl-gantt-evento-cerrar').click();
     await page.keyboard.press('Space');
     assert.equal(await page.locator('#pl-gantt-evento').evaluate(e => e.open), true);
+    await page.locator('#evento-0-0 [data-gantt-tab="pedagogia"]').click();
     await page.locator('#evento-0-0 [data-pedagogico-target]').click();
     assert.equal(await page.locator('#pl-gantt-evento').evaluate(e => e.open), false);
+    await page.waitForFunction(() => document.querySelector('#modal-pedagogico').getAttribute('aria-hidden') === 'false', null, { timeout: 2000 });
     assert.equal(await page.locator('#modal-pedagogico').getAttribute('aria-hidden'), 'false');
     await page.waitForFunction(() => document.querySelector('#modal-pedagogico').contains(document.activeElement), null, { timeout: 2000 });
     assert.equal(await page.evaluate(() => document.querySelector('#modal-pedagogico').contains(document.activeElement)), true);
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.activeElement.dataset.ganttTarget === 'evento-0-0', null, { timeout: 2000 });
     assert.equal(await page.evaluate(() => document.activeElement.dataset.ganttTarget), 'evento-0-0');
+    for (let repeticion = 0; repeticion < 3; repeticion++) {
+        await track.click();
+        await page.locator('#evento-0-0 [data-gantt-tab="pedagogia"]').click();
+        await page.locator('#evento-0-0 [data-pedagogico-target]').click();
+        await page.waitForFunction(() => document.querySelector('#modal-pedagogico').contains(document.activeElement), null, { timeout: 2000 });
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => document.activeElement.dataset.ganttTarget === 'evento-0-0', null, { timeout: 2000 });
+    }
     assert.deepEqual(errores, []);
     await page.close();
+});
+
+test('Ocultar la columna amplía el calendario, conserva los nombres y permite navegar las pestañas', async () => {
+    for (const width of [320, 390, 768, 1440, 1920, 2560]) {
+        const page = await browser.newPage({ viewport: { width, height: 1000 } });
+        await page.goto(url);
+        const control = page.locator('#pl-gantt-columnas');
+        assert.equal(await control.count(), 1, 'El cronograma necesita un control para la columna');
+        assert.ok(await page.locator('#contenido-principal').evaluate(e => e.getBoundingClientRect().width >= innerWidth * .95), 'La vista debe usar el ancho de pantalla');
+        if (width >= 800) await control.click();
+        assert.equal(await control.getAttribute('aria-expanded'), 'false');
+        assert.equal(await page.locator('.pl-gantt-label').first().isVisible(), false);
+        const fila = page.locator('.pl-gantt-row').first();
+        assert.match(await fila.locator('.pl-gantt-evento-nombre').innerText(), /Inducción/);
+        assert.ok(await fila.evaluate(e => e.querySelector('.pl-gantt-track').getBoundingClientRect().width >= e.clientWidth - 36), 'El evento debe usar todo el carril');
+        if (width >= 1440) assert.ok(await fila.evaluate(e => e.clientHeight <= 120), 'La fila colapsada debe ser compacta: ' + await fila.evaluate(e => e.clientHeight));
+        if (width === 1440) await page.locator('#seccion-gantt').screenshot({ path: path.join(raiz, 'test-results', 'cronograma-sin-columna.png'), style: '.app-header, .pl-subnav, .app-notice-region, .skip-link { opacity: 0 !important; }' });
+        await control.click();
+        assert.equal(await page.locator('.pl-gantt-label').first().isVisible(), true);
+        await fila.locator('.pl-gantt-track').click();
+        const tabs = page.locator('#evento-0-0 [role="tab"]');
+        assert.equal(await tabs.count(), 4);
+        await tabs.first().focus();
+        await page.keyboard.press('ArrowRight');
+        assert.equal(await tabs.nth(1).getAttribute('aria-selected'), 'true');
+        assert.equal(await page.locator('#evento-0-0-resultados-pane').isVisible(), true);
+        assert.equal(await page.locator('#evento-0-0-resumen-pane').isVisible(), false);
+        await page.keyboard.press('End');
+        assert.equal(await tabs.nth(3).getAttribute('aria-selected'), 'true');
+        assert.match(await page.locator('#evento-0-0-pedagogia-pane').innerText(), /programa de formación/i);
+        await page.keyboard.press('Home');
+        assert.equal(await tabs.first().getAttribute('aria-selected'), 'true');
+        for (const tab of await tabs.all()) {
+            await tab.click();
+            assert.equal(await page.locator('#evento-0-0 [role="tabpanel"]:visible').count(), 1);
+            assert.ok(await tab.evaluate(e => e.getBoundingClientRect().height >= 44));
+            assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        }
+        if (width === 390) await page.locator('#pl-gantt-evento').screenshot({ path: path.join(raiz, 'test-results', 'cronograma-pestanas-mobile.png') });
+        await page.keyboard.press('Escape');
+        await fila.locator('.pl-gantt-track').click();
+        assert.equal(await tabs.first().getAttribute('aria-selected'), 'true');
+        await page.close();
+    }
 });
 
 test('Los filtros ocultan las fases sin coincidencias y el estado vacío permite volver al cronograma', async () => {

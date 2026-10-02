@@ -23,8 +23,9 @@
             <span><i class="pl-gantt-muestra-hoy" aria-hidden="true"></i> Hoy</span>
         </div>
         <span id="pl-gantt-contador" role="status" aria-live="polite" aria-atomic="true">{{ linea.competencias|length }} competencias</span>
+        <button id="pl-gantt-columnas" type="button" aria-controls="pl-gantt-cronograma" aria-expanded="true" aria-pressed="false">Ocultar columna</button>
     </div>
-    <div class="pl-gantt-wrap" role="region" aria-label="Cronograma planificado y avance por trimestre" tabindex="0">
+    <div class="pl-gantt-wrap" id="pl-gantt-cronograma" role="region" aria-label="Cronograma planificado y avance por trimestre" tabindex="0">
         <div class="pl-gantt" style="--pl-cols: {{ calendario.bloques|length or 1 }}">
             {% if calendario.bloques %}
             <div class="pl-gantt-scale">
@@ -63,6 +64,7 @@
                             </div>
                         </div>
                         <div class="pl-gantt-carril">
+                            <p class="pl-gantt-evento-nombre"><strong>{{ competencia.nombre }}</strong><span class="pl-tone-{{ competencia.estado_tono }}">{{ competencia.porcentaje_avance }}% aprobado · {{ competencia.estado_label }}</span></p>
                             {% if calendario.bloques %}<div class="pl-gantt-mobile-scale" aria-hidden="true">
                                 {% for bloque in calendario.bloques %}<span class="{{ 'is-en_curso' if bloque.estado == 'en_curso' }}" title="{{ periodo(bloque) }}">{{ bloque.etiqueta }}</span>{% endfor %}
                             </div>{% endif %}
@@ -89,7 +91,7 @@
         <p>Seleccione otra categoría para consultar el cronograma.</p>
         <button type="button" class="pl-btn-pedagogico" data-gantt-reset>Mostrar todas</button>
     </div>
-    <p class="pl-gantt-hint">En celular, el periodo aparece debajo de cada competencia. Toque la línea de tiempo para consultar el detalle.</p>
+    <p class="pl-gantt-hint">Toque un evento para abrir su información. Use «Mostrar columna» para consultar el resumen junto al calendario.</p>
 </section>
 
 <section class="pl-card" id="seccion-riesgos">

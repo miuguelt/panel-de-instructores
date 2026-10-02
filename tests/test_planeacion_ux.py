@@ -116,7 +116,7 @@ class PlaneacionUXTestCase(unittest.TestCase):
             self.assertNotIn('pl-gantt-evaluacion', tarjeta)
             self.assertNotIn('pl-gantt-acciones', tarjeta)
             self.assertNotIn('pl-gantt-resultados', tarjeta)
-        self.assertIn('En celular, el periodo aparece debajo de cada competencia', html)
+        self.assertIn('Toque un evento para abrir su información.', html)
         self.assertNotRegex(html, r'class="pl-gantt-row[^>]*role="button"')
 
     def test_eventos_del_cronograma_abren_un_detalle_unico_con_periodo_y_acciones(self):
@@ -153,6 +153,41 @@ class PlaneacionUXTestCase(unittest.TestCase):
         self.assertIn('data-gantt-target="evento-0-0"', html)
         self.assertIn('Sin fechas de formación', html)
         self.assertNotIn('class="pl-gantt-hoy pl-gantt-hoy-local"', html)
+
+    def test_eventos_separan_la_informacion_en_pestanas_con_relaciones_accesibles(self):
+        html = self.pagina(con_planeacion=True)
+        self.assertIn('class="pl-planeacion-ancha"', html)
+        self.assertRegex(html, r'id="pl-gantt-columnas"[^>]*aria-controls="pl-gantt-cronograma"')
+        self.assertIn('class="pl-gantt-evento-nombre"', html)
+        destinos = re.findall(r'data-gantt-target="([^"]+)"', html)
+        for destino in destinos:
+            for pestana in ['resumen', 'resultados', 'aprendices', 'pedagogia']:
+                identificador = f'{destino}-{pestana}'
+                self.assertIn(f'id="{identificador}-tab"', html)
+                self.assertIn(f'aria-controls="{identificador}-pane"', html)
+                self.assertRegex(html, rf'id="{identificador}-pane"[^>]*role="tabpanel"[^>]*aria-labelledby="{identificador}-tab"')
+        self.assertIn('El programa de formación no tiene información pedagógica asociada a esta competencia.', html)
+
+    def test_pestana_pedagogica_conserva_los_datos_oficiales_y_escapa_el_contenido(self):
+        from flask import render_template, template_rendered
+        contexto = {}
+        def capturar(sender, template, context, **extra):
+            contexto.update(context)
+        with template_rendered.connected_to(capturar, self.app):
+            self.pagina(con_planeacion=True)
+        nombre = contexto['linea']['fases'][0]['competencias'][0]['nombre']
+        contexto['catalogo_pedagogico'] = {nombre: {
+            'norma': 'Norma oficial de prueba', 'codigo_norma': '123456789', 'horas_programa': 48,
+            'conocimientos_proceso': ['Proceso <script>alert(1)</script>'],
+            'conocimientos_saber': ['Saber de prueba'], 'criterios_evaluacion': ['Criterio de prueba'],
+            'perfil_instructor': {'requisitos_academicos': 'Formación de prueba'},
+        }}
+        with self.app.test_request_context():
+            html = render_template('instructor/_planeacion_gantt_detalle.html', **contexto)
+        for dato in ['Norma oficial de prueba', '123456789', '48 h', 'Saber de prueba', 'Criterio de prueba', 'Formación de prueba']:
+            self.assertIn(dato, html)
+        self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', html)
+        self.assertNotIn('<script>alert(1)</script>', html)
 
     def test_cronograma_ofrece_rap_con_conteos_y_detalle_por_aprendiz(self):
         self.pagina(con_planeacion=True)
@@ -248,3 +283,30 @@ class PlaneacionUXTestCase(unittest.TestCase):
             respuesta = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/planeacion')
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(ResultadoCalculadoFicha.query.filter_by(tipo='panorama').count(), 1)
+
+    def test_detalle_competencia_ofrece_barras_de_progreso_y_herramientas_pedagogicas(self):
+        from flask import render_template, template_rendered
+        contexto = {}
+        def capturar(sender, template, context, **extra):
+            contexto.update(context)
+        with template_rendered.connected_to(capturar, self.app):
+            self.pagina(con_planeacion=True)
+        nombre = contexto['linea']['fases'][0]['competencias'][0]['nombre']
+        contexto['catalogo_pedagogico'] = {nombre: {
+            'norma': 'Norma avanzada de software', 'codigo_norma': '220501096', 'horas_programa': 1008,
+            'conocimientos_proceso': ['Planear arquitectura de software:', 'Definir modelo de datos'],
+            'conocimientos_saber': ['Fundamentos de programación:', 'Bases de datos relacionales'],
+            'criterios_evaluacion': ['Aplica estándares de codificación limpios.'],
+            'perfil_instructor': {'requisitos_academicos': 'Ingeniero de sistemas', 'experiencia': '24 meses'},
+        }}
+        with self.app.test_request_context():
+            html = render_template('instructor/_planeacion_gantt_detalle.html', **contexto)
+        self.assertIn('role="progressbar"', html)
+        self.assertIn('class="pl-gantt-bar-split"', html)
+        self.assertIn('class="pl-pedagogia-search"', html)
+        self.assertIn('data-pedagogia-filtro="criterios"', html)
+        self.assertIn('pl-pedagogia-criterio-card', html)
+        self.assertIn('Criterio 1', html)
+        self.assertIn('Aplica estándares de codificación limpios.', html)
+        self.assertIn('Planear arquitectura de software:', html)
+

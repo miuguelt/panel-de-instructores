@@ -4,19 +4,19 @@
 
 - Dirección visual: visualización de datos integrada al tablero Bento; superficies sólidas y colores del tema vigente.
 - Jerarquía: filtros y leyenda breve → escala temporal con meses y años → fases → resumen compacto y línea de tiempo por competencia.
-- Densidad: el resumen ocupa entre 15 y 19 rem en escritorio. La línea de tiempo recibe el ancho restante; el nombre completo puede ocupar varias líneas. Conteos, acciones y RAP aparecen en el detalle del evento.
-- Interacción: toda la línea de tiempo es un botón accesible. Un clic, Enter o la barra espaciadora abre el detalle del tramo, con fechas planeadas, primera aprobación, cierre real, evaluación, RAP y accesos a aprendices y ficha pedagógica. Escape y «Cerrar» devuelven el foco al evento.
+- Densidad: la página usa todo el ancho disponible. El resumen ocupa entre 15 y 19 rem en escritorio y «Ocultar columna» devuelve ese espacio al calendario. En esa vista, el nombre y el avance permanecen sobre cada evento; la fila de nombre breve no supera 120 px en escritorio. Los nombres completos pueden ocupar varias líneas.
+- Interacción: toda la línea de tiempo es un botón accesible. Un clic, Enter o la barra espaciadora abre un diálogo con pestañas de resumen, resultados, aprendices y ficha pedagógica. Cada apertura inicia en el resumen; las flechas, Inicio y Fin recorren las pestañas. Escape y «Cerrar» devuelven el foco al evento.
 - Lectura: la barra superior representa el periodo planeado; la inferior muestra la proporción aprobada dentro de ese periodo. El porcentaje no representa una fecha de ejecución. El trimestre actual y la etapa productiva tienen etiquetas explícitas.
-- Adaptación: una columna desde 320 px; dos columnas cuando el contenedor dispone de al menos 800 px. Escala y barras comparten anchura y origen. Los filtros anuncian el conteo, ocultan fases sin coincidencias y permiten restablecer una búsqueda vacía.
+- Adaptación: en celular la columna inicia oculta; el usuario puede mostrarla y su decisión se conserva al cambiar el ancho durante la consulta. Dos columnas cuando el contenedor dispone de al menos 800 px. Escala y barras comparten anchura y origen. El diálogo usa dos pestañas por fila en celular y cuatro en escritorio, con controles de al menos 44 px. Los filtros anuncian el conteo, ocultan fases sin coincidencias y permiten restablecer una búsqueda vacía.
 - Verificación: pruebas de renderizado, interacción y cobertura del 100 % de funciones del módulo; revisión en navegador a 320, 390, 768, 1440, 1920 y 2560 px, nombres largos y ancho disponible al 200 %.
 
 ## Contrato de diseño — seguimiento de evaluaciones por tramo (1 de octubre de 2026)
 
 - Dirección visual: tablero Bento con tarjetas operativas, superficies sólidas y tokens institucionales existentes.
-- Jerarquía en el detalle del evento: competencia y periodo → aprendices evaluados y pendientes → acciones → RAP desplegables con actividad, código y conteos.
+- Jerarquía en el detalle del evento: competencia y periodo → pestañas → fechas y horas, RAP con actividad y conteos, seguimiento de aprendices o contenido curricular según la pestaña seleccionada.
 - Semántica: evaluado y aprobado se consultan por separado. En un tramo, tener un RAP pendiente impide aparecer como completamente evaluado; la evaluación parcial se identifica expresamente.
 - Detalle: diálogo con selección de RAP, búsqueda por nombre o documento, filtro por instructor registrado y estados pendientes, evaluados y todos. El listado usa tarjetas en orden alfabético con juicio, instructor y fecha por RAP.
-- Celular: una columna desde 320 px; el cronograma aparece bajo el resumen y repite los trimestres. Los controles tienen altura mínima de 44 px y el diálogo cabe en el ancho y alto disponibles.
+- Celular: una columna desde 320 px; la vista inicial muestra el nombre sobre el evento y repite los trimestres. El resumen se puede mostrar con el control de columna. Los controles tienen altura mínima de 44 px y el diálogo cabe en el ancho y alto disponibles.
 - Accesibilidad y estados: diálogo nativo, Escape, devolución del foco, nombres completos, anuncios de conteo, vacío con instrucciones para ajustar filtros y error de lectura con reintento. La consulta usa datos ya cargados, sin espera remota adicional.
 - Contratos y criterios BDD: [Seguimiento de evaluaciones](docs/architecture/seguimiento-evaluaciones-planeacion.md).
 
