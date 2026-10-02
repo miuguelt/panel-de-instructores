@@ -1,6 +1,8 @@
 """Pruebas de conciliación documental para fichas ya existentes."""
 
 from datetime import date
+import hashlib
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -9,9 +11,11 @@ from io import StringIO
 from unittest.mock import patch
 
 import openpyxl
+from werkzeug.datastructures import FileStorage
 
 from app import create_app, db
 from app.models import Aprendiz, ArchivoFichaVersion, Ficha, Instructor, JuicioEvaluativo
+from app.services.importacion_ficha import importar_archivo
 from scripts.migrar_fuentes_existentes import main, migrar_fuentes_existentes
 from tests.apoyo_planeacion import crear_planeacion_xlsx
 from tests.apoyo_programa import crear_programa_pdf
@@ -148,6 +152,54 @@ class MigrarFuentesExistentesTestCase(unittest.TestCase):
         self.assertEqual(resultado['sin_ficha'], 1)
         self.assertEqual(Ficha.query.count(), 1)
         self.assertEqual(ArchivoFichaVersion.query.count(), 0)
+
+    def test_repara_estado_historico_aunque_no_haya_versiones_nuevas(self):
+        raiz = Path(self.archivos.name)
+        carpeta = raiz / 'fichas' / str(self.ficha.id) / 'reporte_juicios'
+        antiguo = crear_reporte(carpeta / 'antiguo.xlsx', '01/06/2026', 'POR EVALUAR')
+        reciente = crear_reporte(carpeta / 'reciente.xlsx', '12/09/2026', 'APROBADO')
+
+        with antiguo.open('rb') as stream:
+            importar_archivo(
+                FileStorage(stream=stream, filename=antiguo.name),
+                self.ficha,
+                self.instructor.id,
+            )
+        db.session.commit()
+        # Simula que versiones históricas entraron después del reporte vigente.
+        for numero, ruta, fecha in (
+            (1, reciente, '2026-09-12'),
+            (2, antiguo, '2026-06-01'),
+        ):
+            db.session.add(ArchivoFichaVersion(
+                ficha_id=self.ficha.id,
+                instructor_id=self.instructor.id,
+                tipo='reporte_juicios',
+                version=numero,
+                nombre_archivo=ruta.name,
+                ruta_archivo=ruta.relative_to(raiz).as_posix(),
+                hash_sha256=hashlib.sha256(ruta.read_bytes()).hexdigest(),
+                tamano_bytes=ruta.stat().st_size,
+                estado='procesado',
+                metadata_json=json.dumps({'fecha_reporte': fecha}),
+            ))
+        db.session.commit()
+
+        reparacion = migrar_fuentes_existentes(self.app, raiz, aplicar=True)
+
+        self.assertEqual(reparacion['registrados'], 0)
+        self.assertEqual(reparacion['reportes_reaplicados'], 1)
+        self.assertEqual(JuicioEvaluativo.query.one().juicio, 'APROBADO')
+        self.assertEqual(
+            json.loads(ArchivoFichaVersion.query.filter_by(version=1).one().metadata_json)
+            ['_conciliado_hasta_version'],
+            2,
+        )
+
+        repeticion = migrar_fuentes_existentes(self.app, raiz, aplicar=True)
+
+        self.assertEqual(repeticion['reportes_reaplicados'], 0)
+        self.assertEqual(JuicioEvaluativo.query.one().juicio, 'APROBADO')
 
     def test_modo_revision_no_escribe_en_la_base(self):
         raiz = Path(self.archivos.name)

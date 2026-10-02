@@ -62,8 +62,11 @@ class ModalAsistenciaWebTestCase(unittest.TestCase):
         db.session.add_all([self.falton, self.cumplido])
         db.session.flush()
 
-        self.dia_falta = date.today() - timedelta(days=2)
-        self.dia_tardanza = date.today() - timedelta(days=1)
+        # Mantiene ambos estados en el mismo mes, incluso cuando la suite se
+        # ejecuta durante los primeros días del mes calendario.
+        mes_anterior = date.today().replace(day=1) - timedelta(days=1)
+        self.dia_falta = mes_anterior.replace(day=10)
+        self.dia_tardanza = mes_anterior.replace(day=11)
         for fecha, estado_falton, estado_cumplido in (
             (self.dia_falta, 'FALTA', 'ASISTE'),
             (self.dia_tardanza, 'TARDANZA', 'ASISTE'),

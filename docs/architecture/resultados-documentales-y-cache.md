@@ -23,12 +23,29 @@ sigue presente. Para migrarlos todos y precalentar sus resultados después del
 despliegue, ejecute desde el servicio `app`:
 
 ```powershell
-docker compose exec app python scripts/backfill_documentos_persistidos.py
+docker compose exec app python -m scripts.backfill_documentos_persistidos
 ```
 
 El comando no borra ni modifica los originales. Informa archivos ausentes o
 ilegibles y termina con código distinto de cero para poder corregirlos y repetir
 la operación.
+
+Para incorporar originales heredados de las fichas vigentes, el conciliador
+busca únicamente reportes de juicios (`.xls`/`.xlsx`), planeaciones (`.xlsx`) y
+programas formativos (`.pdf`) bajo `uploads/fichas/`. Primero permite revisar el
+alcance sin escribir y luego aplica los cambios:
+
+```powershell
+python -m scripts.migrar_fuentes_existentes
+python -m scripts.migrar_fuentes_existentes --apply
+```
+
+El conciliador no crea fichas, no copia ni elimina originales y omite fichas
+inexistentes, duplicados y hashes ya registrados. Los juicios se integran a las
+tablas relacionales; planeación y programa guardan su extracción en JSONB. Al
+terminar de incorporar reportes históricos, vuelve a aplicar el reporte con la
+fecha más reciente y registra hasta qué versión quedó conciliado para que las
+ejecuciones siguientes no vuelvan a parsear las fuentes.
 
 ## Navegador
 

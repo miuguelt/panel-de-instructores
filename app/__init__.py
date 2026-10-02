@@ -186,12 +186,10 @@ def _inventario_uploads(carpeta, tope=5000):
 def _registrar_cache_estaticos(app):
     """Sirve /static/ con caducidad larga y cache-busting por contenido.
 
-    El fingerprint se calcula una sola vez por archivo y se memoriza: en
-    produccion los estaticos no cambian mientras el contenedor vive, y hacer un
-    stat() por cada url_for anularia parte del ahorro. En debug no se memoriza
-    para que editar el CSS se refleje sin reiniciar.
+    El fingerprint se vuelve a calcular en cada URL para que el cache-busting
+    también detecte cambios cuando se conserva la fecha de modificación y el
+    tamaño del archivo.
     """
-    versiones = {}
 
     def _version(filename):
         if not app.static_folder:
@@ -217,13 +215,7 @@ def _registrar_cache_estaticos(app):
         filename = values.get('filename')
         if not filename:
             return
-        if app.debug:
-            version = _version(filename)
-        else:
-            version = versiones.get(filename)
-            if version is None:
-                version = _version(filename)
-                versiones[filename] = version
+        version = _version(filename)
         if version:
             values['v'] = version
 
