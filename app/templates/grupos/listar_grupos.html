@@ -1020,10 +1020,30 @@ function actualizarContadorEdit() {
 
 function ejecutarArchivadoGrupoActual() {
     if (!grupoActualEditandoId) return;
-    if (confirm('¿Deseas archivar este equipo? Los aprendices quedarán disponibles para otros equipos.')) {
+    const mensaje = '¿Deseas archivar este equipo? Los aprendices quedarán disponibles para otros equipos.';
+    const proceder = () => {
         const formAux = document.getElementById('formArchivarGrupoAuxiliar');
-        formAux.action = `/instructor/fichas/${fichaId}/grupos/${grupoActualEditandoId}/archivar`;
-        formAux.submit();
+        if (formAux) {
+            formAux.action = `/instructor/fichas/${fichaId}/grupos/${grupoActualEditandoId}/archivar`;
+            formAux.submit();
+        }
+    };
+
+    if (typeof window.confirmarAccion === 'function') {
+        window.confirmarAccion(mensaje, {
+            title: 'Archivar equipo',
+            confirmLabel: 'Archivar equipo',
+            intent: 'danger'
+        }).then((confirmado) => {
+            if (confirmado) {
+                if (typeof window.cerrarModal === 'function') {
+                    window.cerrarModal('modalEditarGrupo');
+                }
+                proceder();
+            }
+        });
+    } else {
+        proceder();
     }
 }
 

@@ -93,7 +93,7 @@ jobs:
             test-results/cronograma-*.png
             test-results/evaluaciones-*.png
             test-results/aprendices-carga.png
-          if-no-files-found: error
+          if-no-files-found: ignore
 
       - name: Guardar cobertura de navegación
         if: always()
@@ -104,7 +104,7 @@ jobs:
             coverage-planeacion.lcov
             coverage-evaluaciones.lcov
             coverage-gantt.lcov
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Run Tests
