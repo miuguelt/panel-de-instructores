@@ -1,6 +1,7 @@
 import unittest
 from datetime import date
 from io import BytesIO
+from tempfile import TemporaryDirectory
 
 import openpyxl
 from openpyxl.utils.datetime import to_excel
@@ -27,12 +28,14 @@ from app.services.importacion_ficha import (
 
 class ImportacionFichaTestCase(unittest.TestCase):
     def setUp(self):
+        self.uploads = TemporaryDirectory()
         self.app = create_app({
             'TESTING': True,
             'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
             'SQLALCHEMY_ENGINE_OPTIONS': {},
             'WTF_CSRF_ENABLED': False,
             'RATELIMIT_ENABLED': False,
+            'UPLOAD_FOLDER': self.uploads.name,
         })
         self.contexto = self.app.app_context()
         self.contexto.push()
@@ -56,6 +59,7 @@ class ImportacionFichaTestCase(unittest.TestCase):
         db.session.remove()
         db.drop_all()
         self.contexto.pop()
+        self.uploads.cleanup()
 
     def _archivo(self):
         libro = openpyxl.Workbook()

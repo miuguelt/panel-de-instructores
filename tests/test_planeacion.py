@@ -13,7 +13,11 @@ from app.services.planeacion import (
 from app import create_app, db
 from app.models import Aprendiz, ArchivoFichaVersion, Ficha, Instructor, JuicioEvaluativo
 from app.services.analisis_planeacion import construir_analisis
-from app.services.emparejamiento_juicios import es_aprobado as _aprobado
+from app.services.emparejamiento_juicios import (
+    es_aprobado as _aprobado,
+    indexar_juicios,
+    juicios_de,
+)
 from app.services.graficos_planeacion import (
     construir_curva_svg,
     construir_fases_progreso,
@@ -77,6 +81,38 @@ class PlaneacionServiceTestCase(unittest.TestCase):
         self.assertFalse(_aprobado('NO APROBADO'))
         self.assertFalse(_aprobado('AÚN NO APROBADO'))
         self.assertFalse(_aprobado('POR EVALUAR'))
+
+    def test_empareja_rap_con_variacion_redaccion_y_prefijo_numeral(self):
+        j_propuesta = SimpleNamespace(
+            id=1,
+            resultado_aprendizaje='593060 - 01 DEFINIR ESPECIFICACIONES TÉCNICAS DEL SOFTWARE DE ACUERDO CON LAS CARACTERÍSTICAS DEL SOFTWARE A CONSTRUIR.'
+        )
+        j_mate_plantear = SimpleNamespace(
+            id=2,
+            resultado_aprendizaje='593258 - 02 PLANTEAR PROBLEMAS MATEMÁTICOS A PARTIR DE SITUACIONES GENERADAS EN EL CONTEXTO SOCIAL Y PRODUCTIVO.'
+        )
+        j_mate_resolver = SimpleNamespace(
+            id=3,
+            resultado_aprendizaje='593255 - 03 RESOLVER PROBLEMAS MATEMÁTICOS A PARTIR DE SITUACIONES GENERADAS EN EL CONTEXTO SOCIAL Y PRODUCTIVO.'
+        )
+        por_clave, por_codigo = indexar_juicios([j_propuesta, j_mate_plantear, j_mate_resolver])
+
+        # 1. Caso reporte SofiaPlus vs planeacion con redaccion alternativa
+        unidad_propuesta = {
+            'rap': 'Definir especificaciones técnicas de acuerdo con las características de la solución de software.'
+        }
+        self.assertEqual(juicios_de(unidad_propuesta, por_clave, por_codigo), [j_propuesta])
+
+        # 2. Casos de prefijos de orden en SofiaPlus que antes competían entre sí
+        unidad_plantear = {
+            'rap': 'Plantear problemas matemáticos a partir de situaciones generadas en el contexto social y productivo.'
+        }
+        unidad_resolver = {
+            'rap': 'Resolver problemas matemáticos a partir de situaciones generadas en el contexto social y productivo.'
+        }
+        self.assertEqual(juicios_de(unidad_plantear, por_clave, por_codigo), [j_mate_plantear])
+        self.assertEqual(juicios_de(unidad_resolver, por_clave, por_codigo), [j_mate_resolver])
+
 
 
 class AnalisisPlaneacionTestCase(unittest.TestCase):

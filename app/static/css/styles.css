@@ -8445,6 +8445,175 @@ select optgroup {
     text-transform: uppercase;
 }
 
+/* Resumen de Contraste al Corte (Esperado vs Real) */
+.fases-corte-banner {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 2px;
+}
+
+@media (max-width: 768px) {
+    .fases-corte-banner {
+        grid-template-columns: 1fr;
+    }
+}
+
+.fases-corte-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 0.2s ease;
+}
+
+.fases-corte-card.is-esperado {
+    border-left: 3px solid #2563eb;
+    background: linear-gradient(180deg, rgba(37, 99, 235, 0.03), var(--bg-card));
+}
+
+.fases-corte-card.is-real {
+    border-left: 3px solid #059669;
+    background: linear-gradient(180deg, rgba(5, 150, 105, 0.03), var(--bg-card));
+}
+
+.fases-corte-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.fases-corte-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.fases-corte-sub {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-muted);
+}
+
+.fases-corte-num-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.fases-corte-num {
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-strong);
+}
+
+.fases-corte-total {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.fases-corte-detalle {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--text-main);
+}
+
+.fases-alerta-vencidas {
+    color: #dc2626;
+    font-weight: 700;
+    display: inline;
+}
+
+/* Fechas y badges por fase */
+.fase-step-dates {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: -0.02em;
+}
+
+.fase-badge-alerta {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.fase-badge-alerta.is-vencida {
+    background: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.fase-badge-alerta.is-ok {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+}
+
+.fase-badge-alerta.is-en-curso {
+    background: rgba(59, 130, 246, 0.12);
+    color: #2563eb;
+}
+
+.fase-badge-alerta.is-futura {
+    background: var(--bg-input);
+    color: var(--text-muted);
+}
+
+.fase-metric-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 11px;
+}
+
+.fase-metric-row.is-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.fase-metric-k {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.fase-step-pending-details {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border-divider);
+    font-size: 10px;
+}
+
+.fase-pending-toggle {
+    cursor: pointer;
+    color: var(--primary);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.fase-pending-list {
+    margin: 4px 0 0 0;
+    padding-left: 14px;
+    color: var(--text-main);
+    line-height: 1.35;
+}
+
+.fase-pending-list li {
+    margin-bottom: 2px;
+}
+
 /* Stepper horizontal de fases */
 .fases-stepper {
     display: grid;

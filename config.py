@@ -58,7 +58,11 @@ if os.getenv('FLASK_ENV') == 'production' and _secret_key in _INSECURE_SECRETS:
 
 
 def _normalize_db_url(url):
-    """La imagen solo trae psycopg2-binary; el esquema psycopg 3 rompe SQLAlchemy."""
+    """Normaliza esquemas PostgreSQL para SQLAlchemy y el driver psycopg2."""
+    if not url:
+        return url
+    if url.startswith('postgres://'):
+        return 'postgresql+psycopg2://' + url[len('postgres://'):]
     if url.startswith('postgresql+psycopg://'):
         return 'postgresql+psycopg2://' + url[len('postgresql+psycopg://'):]
     return url

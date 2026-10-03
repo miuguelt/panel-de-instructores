@@ -112,20 +112,48 @@ def _calcular_con_planeacion(
     )
     seguimiento = construir_seguimiento_fases(linea, calendario, hoy=hoy)
 
+    # Identificar competencias pendientes agrupadas por fase
+    pendientes_por_fase: Dict[str, Dict[str, int]] = {}
+    items_linea = linea.get('resultados', []) if isinstance(linea, dict) else (linea if isinstance(linea, list) else [])
+    for item in items_linea:
+        if not isinstance(item, dict):
+            continue
+        fase_nom = (item.get('fase') or 'Sin fase').upper().strip()
+        pct = float(item.get('porcentaje_avance') or 0.0)
+        if pct < 80.0:
+            comp_nom = (item.get('competencia') or 'Competencia sin nombre').strip()
+            pendientes_por_fase.setdefault(fase_nom, {}).setdefault(comp_nom, 0)
+            pendientes_por_fase[fase_nom][comp_nom] += 1
+
     fases_formateadas = []
     for fase in seguimiento.get('fases', []):
+        nombre_fase_upper = (fase.get('nombre') or '').upper().strip()
+        comps_pend_dict = pendientes_por_fase.get(nombre_fase_upper, {})
+        comps_pend_list = [
+            {'competencia': comp, 'pendientes': count}
+            for comp, count in sorted(comps_pend_dict.items(), key=lambda x: -x[1])
+        ]
+
         fases_formateadas.append({
             'orden': fase.get('orden', 0),
             'nombre': fase.get('nombre'),
             'icono': fase.get('icono', '📌'),
+            'inicio': fase.get('inicio'),
+            'fin': fase.get('fin'),
             'porcentaje_tiempo': fase.get('porcentaje_tiempo', 0),
             'porcentaje_aprobados': fase.get('porcentaje_aprobados', 0),
             'porcentaje_evaluados': fase.get('porcentaje_evaluados', 0),
+            'resultados_esperados': fase.get('resultados_esperados', 0),
             'resultados_aprobados': fase.get('resultados_aprobados', 0),
+            'resultados_evaluados': fase.get('resultados_evaluados', 0),
+            'resultados_pendientes': fase.get('resultados_pendientes', 0),
             'resultados_total': fase.get('resultados_total', 0),
+            'brecha_resultados': fase.get('brecha_resultados', 0),
             'estado_tiempo': fase.get('estado_tiempo', 'pendiente'),
             'estado_ritmo': fase.get('estado_ritmo', 'al_dia'),
             'horas': fase.get('horas', 0),
+            'competencias_total': fase.get('competencias_total', 0),
+            'competencias_pendientes': comps_pend_list,
         })
 
     fase_esperada = seguimiento.get('fase_esperada')
@@ -136,11 +164,43 @@ def _calcular_con_planeacion(
     if fase_esperada and fase_real:
         desfase = fase_esperada.get('orden', 0) - fase_real.get('orden', 0)
 
+    res_data = seguimiento.get('resultados', {})
+    total_raps = res_data.get('total', 0)
+    aprobados_raps = res_data.get('aprobados', 0)
+    evaluados_raps = res_data.get('evaluados', 0)
+    pendientes_raps = res_data.get('pendientes', 0)
+    esperados_raps = res_data.get('esperados', 0)
+    pct_aprobados = res_data.get('porcentaje_aprobados', 0)
+    pct_esperados = round((esperados_raps / total_raps * 100), 1) if total_raps else 0.0
+
+    raps_vencidos_pendientes = sum(
+        f.get('resultados_pendientes', 0)
+        for f in fases_formateadas
+        if f.get('estado_tiempo') == 'vencida'
+    )
+    fases_vencidas_info = [
+        {
+            'nombre': f['nombre'],
+            'pendientes': f['resultados_pendientes'],
+            'total': f['resultados_total'],
+            'aprobados': f['resultados_aprobados'],
+        }
+        for f in fases_formateadas
+        if f.get('estado_tiempo') == 'vencida' and f['resultados_pendientes'] > 0
+    ]
+
     # Mensaje ejecutivo sintético
-    if not seguimiento.get('resultados', {}).get('total'):
+    if not total_raps:
         mensaje_veredicto = 'Sin resultados registrados para calcular fases.'
     elif estado == 'completado':
         mensaje_veredicto = 'Todos los resultados de aprendizaje han sido aprobados.'
+    elif raps_vencidos_pendientes > 0 and desfase > 0:
+        nombres_vencidas = ', '.join(f"{fv['nombre'].title()} ({fv['pendientes']})" for fv in fases_vencidas_info)
+        mensaje_veredicto = (
+            f"Fase esperada por tiempo: {fase_esperada.get('nombre', '').title()} · "
+            f"Fase según RAPs: {fase_real.get('nombre', '').title()} (Retraso de {desfase} "
+            f"{'fase' if desfase == 1 else 'fases'}, con {raps_vencidos_pendientes} RAPs pendientes en fases ya culminadas: {nombres_vencidas})."
+        )
     elif desfase > 0:
         mensaje_veredicto = (
             f"Fase esperada por tiempo: {fase_esperada.get('nombre', '').title()} · "
@@ -155,11 +215,6 @@ def _calcular_con_planeacion(
     else:
         nombre_fase = fase_esperada.get('nombre', '').title() if fase_esperada else 'En curso'
         mensaje_veredicto = f"Al día: Proyecto sincronizado en fase de {nombre_fase}."
-
-    res_data = seguimiento.get('resultados', {})
-    total_raps = res_data.get('total', 0)
-    aprobados_raps = res_data.get('aprobados', 0)
-    pct_aprobados = res_data.get('porcentaje_aprobados', 0)
 
     return {
         'disponible': True,
@@ -186,9 +241,13 @@ def _calcular_con_planeacion(
         'resumen_raps': {
             'total': total_raps,
             'aprobados': aprobados_raps,
-            'evaluados': res_data.get('evaluados', 0),
-            'pendientes': res_data.get('pendientes', 0),
+            'evaluados': evaluados_raps,
+            'pendientes': pendientes_raps,
+            'esperados': esperados_raps,
             'porcentaje_aprobados': pct_aprobados,
+            'porcentaje_esperados': pct_esperados,
+            'raps_vencidos_pendientes': raps_vencidos_pendientes,
+            'fases_vencidas': fases_vencidas_info,
         },
         'mensaje_veredicto': mensaje_veredicto,
     }
@@ -320,23 +379,50 @@ def _calcular_estimado_por_juicios(
             acum_totales += raps_fase_total
 
         raps_fase_aprobados = min(round(raps_fase_total * rap_ratio), raps_fase_total)
+        raps_fase_esperados = min(round(raps_fase_total * (t_pct / 100)), raps_fase_total)
+        raps_fase_pendientes = max(raps_fase_total - raps_fase_aprobados, 0)
+        brecha_fase = raps_fase_aprobados - raps_fase_esperados
 
         fases_formateadas.append({
             'orden': idx,
             'nombre': fase_nom,
             'icono': icono,
+            'inicio': None,
+            'fin': None,
             'porcentaje_tiempo': t_pct,
             'porcentaje_aprobados': rap_pct,
             'porcentaje_evaluados': rap_pct,
+            'resultados_esperados': raps_fase_esperados,
             'resultados_aprobados': raps_fase_aprobados,
+            'resultados_evaluados': raps_fase_aprobados,
+            'resultados_pendientes': raps_fase_pendientes,
             'resultados_total': raps_fase_total,
+            'brecha_resultados': brecha_fase,
             'estado_tiempo': st_tiempo,
             'estado_ritmo': 'al_dia' if rap_pct >= t_pct else 'atrasado',
             'horas': 0,
+            'competencias_total': 0,
+            'competencias_pendientes': [],
         })
 
     aprobados_raps = sum(f['resultados_aprobados'] for f in fases_formateadas) if total_raps else 0
     evaluados_raps = max(round(total_raps * (pct_evaluados / 100)), aprobados_raps) if total_raps else 0
+    esperados_totales = sum(f['resultados_esperados'] for f in fases_formateadas) if total_raps else 0
+    raps_vencidos = sum(
+        f['resultados_pendientes']
+        for f in fases_formateadas
+        if f['estado_tiempo'] == 'cumplida'
+    )
+    fases_vencidas_info = [
+        {
+            'nombre': f['nombre'],
+            'pendientes': f['resultados_pendientes'],
+            'total': f['resultados_total'],
+            'aprobados': f['resultados_aprobados'],
+        }
+        for f in fases_formateadas
+        if f['estado_tiempo'] == 'cumplida' and f['resultados_pendientes'] > 0
+    ]
 
     return {
         'disponible': True,
@@ -365,7 +451,11 @@ def _calcular_estimado_por_juicios(
             'aprobados': aprobados_raps,
             'evaluados': evaluados_raps,
             'pendientes': max(total_raps - aprobados_raps, 0),
+            'esperados': esperados_totales,
             'porcentaje_aprobados': round(pct_aprobados, 1),
+            'porcentaje_esperados': round(pct_tiempo, 1) if configurado else 0.0,
+            'raps_vencidos_pendientes': raps_vencidos,
+            'fases_vencidas': fases_vencidas_info,
         },
         'mensaje_veredicto': mensaje_veredicto,
     }

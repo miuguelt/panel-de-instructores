@@ -376,7 +376,7 @@
             <summary>
                 <span class="ficha-phase-summary-copy">
                     <strong>Desglose de fases del proyecto formativo</strong>
-                    <small>Avance de resultados según GFPI y reporte de juicios</small>
+                    <small>{% if resumen.fases_data.resumen_raps and (resumen.fases_data.resumen_raps.raps_vencidos_pendientes|default(0)) > 0 %}<strong class="text-danger">⚠️ {{ resumen.fases_data.resumen_raps.raps_vencidos_pendientes }} RAPs pendientes de fases culminadas</strong> · {% endif %}Avance según GFPI y reporte de juicios</small>
                 </span>
                 <span class="ficha-phase-summary-action">Ver fases <span aria-hidden="true">＋</span></span>
             </summary>

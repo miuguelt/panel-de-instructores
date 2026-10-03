@@ -22,7 +22,7 @@ from app.models import (
 )
 
 
-ALGORITMO_RESULTADOS = 'resultados-v1'
+ALGORITMO_RESULTADOS = 'resultados-v2'
 
 
 def fecha_corte_bogota():
@@ -66,16 +66,16 @@ def obtener_contenido_documento(version, parser, parser_version):
     if not version:
         return None
     if (
-        version.contenido_extraido_json
-        and version.contenido_extraido_version == parser_version
+        getattr(version, 'contenido_extraido_json', None)
+        and getattr(version, 'contenido_extraido_version', None) == parser_version
     ):
         return json.loads(
             json.dumps(version.contenido_extraido_json), object_hook=_json_object_hook,
         )
 
-    ruta = Path(current_app.config['UPLOAD_FOLDER']) / version.ruta_archivo
+    ruta = Path(current_app.config['UPLOAD_FOLDER']) / getattr(version, 'ruta_archivo', '')
     if not ruta.is_file():
-        raise FileNotFoundError(f'No se encontró el archivo fuente {version.nombre_archivo}.')
+        raise FileNotFoundError(f'No se encontró el archivo fuente {getattr(version, "nombre_archivo", "desconocido")}.')
     contenido = parser(ruta)
     guardar_contenido_documento(version, contenido, parser_version)
     # Este camino migra de forma transparente una versión anterior que aún no
@@ -88,14 +88,14 @@ def huella_resultado(ficha, tipo, fecha_corte, versiones):
     """Construye la clave de validez con calendario, revisión y versiones fuente."""
     fuentes = [
         {
-            'id': version.id,
-            'tipo': version.tipo,
-            'hash': version.hash_sha256,
-            'estado': version.estado,
+            'id': getattr(version, 'id', None),
+            'tipo': getattr(version, 'tipo', 'desconocido'),
+            'hash': getattr(version, 'hash_sha256', None),
+            'estado': getattr(version, 'estado', 'procesado'),
         }
         for version in sorted(
             (item for item in (versiones or []) if item),
-            key=lambda item: (item.tipo, item.id or 0),
+            key=lambda item: (getattr(item, 'tipo', ''), getattr(item, 'id', 0) or 0),
         )
     ]
     entrada = {

@@ -228,3 +228,35 @@ test('Los filtros ocultan las fases sin coincidencias y el estado vacío permite
     assert.equal(await page.locator('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
     await page.close();
 });
+
+test('El análisis de competencias vencidas muestra fechas y abre modal con RAP y aprendices pendientes', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto(url);
+    const seccionVencidas = page.locator('#pl-analisis-vencidas');
+    assert.equal(await seccionVencidas.isVisible(), true);
+    assert.match(await seccionVencidas.innerText(), /Competencias que ya deberían estar evaluadas/);
+    assert.match(await seccionVencidas.innerText(), /debió evaluarse el/);
+
+    const tarjetaVencida = seccionVencidas.locator('.pl-vencida-item').first();
+    assert.equal(await tarjetaVencida.isVisible(), true);
+    await tarjetaVencida.click();
+
+    const dialogo = page.locator('#pl-evaluaciones');
+    assert.equal(await dialogo.evaluate(d => d.open), true);
+    assert.match(await page.locator('#pl-evaluaciones-titulo').innerText(), /Inducción/);
+    assert.match(await page.locator('#pl-evaluaciones-contexto').innerText(), /Debió evaluarse:/);
+
+    // Verifica que se muestre el resumen visual de resultados de aprendizaje (RAP)
+    const rapsResumen = page.locator('#pl-evaluaciones-raps');
+    assert.equal(await rapsResumen.isVisible(), true);
+    assert.match(await rapsResumen.innerText(), /Resultados de aprendizaje/);
+
+    // Verifica que los aprendices pendientes estén listados por defecto
+    assert.match(await page.locator('#pl-evaluaciones-contador').innerText(), /2 de 3 aprendices/);
+    assert.deepEqual(await page.locator('.pl-eval-aprendiz h3').allTextContents(), ['Beatriz de prueba', 'Carlos de prueba']);
+
+    await page.locator('#pl-evaluaciones-cerrar').click();
+    assert.equal(await dialogo.evaluate(d => d.open), false);
+    await page.close();
+});
+

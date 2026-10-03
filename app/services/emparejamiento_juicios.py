@@ -14,7 +14,7 @@ from difflib import SequenceMatcher
 from functools import lru_cache
 
 
-SIMILITUD_MINIMA = 0.9
+SIMILITUD_MINIMA = 0.78
 
 
 def texto_limpio(valor):
@@ -35,6 +35,7 @@ def _normalizar_clave(texto):
     texto = unicodedata.normalize('NFKD', texto)
     texto = ''.join(c for c in texto if not unicodedata.combining(c)).lower()
     texto = re.sub(r'^\s*\d{4,}\s*[-:]\s*', '', texto)
+    texto = re.sub(r'^\s*\d{1,3}\s*[-:.)]\s*|^\s*\d{1,3}\s+', '', texto)
     return re.sub(r'[^a-z0-9]+', ' ', texto).strip()
 
 

@@ -159,35 +159,44 @@ function initPlaneacionEvaluaciones(doc = document) {
             : 'No hay aprendices incluidos en el análisis de este tramo. Revise el grupo y el reporte de juicios.'));
     }
 
-    for (const boton of doc.querySelectorAll('[data-evaluacion-target]')) {
-        boton.addEventListener('click', function () {
-            const datos = catalogo[boton.dataset.evaluacionTarget];
-            if (!datos) return;
-            tramo = datos;
-            origen = boton;
-            estado = 'pendiente';
-            titulo.textContent = tramo.nombre;
-            contexto.textContent = [tramo.fase, tramo.periodo, tramo.fecha_limite ? ('Debió evaluarse: ' + tramo.fecha_limite) : ''].filter(Boolean).join(' · ');
-            selectorRap.replaceChildren(elemento('option', '', 'Todos los RAP del tramo'));
-            selectorRap.children[0].value = '';
-            for (const rap of tramo.resultados) {
-                const opcion = elemento('option', '', tituloResultado(rap));
-                opcion.value = rap.id;
-                selectorRap.append(opcion);
-            }
-            selectorRap.value = '';
-            buscar.value = '';
-            actualizarInstructores();
-            actualizar();
-            dialogo.showModal();
-        });
-        boton.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                boton.click();
-            }
-        });
+    function abrirTramo(targetId, elementoOrigen) {
+        const datos = catalogo[targetId];
+        if (!datos) return;
+        tramo = datos;
+        origen = elementoOrigen;
+        estado = 'pendiente';
+        titulo.textContent = tramo.nombre;
+        contexto.textContent = [tramo.fase, tramo.periodo, tramo.fecha_limite ? ('Debió evaluarse: ' + tramo.fecha_limite) : ''].filter(Boolean).join(' · ');
+        selectorRap.replaceChildren(elemento('option', '', 'Todos los RAP del tramo'));
+        selectorRap.children[0].value = '';
+        for (const rap of tramo.resultados) {
+            const opcion = elemento('option', '', tituloResultado(rap));
+            opcion.value = rap.id;
+            selectorRap.append(opcion);
+        }
+        selectorRap.value = '';
+        buscar.value = '';
+        actualizarInstructores();
+        actualizar();
+        dialogo.showModal();
     }
+
+    function registrarApertura(elementos, obtenerTarget) {
+        for (const el of elementos) {
+            el.addEventListener('click', function () {
+                abrirTramo(obtenerTarget(el), el);
+            });
+            el.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    el.click();
+                }
+            });
+        }
+    }
+
+    registrarApertura(doc.querySelectorAll('[data-evaluacion-target]'), function (el) { return el.dataset.evaluacionTarget; });
+    registrarApertura(doc.querySelectorAll('[data-vencida-target]'), function (el) { return el.dataset.vencidaTarget; });
     for (const boton of filtros) boton.addEventListener('click', function () {
         estado = boton.dataset.evaluacionEstado;
         actualizar();

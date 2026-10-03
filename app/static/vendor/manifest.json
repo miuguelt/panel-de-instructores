@@ -15,7 +15,7 @@
   },
   "lucide": {
     "version": "0.468.0",
-    "file": "lucide/lucide.min.js",
+    "file": "lucide.min.js",
     "url": "https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js",
     "license": "https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE",
     "sha256": "3411692820cb8d47543f69496aa25fd603a358f4498046f41c508a5a3342210e"

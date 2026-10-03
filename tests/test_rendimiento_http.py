@@ -24,7 +24,7 @@ class CargaPaginasTestCase(BaseRendimiento):
     def test_librerias_locales_integras_y_cacheadas(self):
         raiz = Path(self.app.static_folder) / 'vendor'
         manifiesto = json.loads((raiz / 'manifest.json').read_text(encoding='utf-8'))
-        self.assertEqual(set(manifiesto), {'htmx', 'qrcodejs'})
+        self.assertEqual(set(manifiesto), {'htmx', 'qrcodejs', 'lucide'})
         for nombre, asset in manifiesto.items():
             contenido = (raiz / nombre / asset['file']).read_bytes()
             self.assertEqual(hashlib.sha256(contenido).hexdigest(), asset['sha256'])

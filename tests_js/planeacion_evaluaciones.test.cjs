@@ -25,6 +25,7 @@ class Elemento {
     setAttribute(name, value) { this.attrs[name] = value; }
     addEventListener(name, fn) { (this.listeners[name] ??= []).push(fn); }
     dispatch(name, event = {}) { for (const fn of this.listeners[name] ?? []) fn({ target: this, ...event }); }
+    click() { this.dispatch('click'); }
     showModal() { this.open = true; }
     close() { this.open = false; this.dispatch('close'); }
     focus() { this.focused = true; }
@@ -33,12 +34,21 @@ class Elemento {
 
 function entorno(datos = { 'tramo-0': tramo }) {
     const ids = {};
-    for (const id of ['pl-evaluaciones', 'pl-evaluaciones-json', 'pl-evaluaciones-error', 'pl-evaluaciones-titulo', 'pl-evaluaciones-contexto', 'pl-evaluaciones-metricas', 'pl-evaluaciones-rap', 'pl-evaluaciones-instructor', 'pl-evaluaciones-buscar', 'pl-evaluaciones-lista', 'pl-evaluaciones-contador', 'pl-evaluaciones-descripcion', 'pl-evaluaciones-cerrar']) ids[id] = new Elemento();
+    for (const id of ['pl-evaluaciones', 'pl-evaluaciones-json', 'pl-evaluaciones-error', 'pl-evaluaciones-titulo', 'pl-evaluaciones-contexto', 'pl-evaluaciones-metricas', 'pl-evaluaciones-raps', 'pl-evaluaciones-rap', 'pl-evaluaciones-instructor', 'pl-evaluaciones-buscar', 'pl-evaluaciones-lista', 'pl-evaluaciones-contador', 'pl-evaluaciones-descripcion', 'pl-evaluaciones-cerrar']) ids[id] = new Elemento();
     ids['pl-evaluaciones-json'].textContent = JSON.stringify(datos);
     const abrir = new Elemento('BUTTON'); abrir.dataset.evaluacionTarget = 'tramo-0';
+    const abrirVencida = new Elemento('ARTICLE'); abrirVencida.dataset.vencidaTarget = 'tramo-0';
     const filtros = ['pendiente', 'evaluado', 'todos'].map(estado => { const e = new Elemento('BUTTON'); e.dataset.evaluacionEstado = estado; return e; });
-    const doc = { getElementById: id => ids[id] ?? null, createElement: tag => new Elemento(tag), querySelectorAll: selector => selector === '[data-evaluacion-target]' ? [abrir] : filtros };
-    return { ids, abrir, filtros, doc };
+    const doc = {
+        getElementById: id => ids[id] ?? null,
+        createElement: tag => new Elemento(tag),
+        querySelectorAll: selector => {
+            if (selector === '[data-evaluacion-target]') return [abrir];
+            if (selector === '[data-vencida-target]') return [abrirVencida];
+            return filtros;
+        },
+    };
+    return { ids, abrir, abrirVencida, filtros, doc };
 }
 
 test('Los filtros distinguen pendientes, parciales y evaluados y encuentran tildes o documento', () => {
@@ -106,3 +116,32 @@ test('El archivo se inicializa en el navegador', () => {
     const { doc } = entorno();
     vm.runInNewContext(fs.readFileSync(require.resolve('../app/static/js/planeacion_evaluaciones.js'), 'utf8'), { document: doc });
 });
+
+test('El diálogo muestra la fecha límite, el listado de RAPs con pendientes y admite apertura con teclado', () => {
+    const tramoConFecha = {
+        ...tramo,
+        fecha_limite: '15/09/2026',
+    };
+    const { ids, abrir, abrirVencida, doc } = entorno({ 'tramo-0': tramoConFecha });
+    initPlaneacionEvaluaciones(doc);
+    abrir.dispatch('keydown', { key: 'Enter', preventDefault() {} });
+    assert.equal(ids['pl-evaluaciones'].open, true);
+    assert.match(ids['pl-evaluaciones-contexto'].textContent, /Debió evaluarse: 15\/09\/2026/);
+    assert.match(ids['pl-evaluaciones-raps'].texto(), /Resultados de aprendizaje/);
+    assert.match(ids['pl-evaluaciones-raps'].texto(), /1 pendientes/);
+    assert.match(ids['pl-evaluaciones-raps'].texto(), /2 pendientes/);
+
+    // Clic en un resultado filtra y segundo clic lo restaura
+    const listaRaps = ids['pl-evaluaciones-raps'].children[1];
+    const primerRap = listaRaps.children[0];
+    primerRap.click();
+    assert.equal(ids['pl-evaluaciones-rap'].value, tramo.resultados[0].id);
+    primerRap.click();
+    assert.equal(ids['pl-evaluaciones-rap'].value, '');
+
+    // Apertura desde tarjeta de competencia vencida
+    ids['pl-evaluaciones'].open = false;
+    abrirVencida.click();
+    assert.equal(ids['pl-evaluaciones'].open, true);
+});
+
