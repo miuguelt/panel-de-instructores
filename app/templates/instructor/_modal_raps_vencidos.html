@@ -1,0 +1,211 @@
+{# Componente Modal Accesible para Auditoría de RAPs Vencidos en la Ficha #}
+{% set raps_vencidos = resumen.fases_data.resumen_raps.raps_vencidos_detalle if (resumen.fases_data and resumen.fases_data.resumen_raps and resumen.fases_data.resumen_raps.raps_vencidos_detalle) else [] %}
+<dialog id="modal-raps-vencidos" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalRapsVencidosTitulo" aria-describedby="modalRapsVencidosDesc">
+    <section class="app-modal-content app-modal-content--large raps-vencidos-modal-shell" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
+        <header class="app-modal-header" style="flex-shrink: 0;">
+            <div class="raps-vencidos-header-wrap">
+                <span class="badge badge-danger" aria-hidden="true">⚠️ Auditoría</span>
+                <div>
+                    <h2 id="modalRapsVencidosTitulo" class="app-modal-title" style="margin: 0; font-size: 1.25rem;">
+                        Resultados de Aprendizaje Vencidos por Calificar
+                    </h2>
+                    <p id="modalRapsVencidosDesc" class="text-muted" style="margin: 0.25rem 0 0 0; font-size: 0.85rem;">
+                        Ficha {{ ficha.codigo }} · Planeación GFPI-F-134 vs Asentamiento en SOFIA Plus
+                    </p>
+                </div>
+            </div>
+            <button type="button" class="btn-close" aria-label="Cerrar modal" onclick="window.cerrarModal('modal-raps-vencidos')">&times;</button>
+        </header>
+
+        <!-- Barra de filtros rápidos -->
+        <div class="raps-vencidos-toolbar" style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border, #e2e8f0); background: var(--bg-surface, #f8fafc); flex-shrink: 0;">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between;">
+                <!-- Pestañas de fases y filtros -->
+                <div class="btn-group btn-group-sm" role="tablist" aria-label="Filtrar por fase formativa o tipo" id="rapsFaseTabs">
+                    <button type="button" class="btn btn-sm btn-primary active" data-fase-filter="TODAS" onclick="filtrarRapsPorFase('TODAS', this)">
+                        Todas ({{ raps_vencidos|length }})
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-fase-filter="ANÁLISIS" onclick="filtrarRapsPorFase('ANÁLISIS', this)">
+                        Análisis
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-fase-filter="PLANEACIÓN" onclick="filtrarRapsPorFase('PLANEACIÓN', this)">
+                        Planeación
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-fase-filter="EJECUCIÓN" onclick="filtrarRapsPorFase('EJECUCIÓN', this)">
+                        Ejecución
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-fase-filter="INGLES" onclick="filtrarRapsPorFase('INGLES', this)" title="Competencias de inglés indispensables para Pruebas Saber TyT">
+                        🇬🇧 Inglés (TyT)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-fase-filter="TRANSVERSAL" onclick="filtrarRapsPorFase('TRANSVERSAL', this)">
+                        Transversales
+                    </button>
+                </div>
+
+                <!-- Buscador rápido en vivo -->
+                <div style="flex: 1; min-width: 200px; max-width: 320px;">
+                    <input type="search" id="busquedaRapsVencidos" class="form-control form-control-sm" placeholder="Buscar competencia, RAP o instructor..." oninput="filtrarRapsTexto()" aria-label="Buscar RAPs vencidos">
+                </div>
+            </div>
+        </div>
+
+        <!-- Cuerpo desplazable con tarjetas de RAPs -->
+        <div class="app-modal-body" style="padding: 1rem 1.25rem; overflow-y: auto; flex: 1;" id="contenedorListaRapsVencidos">
+            {% if raps_vencidos %}
+            <div class="raps-vencidos-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                {% for r in raps_vencidos %}
+                <article class="raps-vencidos-item card p-3" data-fase="{{ r.fase }}" data-competencia-tipo="{{ r.competencia_tipo }}" data-instructor="{{ r.instructores|join(' ')|lower }}" data-texto="{{ (r.rap ~ ' ' ~ r.competencia ~ ' ' ~ (r.instructores|join(' ')))|lower }}" style="border-left: 4px solid {% if r.competencia_tipo == 'ingles' %}#d97706{% elif r.fase == 'ANÁLISIS' %}#e11d48{% elif r.fase == 'PLANEACIÓN' %}#d97706{% else %}#2563eb{% endif %};">
+                    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;">
+                            <span class="badge {% if r.fase == 'ANÁLISIS' %}badge-danger{% elif r.fase == 'PLANEACIÓN' %}badge-warning{% else %}badge-info{% endif %}">
+                                {{ r.fase }}
+                            </span>
+                            {% if r.competencia_tipo == 'ingles' %}
+                            <span class="badge" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d; font-size: 0.75rem;">
+                                🇬🇧 Inglés · Requisito Saber TyT
+                            </span>
+                            {% elif r.competencia_tipo == 'transversal' %}
+                            <span class="badge" style="background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 0.75rem;">
+                                Transversal
+                            </span>
+                            {% else %}
+                            <span class="badge" style="background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.75rem;">
+                                Técnica
+                            </span>
+                            {% endif %}
+                            <span class="text-danger" style="font-size: 0.82rem; font-weight: 600;">
+                                ⏱️ Debió calificarse: {{ r.fecha_plan_fin }}
+                            </span>
+                            {% if r.dias_atraso > 0 %}
+                            <small class="text-muted" style="font-size: 0.75rem;">(Vencido hace {{ (r.dias_atraso / 30)|round|int }} meses)</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-muted" style="font-size: 0.8rem; font-weight: 500;">
+                            👤 {{ r.instructores|join(', ') if r.instructores else 'Instructor Asignado' }}
+                        </div>
+                    </div>
+
+                    <h4 style="font-size: 0.95rem; font-weight: 600; margin: 0.25rem 0; line-height: 1.35; color: var(--text-heading, #0f172a);">
+                        {{ r.rap }}
+                    </h4>
+
+                    <p class="text-muted" style="font-size: 0.8rem; margin: 0.2rem 0 0.5rem 0;">
+                        <strong>Competencia:</strong> {{ r.competencia }}
+                    </p>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-light, #f1f5f9); padding-top: 0.4rem; font-size: 0.8rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div class="progress" style="width: 90px; height: 6px; background-color: #e2e8f0;">
+                                <div class="progress-bar {% if r.porcentaje_avance == 0 %}bg-danger{% else %}bg-warning{% endif %}" role="progressbar" style="width: {{ [r.porcentaje_avance, 100]|min }}%;" aria-valuenow="{{ r.porcentaje_avance }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <span class="{% if r.porcentaje_avance == 0 %}text-danger{% else %}text-warning{% endif %}" style="font-weight: 600;">
+                                {{ r.porcentaje_avance }}% aprobado ({{ r.aprendices_aprobados }}/{{ r.aprendices_total }} aprendices)
+                            </span>
+                        </div>
+                        <span class="badge badge-outline text-danger" style="font-size: 0.75rem;">
+                            ⚠️ Juicio pendiente en SOFIA Plus
+                        </span>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <p>✓ No hay Resultados de Aprendizaje con fecha vencida pendientes de calificación.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <footer class="app-modal-footer" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border, #e2e8f0); background: var(--bg-surface, #f8fafc);">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCopiarRapsModal" onclick="copiarListadoRapsModal()">
+                📋 Copiar listado para requerimiento
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="window.cerrarModal('modal-raps-vencidos')">
+                Cerrar
+            </button>
+        </footer>
+    </section>
+</dialog>
+
+<script>
+    let faseFiltroActiva = 'TODAS';
+
+    function filtrarRapsPorFase(fase, boton) {
+        faseFiltroActiva = fase;
+        const contenedorTabs = document.getElementById('rapsFaseTabs');
+        if (contenedorTabs) {
+            contenedorTabs.querySelectorAll('button').forEach(b => {
+                b.classList.remove('btn-primary', 'active');
+                b.classList.add('btn-outline-secondary');
+            });
+        }
+        if (boton) {
+            boton.classList.remove('btn-outline-secondary');
+            boton.classList.add('btn-primary', 'active');
+        }
+        aplicarFiltrosRapsModal();
+    }
+
+    function filtrarRapsTexto() {
+        aplicarFiltrosRapsModal();
+    }
+
+    function aplicarFiltrosRapsModal() {
+        const query = (document.getElementById('busquedaRapsVencidos')?.value || '').toLowerCase().trim();
+        const items = document.querySelectorAll('#contenedorListaRapsVencidos .raps-vencidos-item');
+        items.forEach(it => {
+            const itemFase = (it.dataset.fase || '').toUpperCase();
+            const itemTipo = (it.dataset.competenciaTipo || '').toLowerCase();
+            const itemTexto = it.dataset.texto || '';
+
+            let matchFase = false;
+            if (faseFiltroActiva === 'TODAS') {
+                matchFase = true;
+            } else if (faseFiltroActiva === 'INGLES') {
+                matchFase = (itemTipo === 'ingles');
+            } else if (faseFiltroActiva === 'TRANSVERSAL') {
+                matchFase = (itemTipo === 'transversal');
+            } else {
+                matchFase = (itemFase === faseFiltroActiva);
+            }
+
+            const matchTexto = (!query || itemTexto.includes(query));
+            it.style.display = (matchFase && matchTexto) ? 'block' : 'none';
+        });
+    }
+
+    function copiarListadoRapsModal() {
+        const btnCopiar = document.getElementById('btnCopiarRapsModal');
+        const items = document.querySelectorAll('#contenedorListaRapsVencidos .raps-vencidos-item');
+        let texto = "AUDITORÍA DE RAPS VENCIDOS - FICHA {{ ficha.codigo }}\n\n";
+        let count = 0;
+        items.forEach((it) => {
+            if (it.style.display !== 'none') {
+                count++;
+                const fase = it.dataset.fase || '';
+                const h4 = it.querySelector('h4')?.textContent.trim() || '';
+                const comp = it.querySelector('p')?.textContent.trim() || '';
+                const fecha = it.querySelector('.text-danger')?.textContent.trim() || '';
+                texto += `${count}. [${fase}] ${fecha}\n   ${comp}\n   RAP: ${h4}\n\n`;
+            }
+        });
+        navigator.clipboard.writeText(texto).then(() => {
+            if (btnCopiar) {
+                const textoOriginal = btnCopiar.innerHTML;
+                btnCopiar.innerHTML = `✅ ¡Copiados ${count} RAPs al portapapeles!`;
+                btnCopiar.classList.remove('btn-outline-secondary');
+                btnCopiar.classList.add('btn-success');
+                setTimeout(() => {
+                    btnCopiar.innerHTML = textoOriginal;
+                    btnCopiar.classList.remove('btn-success');
+                    btnCopiar.classList.add('btn-outline-secondary');
+                }, 2500);
+            }
+        }).catch(() => {
+            if (btnCopiar) {
+                btnCopiar.innerHTML = '⚠️ Error al copiar';
+                setTimeout(() => { btnCopiar.innerHTML = '📋 Copiar listado para requerimiento'; }, 2000);
+            }
+        });
+    }
+</script>

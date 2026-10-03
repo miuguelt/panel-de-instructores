@@ -65,10 +65,7 @@ def revisar_avisos_al_entrar():
         fichas = _fichas_autorizadas()
         hubo_cambios = False
         for ficha in fichas:
-            seguimiento = _obtener_seguimiento_solicitud(ficha)
-            hubo_cambios = actualizar_avisos(
-                ficha, seguimiento=seguimiento,
-            ) or hubo_cambios
+            hubo_cambios = actualizar_avisos(ficha) or hubo_cambios
         # Confirma antes de que la ruta cargue sus objetos ORM, solo si hubo
         # avisos nuevos; las visitas sin cambios no necesitan una escritura.
         if hubo_cambios:

@@ -33,6 +33,8 @@ from app.services.resultados_persistidos import (
 from app.services.seguimiento_fases import FASES_PROYECTO, construir_seguimiento_fases
 from app.services.versiones_archivos import ultima_version
 
+_VERSION_NO_PROVISTA = object()
+
 # Memoización por proceso; la extracción primaria ya vive en PostgreSQL.
 _CACHE_PLANEACION_PARSED: Dict[tuple, Dict[str, Any]] = {}
 
@@ -46,7 +48,36 @@ UMBRALES_ESTANDAR_FASES = [
 ]
 
 
-def _buscar_version_planeacion(ficha: Ficha) -> Optional[ArchivoFichaVersion]:
+def _buscar_planeacion_compartida(
+    ficha: Ficha,
+    cache_programa: Optional[Dict[str, Optional[ArchivoFichaVersion]]] = None,
+) -> Optional[ArchivoFichaVersion]:
+    """Busca planeación procesada de otra ficha con el mismo código de programa."""
+    if not ficha.codigo_programa:
+        return None
+    if cache_programa is not None and ficha.codigo_programa in cache_programa:
+        return cache_programa[ficha.codigo_programa]
+
+    version_compartida = (
+        ArchivoFichaVersion.query.join(Ficha, ArchivoFichaVersion.ficha_id == Ficha.id)
+        .filter(
+            Ficha.codigo_programa == ficha.codigo_programa,
+            Ficha.id != ficha.id,
+            ArchivoFichaVersion.tipo == TIPO_PLANEACION,
+            ArchivoFichaVersion.estado == 'procesado',
+        )
+        .order_by(ArchivoFichaVersion.version.desc())
+        .first()
+    )
+    if cache_programa is not None:
+        cache_programa[ficha.codigo_programa] = version_compartida
+    return version_compartida
+
+
+def _buscar_version_planeacion(
+    ficha: Ficha,
+    cache_programa: Optional[Dict[str, Optional[ArchivoFichaVersion]]] = None,
+) -> Optional[ArchivoFichaVersion]:
     """Busca la planeación procesada de la ficha o de otra ficha del mismo programa."""
     # 1. Planeación directa de la ficha
     version = ultima_version(ficha.id, TIPO_PLANEACION, solo_procesadas=True)
@@ -54,18 +85,7 @@ def _buscar_version_planeacion(ficha: Ficha) -> Optional[ArchivoFichaVersion]:
         return version
 
     # 2. Fallback: buscar planeación válida de otra ficha con el mismo código de programa
-    if ficha.codigo_programa:
-        otras_fichas = (
-            db.session.query(Ficha.id)
-            .filter(Ficha.codigo_programa == ficha.codigo_programa, Ficha.id != ficha.id)
-            .all()
-        )
-        for (otra_id,) in otras_fichas:
-            version_compartida = ultima_version(otra_id, TIPO_PLANEACION, solo_procesadas=True)
-            if version_compartida:
-                return version_compartida
-
-    return None
+    return _buscar_planeacion_compartida(ficha, cache_programa=cache_programa)
 
 
 def _obtener_planeacion_parseada(version: ArchivoFichaVersion) -> Optional[Dict[str, Any]]:
@@ -90,11 +110,13 @@ def _calcular_con_planeacion(
     version_planeacion: ArchivoFichaVersion,
     contenido_planeacion: Dict[str, Any],
     hoy: date,
+    version_reporte: Any = _VERSION_NO_PROVISTA,
 ) -> Dict[str, Any]:
     """Calcula el seguimiento exacto de fases cruzando GFPI-F-134 con los juicios."""
-    version_reporte = ultima_version(
-        ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True, recuperar_reporte=False,
-    )
+    if version_reporte is _VERSION_NO_PROVISTA:
+        version_reporte = ultima_version(
+            ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True, recuperar_reporte=False,
+        )
     analisis = construir_analisis(
         ficha,
         contenido_planeacion,
@@ -216,6 +238,50 @@ def _calcular_con_planeacion(
         nombre_fase = fase_esperada.get('nombre', '').title() if fase_esperada else 'En curso'
         mensaje_veredicto = f"Al día: Proyecto sincronizado en fase de {nombre_fase}."
 
+    raps_vencidos_detalle = []
+    items_linea = linea.get('resultados', []) if isinstance(linea, dict) else (linea if isinstance(linea, list) else [])
+    for it in items_linea:
+        if not isinstance(it, dict):
+            continue
+        fin_val = it.get('fecha_plan_fin')
+        if not fin_val:
+            continue
+        fin_dt = fin_val if isinstance(fin_val, date) else None
+        if not fin_dt:
+            from app.services.seguimiento_fases import _fecha
+            fin_dt = _fecha(fin_val)
+        if fin_dt and fin_dt <= hoy:
+            pct_av = float(it.get('porcentaje_avance') or 0.0)
+            if pct_av < 80.0:
+                ini_val = it.get('fecha_plan_inicio')
+                ini_dt = ini_val if isinstance(ini_val, date) else None
+                if not ini_dt and ini_val:
+                    from app.services.seguimiento_fases import _fecha
+                    ini_dt = _fecha(ini_val)
+                dias_atraso = (hoy - fin_dt).days if fin_dt else 0
+                comp_nom = (it.get('competencia') or '').strip()
+                comp_tipo = it.get('competencia_tipo')
+                if not comp_tipo:
+                    from app.services.importacion_ficha import clasificar_competencia
+                    comp_tipo = clasificar_competencia(comp_nom)
+                raps_vencidos_detalle.append({
+                    'fase': (it.get('fase') or '').strip().upper(),
+                    'competencia': comp_nom,
+                    'competencia_tipo': comp_tipo or 'tecnica',
+                    'rap': (it.get('rap') or '').strip(),
+                    'rap_codigo': (it.get('rap_codigo') or '').strip(),
+                    'horas': float(it.get('horas_total') or 0.0),
+                    'fecha_plan_inicio': ini_dt.strftime('%d/%m/%Y') if ini_dt else '',
+                    'fecha_plan_fin': fin_dt.strftime('%d/%m/%Y') if fin_dt else '',
+                    'fecha_plan_fin_iso': fin_dt.isoformat() if fin_dt else '',
+                    'dias_atraso': dias_atraso,
+                    'porcentaje_avance': round(pct_av, 1),
+                    'aprendices_aprobados': int(it.get('aprendices_aprobados') or 0),
+                    'aprendices_total': int(it.get('aprendices_total') or 0),
+                    'instructores': it.get('instructores') or [],
+                })
+    raps_vencidos_detalle.sort(key=lambda x: (x['fecha_plan_fin_iso'], x['fase']))
+
     return {
         'disponible': True,
         'fuente': 'planeacion_gfpi',
@@ -248,6 +314,7 @@ def _calcular_con_planeacion(
             'porcentaje_esperados': pct_esperados,
             'raps_vencidos_pendientes': raps_vencidos_pendientes,
             'fases_vencidas': fases_vencidas_info,
+            'raps_vencidos_detalle': raps_vencidos_detalle,
         },
         'mensaje_veredicto': mensaje_veredicto,
     }
@@ -456,6 +523,7 @@ def _calcular_estimado_por_juicios(
             'porcentaje_esperados': round(pct_tiempo, 1) if configurado else 0.0,
             'raps_vencidos_pendientes': raps_vencidos,
             'fases_vencidas': fases_vencidas_info,
+            'raps_vencidos_detalle': [],
         },
         'mensaje_veredicto': mensaje_veredicto,
     }
@@ -465,23 +533,33 @@ def obtener_seguimiento_fases_dashboard(
     ficha: Ficha,
     cronograma: Optional[Dict[str, Any]] = None,
     hoy: Optional[date] = None,
+    cache_programa: Optional[Dict[str, Optional[ArchivoFichaVersion]]] = None,
+    version_plan: Any = _VERSION_NO_PROVISTA,
+    version_reporte: Any = _VERSION_NO_PROVISTA,
 ) -> Dict[str, Any]:
     """Punto de entrada principal para el estado de fases del proyecto en la tarjeta."""
     hoy = hoy or fecha_corte_bogota()
     if cronograma is None:
         cronograma = obtener_cronograma(ficha, hoy)
 
-    version_plan = _buscar_version_planeacion(ficha)
-    version_reporte = ultima_version(
-        ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True, recuperar_reporte=False,
-    )
+    if version_plan is _VERSION_NO_PROVISTA:
+        version_plan = _buscar_version_planeacion(ficha, cache_programa=cache_programa)
+    elif version_plan is None:
+        version_plan = _buscar_planeacion_compartida(ficha, cache_programa=cache_programa)
+
+    if version_reporte is _VERSION_NO_PROVISTA:
+        version_reporte = ultima_version(
+            ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True, recuperar_reporte=False,
+        )
 
     def _construir():
         if version_plan:
             contenido = _obtener_planeacion_parseada(version_plan)
             if contenido and contenido.get('unidades'):
                 try:
-                    return _calcular_con_planeacion(ficha, version_plan, contenido, hoy)
+                    return _calcular_con_planeacion(
+                        ficha, version_plan, contenido, hoy, version_reporte=version_reporte
+                    )
                 except Exception:
                     current_app.logger.exception(
                         'Error calculando fases con planeación para ficha %s, usando fallback de juicios',

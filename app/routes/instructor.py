@@ -98,10 +98,10 @@ from app.models.observador import NotaObservador, TIPO_NEGATIVA
 from app.models.ficha_instructor import FichaInstructor
 from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor, FichaCompetenciaSeleccionada
 from app.models.material import MaterialFicha
+from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_PLANEACION, TIPO_REPORTE_JUICIOS
 from app.models.importacion import ImportacionJob
-from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_REPORTE_JUICIOS
 from app.services.importacion_jobs import encolar_importacion, ColaImportacionesNoDisponible
-from app.services.versiones_archivos import actualizar_estado, crear_version
+from app.services.versiones_archivos import actualizar_estado, crear_version, ultimas_versiones_por_fichas
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from app.helpers import utc_now
@@ -509,8 +509,22 @@ def _dashboard_inner():
 
     fichas.sort(key=lambda f: get_order(cronogramas[f.id]['fase']))
 
+    cache_planeaciones_prog = {}
+    versiones_lote = ultimas_versiones_por_fichas(
+        [f.id for f in fichas],
+        tipos=[TIPO_PLANEACION, TIPO_REPORTE_JUICIOS],
+        solo_procesadas=True,
+    ) if fichas else {}
+
     fases_fichas = {
-        ficha.id: obtener_seguimiento_fases_dashboard(ficha, cronogramas[ficha.id], hoy=now.date())
+        ficha.id: obtener_seguimiento_fases_dashboard(
+            ficha,
+            cronogramas[ficha.id],
+            hoy=now.date(),
+            cache_programa=cache_planeaciones_prog,
+            version_plan=versiones_lote.get((ficha.id, TIPO_PLANEACION)),
+            version_reporte=versiones_lote.get((ficha.id, TIPO_REPORTE_JUICIOS)),
+        )
         for ficha in fichas
     }
 
@@ -530,14 +544,18 @@ def _dashboard_inner():
             instructor_id=current_user.id if getattr(current_user, 'is_authenticated', False) else None,
             ahora=now,
             contexto_precalculado=ctx_recom,
+            categorias=['fases_cronograma', 'juicios_evaluativos'],
         )
         recomendaciones_fichas[fid] = recoms
 
     tyt_fichas = {}
     try:
-        from app.tyt.vistas import progreso_tyt
-        for f in fichas:
-            tyt_fichas[f.id] = progreso_tyt(f)
+        from app.tyt.consulta import obtener_seguimiento_por_fichas
+        from flask import g
+        tyt_fichas = obtener_seguimiento_por_fichas(fichas, hoy=now.date())
+        if not hasattr(g, '_seguimientos_tyt') or g._seguimientos_tyt is None:
+            g._seguimientos_tyt = {}
+        g._seguimientos_tyt.update(tyt_fichas)
     except Exception:
         current_app.logger.exception('No se pudo precargar seguimiento TyT en dashboard.')
 

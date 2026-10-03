@@ -161,3 +161,19 @@ class SeguimientoTyTTest(unittest.TestCase):
             assert 'Te falta' in html
             assert 'Luis' not in html
             assert f'/instructor/fichas/{self.ficha.id}/seguimiento-tyt' not in html
+
+    def test_obtener_seguimiento_por_fichas_en_lote(self):
+        from app.tyt.consulta import obtener_seguimiento, obtener_seguimiento_por_fichas
+        vacio = obtener_seguimiento_por_fichas([])
+        assert vacio == {}
+
+        individual = obtener_seguimiento(self.ficha)
+        lote = obtener_seguimiento_por_fichas([self.ficha])
+        assert self.ficha.id in lote
+        resultado_lote = lote[self.ficha.id]
+        assert resultado_lote['total_aprendices'] == individual['total_aprendices']
+        assert resultado_lote['total_resultados'] == individual['total_resultados']
+        assert resultado_lote['meta_resultados'] == individual['meta_resultados']
+        assert resultado_lote['promedio_aprobados'] == individual['promedio_aprobados']
+        assert resultado_lote['promedio_evaluados'] == individual['promedio_evaluados']
+

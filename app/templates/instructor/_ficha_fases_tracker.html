@@ -89,6 +89,10 @@
                 {% if vencidos_pend > 0 %}
                 <span class="fases-alerta-vencidas">⚠️ Rezago en fases culminadas:</span>
                 Hay <strong>{{ vencidos_pend }} RAPs pendientes</strong> en fases que ya terminaron ({% for fv in fases_venc_list %}{{ fv.nombre|title }}: {{ fv.pendientes }}{% if not loop.last %}, {% endif %}{% endfor %}), lo cual mantiene a la ficha anclada en {{ fases_data.fase_real.nombre|title if fases_data.fase_real else 'fases previas' }}.
+                <br>
+                <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="window.abrirModal('modal-raps-vencidos')" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;">
+                    <span>🔍</span> <span>Ver auditoría de RAPs y fechas límites</span>
+                </button>
                 {% else %}
                 Las evaluaciones asentadas se encuentran al día con respecto al calendario de fases.
                 {% endif %}

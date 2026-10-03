@@ -380,6 +380,28 @@ def ultima_version(ficha_id, tipo, solo_procesadas=False, recuperar_reporte=True
     return consulta.order_by(ArchivoFichaVersion.version.desc()).first()
 
 
+def ultimas_versiones_por_fichas(ficha_ids, tipos=None, solo_procesadas=True):
+    """Retorna un mapa {(ficha_id, tipo): version} en una sola consulta por lote."""
+    if not ficha_ids:
+        return {}
+    consulta = ArchivoFichaVersion.query.filter(ArchivoFichaVersion.ficha_id.in_(ficha_ids))
+    if tipos:
+        consulta = consulta.filter(ArchivoFichaVersion.tipo.in_(tipos))
+    if solo_procesadas:
+        consulta = consulta.filter(ArchivoFichaVersion.estado == 'procesado')
+    filas = consulta.order_by(
+        ArchivoFichaVersion.ficha_id,
+        ArchivoFichaVersion.tipo,
+        ArchivoFichaVersion.version.desc(),
+    ).all()
+    resultado = {}
+    for version in filas:
+        clave = (version.ficha_id, version.tipo)
+        if clave not in resultado:
+            resultado[clave] = version
+    return resultado
+
+
 def ruta_version(version):
     raiz = Path(current_app.config['UPLOAD_FOLDER']).resolve()
     ruta = (raiz / version.ruta_archivo).resolve()

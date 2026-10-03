@@ -220,9 +220,9 @@ class FasesDashboardTestCase(unittest.TestCase):
         mock_calendario.return_value = {'configurado': True}
         mock_linea.return_value = {
             'resultados': [
-                {'fase': 'ANÁLISIS', 'competencia': 'TIC', 'porcentaje_avance': 20},
-                {'fase': 'ANÁLISIS', 'competencia': 'TIC', 'porcentaje_avance': 100},
-                {'fase': 'PLANEACIÓN', 'competencia': 'FÍSICA', 'porcentaje_avance': 10},
+                {'fase': 'ANÁLISIS', 'competencia': 'TIC', 'rap': 'RAP TIC Vencido', 'fecha_plan_fin': date(2026, 1, 24), 'porcentaje_avance': 20},
+                {'fase': 'ANÁLISIS', 'competencia': 'TIC', 'rap': 'RAP TIC Aprobado', 'fecha_plan_fin': date(2026, 1, 24), 'porcentaje_avance': 100},
+                {'fase': 'PLANEACIÓN', 'competencia': 'FÍSICA', 'rap': 'RAP Física Vencido', 'fecha_plan_fin': date(2026, 7, 24), 'porcentaje_avance': 10},
             ]
         }
         mock_seguimiento.return_value = {
@@ -260,6 +260,10 @@ class FasesDashboardTestCase(unittest.TestCase):
         self.assertEqual(res['desfase_fases'], 2)
         self.assertEqual(res['resumen_raps']['raps_vencidos_pendientes'], 2)
         self.assertEqual(len(res['resumen_raps']['fases_vencidas']), 2)
+        self.assertIn('raps_vencidos_detalle', res['resumen_raps'])
+        self.assertEqual(len(res['resumen_raps']['raps_vencidos_detalle']), 2)
+        self.assertEqual(res['resumen_raps']['raps_vencidos_detalle'][0]['rap'], 'RAP TIC Vencido')
+        self.assertEqual(res['resumen_raps']['raps_vencidos_detalle'][0]['competencia_tipo'], 'tecnica')
         fase_0 = res['fases'][0]
         self.assertEqual(fase_0['competencias_pendientes'][0]['competencia'], 'TIC')
         self.assertEqual(fase_0['competencias_pendientes'][0]['pendientes'], 1)

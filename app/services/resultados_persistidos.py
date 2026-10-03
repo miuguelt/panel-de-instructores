@@ -139,6 +139,17 @@ def invalidar_resultados_ficha(ficha_id):
 def obtener_resultado_persistido(ficha, tipo, fecha_corte, versiones, construir):
     """Retorna el snapshot vigente o lo calcula y persiste una sola vez."""
     huella = huella_resultado(ficha, tipo, fecha_corte, versiones)
+    fila = ResultadoCalculadoFicha.query.filter_by(
+        ficha_id=ficha.id,
+        tipo=tipo,
+        fecha_corte=fecha_corte,
+        revision_calculo=ficha.revision_calculos or 1,
+        version_algoritmo=ALGORITMO_RESULTADOS,
+        huella_fuentes=huella,
+    ).first()
+    if fila:
+        return json.loads(json.dumps(fila.payload_json), object_hook=_json_object_hook)
+
     _adquirir_bloqueo(ficha.id)
     fila = ResultadoCalculadoFicha.query.filter_by(
         ficha_id=ficha.id,

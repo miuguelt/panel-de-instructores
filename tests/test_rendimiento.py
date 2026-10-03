@@ -305,5 +305,30 @@ class SinConsultasNMasUnoTestCase(BaseRendimiento):
             type(self).TAREAS = 2
 
 
+    def test_el_dashboard_del_instructor_no_escala_cuadraticamente_con_las_fichas(self):
+        _resp1, consultas_1 = self.contar_consultas('/instructor/')
+        self.assertEqual(_resp1.status_code, 200)
+
+        for i in range(1, 4):
+            f = Ficha(
+                codigo=f'399999{i}',
+                codigo_ficha=f'399999{i}',
+                nombre_programa='ADSO',
+                instructor_id=1,
+                fecha_inicio=date(2026, 1, 1),
+                fecha_fin=date(2027, 1, 1),
+            )
+            db.session.add(f)
+        db.session.commit()
+
+        _resp4, consultas_4 = self.contar_consultas('/instructor/')
+        self.assertEqual(_resp4.status_code, 200)
+        self.assertLessEqual(
+            len(consultas_4) - len(consultas_1),
+            15,
+            f'El dashboard pasó de {len(consultas_1)} a {len(consultas_4)} consultas con 3 fichas más.'
+        )
+
+
 if __name__ == '__main__':
     unittest.main()

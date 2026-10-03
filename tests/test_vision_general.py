@@ -231,3 +231,13 @@ class VisionGeneralTestCase(unittest.TestCase):
         res = self.client.get(f'/instructor/?ficha_id={self.ficha.id}', follow_redirects=False)
         self.assertEqual(res.status_code, 302)
         self.assertIn(f'/instructor/fichas/{self.ficha.id}', res.headers.get('Location'))
+
+    def test_modal_raps_vencidos_renderizado(self):
+        self._login()
+        res = self.client.get(f'/instructor/fichas/{self.ficha.id}')
+        self.assertEqual(res.status_code, 200)
+        contenido = res.get_data(as_text=True)
+        self.assertIn('modal-raps-vencidos', contenido)
+        self.assertIn('Resultados de Aprendizaje Vencidos por Calificar', contenido)
+        self.assertIn('btnCopiarRapsModal', contenido)
+        self.assertIn('rapsFaseTabs', contenido)
