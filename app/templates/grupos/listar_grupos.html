@@ -2,7 +2,7 @@
 {% block title %}Gestión de Grupos - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block head %}
-<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu" crossorigin="anonymous" defer></script>
+<script src="{{ url_for('static', filename='vendor/lucide/lucide.min.js') }}" defer></script>
 <style>
     :root {
         --bento-radius: 20px;
@@ -602,10 +602,23 @@
                             </div>
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-                            <button type="button" class="btn-group-action btn-group-edit" onclick="abrirModalEditarGrupo('{{ grupo.id }}', '{{ grupo.nombre|escape }}', {{ grupo.aprendices|map(attribute='id')|list|tojson }})" title="Editar equipo y aprendices" aria-label="Editar {{ grupo.nombre }}">
+                            <button type="button"
+                                    class="btn-group-action btn-group-edit js-btn-editar-grupo"
+                                    data-grupo-id="{{ grupo.id }}"
+                                    data-grupo-nombre="{{ grupo.nombre }}"
+                                    data-miembros="{{ grupo.aprendices|map(attribute='id')|list|tojson|forceescape }}"
+                                    onclick="abrirModalEditarGrupo(this.dataset.grupoId, this.dataset.grupoNombre, this.dataset.miembros)"
+                                    title="Editar equipo y aprendices"
+                                    aria-label="Editar {{ grupo.nombre }}">
                                 <i data-lucide="pencil" style="width:15px;height:15px;"></i>
                             </button>
-                            <button type="button" class="btn-medal-award" onclick="abrirModalInsignia('{{ grupo.id }}', '{{ grupo.nombre|escape }}')" title="Otorgar medalla a este equipo" aria-label="Otorgar medalla a {{ grupo.nombre }}">
+                            <button type="button"
+                                    class="btn-medal-award js-btn-medalla-grupo"
+                                    data-grupo-id="{{ grupo.id }}"
+                                    data-grupo-nombre="{{ grupo.nombre }}"
+                                    onclick="abrirModalInsignia(this.dataset.grupoId, this.dataset.grupoNombre)"
+                                    title="Otorgar medalla a este equipo"
+                                    aria-label="Otorgar medalla a {{ grupo.nombre }}">
                                 <i data-lucide="medal" style="width:16px;height:16px;"></i>
                             </button>
                         </div>
@@ -827,24 +840,66 @@
 </form>
 
 <script>
-lucide.createIcons();
-
 const fichaId = {{ ficha.id }};
 const mapaAsignaciones = {{ (mapa_asignaciones or {})|tojson }};
+const urlEditarGrupoTemplate = "{{ url_for('grupos.editar_grupo', ficha_id=ficha.id, grupo_id=0) }}";
+const urlCrearGrupo = "{{ url_for('grupos.crear_grupo', ficha_id=ficha.id) }}";
+const urlArchivarGrupoTemplate = "{{ url_for('grupos.archivar_grupo_route', ficha_id=ficha.id, grupo_id=0) }}";
+
 let grupoActualEditandoId = null;
 
+function renderLucideIcons() {
+    if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+    }
+}
+
+function abrirModalHelper(id) {
+    if (typeof window.abrirModal === 'function') {
+        return window.abrirModal(id);
+    }
+    const dialog = document.getElementById(id);
+    if (!dialog) return false;
+    if (typeof dialog.showModal === 'function') {
+        if (!dialog.open) dialog.showModal();
+    } else {
+        dialog.hidden = false;
+        dialog.classList.add('is-open');
+    }
+    return true;
+}
+
+function cerrarModalHelper(id, valorRetorno) {
+    if (typeof window.cerrarModal === 'function') {
+        return window.cerrarModal(id, valorRetorno);
+    }
+    const dialog = document.getElementById(id);
+    if (!dialog) return false;
+    if (typeof dialog.close === 'function') {
+        dialog.close(valorRetorno || '');
+    } else {
+        dialog.classList.remove('is-open');
+        dialog.hidden = true;
+    }
+    return true;
+}
+
+if (!window.abrirModal) window.abrirModal = abrirModalHelper;
+if (!window.cerrarModal) window.cerrarModal = cerrarModalHelper;
+
 function setTamano(val, btn) {
-    document.getElementById('inputTamanoGrupo').value = val;
+    const input = document.getElementById('inputTamanoGrupo');
+    if (input) input.value = val;
     document.querySelectorAll('.segmented-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    if (btn) btn.classList.add('active');
 }
 
 const inputTamano = document.getElementById('inputTamanoGrupo');
 if (inputTamano) {
     inputTamano.addEventListener('input', function () {
-        const val = parseInt(this.value);
+        const val = parseInt(this.value, 10);
         document.querySelectorAll('.segmented-btn').forEach(b => {
-            b.classList.toggle('active', parseInt(b.textContent) === val);
+            b.classList.toggle('active', parseInt(b.textContent, 10) === val);
         });
     });
 }
@@ -890,20 +945,27 @@ function actualizarContador() {
 }
 
 function abrirModalInsignia(grupoId, grupoNombre) {
-    document.getElementById('modalGrupoId').value = grupoId;
-    document.getElementById('modalGrupoNombre').textContent = grupoNombre;
-    abrirModal('modalInsignia');
-    lucide.createIcons();
+    const inputId = document.getElementById('modalGrupoId');
+    if (inputId) inputId.value = grupoId;
+    const elNombre = document.getElementById('modalGrupoNombre');
+    if (elNombre) elNombre.textContent = grupoNombre || '';
+    abrirModalHelper('modalInsignia');
+    renderLucideIcons();
 }
 
 function abrirModalEditarGrupo(grupoId, grupoNombre, miembrosIds) {
     grupoActualEditandoId = parseInt(grupoId, 10);
     const form = document.getElementById('formEditarGrupo');
-    form.action = `/instructor/fichas/${fichaId}/grupos/${grupoId}/editar`;
+    if (form) {
+        form.action = urlEditarGrupoTemplate.replace('/0/editar', `/${grupoId}/editar`);
+    }
 
-    document.getElementById('modalEditarEyebrow').textContent = 'Edición de Equipo';
-    document.getElementById('textoModalEditarTitulo').textContent = `Editar ${grupoNombre}`;
-    document.getElementById('editNombreGrupo').value = grupoNombre;
+    const eyebrow = document.getElementById('modalEditarEyebrow');
+    if (eyebrow) eyebrow.textContent = 'Edición de Equipo';
+    const titulo = document.getElementById('textoModalEditarTitulo');
+    if (titulo) titulo.textContent = `Editar ${grupoNombre || ''}`;
+    const inputNombre = document.getElementById('editNombreGrupo');
+    if (inputNombre) inputNombre.value = grupoNombre || '';
 
     const btnArchivar = document.getElementById('btnArchivarDesdeModal');
     if (btnArchivar) btnArchivar.style.display = 'inline-flex';
@@ -911,13 +973,23 @@ function abrirModalEditarGrupo(grupoId, grupoNombre, miembrosIds) {
     const buscador = document.getElementById('buscadorEditAprendices');
     if (buscador) buscador.value = '';
 
-    const idsSet = new Set((miembrosIds || []).map(id => parseInt(id, 10)));
+    let idsArray = [];
+    if (Array.isArray(miembrosIds)) {
+        idsArray = miembrosIds;
+    } else if (typeof miembrosIds === 'string') {
+        try {
+            idsArray = JSON.parse(miembrosIds);
+        } catch (e) {
+            idsArray = [];
+        }
+    }
+    const idsSet = new Set((idsArray || []).map(id => parseInt(id, 10)));
 
     document.querySelectorAll('.chk-edit-aprendiz').forEach(chk => {
         const aid = parseInt(chk.value, 10);
         const row = document.getElementById(`edit-row-${aid}`);
         const statusEl = document.getElementById(`edit-status-${aid}`);
-        const asignacion = mapaAsignaciones[aid];
+        const asignacion = (typeof mapaAsignaciones !== 'undefined' && mapaAsignaciones) ? mapaAsignaciones[aid] : null;
         const estaEnEsteGrupo = idsSet.has(aid);
 
         chk.checked = estaEnEsteGrupo;
@@ -941,18 +1013,23 @@ function abrirModalEditarGrupo(grupoId, grupoNombre, miembrosIds) {
     });
 
     actualizarContadorEdit();
-    abrirModal('modalEditarGrupo');
-    lucide.createIcons();
+    abrirModalHelper('modalEditarGrupo');
+    renderLucideIcons();
 }
 
 function abrirModalCrearGrupo() {
     grupoActualEditandoId = null;
     const form = document.getElementById('formEditarGrupo');
-    form.action = `/instructor/fichas/${fichaId}/grupos/crear`;
+    if (form) {
+        form.action = urlCrearGrupo;
+    }
 
-    document.getElementById('modalEditarEyebrow').textContent = 'Creación Manual';
-    document.getElementById('textoModalEditarTitulo').textContent = 'Nuevo Equipo';
-    document.getElementById('editNombreGrupo').value = '';
+    const eyebrow = document.getElementById('modalEditarEyebrow');
+    if (eyebrow) eyebrow.textContent = 'Creación Manual';
+    const titulo = document.getElementById('textoModalEditarTitulo');
+    if (titulo) titulo.textContent = 'Nuevo Equipo';
+    const inputNombre = document.getElementById('editNombreGrupo');
+    if (inputNombre) inputNombre.value = '';
 
     const btnArchivar = document.getElementById('btnArchivarDesdeModal');
     if (btnArchivar) btnArchivar.style.display = 'none';
@@ -964,7 +1041,7 @@ function abrirModalCrearGrupo() {
         const aid = parseInt(chk.value, 10);
         const row = document.getElementById(`edit-row-${aid}`);
         const statusEl = document.getElementById(`edit-status-${aid}`);
-        const asignacion = mapaAsignaciones[aid];
+        const asignacion = (typeof mapaAsignaciones !== 'undefined' && mapaAsignaciones) ? mapaAsignaciones[aid] : null;
 
         chk.checked = false;
         if (row) {
@@ -984,8 +1061,8 @@ function abrirModalCrearGrupo() {
     });
 
     actualizarContadorEdit();
-    abrirModal('modalEditarGrupo');
-    lucide.createIcons();
+    abrirModalHelper('modalEditarGrupo');
+    renderLucideIcons();
 }
 
 function toggleEditItem(checkbox, rowId) {
@@ -1024,7 +1101,7 @@ function ejecutarArchivadoGrupoActual() {
     const proceder = () => {
         const formAux = document.getElementById('formArchivarGrupoAuxiliar');
         if (formAux) {
-            formAux.action = `/instructor/fichas/${fichaId}/grupos/${grupoActualEditandoId}/archivar`;
+            formAux.action = urlArchivarGrupoTemplate.replace('/0/archivar', `/${grupoActualEditandoId}/archivar`);
             formAux.submit();
         }
     };
@@ -1036,9 +1113,7 @@ function ejecutarArchivadoGrupoActual() {
             intent: 'danger'
         }).then((confirmado) => {
             if (confirmado) {
-                if (typeof window.cerrarModal === 'function') {
-                    window.cerrarModal('modalEditarGrupo');
-                }
+                cerrarModalHelper('modalEditarGrupo');
                 proceder();
             }
         });
@@ -1047,7 +1122,37 @@ function ejecutarArchivadoGrupoActual() {
     }
 }
 
+window.abrirModalEditarGrupo = abrirModalEditarGrupo;
+window.abrirModalCrearGrupo = abrirModalCrearGrupo;
+window.abrirModalInsignia = abrirModalInsignia;
+window.cerrarModal = cerrarModalHelper;
+window.abrirModal = abrirModalHelper;
+window.toggleEditItem = toggleEditItem;
+window.setEditSeleccionados = setEditSeleccionados;
+window.actualizarContadorEdit = actualizarContadorEdit;
+window.ejecutarArchivadoGrupoActual = ejecutarArchivadoGrupoActual;
+window.setTamano = setTamano;
+window.toggleItem = toggleItem;
+window.setSeleccionados = setSeleccionados;
+window.actualizarContador = actualizarContador;
+
+document.addEventListener('click', function (e) {
+    const btnEdit = e.target.closest('.js-btn-editar-grupo');
+    if (btnEdit) {
+        e.preventDefault();
+        abrirModalEditarGrupo(btnEdit.dataset.grupoId, btnEdit.dataset.grupoNombre, btnEdit.dataset.miembros);
+        return;
+    }
+    const btnMedal = e.target.closest('.js-btn-medalla-grupo');
+    if (btnMedal) {
+        e.preventDefault();
+        abrirModalInsignia(btnMedal.dataset.grupoId, btnMedal.dataset.grupoNombre);
+        return;
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
+    renderLucideIcons();
     actualizarContador();
     const buscador = document.getElementById('buscadorAprendices');
     if (buscador) {

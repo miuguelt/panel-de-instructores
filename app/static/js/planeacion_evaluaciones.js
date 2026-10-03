@@ -34,6 +34,7 @@ function initPlaneacionEvaluaciones(doc = document) {
     const titulo = doc.getElementById('pl-evaluaciones-titulo');
     const contexto = doc.getElementById('pl-evaluaciones-contexto');
     const metricas = doc.getElementById('pl-evaluaciones-metricas');
+    const rapsResumen = doc.getElementById('pl-evaluaciones-raps');
     const selectorRap = doc.getElementById('pl-evaluaciones-rap');
     const selectorInstructor = doc.getElementById('pl-evaluaciones-instructor');
     const buscar = doc.getElementById('pl-evaluaciones-buscar');
@@ -72,7 +73,50 @@ function initPlaneacionEvaluaciones(doc = document) {
         selectorInstructor.value = '';
     }
 
+    function actualizarRaps() {
+        if (!rapsResumen) return;
+        rapsResumen.replaceChildren();
+        if (!tramo || !tramo.resultados || !tramo.resultados.length) {
+            rapsResumen.hidden = true;
+            return;
+        }
+        rapsResumen.hidden = false;
+        const cabecera = elemento('div', 'pl-eval-raps-head');
+        cabecera.append(
+            elemento('span', '', `Resultados de aprendizaje (${tramo.resultados.length} RAP)`),
+            elemento('small', 'pl-eval-nota', 'Haga clic en un resultado para filtrar los aprendices')
+        );
+        const listaRaps = elemento('div', 'pl-eval-raps-lista');
+        const rapSeleccionadoId = selectorRap.value;
+        for (const rap of tramo.resultados) {
+            const item = elemento('button', 'pl-eval-rap-item' + (rapSeleccionadoId === rap.id ? ' is-selected' : ''));
+            item.type = 'button';
+            item.setAttribute('aria-pressed', String(rapSeleccionadoId === rap.id));
+            const info = elemento('div', 'pl-eval-rap-info');
+            info.append(
+                elemento('strong', '', tituloResultado(rap)),
+                elemento('small', '', rap.actividad || 'Actividad de aprendizaje')
+            );
+            const pendientes = rap.resumen ? rap.resumen.pendientes : 0;
+            const chip = elemento(
+                'span',
+                'pl-chip pl-chip-sm pl-tone-' + (pendientes > 0 ? 'warning' : 'success') + ' is-tone',
+                pendientes > 0 ? `${pendientes} pendientes` : 'Al día'
+            );
+            item.append(info, chip);
+            item.addEventListener('click', function () {
+                selectorRap.value = selectorRap.value === rap.id ? '' : rap.id;
+                estado = 'pendiente';
+                actualizarInstructores();
+                actualizar();
+            });
+            listaRaps.append(item);
+        }
+        rapsResumen.append(cabecera, listaRaps);
+    }
+
     function actualizar() {
+        actualizarRaps();
         const resultado = seleccionado();
         const datos = resultado || tramo;
         metricas.replaceChildren();
@@ -123,7 +167,7 @@ function initPlaneacionEvaluaciones(doc = document) {
             origen = boton;
             estado = 'pendiente';
             titulo.textContent = tramo.nombre;
-            contexto.textContent = [tramo.fase, tramo.periodo].filter(Boolean).join(' · ');
+            contexto.textContent = [tramo.fase, tramo.periodo, tramo.fecha_limite ? ('Debió evaluarse: ' + tramo.fecha_limite) : ''].filter(Boolean).join(' · ');
             selectorRap.replaceChildren(elemento('option', '', 'Todos los RAP del tramo'));
             selectorRap.children[0].value = '';
             for (const rap of tramo.resultados) {
@@ -136,6 +180,12 @@ function initPlaneacionEvaluaciones(doc = document) {
             actualizarInstructores();
             actualizar();
             dialogo.showModal();
+        });
+        boton.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                boton.click();
+            }
         });
     }
     for (const boton of filtros) boton.addEventListener('click', function () {

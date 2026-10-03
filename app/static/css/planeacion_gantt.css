@@ -196,3 +196,24 @@
     .pl-page .pl-gantt-mobile-scale, .pl-gantt-abrir, .pl-gantt-evento, .pl-gantt-vacio { display: none; }
     .pl-page .pl-gantt-track { outline: none; }
 }
+
+/* Diagnóstico de competencias que ya deberían estar evaluadas */
+.pl-vencidas-card { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-divider); }
+.pl-vencidas-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: .8rem 1.2rem; margin-bottom: 1rem; }
+.pl-vencidas-head h3 { margin: .2rem 0 .4rem; font-size: 1.15rem; color: var(--text-strong); }
+.pl-vencidas-head p { margin: 0; font-size: .83rem; color: var(--text-muted); max-width: 50rem; line-height: 1.5; }
+.pl-vencidas-chips { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.pl-vencidas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 1rem; }
+.pl-vencida-item { display: flex; flex-direction: column; padding: 1rem; border-radius: 12px; border: 1px solid var(--border-divider); background: var(--bg-surface); cursor: pointer; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; text-align: left; }
+.pl-vencida-item:hover, .pl-vencida-item:focus-visible { transform: translateY(-2px); border-color: var(--accent-primary); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); outline: none; }
+.pl-vencida-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .4rem; }
+.pl-vencida-top h4 { margin: 0; font-size: .92rem; line-height: 1.45; color: var(--text-strong); flex: 1; }
+.pl-vencida-meta { display: flex; gap: .35rem .45rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.pl-vencida-fecha-caja { padding: .5rem .65rem; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-divider); margin-bottom: .6rem; }
+.pl-vencida-fecha { margin: 0; font-size: .78rem; color: var(--text-strong); line-height: 1.4; }
+.pl-vencida-progreso { margin-top: auto; margin-bottom: .6rem; }
+.pl-vencida-footer { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding-top: .6rem; border-top: 1px solid var(--border-divider); }
+.pl-vencida-raps-badge { font-size: .76rem; font-weight: 600; color: var(--text-muted); }
+.pl-btn-vencida-abrir { background: transparent; border: 0; color: var(--accent-primary); font-size: .78rem; font-weight: 700; cursor: pointer; padding: 0; }
+.pl-vencida-item:hover .pl-btn-vencida-abrir { text-decoration: underline; }
+

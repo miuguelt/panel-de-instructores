@@ -59,3 +59,18 @@
 @media print {
     .pl-eval-dialog, .pl-gantt-acciones { display: none; }
 }
+
+/* Resumen visual de resultados de aprendizaje en el modal */
+.pl-eval-raps { display: flex; flex-direction: column; gap: .6rem; margin: .8rem 0; padding: .85rem; background: var(--bg-surface); border: 1px solid var(--border-divider); border-radius: 12px; }
+.pl-eval-raps-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .4rem; font-size: .82rem; font-weight: 700; color: var(--text-strong); }
+.pl-eval-raps-lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+@media (min-width: 640px) {
+    .pl-eval-raps-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.pl-eval-rap-item { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .6rem .8rem; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-divider); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, background-color .15s ease; }
+.pl-eval-rap-item:hover { border-color: var(--accent-primary); }
+.pl-eval-rap-item.is-selected { border-color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-card)); }
+.pl-eval-rap-info { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.pl-eval-rap-info strong { font-size: .83rem; color: var(--text-strong); line-height: 1.35; white-space: normal; }
+.pl-eval-rap-info small { color: var(--text-muted); font-size: .75rem; line-height: 1.3; }
+

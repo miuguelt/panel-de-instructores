@@ -1,10 +1,14 @@
 """Escenarios del seguimiento de evaluaciones por RAP y tramo del Gantt."""
 
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 
-from app.services.evaluacion_planeacion import evaluar_resultado, construir_seguimiento
+from app.services.evaluacion_planeacion import (
+    evaluar_resultado,
+    construir_seguimiento,
+    analizar_competencias_vencidas,
+)
 
 
 def aprendiz(numero, nombre, documento=None):
@@ -83,3 +87,84 @@ class EvaluacionPlaneacionTestCase(unittest.TestCase):
         self.assertEqual(len(catalogo), 2)
         self.assertEqual(catalogo['tramo-0']['resumen']['total'], 0)
         self.assertEqual(catalogo['tramo-1']['resumen']['evaluados'], 0)
+
+    def test_analizar_competencias_vencidas_linea_vacia_devuelve_estructura_segura(self):
+        vacio = analizar_competencias_vencidas({})
+        self.assertEqual(vacio['items'], [])
+        self.assertEqual(vacio['total_deberian_evaluarse'], 0)
+        self.assertEqual(vacio['con_pendientes'], 0)
+        self.assertEqual(vacio['al_dia'], 0)
+
+    def test_analizar_competencias_vencidas_filtra_futuras_y_reporta_fechas_y_aprendices(self):
+        hoy = date(2026, 10, 15)
+        grupo = [aprendiz(1, 'Ana'), aprendiz(2, 'Carlos')]
+        r1 = dict(
+            rap='RAP 1',
+            evaluacion=evaluar_resultado(grupo, [juicio(1, 'APROBADO', instructor='Profesor X')]),
+        )
+        r2 = dict(
+            rap='RAP 2',
+            evaluacion=evaluar_resultado(grupo, [juicio(1, 'APROBADO'), juicio(2, 'APROBADO')]),
+        )
+
+        c_vencida_con_pendientes = dict(
+            nombre='Comp 1 Vencida',
+            fase='PLANEACIÓN',
+            etiqueta_trimestre='T2',
+            fecha_plan_fin=date(2026, 8, 30),
+            resultados=[r1],
+        )
+        c_vencida_al_dia = dict(
+            nombre='Comp 2 Vencida Al Día',
+            fase='INDUCCIÓN',
+            etiqueta_trimestre='T1',
+            fecha_plan_fin=date(2026, 4, 15),
+            resultados=[r2],
+        )
+        c_futura = dict(
+            nombre='Comp 3 Futura',
+            fase='EJECUCIÓN',
+            etiqueta_trimestre='T3',
+            fecha_plan_fin=date(2026, 11, 30),
+            resultados=[r1],
+        )
+        c_sin_fecha = dict(
+            nombre='Comp 4 Sin Fecha',
+            fase='EJECUCIÓN',
+            etiqueta_trimestre='T3',
+            resultados=[r1],
+        )
+
+        linea = dict(competencias=[c_futura, c_sin_fecha, c_vencida_con_pendientes, c_vencida_al_dia])
+        catalogo = construir_seguimiento(linea)
+
+        # Verificar que construir_seguimiento asocia fecha_limite
+        self.assertEqual(catalogo[c_vencida_con_pendientes['seguimiento_id']]['fecha_limite'], '30/08/2026')
+        self.assertIsNone(catalogo[c_sin_fecha['seguimiento_id']]['fecha_limite'])
+
+        analisis = analizar_competencias_vencidas(linea, hoy=hoy)
+
+        self.assertEqual(analisis['total_deberian_evaluarse'], 2)
+        self.assertEqual(analisis['con_pendientes'], 1)
+        self.assertEqual(analisis['al_dia'], 1)
+        self.assertEqual(analisis['total_aprendices_pendientes'], 1)
+
+        # La que tiene aprendices pendientes se prioriza primero
+        item_prioritario = analisis['items'][0]
+        self.assertEqual(item_prioritario['nombre'], 'Comp 1 Vencida')
+        self.assertEqual(item_prioritario['fecha_debio_evaluarse'], date(2026, 8, 30))
+        self.assertEqual(item_prioritario['fecha_debio_evaluarse_str'], '30/08/2026')
+        self.assertEqual(item_prioritario['dias_vencida'], 46)
+        self.assertEqual(item_prioritario['aprendices_pendientes'], 1)
+        self.assertEqual(item_prioritario['aprendices_evaluados'], 1)
+        self.assertEqual(item_prioritario['total_aprendices'], 2)
+        self.assertFalse(item_prioritario['esta_al_dia'])
+        self.assertEqual(item_prioritario['seguimiento_id'], c_vencida_con_pendientes['seguimiento_id'])
+
+        # La que está al día va después
+        item_al_dia = analisis['items'][1]
+        self.assertEqual(item_al_dia['nombre'], 'Comp 2 Vencida Al Día')
+        self.assertEqual(item_al_dia['fecha_debio_evaluarse_str'], '15/04/2026')
+        self.assertTrue(item_al_dia['esta_al_dia'])
+        self.assertEqual(item_al_dia['aprendices_pendientes'], 0)
+

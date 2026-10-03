@@ -92,6 +92,66 @@
         <button type="button" class="pl-btn-pedagogico" data-gantt-reset>Mostrar todas</button>
     </div>
     <p class="pl-gantt-hint">Toque un evento para abrir su información. Use «Mostrar columna» para consultar el resumen junto al calendario.</p>
+    {% set vencimiento = analisis_vencimiento or (linea.analisis_vencimiento if linea is defined else None) %}
+    {% if vencimiento and vencimiento.items %}
+    <div class="pl-vencidas-card" id="pl-analisis-vencidas">
+        <div class="pl-vencidas-head">
+            <div>
+                <span class="pl-eyebrow">Diagnóstico de tiempos de evaluación</span>
+                <h3>Competencias que ya deberían estar evaluadas</h3>
+                <p>Competencias cuyo periodo de ejecución planificado ya concluyó. Consulte la fecha límite en la que debieron ser evaluadas y seleccione cualquiera de ellas para abrir el modal con el detalle completo de la competencia, sus resultados de aprendizaje y los aprendices pendientes.</p>
+            </div>
+            <div class="pl-vencidas-chips">
+                <span class="pl-chip pl-tone-warning is-tone"><b>{{ vencimiento.con_pendientes }}</b> con pendientes</span>
+                <span class="pl-chip pl-tone-info is-tone"><b>{{ vencimiento.total_deberian_evaluarse }}</b> debieron finalizar</span>
+                {% if vencimiento.al_dia > 0 %}
+                <span class="pl-chip pl-tone-success is-tone"><b>{{ vencimiento.al_dia }}</b> evaluadas al 100%</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="pl-vencidas-grid">
+            {% for item in vencimiento.items %}
+            <article class="pl-vencida-item pl-clickable pl-tone-{{ item.tono_eval }}" data-evaluacion-target="{{ item.seguimiento_id }}" tabindex="0" role="button" aria-haspopup="dialog" aria-controls="pl-evaluaciones" aria-label="Ver resultados de aprendizaje y aprendices pendientes de {{ item.nombre }}. Debió evaluarse el {{ item.fecha_debio_evaluarse_str }}.">
+                <div class="pl-vencida-top">
+                    <h4>{{ item.nombre }}</h4>
+                    <span class="pl-chip pl-chip-sm pl-tone-{{ item.tono_eval }} is-tone">{{ item.estado_eval }}</span>
+                </div>
+                <div class="pl-vencida-meta">
+                    <span class="pl-chip pl-chip-sm">{{ item.fase }}</span>
+                    <span class="pl-chip pl-chip-sm">{{ item.etiqueta_trimestre }}</span>
+                    {% if item.dias_vencida > 0 %}
+                    <span class="pl-chip pl-chip-sm pl-tone-{{ 'danger' if item.dias_vencida > 30 else 'warning' }} is-tone">Hace {{ item.dias_vencida }} días</span>
+                    {% endif %}
+                </div>
+                <div class="pl-vencida-fecha-caja">
+                    <p class="pl-vencida-fecha">
+                        <strong>Fecha programada:</strong> debió evaluarse el <time datetime="{{ item.fecha_debio_evaluarse.isoformat() }}">{{ item.fecha_debio_evaluarse_str }}</time>
+                    </p>
+                </div>
+                <div class="pl-vencida-progreso">
+                    <div class="pl-gantt-progress-head">
+                        <small>{{ item.aprendices_evaluados }} de {{ item.total_aprendices }} aprendices evaluados</small>
+                        <small><b>{{ item.porcentaje_evaluado }}%</b></small>
+                    </div>
+                    <div class="pl-gantt-progress-bar" role="progressbar" aria-valuenow="{{ item.porcentaje_evaluado }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="pl-gantt-progress-fill pl-tone-{{ item.tono_eval }}" style="width: {{ item.porcentaje_evaluado }}%;"></div>
+                    </div>
+                </div>
+                <div class="pl-vencida-footer">
+                    <span class="pl-vencida-raps-badge">📋 {{ item.resultados_total }} RAP</span>
+                    <button type="button" class="pl-btn-vencida-abrir" data-evaluacion-target="{{ item.seguimiento_id }}" tabindex="-1" aria-hidden="true">
+                        Ver aprendices y RAP ↗
+                    </button>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+    {% elif vencimiento %}
+    <div class="pl-vencidas-card is-empty" id="pl-analisis-vencidas">
+        <p class="pl-note">Todas las competencias planificadas se encuentran dentro de sus fechas o aún no vence su periodo de evaluación programado.</p>
+    </div>
+    {% endif %}
 </section>
 
 <section class="pl-card" id="seccion-riesgos">
