@@ -78,10 +78,11 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Verificar evaluaciones y carga del directorio de aprendices
+      - name: Verificar evaluaciones, grupos y carga del directorio de aprendices
         run: |
           python -m tests.exportar_evaluaciones
           python -m tests.exportar_rendimiento
+          python -m tests.exportar_grupos
           npm run test:browser
 
       - name: Guardar evidencia visual del cronograma y las evaluaciones

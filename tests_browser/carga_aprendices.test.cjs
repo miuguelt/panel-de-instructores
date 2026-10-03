@@ -3,12 +3,25 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
+const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright');
 
 const raiz = path.resolve(__dirname, '..');
 let servidor, browser, url;
 
 test.before(async () => {
+    const destinoHtml = path.join(raiz, 'test-results', 'aprendices-navegador.html');
+    if (!fs.existsSync(destinoHtml)) {
+        const pythonBin = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+        try {
+            execFileSync(pythonBin, ['-m', 'tests.exportar_rendimiento'], { cwd: raiz, stdio: 'ignore' });
+        } catch {
+            try {
+                execFileSync('python', ['-m', 'tests.exportar_rendimiento'], { cwd: raiz, stdio: 'ignore' });
+            } catch {}
+        }
+    }
+
     servidor = http.createServer((req, res) => {
         const pathname = new URL(req.url, 'http://localhost').pathname;
         const destino = pathname.startsWith('/static/')
