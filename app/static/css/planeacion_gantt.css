@@ -209,7 +209,10 @@
 .pl-vencida-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .4rem; }
 .pl-vencida-top h4 { margin: 0; font-size: .92rem; line-height: 1.45; color: var(--text-strong); flex: 1; }
 .pl-vencida-meta { display: flex; gap: .35rem .45rem; flex-wrap: wrap; margin-bottom: .6rem; }
-.pl-vencida-fecha-caja { padding: .5rem .65rem; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-divider); margin-bottom: .6rem; }
+.pl-vencida-fecha-caja { display: flex; flex-direction: column; gap: .35rem; padding: .5rem .65rem; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-divider); margin-bottom: .6rem; }
+.pl-vencida-fecha-fila { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: .25rem .5rem; font-size: .78rem; line-height: 1.35; }
+.pl-vencida-fecha-label { color: var(--text-muted); font-size: .76rem; }
+.pl-vencida-fecha-val { color: var(--text-strong); font-weight: 600; font-size: .78rem; }
 .pl-vencida-fecha { margin: 0; font-size: .78rem; color: var(--text-strong); line-height: 1.4; }
 .pl-vencida-progreso { margin-top: auto; margin-bottom: .6rem; }
 .pl-vencida-footer { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding-top: .6rem; border-top: 1px solid var(--border-divider); }

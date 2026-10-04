@@ -310,3 +310,54 @@ class PlaneacionUXTestCase(unittest.TestCase):
         self.assertIn('Aplica estándares de codificación limpios.', html)
         self.assertIn('Planear arquitectura de software:', html)
 
+    def test_tarjeta_competencia_vencida_muestra_fechas_debajo_de_progreso(self):
+        from flask import render_template
+        analisis_vencimiento = {
+            'competencias': [
+                {
+                    'nombre': 'Construcción de software',
+                    'seguimiento_id': 'tramo-0',
+                    'tono_eval': 'warning',
+                    'estado_eval': '5 pendientes (75% evaluado)',
+                    'fase': 'EJECUCIÓN',
+                    'etiqueta_trimestre': 'T3',
+                    'dias_vencida': 15,
+                    'aprendices_evaluados': 15,
+                    'total_aprendices': 20,
+                    'porcentaje_evaluado': 75,
+                    'fecha_debio_evaluarse': date(2026, 8, 30),
+                    'fecha_debio_evaluarse_str': '30/08/2026',
+                    'fecha_se_evaluo': date(2026, 9, 10),
+                    'fecha_se_evaluo_str': '10/09/2026 (parcial)',
+                    'resultados_total': 3,
+                }
+            ],
+            'total_deberian_evaluarse': 1,
+            'con_pendientes': 1,
+            'al_dia': 0,
+        }
+        with self.app.test_request_context():
+            html = render_template(
+                'instructor/_planeacion_mapa.html',
+                linea={'competencias': [], 'fases': [], 'resumen': {}},
+                calendario={'bloques': []},
+                analisis_vencimiento=analisis_vencimiento,
+                criticas=[],
+            )
+
+        self.assertIn('pl-vencidas-grid', html)
+        self.assertIn('15 de 20 aprendices evaluados', html)
+        self.assertIn('role="progressbar"', html)
+
+        # Verificar que debajo de la barra de progreso están las fechas:
+        idx_progreso = html.find('class="pl-vencida-progreso"')
+        idx_barra = html.find('class="pl-gantt-progress-bar"', idx_progreso)
+        idx_fechas = html.find('class="pl-vencida-fecha-caja"', idx_barra)
+        self.assertTrue(idx_progreso < idx_barra < idx_fechas, 'Las fechas deben ubicarse debajo de la barra de progreso.')
+
+        self.assertIn('Debió evaluarse:', html)
+        self.assertIn('30/08/2026', html)
+        self.assertIn('Se evaluó:', html)
+        self.assertIn('10/09/2026 (parcial)', html)
+
+

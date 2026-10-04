@@ -111,7 +111,7 @@
         </div>
         <div class="pl-vencidas-grid">
             {% for item in vencimiento.competencias %}
-            <article class="pl-vencida-item pl-clickable pl-tone-{{ item.tono_eval }}" data-vencida-target="{{ item.seguimiento_id }}" tabindex="0" role="button" aria-haspopup="dialog" aria-controls="pl-evaluaciones" aria-label="Ver resultados de aprendizaje y aprendices pendientes de {{ item.nombre }}. Debió evaluarse el {{ item.fecha_debio_evaluarse_str }}.">
+            <article class="pl-vencida-item pl-clickable pl-tone-{{ item.tono_eval }}" data-vencida-target="{{ item.seguimiento_id }}" tabindex="0" role="button" aria-haspopup="dialog" aria-controls="pl-evaluaciones" aria-label="Ver resultados de aprendizaje y aprendices pendientes de {{ item.nombre }}. Debió evaluarse el {{ item.fecha_debio_evaluarse_str }}; se evaluó: {{ item.fecha_se_evaluo_str }}.">
                 <div class="pl-vencida-top">
                     <h4>{{ item.nombre }}</h4>
                     <span class="pl-chip pl-chip-sm pl-tone-{{ item.tono_eval }} is-tone">{{ item.estado_eval }}</span>
@@ -123,11 +123,6 @@
                     <span class="pl-chip pl-chip-sm pl-tone-{{ 'danger' if item.dias_vencida > 30 else 'warning' }} is-tone">Hace {{ item.dias_vencida }} días</span>
                     {% endif %}
                 </div>
-                <div class="pl-vencida-fecha-caja">
-                    <p class="pl-vencida-fecha">
-                        <strong>Fecha programada:</strong> debió evaluarse el <time datetime="{{ item.fecha_debio_evaluarse.isoformat() }}">{{ item.fecha_debio_evaluarse_str }}</time>
-                    </p>
-                </div>
                 <div class="pl-vencida-progreso">
                     <div class="pl-gantt-progress-head">
                         <small>{{ item.aprendices_evaluados }} de {{ item.total_aprendices }} aprendices evaluados</small>
@@ -135,6 +130,16 @@
                     </div>
                     <div class="pl-gantt-progress-bar" role="progressbar" aria-valuenow="{{ item.porcentaje_evaluado }}" aria-valuemin="0" aria-valuemax="100">
                         <div class="pl-gantt-progress-fill pl-tone-{{ item.tono_eval }}" style="width: {{ item.porcentaje_evaluado }}%;"></div>
+                    </div>
+                </div>
+                <div class="pl-vencida-fecha-caja">
+                    <div class="pl-vencida-fecha-fila">
+                        <span class="pl-vencida-fecha-label">Debió evaluarse:</span>
+                        <strong class="pl-vencida-fecha-val"><time datetime="{{ item.fecha_debio_evaluarse.isoformat() if item.fecha_debio_evaluarse else '' }}">{{ item.fecha_debio_evaluarse_str }}</time></strong>
+                    </div>
+                    <div class="pl-vencida-fecha-fila">
+                        <span class="pl-vencida-fecha-label">Se evaluó:</span>
+                        <strong class="pl-vencida-fecha-val">{{ item.fecha_se_evaluo_str }}</strong>
                     </div>
                 </div>
                 <div class="pl-vencida-footer">

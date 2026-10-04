@@ -82,13 +82,62 @@ def construir_seguimiento(linea):
         competencia['evaluacion_resumen'] = resumen
         fecha_fin = competencia.get('fecha_plan_fin')
         fecha_limite = fecha_fin.strftime('%d/%m/%Y') if fecha_fin else None
+        fecha_eval = extraer_fecha_evaluacion(competencia)
+        fecha_eval_str = (
+            fecha_eval.strftime('%d/%m/%Y') if fecha_eval else (
+                'Sin evaluar' if resumen['evaluados'] == 0 else 'Sin fecha registrada'
+            )
+        )
         catalogo[identificador] = {
             'nombre': competencia['nombre'], 'fase': competencia.get('fase') or '',
             'periodo': competencia.get('etiqueta_trimestre') or '',
             'fecha_limite': fecha_limite,
+            'fecha_se_evaluo': fecha_eval_str,
             'resumen': resumen, 'resultados': resultados, 'aprendices': filas,
         }
     return catalogo
+
+
+def extraer_fecha_evaluacion(competencia):
+    """Recolecta y devuelve la fecha más reciente en que se evaluó la competencia.
+
+    Considera la fecha de cierre real de la competencia o sus RAPs, la última
+    evaluación registrada, las aprobaciones con marca temporal y los juicios
+    individuales de cada aprendiz. Devuelve un objeto date o None.
+    """
+    fechas = []
+
+    def _agregar(val):
+        if not val:
+            return
+        if isinstance(val, datetime):
+            fechas.append(val.date())
+        elif isinstance(val, date):
+            fechas.append(val)
+        elif isinstance(val, str):
+            for fmt in ('%d/%m/%Y', '%Y-%m-%d'):
+                try:
+                    fechas.append(datetime.strptime(val.strip(), fmt).date())
+                    break
+                except ValueError:
+                    pass
+
+    # 1. Metadatos directos de la competencia
+    _agregar(competencia.get('fecha_cierre_real'))
+    _agregar(competencia.get('fecha_evaluacion'))
+
+    # 2. De sus resultados y evaluaciones
+    for resultado in competencia.get('resultados', []):
+        _agregar(resultado.get('fecha_cierre_real'))
+        _agregar(resultado.get('ultima_evaluacion'))
+        for fecha_aprobacion in resultado.get('fechas_aprobacion') or []:
+            _agregar(fecha_aprobacion)
+        evaluacion = resultado.get('evaluacion') or {}
+        for aprendiz in evaluacion.get('aprendices', []):
+            if aprendiz.get('estado') == 'evaluado':
+                _agregar(aprendiz.get('fecha'))
+
+    return max(fechas) if fechas else None
 
 
 def analizar_competencias_vencidas(linea, hoy=None):
@@ -122,6 +171,22 @@ def analizar_competencias_vencidas(linea, hoy=None):
         esta_al_dia = (pendientes == 0 and total_aprendices > 0)
         pct_evaluado = round((evaluados / total_aprendices) * 100) if total_aprendices else 0
 
+        fecha_eval = extraer_fecha_evaluacion(competencia)
+        if total_aprendices == 0:
+            fecha_se_evaluo_str = 'Sin aprendices'
+        elif evaluados == 0:
+            fecha_se_evaluo_str = 'Sin evaluar'
+        elif fecha_eval:
+            if esta_al_dia:
+                fecha_se_evaluo_str = fecha_eval.strftime('%d/%m/%Y')
+            else:
+                fecha_se_evaluo_str = f"{fecha_eval.strftime('%d/%m/%Y')} (parcial)"
+        else:
+            if esta_al_dia:
+                fecha_se_evaluo_str = 'Evaluada (sin fecha registrada)'
+            else:
+                fecha_se_evaluo_str = 'Sin fecha registrada (parcial)'
+
         if total_aprendices == 0:
             estado_eval = 'Sin aprendices'
             tono_eval = 'neutral'
@@ -141,6 +206,10 @@ def analizar_competencias_vencidas(linea, hoy=None):
             'etiqueta_trimestre': competencia.get('etiqueta_trimestre') or '',
             'fecha_debio_evaluarse': fecha_fin,
             'fecha_debio_evaluarse_str': fecha_fin.strftime('%d/%m/%Y'),
+            'fecha_se_evaluo': fecha_eval,
+            'fecha_se_evaluo_str': fecha_se_evaluo_str,
+            'fecha_evaluacion': fecha_eval,
+            'fecha_evaluacion_str': fecha_se_evaluo_str,
             'dias_vencida': dias_vencida,
             'total_aprendices': total_aprendices,
             'aprendices_evaluados': evaluados,

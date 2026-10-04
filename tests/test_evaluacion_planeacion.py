@@ -8,6 +8,7 @@ from app.services.evaluacion_planeacion import (
     evaluar_resultado,
     construir_seguimiento,
     analizar_competencias_vencidas,
+    extraer_fecha_evaluacion,
 )
 
 
@@ -154,6 +155,7 @@ class EvaluacionPlaneacionTestCase(unittest.TestCase):
         self.assertEqual(item_prioritario['nombre'], 'Comp 1 Vencida')
         self.assertEqual(item_prioritario['fecha_debio_evaluarse'], date(2026, 8, 30))
         self.assertEqual(item_prioritario['fecha_debio_evaluarse_str'], '30/08/2026')
+        self.assertEqual(item_prioritario['fecha_se_evaluo_str'], 'Sin fecha registrada (parcial)')
         self.assertEqual(item_prioritario['dias_vencida'], 46)
         self.assertEqual(item_prioritario['aprendices_pendientes'], 1)
         self.assertEqual(item_prioritario['aprendices_evaluados'], 1)
@@ -165,6 +167,128 @@ class EvaluacionPlaneacionTestCase(unittest.TestCase):
         item_al_dia = analisis['items'][1]
         self.assertEqual(item_al_dia['nombre'], 'Comp 2 Vencida Al Día')
         self.assertEqual(item_al_dia['fecha_debio_evaluarse_str'], '15/04/2026')
+        self.assertEqual(item_al_dia['fecha_se_evaluo_str'], 'Evaluada (sin fecha registrada)')
         self.assertTrue(item_al_dia['esta_al_dia'])
         self.assertEqual(item_al_dia['aprendices_pendientes'], 0)
+
+    def test_extraer_fecha_evaluacion_fuentes_y_prioridades(self):
+        # 1. Directo de fecha_cierre_real
+        comp1 = {'fecha_cierre_real': date(2026, 5, 20)}
+        self.assertEqual(extraer_fecha_evaluacion(comp1), date(2026, 5, 20))
+
+        # 2. De resultados con fechas de aprobacion y ultima_evaluacion
+        comp2 = {
+            'resultados': [
+                {'fecha_cierre_real': date(2026, 4, 10), 'ultima_evaluacion': datetime(2026, 6, 1, 10, 0)},
+                {'fechas_aprobacion': [date(2026, 5, 15), '2026-06-05']},
+            ]
+        }
+        self.assertEqual(extraer_fecha_evaluacion(comp2), date(2026, 6, 5))
+
+        # 3. De aprendices evaluados con formato DD/MM/YYYY
+        comp3 = {
+            'resultados': [
+                {
+                    'evaluacion': {
+                        'aprendices': [
+                            {'estado': 'evaluado', 'fecha': '12/07/2026'},
+                            {'estado': 'pendiente', 'fecha': '30/12/2026'},
+                        ]
+                    }
+                }
+            ]
+        }
+        self.assertEqual(extraer_fecha_evaluacion(comp3), date(2026, 7, 12))
+
+        # 4. Vacía devuelve None
+        self.assertIsNone(extraer_fecha_evaluacion({}))
+
+    def test_analizar_competencias_vencidas_expone_fecha_debio_evaluarse_y_se_evaluo(self):
+        hoy = date(2026, 10, 1)
+        grupo = [aprendiz(1, 'Ana'), aprendiz(2, 'Carlos')]
+
+        # Caso A: Evaluada al 100% con fecha registrada
+        r_completo = dict(
+            rap='RAP Completo',
+            evaluacion=evaluar_resultado(grupo, [
+                juicio(1, 'APROBADO', fecha=datetime(2026, 5, 10)),
+                juicio(2, 'APROBADO', fecha=datetime(2026, 5, 15)),
+            ]),
+        )
+        c_completa = dict(
+            nombre='Comp 100%',
+            fase='FASE 1',
+            fecha_plan_fin=date(2026, 5, 1),
+            resultados=[r_completo],
+        )
+
+        # Caso B: Parcial con fecha registrada
+        r_parcial = dict(
+            rap='RAP Parcial',
+            evaluacion=evaluar_resultado(grupo, [
+                juicio(1, 'APROBADO', fecha=datetime(2026, 6, 12)),
+            ]),
+        )
+        c_parcial = dict(
+            nombre='Comp Parcial',
+            fase='FASE 2',
+            fecha_plan_fin=date(2026, 6, 1),
+            resultados=[r_parcial],
+        )
+
+        # Caso C: Sin evaluar (0 evaluados)
+        r_vacio = dict(
+            rap='RAP Sin Evaluar',
+            evaluacion=evaluar_resultado(grupo, []),
+        )
+        c_sin_evaluar = dict(
+            nombre='Comp Sin Evaluar',
+            fase='FASE 3',
+            fecha_plan_fin=date(2026, 7, 1),
+            resultados=[r_vacio],
+        )
+
+        # Caso D: Sin aprendices
+        c_sin_aprendices = dict(
+            nombre='Comp Sin Grupo',
+            fase='FASE 4',
+            fecha_plan_fin=date(2026, 8, 1),
+            resultados=[dict(rap='RAP', evaluacion=evaluar_resultado([], []))],
+        )
+
+        linea = dict(competencias=[c_completa, c_parcial, c_sin_evaluar, c_sin_aprendices])
+        catalogo = construir_seguimiento(linea)
+
+        # Verificar catalogo en construir_seguimiento
+        id_completa = c_completa['seguimiento_id']
+        self.assertEqual(catalogo[id_completa]['fecha_limite'], '01/05/2026')
+        self.assertEqual(catalogo[id_completa]['fecha_se_evaluo'], '15/05/2026')
+
+        analisis = analizar_competencias_vencidas(linea, hoy=hoy)
+        items_map = {item['nombre']: item for item in analisis['items']}
+
+        # Validaciones de Caso A: 100%
+        item_a = items_map['Comp 100%']
+        self.assertEqual(item_a['fecha_debio_evaluarse'], date(2026, 5, 1))
+        self.assertEqual(item_a['fecha_debio_evaluarse_str'], '01/05/2026')
+        self.assertEqual(item_a['fecha_se_evaluo'], date(2026, 5, 15))
+        self.assertEqual(item_a['fecha_se_evaluo_str'], '15/05/2026')
+
+        # Validaciones de Caso B: Parcial
+        item_b = items_map['Comp Parcial']
+        self.assertEqual(item_b['fecha_debio_evaluarse_str'], '01/06/2026')
+        self.assertEqual(item_b['fecha_se_evaluo'], date(2026, 6, 12))
+        self.assertEqual(item_b['fecha_se_evaluo_str'], '12/06/2026 (parcial)')
+
+        # Validaciones de Caso C: Sin evaluar
+        item_c = items_map['Comp Sin Evaluar']
+        self.assertEqual(item_c['fecha_debio_evaluarse_str'], '01/07/2026')
+        self.assertIsNone(item_c['fecha_se_evaluo'])
+        self.assertEqual(item_c['fecha_se_evaluo_str'], 'Sin evaluar')
+
+        # Validaciones de Caso D: Sin grupo
+        item_d = items_map['Comp Sin Grupo']
+        self.assertEqual(item_d['fecha_debio_evaluarse_str'], '01/08/2026')
+        self.assertIsNone(item_d['fecha_se_evaluo'])
+        self.assertEqual(item_d['fecha_se_evaluo_str'], 'Sin aprendices')
 

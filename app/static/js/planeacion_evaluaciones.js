@@ -166,7 +166,12 @@ function initPlaneacionEvaluaciones(doc = document) {
         origen = elementoOrigen;
         estado = 'pendiente';
         titulo.textContent = tramo.nombre;
-        contexto.textContent = [tramo.fase, tramo.periodo, tramo.fecha_limite ? ('Debió evaluarse: ' + tramo.fecha_limite) : ''].filter(Boolean).join(' · ');
+        contexto.textContent = [
+            tramo.fase,
+            tramo.periodo,
+            tramo.fecha_limite ? ('Debió evaluarse: ' + tramo.fecha_limite) : '',
+            tramo.fecha_se_evaluo && tramo.fecha_se_evaluo !== 'Sin evaluar' ? ('Se evaluó: ' + tramo.fecha_se_evaluo) : ''
+        ].filter(Boolean).join(' · ');
         selectorRap.replaceChildren(elemento('option', '', 'Todos los RAP del tramo'));
         selectorRap.children[0].value = '';
         for (const rap of tramo.resultados) {
