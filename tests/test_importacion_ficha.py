@@ -332,6 +332,14 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.assertEqual(registros[0]['documento'], '11223344')
         self.assertEqual(registros[0]['nombre'], 'Diana')
 
+    def test_leer_archivo_fallback_xls_con_extension_xlsx(self):
+        from pathlib import Path
+        contenido = (Path(__file__).parent / 'fixtures/rendimiento_metadatos.xls').read_bytes()
+        archivo = FileStorage(stream=BytesIO(contenido), filename='reporte_con_extension_falsa.xlsx')
+        metadata, registros = _leer_archivo(archivo)
+        self.assertEqual(metadata['codigo_ficha'], '3999999')
+        self.assertEqual(len(registros), 35)
+
     def test_ruta_cargar_excel_retorno_juicios(self):
         cliente = self.app.test_client()
         cliente.post('/login', data={'correo': self.a.correo, 'password': 'x'})

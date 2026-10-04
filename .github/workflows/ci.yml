@@ -137,3 +137,48 @@ jobs:
         run: |
           echo "### 📋 Panel de Instructores CI Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Estado**: ${{ job.status == 'success' && '✅ Aprobado' || '❌ Fallido' }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    name: Despliegue a Producción (Coolify)
+    needs: [test-suite]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Disparar Webhook de Despliegue en Coolify
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+        run: |
+          if [ -z "$COOLIFY_WEBHOOK" ]; then
+            echo "ℹ️ El secreto COOLIFY_WEBHOOK no está configurado en GitHub Secrets."
+            echo "Para habilitar el despliegue automático continuo, añade COOLIFY_WEBHOOK en Settings -> Secrets."
+            echo "Los tests pasaron al 100% exitosamente; el build es apto para producción."
+            exit 0
+          fi
+
+          echo "🚀 Disparando webhook de despliegue en Coolify..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$COOLIFY_WEBHOOK")
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Respuesta Coolify: $BODY"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Despliegue disparado exitosamente en Coolify."
+          else
+            echo "❌ Error al disparar el despliegue en Coolify (Código HTTP: $HTTP_STATUS)."
+            exit 1
+          fi
+
+      - name: Deployment Step Summary
+        if: always()
+        run: |
+          echo "### 🚀 Resumen del Despliegue a Producción" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rama**: \`${{ github.ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Disparado por**: \`${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality Gate**: Suite hermética de pruebas y cobertura aprobadas." >> $GITHUB_STEP_SUMMARY
+

@@ -276,12 +276,21 @@ def _parse_rows(rows):
     return registros
 
 
+class _ErrorApertura(Exception):
+    """Error al abrir el formato binario del libro (no imputable a metadatos ni filas)."""
+    pass
+
+
 def _leer_con_xlrd(contenido, solo_metadata=False):
     import xlrd
-    libro = xlrd.open_workbook(file_contents=contenido, on_demand=solo_metadata)
+    try:
+        libro = xlrd.open_workbook(file_contents=contenido, on_demand=solo_metadata)
+    except Exception as exc:
+        raise _ErrorApertura('No se pudo abrir como formato .xls (BIFF)') from exc
+
     try:
         hoja = libro.sheet_by_index(0)
-        limite = min(hoja.nrows, 35) if solo_metadata else hoja.nrows
+        limite = min(hoja.nrows, 20) if solo_metadata else hoja.nrows
         filas = [hoja.row_values(i) for i in range(limite)]
         return _extraer_metadata(filas), [] if solo_metadata else _parse_rows(filas)
     finally:
@@ -289,10 +298,14 @@ def _leer_con_xlrd(contenido, solo_metadata=False):
 
 
 def _leer_con_openpyxl(contenido, solo_metadata=False):
-    libro = openpyxl.load_workbook(io.BytesIO(contenido), read_only=True, data_only=True)
+    try:
+        libro = openpyxl.load_workbook(io.BytesIO(contenido), read_only=True, data_only=True)
+    except Exception as exc:
+        raise _ErrorApertura('No se pudo abrir como formato .xlsx (OpenXML)') from exc
+
     try:
         hoja = libro.active
-        filas = list(hoja.iter_rows(max_row=35 if solo_metadata else None, values_only=True))
+        filas = list(hoja.iter_rows(max_row=20 if solo_metadata else None, values_only=True))
         metadata = _extraer_metadata(filas)
         return metadata, [] if solo_metadata else _parse_rows(filas)
     finally:
@@ -304,24 +317,28 @@ def _leer_archivo(archivo, solo_metadata=False):
     extension = (archivo.filename or '').lower().rsplit('.', 1)[-1]
     if extension == 'xls':
         try:
+            import xlrd
+        except ImportError as exc:
+            raise RuntimeError('Para cargar reportes .xls instala la dependencia xlrd==2.0.1.') from exc
+        try:
             return _leer_con_xlrd(contenido, solo_metadata=solo_metadata)
-        except Exception:
+        except _ErrorApertura as exc_apertura:
             try:
                 return _leer_con_openpyxl(contenido, solo_metadata=solo_metadata)
-            except Exception as exc:
+            except _ErrorApertura:
                 raise ErrorImportacion(
-                    'El archivo no es un Excel (.xls o .xlsx) válido o está dañado.'
-                ) from exc
+                    'El archivo .xls no es válido o está dañado.'
+                ) from exc_apertura
     else:
         try:
             return _leer_con_openpyxl(contenido, solo_metadata=solo_metadata)
-        except Exception:
+        except _ErrorApertura as exc_apertura:
             try:
                 return _leer_con_xlrd(contenido, solo_metadata=solo_metadata)
-            except Exception as exc:
+            except _ErrorApertura:
                 raise ErrorImportacion(
                     'El archivo no es un Excel válido o está dañado.'
-                ) from exc
+                ) from exc_apertura
 
 
 def leer_metadata_archivo(archivo):

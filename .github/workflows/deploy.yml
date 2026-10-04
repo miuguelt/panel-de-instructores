@@ -1,0 +1,101 @@
+name: DevBrain CD - Deploy Production (Panel de Instructores)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+concurrency:
+  group: cd-panel-production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-suite:
+    name: Validar Suite de Pruebas y Cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run JavaScript Tests
+        run: |
+          node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/grupo_chat.js --test tests_js/grupo_chat.test.cjs
+          node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_navegacion.js --test tests_js/planeacion_navegacion.test.cjs
+          node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_evaluaciones.js --test tests_js/planeacion_evaluaciones.test.cjs
+          node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_gantt.js --test tests_js/planeacion_gantt.test.cjs
+          node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/modal-system.js --test tests_js/modal_system.test.cjs
+          node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/loading-indicator.js --test tests_js/loading_indicator.test.cjs
+          node --test tests_js/grupos_layout.test.cjs
+
+      - name: Run Backend Pytest Suite
+        env:
+          FLASK_ENV: testing
+          DATABASE_URL: "sqlite:///:memory:"
+        run: |
+          echo "Ejecutando pruebas de validación previas al despliegue..."
+          python -m pytest tests/ -v --tb=short --cov=app --cov-branch --cov-report=xml:coverage.xml --cov-fail-under=75
+
+      - name: Verificar Cobertura de Funciones al 100%
+        run: python scripts/check_function_coverage.py --source app --coverage-xml coverage.xml
+
+  trigger-coolify:
+    name: Desplegar a Producción en Coolify
+    needs: [validate-suite]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Disparar Webhook de Despliegue en Coolify
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+        run: |
+          if [ -z "$COOLIFY_WEBHOOK" ]; then
+            echo "⚠️ ADVERTENCIA: El secreto COOLIFY_WEBHOOK no está configurado en GitHub Secrets."
+            echo "Para habilitar el despliegue automático continuo, añade COOLIFY_WEBHOOK en Settings -> Secrets."
+            echo "Los tests pasaron al 100% exitosamente; el build es apto para producción."
+            exit 0
+          fi
+
+          echo "🚀 Disparando webhook de despliegue en Coolify..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$COOLIFY_WEBHOOK")
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Respuesta Coolify: $BODY"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Despliegue disparado exitosamente en Coolify."
+          else
+            echo "❌ Error al disparar el despliegue en Coolify (Código HTTP: $HTTP_STATUS)."
+            exit 1
+          fi
+
+      - name: Resumen del Despliegue
+        if: always()
+        run: |
+          echo "### 🚀 Resumen del Despliegue a Producción (Panel de Instructores)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rama**: \`${{ github.ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Disparado por**: \`${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality Gate**: Suite hermética de pruebas y cobertura aprobadas al 100%." >> $GITHUB_STEP_SUMMARY
