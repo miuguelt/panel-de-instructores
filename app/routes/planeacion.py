@@ -32,6 +32,9 @@ from app.services.resultados_persistidos import (
     obtener_contenido_documento,
     obtener_resultado_persistido,
 )
+from app.services.recuperacion_fuentes import recuperar_fuentes_ficha
+from app.services.recuperacion_planeacion import asegurar_version_planeacion
+from app.services.recuperacion_programa import asegurar_version_programa
 from app.services.versiones_archivos import (
     actualizar_estado,
     asegurar_version_reporte,
@@ -359,10 +362,15 @@ def descargar_version(ficha_id, version_id):
         flash('Archivo no encontrado.', 'error')
         return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))
 
-    if version.tipo == TIPO_REPORTE_JUICIOS:
-        version_actualizada = asegurar_version_reporte(ficha)
-        if version_actualizada and version_actualizada.id == version.id:
-            version = version_actualizada
+    asegurar = {
+        TIPO_REPORTE_JUICIOS: asegurar_version_reporte,
+        TIPO_PLANEACION: asegurar_version_planeacion,
+        TIPO_PROGRAMA: asegurar_version_programa,
+    }.get(version.tipo)
+    if asegurar:
+        v_act = asegurar(ficha)
+        if v_act and v_act.id == version.id:
+            version = v_act
 
     try:
         raiz, relativa, _candidatos = resolver_archivo_subido(version.ruta_archivo)
@@ -372,3 +380,20 @@ def descargar_version(ficha_id, version_id):
         flash('La versión ya no está disponible en el almacenamiento.', 'error')
         return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))
 
+
+@planeacion_bp.route('/fichas/<int:ficha_id>/planeacion/recuperar-fuentes', methods=['POST'])
+@login_required
+def recuperar_fuentes(ficha_id):
+    ficha = _ficha_autorizada(ficha_id)
+    if not ficha:
+        flash('Ficha no encontrada.', 'error')
+        return redirect(url_for('instructor.fichas'))
+
+    res = recuperar_fuentes_ficha(ficha, current_user.id)
+    msg = (
+        f'Se recuperaron exitosamente {res["total_nuevas"]} archivo(s): {", ".join(res["nuevas"])}.'
+        if res['total_nuevas'] > 0
+        else 'No se encontraron nuevos archivos para recuperar o ya están al día.'
+    )
+    flash(msg, 'success' if res['total_nuevas'] > 0 else 'info')
+    return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))

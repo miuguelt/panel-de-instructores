@@ -7,16 +7,29 @@
             <h2>Archivos fuente e historial</h2>
             <p>Estado de los tres archivos que alimentan esta vista. Cada carga crea una versión nueva sin sobrescribir la anterior, así que el historial completo queda descargable.</p>
         </div>
-        <a href="#centro-carga" class="btn btn-sm btn-outline" title="Ir al Centro de Carga para subir una nueva versión">⬆️ Actualizar archivos</a>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <form method="POST" action="{{ url_for('planeacion.recuperar_fuentes', ficha_id=ficha.id) }}" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 0.35rem;" title="Buscar y recuperar automáticamente archivos fuente desde el almacenamiento o fichas hermanas del mismo programa">
+                    <span>⚡</span> <span>Recuperar fuentes</span>
+                </button>
+            </form>
+            <a href="#centro-carga" class="btn btn-sm btn-outline" title="Ir al Centro de Carga para subir una nueva versión">⬆️ Actualizar archivos</a>
+        </div>
     </div>
 
     <div class="pl-docs">
         <article class="pl-doc {{ 'is-listo' if version_planeacion else 'is-falta' }}">
             <header>
                 <h3>Planeación pedagógica</h3>
-                <span class="pl-chip pl-tone-{{ 'success' if version_planeacion else 'warning' }} is-tone">
-                    {{ 'v' ~ version_planeacion.version if version_planeacion else 'Sin cargar' }}
-                </span>
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                    {% if version_planeacion and version_planeacion.detalle and 'recuperad' in version_planeacion.detalle.lower() %}
+                    <span class="pl-chip pl-tone-info is-tone" title="{{ version_planeacion.detalle }}">⚡ Recuperada</span>
+                    {% endif %}
+                    <span class="pl-chip pl-tone-{{ 'success' if version_planeacion else 'warning' }} is-tone">
+                        {{ 'v' ~ version_planeacion.version if version_planeacion else 'Sin cargar' }}
+                    </span>
+                </div>
             </header>
             <p class="pl-note">Formato GFPI-F-134 en Excel. Aporta las fases del proyecto, las competencias, las horas por resultado y el trimestre planeado.</p>
             {% if version_planeacion %}
@@ -33,9 +46,14 @@
         <article class="pl-doc {{ 'is-listo' if version_reporte else 'is-falta' }}">
             <header>
                 <h3>Reporte de Juicios Evaluativos</h3>
-                <span class="pl-chip pl-tone-{{ 'success' if version_reporte else 'warning' }} is-tone">
-                    {{ 'v' ~ version_reporte.version if version_reporte else 'Sin cargar' }}
-                </span>
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                    {% if version_reporte and version_reporte.detalle and ('recuperad' in version_reporte.detalle.lower() or 'reconstruid' in version_reporte.detalle.lower()) %}
+                    <span class="pl-chip pl-tone-info is-tone" title="{{ version_reporte.detalle }}">⚡ Recuperado</span>
+                    {% endif %}
+                    <span class="pl-chip pl-tone-{{ 'success' if version_reporte else 'warning' }} is-tone">
+                        {{ 'v' ~ version_reporte.version if version_reporte else 'Sin cargar' }}
+                    </span>
+                </div>
             </header>
             <p class="pl-note">Excel de SOFIA Plus. Es la única fuente con fechas reales: solo las aprobaciones traen fecha y de ahí sale el avance y el ritmo.</p>
             {% if version_reporte %}
@@ -52,9 +70,14 @@
         <article class="pl-doc {{ 'is-listo' if version_programa else 'is-falta' }}">
             <header>
                 <h3>Programa de Formación</h3>
-                <span class="pl-chip pl-tone-{{ 'success' if version_programa else 'info' }} is-tone">
-                    {{ 'v' ~ version_programa.version if version_programa else 'Recomendado' }}
-                </span>
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                    {% if version_programa and version_programa.detalle and 'recuperad' in version_programa.detalle.lower() %}
+                    <span class="pl-chip pl-tone-info is-tone" title="{{ version_programa.detalle }}">⚡ Recuperado</span>
+                    {% endif %}
+                    <span class="pl-chip pl-tone-{{ 'success' if version_programa else 'info' }} is-tone">
+                        {{ 'v' ~ version_programa.version if version_programa else 'Recomendado' }}
+                    </span>
+                </div>
             </header>
             <p class="pl-note">PDF del diseño curricular oficial. Aporta las horas máximas por competencia, el código de norma y la lista completa de resultados de aprendizaje.</p>
             {% if version_programa %}
