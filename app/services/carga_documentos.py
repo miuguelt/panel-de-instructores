@@ -24,6 +24,7 @@ from app.services.alertas import actualizar_alertas_ficha
 from app.services.archivos import ArchivoService, ErrorArchivo
 from app.services.importacion_ficha import (
     ErrorImportacion,
+    es_reporte_oficial,
     importar_archivo,
     leer_metadata_archivo,
     validar_reporte_ficha,
@@ -112,7 +113,8 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
             if not archivo_juicios.filename.lower().endswith(('.xls', '.xlsx')):
                 raise ValueError('El Reporte de Juicios debe estar en formato .xls o .xlsx.')
             meta_rep = leer_metadata_archivo(archivo_juicios)
-            validar_reporte_ficha(ficha, meta_rep)
+            if es_reporte_oficial(meta_rep):
+                validar_reporte_ficha(ficha, meta_rep)
             ver_rep = crear_version(archivo_juicios, ficha.id, instructor_id, TIPO_REPORTE_JUICIOS, metadata=meta_rep, permitir_existente=True)
             if ver_rep not in versiones_creadas:
                 versiones_creadas.append(ver_rep)

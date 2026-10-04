@@ -12,6 +12,10 @@
             <span class="nav-context-text">Juicios de Evaluación<span class="nav-context-title-ext"> Oficiales</span></span>
         </h1>
         <span class="nav-context-divider" aria-hidden="true"></span>
+        <button type="button" class="nav-context-btn-action" onclick="document.getElementById('modal-cargar-juicios').showModal()" title="Cargar o actualizar el Reporte de Juicios de SOFIA Plus" style="background:var(--accent-primary); color:#fff; border:none; cursor:pointer;">
+            <span class="nav-context-btn-icon" aria-hidden="true">📋</span>
+            <span>Cargar Juicios</span>
+        </button>
         <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="nav-context-btn-action" title="Analizar planeación pedagógica">
             <span class="nav-context-btn-icon" aria-hidden="true">🧭</span>
             <span>Analizar planeación</span>
@@ -228,6 +232,93 @@
 </style>
 
 <div class="juicios-container">
+    {% set importacion_id = request.args.get('importacion_id')|int %}
+    {% if importacion_id %}
+    <div class="card" id="import-status" data-status-url="{{ url_for('instructor.estado_importacion', ficha_id=ficha.id, job_id=importacion_id) }}" aria-busy="true" style="margin-bottom: 1.25rem;">
+        <strong>Solicitud recibida: importación en segundo plano</strong>
+        <p id="import-status-message" class="text-muted" role="status" aria-live="polite">El archivo fue recibido y está en cola (trabajo #{{ importacion_id }}). El sistema te avisará cuando termine; puedes seguir usando el panel.</p>
+    </div>
+    <script>
+    (function () {
+        const box = document.getElementById('import-status');
+        const message = document.getElementById('import-status-message');
+        if (!box || !message) return;
+        let intentos = 0;
+        const consultar = () => fetch(box.dataset.statusUrl, { credentials: 'same-origin' })
+            .then(res => res.json())
+            .then(job => {
+                if (job.estado === 'completado') {
+                    const r = job.resultado || {};
+                    const partes = [];
+                    if (r.nuevos > 0) partes.push(`${r.nuevos} aprendices nuevos`);
+                    if (r.actualizados > 0) partes.push(`${r.actualizados} aprendices actualizados`);
+                    if (r.juicios_nuevos > 0) partes.push(`${r.juicios_nuevos} juicios evaluativos incorporados`);
+                    if (r.juicios_actualizados > 0) partes.push(`${r.juicios_actualizados} juicios evaluativos actualizados`);
+                    if (r.juicios_repetidos > 0) {
+                        if (!r.juicios_nuevos && !r.juicios_actualizados) {
+                            partes.push(`${r.juicios_repetidos} juicios evaluativos verificados y conservados al día`);
+                        } else {
+                            partes.push(`${r.juicios_repetidos} juicios ya estaban en el historial`);
+                        }
+                    }
+                    const detalle = partes.length > 0 ? partes.join(', ') : 'Datos procesados correctamente';
+                    message.textContent = `Importación completada con éxito: ${detalle}. Actualizando vista…`;
+                    box.classList.remove('alert-error');
+                    box.classList.add('alert', 'alert-success');
+                    box.setAttribute('aria-busy', 'false');
+                    setTimeout(() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('importacion_id');
+                        window.location.replace(url.toString());
+                    }, 1200);
+                    return;
+                }
+                if (job.estado === 'error') {
+                    message.textContent = 'La importación no se pudo completar: ' + (job.error || 'revisa el archivo o consulta los logs.');
+                    box.classList.add('alert', 'alert-error');
+                    box.setAttribute('aria-busy', 'false');
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('importacion_id');
+                    window.history.replaceState({}, document.title, url.toString());
+                    return;
+                }
+                message.textContent = job.estado === 'procesando'
+                    ? 'El sistema está leyendo y guardando el reporte. No vuelvas a enviarlo; puedes seguir navegando por el panel.'
+                    : 'El reporte está en cola y será atendido por el worker. Puedes seguir navegando por el panel.';
+                if (++intentos < 150) setTimeout(consultar, 2000);
+            })
+            .catch(() => {
+                if (++intentos < 150) setTimeout(consultar, 4000);
+            });
+        consultar();
+    })();
+    </script>
+    {% endif %}
+
+    <dialog id="modal-cargar-juicios" class="modal-dialog" style="border:none; border-radius:16px; padding:0; max-width:540px; width:90%; background:var(--bg-card); color:var(--text-strong); box-shadow:var(--shadow-xl);">
+        <div style="padding:1.5rem; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
+                <span aria-hidden="true">📋</span> Cargar Reporte de Juicios Evaluativos
+            </h3>
+            <button type="button" onclick="document.getElementById('modal-cargar-juicios').close()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('instructor.cargar_excel', ficha_id=ficha.id) }}" enctype="multipart/form-data" style="padding:1.5rem;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="retorno" value="juicios">
+            <p style="font-size:0.88rem; color:var(--text-muted); margin-top:0; margin-bottom:1.25rem; line-height:1.5;">
+                Selecciona el Reporte Oficial de Juicios de Evaluación emitido por SOFIA Plus (.xls o .xlsx). Los registros existentes se conservarán y las nuevas calificaciones se actualizarán sin alterar la identidad de los aprendices.
+            </p>
+            <div style="margin-bottom:1.5rem;">
+                <label for="input-archivo-juicios-modal" style="display:block; font-weight:600; font-size:0.85rem; margin-bottom:0.5rem;">Archivo Excel (.xls / .xlsx)</label>
+                <input type="file" id="input-archivo-juicios-modal" name="archivo" accept=".xls,.xlsx" required class="form-control" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-subtle); background:var(--bg-input);">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('modal-cargar-juicios').close()">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm">↑ Subir y procesar</button>
+            </div>
+        </form>
+    </dialog>
+
     {{ render_alertas_contextuales(ficha.id, 'juicios_evaluativos', recomendaciones_juicios) }}
 
     <!-- Stats Grid -->
@@ -386,10 +477,13 @@
         </div>
     </div>
     {% else %}
-    <div class="empty-state card">
-        <div class="empty-icon">📑</div>
-        <h3 style="color:var(--text-strong)">Sin Juicios Evaluativos</h3>
-        <p style="color:var(--text-muted)">Sube el archivo Excel oficial de SOFIA Plus para ver el desglose agrupado por competencias.</p>
+    <div class="empty-state card" style="text-align:center; padding:2.5rem 1rem;">
+        <div class="empty-icon" style="font-size:2.5rem; margin-bottom:0.75rem;">📑</div>
+        <h3 style="color:var(--text-strong); margin-bottom:0.5rem;">Sin Juicios Evaluativos</h3>
+        <p style="color:var(--text-muted); max-width:480px; margin:0 auto 1.5rem;">Sube el archivo Excel oficial de SOFIA Plus (.xls o .xlsx) para ver el desglose agrupado por competencias y el progreso de los aprendices.</p>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-cargar-juicios').showModal()">
+            <span aria-hidden="true">↑</span> Subir Reporte de SOFIA Plus
+        </button>
     </div>
     {% endif %}
 

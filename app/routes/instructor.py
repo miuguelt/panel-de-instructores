@@ -45,8 +45,10 @@ from app.services.asistencia import (
     mapa_asistencia_por_fecha,
     mes_inicial_calendario,
 )
+from app.helpers import utc_now
 from app.services.importacion_ficha import (
     ErrorImportacion,
+    es_reporte_oficial,
     importar_archivo,
     clasificar_competencia,
     leer_metadata_archivo,
@@ -645,22 +647,30 @@ def fichas():
 
 
 def _resumen_importacion(resultado):
-    mensaje = (
-        f"{resultado['nuevos']} aprendices nuevos, "
-        f"{resultado['actualizados']} actualizados y "
-        f"{resultado['juicios_nuevos']} juicios evaluativos incorporados."
-    )
-    juicios_actualizados = resultado.get('juicios_actualizados', 0)
-    if juicios_actualizados:
-        mensaje += f" {juicios_actualizados} juicios evaluativos actualizados."
-    if resultado['juicios_repetidos']:
-        mensaje += (
-            f" {resultado['juicios_repetidos']} juicios ya estaban en el historial."
-        )
+    partes = []
+    if resultado.get('nuevos', 0):
+        partes.append(f"{resultado['nuevos']} aprendices nuevos")
+    if resultado.get('actualizados', 0):
+        partes.append(f"{resultado['actualizados']} aprendices actualizados")
+    if resultado.get('juicios_nuevos', 0):
+        partes.append(f"{resultado['juicios_nuevos']} juicios evaluativos incorporados")
+    if resultado.get('juicios_actualizados', 0):
+        partes.append(f"{resultado['juicios_actualizados']} juicios evaluativos actualizados")
+
+    repetidos = resultado.get('juicios_repetidos', 0)
+    if repetidos:
+        if not resultado.get('juicios_nuevos', 0) and not resultado.get('juicios_actualizados', 0):
+            partes.append(f"{repetidos} juicios evaluativos verificados y conservados al día")
+        else:
+            partes.append(f"{repetidos} juicios ya estaban en el historial")
+
     sesiones = resultado.get('sesiones_creadas', 0)
     if sesiones:
-        mensaje += f" {sesiones} sesiones de clase creadas automáticamente."
-    return mensaje
+        partes.append(f"{sesiones} sesiones de clase creadas automáticamente")
+
+    if not partes:
+        return "El archivo fue procesado correctamente."
+    return " · ".join(partes) + "."
 
 
 @instructor_bp.route('/fichas/importar-reporte', methods=['POST'])
@@ -1396,10 +1406,12 @@ def cargar_excel(ficha_id):
     version = None
     version_path = None
     volver_planeacion = request.form.get('retorno') == 'planeacion'
+    volver_juicios = request.form.get('retorno') == 'juicios'
     aprendiz_admin_id = request.form.get('aprendiz_administrativo_id', type=int)
     try:
         metadata_reporte = leer_metadata_archivo(archivo)
-        validar_reporte_ficha(ficha, metadata_reporte)
+        if es_reporte_oficial(metadata_reporte):
+            validar_reporte_ficha(ficha, metadata_reporte)
         version = crear_version(
             archivo,
             ficha.id,
@@ -1444,7 +1456,7 @@ def cargar_excel(ficha_id):
                 if job:
                     job.estado = 'error'
                     job.error = 'No fue posible conectar con la cola de procesamiento.'
-                    job.terminado_en = datetime.utcnow()
+                    job.terminado_en = utc_now()
                     version = db.session.get(ArchivoFichaVersion, version.id)
                     if version:
                         actualizar_estado(version, 'error', detalle=job.error)
@@ -1501,6 +1513,8 @@ def cargar_excel(ficha_id):
         parametros['importacion_id'] = importacion_job_id
     if volver_planeacion:
         return redirect(url_for('planeacion.analisis', **parametros))
+    if volver_juicios:
+        return redirect(url_for('instructor.juicios', **parametros))
     return redirect(url_for('instructor.aprendices', **parametros))
 
 

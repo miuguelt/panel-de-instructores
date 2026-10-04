@@ -175,8 +175,13 @@
                 .then(function (respuesta) { return respuesta.ok ? respuesta.json() : null; })
                 .then(function (datos) {
                     if (!datos) return;
-                    if (datos.estado === 'completado' || datos.estado === 'error') window.location.reload();
-                    else window.setTimeout(revisar, 2500);
+                    if (datos.estado === 'completado' || datos.estado === 'error') {
+                        const cleanUrl = new URL(window.location.href);
+                        cleanUrl.searchParams.delete('importacion_id');
+                        window.location.replace(cleanUrl.toString());
+                    } else {
+                        window.setTimeout(revisar, 2500);
+                    }
                 })
                 .catch(function () { window.setTimeout(revisar, 5000); });
         };

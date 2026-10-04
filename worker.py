@@ -19,6 +19,7 @@ from app.services.permisos import configurar_rol_aprendiz
 from app.services.ranking import actualizar_participacion_ficha
 from app.services.archivos import resolver_archivo_subido
 from app import db
+from app.helpers import utc_now
 from app.services.importacion_jobs import _cliente_redis, _redis_destino
 from wsgi import app
 
@@ -151,7 +152,7 @@ def _procesar(job_id):
         archivo_path = job.archivo_path
 
         job.estado = 'procesando'
-        job.iniciado_en = datetime.utcnow()
+        job.iniciado_en = utc_now()
         db.session.commit()
 
         try:
@@ -180,7 +181,7 @@ def _procesar(job_id):
                 if version:
                     version.estado = 'procesado'
                     version.detalle = job.resultado
-            job.terminado_en = datetime.utcnow()
+            job.terminado_en = utc_now()
             db.session.commit()
             log.info('Importación #%s completada: %s', job.id, job.resultado)
             try:
@@ -200,7 +201,7 @@ def _procesar(job_id):
                     if version:
                         version.estado = 'error'
                         version.detalle = job.error
-                job.terminado_en = datetime.utcnow()
+                job.terminado_en = utc_now()
                 db.session.commit()
             log.exception('Falló la importación #%s', job_id)
         finally:
@@ -215,7 +216,7 @@ def _procesar(job_id):
 def _procesar_resumen(job):
     """Genera snapshots persistentes dentro del worker, no en Gunicorn."""
     job.estado = 'procesando'
-    job.iniciado_en = datetime.utcnow()
+    job.iniciado_en = utc_now()
     db.session.commit()
     try:
         from app.services.resultados_persistidos import precargar_resultados_ficha
@@ -229,7 +230,7 @@ def _procesar_resumen(job):
         job.estado = 'error'
         job.error = f'{type(exc).__name__}: {exc}'
         log.exception('Falló el recálculo de resúmenes de la ficha %s', job.ficha_id)
-    job.terminado_en = datetime.utcnow()
+    job.terminado_en = utc_now()
     db.session.commit()
     db.session.remove()
 

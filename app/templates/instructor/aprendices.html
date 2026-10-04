@@ -29,15 +29,37 @@
         .then(job => {
             if (job.estado === 'completado') {
                 const r = job.resultado || {};
-                message.textContent = `Importación completada: ${r.nuevos || 0} aprendices, ${r.juicios_nuevos || 0} juicios nuevos y ${r.juicios_actualizados || 0} juicios actualizados. Actualizando los datos…`;
+                const partes = [];
+                if (r.nuevos > 0) partes.push(`${r.nuevos} aprendices nuevos`);
+                if (r.actualizados > 0) partes.push(`${r.actualizados} aprendices actualizados`);
+                if (r.juicios_nuevos > 0) partes.push(`${r.juicios_nuevos} juicios evaluativos incorporados`);
+                if (r.juicios_actualizados > 0) partes.push(`${r.juicios_actualizados} juicios evaluativos actualizados`);
+                if (r.juicios_repetidos > 0) {
+                    if (!r.juicios_nuevos && !r.juicios_actualizados) {
+                        partes.push(`${r.juicios_repetidos} juicios evaluativos verificados y conservados al día`);
+                    } else {
+                        partes.push(`${r.juicios_repetidos} juicios ya estaban en el historial`);
+                    }
+                }
+                const detalle = partes.length > 0 ? partes.join(', ') : 'Datos procesados correctamente';
+                message.textContent = `Importación completada con éxito: ${detalle}. Actualizando vista…`;
+                box.classList.remove('alert-error');
+                box.classList.add('alert', 'alert-success');
                 box.setAttribute('aria-busy', 'false');
-                setTimeout(() => window.location.reload(), 700);
+                setTimeout(() => {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('importacion_id');
+                    window.location.replace(url.toString());
+                }, 1200);
                 return;
             }
             if (job.estado === 'error') {
-                message.textContent = 'La importación falló: ' + (job.error || 'revisa los logs del worker.');
+                message.textContent = 'La importación no se pudo completar: ' + (job.error || 'revisa el archivo o consulta los logs.');
                 box.classList.add('alert', 'alert-error');
                 box.setAttribute('aria-busy', 'false');
+                const url = new URL(window.location.href);
+                url.searchParams.delete('importacion_id');
+                window.history.replaceState({}, document.title, url.toString());
                 return;
             }
             message.textContent = job.estado === 'procesando'

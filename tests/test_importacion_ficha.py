@@ -21,8 +21,10 @@ from app.models import (
 )
 from app.services.importacion_ficha import (
     ErrorImportacion,
+    es_reporte_oficial,
     importar_archivo,
     validar_reporte_ficha,
+    _leer_archivo,
 )
 
 
@@ -285,6 +287,64 @@ class ImportacionFichaTestCase(unittest.TestCase):
                     'nombre_programa': 'Programa',
                 },
             )
+
+    def test_es_reporte_oficial_identifica_metadatos(self):
+        self.assertTrue(es_reporte_oficial({'codigo_ficha': '12345'}))
+        self.assertTrue(es_reporte_oficial({'codigo_programa': '228118'}))
+        self.assertTrue(es_reporte_oficial({'nombre_programa': 'ADSO'}))
+        self.assertFalse(es_reporte_oficial({}))
+        self.assertFalse(es_reporte_oficial(None))
+
+    def test_permite_importar_plantilla_simple_en_ficha_existente(self):
+        libro = openpyxl.Workbook()
+        hoja = libro.active
+        hoja.append(['Documento', 'Nombre', 'Apellidos', 'Tipo', 'Estado'])
+        hoja.append(['1098765432', 'Carlos', 'Gomez', 'CC', 'EN_FORMACION'])
+        salida = BytesIO()
+        libro.save(salida)
+        salida.seek(0)
+        archivo = FileStorage(stream=salida, filename='plantilla_aprendices.xlsx')
+
+        resultado = importar_archivo(
+            archivo,
+            ficha_actual=self.ficha,
+            instructor_id=self.a.id,
+            crear_ficha=False,
+        )
+        self.assertEqual(resultado['nuevos'], 1)
+        aprendiz = Aprendiz.query.filter_by(documento='1098765432', ficha_id=self.ficha.id).one()
+        self.assertEqual(aprendiz.nombre, 'Carlos')
+        self.assertEqual(aprendiz.apellidos, 'Gomez')
+
+    def test_leer_archivo_fallback_extension_cruzada(self):
+        # Crear un archivo formato OpenXML (openpyxl) pero con extension .xls
+        libro = openpyxl.Workbook()
+        hoja = libro.active
+        hoja.append(['Documento', 'Nombre', 'Apellidos'])
+        hoja.append(['11223344', 'Diana', 'Ruiz'])
+        salida = BytesIO()
+        libro.save(salida)
+        salida.seek(0)
+        archivo = FileStorage(stream=salida, filename='archivo_con_extension_falsa.xls')
+
+        metadata, registros = _leer_archivo(archivo)
+        self.assertEqual(len(registros), 1)
+        self.assertEqual(registros[0]['documento'], '11223344')
+        self.assertEqual(registros[0]['nombre'], 'Diana')
+
+    def test_ruta_cargar_excel_retorno_juicios(self):
+        cliente = self.app.test_client()
+        cliente.post('/login', data={'correo': self.a.correo, 'password': 'x'})
+        reporte = self._archivo()
+
+        respuesta = cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/cargar-excel',
+            data={'archivo': (reporte.stream, reporte.filename), 'retorno': 'juicios'},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(f'/instructor/fichas/{self.ficha.id}/juicios', respuesta.headers['Location'])
 
 
 if __name__ == '__main__':
