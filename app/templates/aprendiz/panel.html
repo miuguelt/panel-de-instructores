@@ -126,7 +126,7 @@
     </header>
 
     <!-- FILA DE ATENCION -->
-    <div class="card mb-4" style="background-color: var(--card-bg);">
+    <div class="card mb-4" style="background-color: var(--card-bg);" id="seccion-turno-atencion">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h3 class="card-title m-0">🙋‍♂️ Pedir turno con el instructor</h3>
         </div>
@@ -157,7 +157,43 @@
                         </form>
                     </div>
                     <script>
-                        setTimeout(function() { window.location.reload(); }, 10000);
+                        (function() {
+                            let temporizadorTurno = null;
+                            function verificarEstadoTurno() {
+                                if (document.hidden) {
+                                    temporizadorTurno = setTimeout(verificarEstadoTurno, 10000);
+                                    return;
+                                }
+                                fetch(window.location.href, {
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                                })
+                                .then(function(res) { return res.ok ? res.text() : null; })
+                                .then(function(html) {
+                                    if (!html) {
+                                        temporizadorTurno = setTimeout(verificarEstadoTurno, 12000);
+                                        return;
+                                    }
+                                    const parser = new DOMParser();
+                                    const doc = parser.parseFromString(html, 'text/html');
+                                    const nuevaSeccion = doc.getElementById('seccion-turno-atencion');
+                                    const seccionActual = document.getElementById('seccion-turno-atencion');
+                                    if (nuevaSeccion && seccionActual && nuevaSeccion.innerHTML !== seccionActual.innerHTML) {
+                                        seccionActual.innerHTML = nuevaSeccion.innerHTML;
+                                        return;
+                                    }
+                                    temporizadorTurno = setTimeout(verificarEstadoTurno, 10000);
+                                })
+                                .catch(function() {
+                                    temporizadorTurno = setTimeout(verificarEstadoTurno, 15000);
+                                });
+                            }
+                            temporizadorTurno = setTimeout(verificarEstadoTurno, 10000);
+                            document.addEventListener('visibilitychange', function() {
+                                if (!document.hidden && !temporizadorTurno) {
+                                    verificarEstadoTurno();
+                                }
+                            });
+                        })();
                     </script>
                     {% endif %}
                 </div>

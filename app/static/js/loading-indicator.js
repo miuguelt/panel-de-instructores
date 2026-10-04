@@ -56,6 +56,23 @@
         return esDestinoInterno(formulario.action || window.location.href);
     }
 
+    function debeIndicarHtmx(evento) {
+        if (!evento || evento.defaultPrevented) return false;
+        const elemento = evento.detail?.elt || evento.target;
+        if (!elemento || typeof elemento.getAttribute !== 'function') return true;
+
+        if (elemento.hasAttribute('data-no-loading')) return false;
+        if (elemento.getAttribute('hx-boost') === 'false') return false;
+        if (elemento.hasAttribute('hx-indicator')) return false;
+        const trigger = elemento.getAttribute('hx-trigger') || '';
+        if (/\bevery\b/i.test(trigger)) return false;
+        if (typeof elemento.closest === 'function') {
+            const ancestroExcluido = elemento.closest('[data-no-loading], [hx-indicator], [hx-trigger*="every"]');
+            if (ancestroExcluido) return false;
+        }
+        return true;
+    }
+
     function programarIndicador(evento) {
         queueMicrotask(function () {
             if (!evento.defaultPrevented) mostrarIndicador();
@@ -74,13 +91,19 @@
 
     function alIniciarSolicitudHtmx(evento) {
         queueMicrotask(function () {
-            if (evento.defaultPrevented) return;
+            if (!debeIndicarHtmx(evento)) return;
+            if (evento.detail && typeof evento.detail === 'object') {
+                evento.detail._indicaCarga = true;
+            }
             solicitudesHtmxActivas += 1;
             mostrarIndicador();
         });
     }
 
-    function alFinalizarSolicitudHtmx() {
+    function alFinalizarSolicitudHtmx(evento) {
+        if (evento && evento.detail && typeof evento.detail === 'object' && !evento.detail._indicaCarga) {
+            return;
+        }
         solicitudesHtmxActivas = Math.max(0, solicitudesHtmxActivas - 1);
         if (solicitudesHtmxActivas === 0) ocultarIndicador();
     }

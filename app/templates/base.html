@@ -217,10 +217,34 @@
                 }, 200);
             }
 
-            document.addEventListener('htmx:beforeRequest', iniciarProgreso);
+            function debeIniciarProgresoHtmx(e) {
+                const el = e.detail?.elt || e.target;
+                if (!el || typeof el.getAttribute !== 'function') return true;
+                if (el.hasAttribute('data-no-loading') || el.hasAttribute('hx-indicator')) return false;
+                const trigger = el.getAttribute('hx-trigger') || '';
+                if (/\bevery\b/i.test(trigger)) return false;
+                if (typeof el.closest === 'function') {
+                    if (el.closest('[data-no-loading], [hx-indicator], [hx-trigger*="every"]')) return false;
+                }
+                return true;
+            }
+
+            document.addEventListener('htmx:beforeRequest', function(e) {
+                if (debeIniciarProgresoHtmx(e)) iniciarProgreso();
+            });
             document.addEventListener('htmx:afterOnLoad', terminarProgreso);
             document.addEventListener('htmx:requestError', function() {
                 bar.classList.remove('is-loading', 'is-finishing');
+            });
+
+            document.addEventListener('htmx:configRequest', function(e) {
+                if (document.hidden) {
+                    const el = e.detail?.elt;
+                    const trigger = el?.getAttribute?.('hx-trigger') || '';
+                    if (/\bevery\b/i.test(trigger)) {
+                        e.preventDefault();
+                    }
+                }
             });
 
             document.addEventListener('click', function(e) {

@@ -286,3 +286,43 @@ test('beforeunload de una descarga o navegación externa no bloquea la página',
     entorno.window.emitir('beforeunload');
     assert.equal(entorno.indicador.hidden, true);
 });
+
+test('ignora solicitudes HTMX de sondeo periódico e indicadores propios', async () => {
+    const entorno = crearEntorno();
+
+    function crearElementoHtmx(atributos = {}) {
+        return {
+            hasAttribute(nombre) {
+                return Object.prototype.hasOwnProperty.call(atributos, nombre);
+            },
+            getAttribute(nombre) {
+                return atributos[nombre] ?? null;
+            },
+            closest() {
+                return null;
+            }
+        };
+    }
+
+    const elSondeo = crearElementoHtmx({ 'hx-trigger': 'every 30s' });
+    const detailSondeo = { elt: elSondeo };
+    entorno.document.emitir('htmx:beforeRequest', { defaultPrevented: false, detail: detailSondeo });
+    await vaciarMicrotareas();
+    assert.equal(entorno.indicador.hidden, true, 'no debe bloquear con sondeo periódico');
+
+    const elIndicadorPropio = crearElementoHtmx({ 'hx-indicator': '#ranking-loading' });
+    const detailIndicador = { elt: elIndicadorPropio };
+    entorno.document.emitir('htmx:beforeRequest', { defaultPrevented: false, detail: detailIndicador });
+    await vaciarMicrotareas();
+    assert.equal(entorno.indicador.hidden, true, 'no debe bloquear con indicador propio');
+
+    const elSinCarga = crearElementoHtmx({ 'data-no-loading': '' });
+    const detailSinCarga = { elt: elSinCarga };
+    entorno.document.emitir('htmx:beforeRequest', { defaultPrevented: false, detail: detailSinCarga });
+    await vaciarMicrotareas();
+    assert.equal(entorno.indicador.hidden, true, 'no debe bloquear con data-no-loading');
+
+    entorno.document.emitir('htmx:afterRequest', { detail: detailSondeo });
+    assert.equal(entorno.indicador.hidden, true);
+});
+

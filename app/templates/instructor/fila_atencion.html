@@ -30,7 +30,7 @@
                         <button type="button" id="btnToggleAuto" class="btn btn-sm btn-outline-secondary" onclick="toggleAutoRecarga()">Pausar</button>
                     </div>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0" id="contenedor-fila-turnos">
                     {% if turnos %}
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
@@ -112,7 +112,7 @@ function toggleAutoRecarga() {
 }
 
 setInterval(async () => {
-    if (!autoActivo) return;
+    if (!autoActivo || document.hidden) return;
     
     segundosRestantes--;
     const cuentaEl = document.getElementById('cuentaAtras');
@@ -128,15 +128,29 @@ setInterval(async () => {
                 const data = await resp.json();
                 const nuevoSnapshot = data.turnos.map(t => t.id).join(',') + ':' + data.turnos.map(t => t.estado).join(',');
                 if (nuevoSnapshot !== snapshotActual) {
-                    // Hay cambios en la fila: recargar la pagina suavemente para ver los botones y estados actualizados
-                    window.location.reload();
-                } else {
-                    // Actualizar contadores si aplica
-                    const badgeEsp = document.getElementById('badgeEsperando');
-                    const badgeAtn = document.getElementById('badgeEnAtencion');
-                    if (badgeEsp) badgeEsp.textContent = `${data.esperando} en espera`;
-                    if (badgeAtn) badgeAtn.textContent = `${data.en_atencion} en atención`;
+                    try {
+                        const htmlResp = await fetch(window.location.href, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        if (htmlResp.ok) {
+                            const html = await htmlResp.text();
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, 'text/html');
+                            const nuevoContenido = doc.getElementById('contenedor-fila-turnos');
+                            const contenedorActual = document.getElementById('contenedor-fila-turnos');
+                            if (nuevoContenido && contenedorActual) {
+                                contenedorActual.innerHTML = nuevoContenido.innerHTML;
+                            }
+                            snapshotActual = nuevoSnapshot;
+                        }
+                    } catch (errHtml) {
+                        console.debug('Error actualizando tabla de fila:', errHtml);
+                    }
                 }
+                const badgeEsp = document.getElementById('badgeEsperando');
+                const badgeAtn = document.getElementById('badgeEnAtencion');
+                if (badgeEsp) badgeEsp.textContent = `${data.esperando} en espera`;
+                if (badgeAtn) badgeAtn.textContent = `${data.en_atencion} en atención`;
             }
         } catch (e) {
             console.debug('Error comprobando estado de fila:', e);
