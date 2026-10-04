@@ -248,7 +248,8 @@ test('El análisis de competencias vencidas muestra fechas y abre modal con RAP 
     const seccionVencidas = page.locator('#pl-analisis-vencidas');
     assert.equal(await seccionVencidas.isVisible(), true);
     assert.match(await seccionVencidas.innerText(), /Competencias que ya deberían estar evaluadas/);
-    assert.match(await seccionVencidas.innerText(), /debió evaluarse el/);
+    assert.match(await seccionVencidas.innerText(), /debió evaluarse/i);
+    assert.match(await seccionVencidas.innerText(), /se evaluó/i);
 
     const tarjetaVencida = seccionVencidas.locator('.pl-vencida-item').first();
     assert.equal(await tarjetaVencida.isVisible(), true);
