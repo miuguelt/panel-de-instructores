@@ -3465,6 +3465,58 @@ select optgroup {
     gap: 12px;
 }
 
+.cleaning-weekday-fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+}
+
+.cleaning-weekday-legend {
+    padding: 0 0.4rem;
+    color: var(--text-strong);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.cleaning-weekday-help {
+    margin: 0 0 0.8rem;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.cleaning-weekday-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+    gap: 8px;
+}
+
+.cleaning-weekday-option {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    gap: 8px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    color: var(--text-strong);
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+.cleaning-weekday-option:has(input:checked) {
+    border-color: var(--accent-primary);
+    background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-card));
+}
+
+.cleaning-weekday-option:focus-within {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
 .cleaning-option-chip {
     display: flex;
     align-items: flex-start;

@@ -1,0 +1,21 @@
+<fieldset class="cleaning-weekday-fieldset" aria-describedby="indicacion-dias-aseo">
+    <legend class="cleaning-weekday-legend">Días de la semana para programar</legend>
+    <p id="indicacion-dias-aseo" class="cleaning-weekday-help">
+        De lunes a viernes está seleccionado por defecto. Para programar en sábado o domingo, selecciona esos días.
+    </p>
+    <input type="hidden" name="dias_semana_present" value="1">
+    <div class="cleaning-weekday-grid">
+        {% for numero, nombre in opciones_dias_semana %}
+        <label class="cleaning-weekday-option">
+            <input
+                type="checkbox"
+                name="dias_semana"
+                value="{{ numero }}"
+                {% if numero in dias_laborales %}checked{% endif %}
+                class="cleaning-custom-checkbox"
+            >
+            <span>{{ nombre }}</span>
+        </label>
+        {% endfor %}
+    </div>
+</fieldset>

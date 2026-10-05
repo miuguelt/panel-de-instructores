@@ -29,3 +29,18 @@
   las compuertas de pruebas o modularidad.
 - Plan: separar esos casos de uso gradualmente con pruebas de sus transacciones
   y contratos. La decisión de esta extracción está en `cola-equitativa-aseo.md`.
+
+## Rutas heredadas del calendario de aseo
+
+- Propietario: equipo de mantenimiento de Panel de Instructores.
+- Archivo: `app/routes/aseo.py`.
+- Motivo: el archivo ya superaba el presupuesto antes de esta mejora. Los
+  formularios del instructor y del aprendiz tienen permisos y contratos
+  independientes; esta iteración agrega la misma selección semanal a ambos
+  y valida los valores recibidos antes de invocar el servicio de generación.
+- Excepción: crecimiento acotado para pasar la selección semanal a la generación
+  y ofrecer las mismas opciones en las dos vistas. La validación de los días
+  vive en `app/services/aseo_calendario.py`; el cálculo de fechas sigue en
+  `app/services/aseo.py`.
+- Plan: extraer en una iteración posterior los controladores de generación y las
+  vistas del calendario con pruebas independientes de sus permisos y rutas.

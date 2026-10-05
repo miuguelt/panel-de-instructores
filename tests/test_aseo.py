@@ -259,7 +259,60 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
         self.assertEqual(respuesta.status_code, 200)
         self.assertIn('Turnos de aseo'.encode(), respuesta.data)
+        self.assertIn('name="dias_semana_present"'.encode(), respuesta.data)
+        self.assertIn('Sábado'.encode(), respuesta.data)
+        self.assertIn('Domingo'.encode(), respuesta.data)
         self.assertEqual(TurnoAseo.query.count(), 1)
+
+        sabado = date.today() + timedelta(days=1)
+        while sabado.weekday() != 5 or es_festivo_colombia(sabado) or es_festivo_colombia(
+            sabado + timedelta(days=1)
+        ):
+            sabado += timedelta(days=1)
+        domingo = sabado + timedelta(days=1)
+        self._crear_sesion(sabado)
+        self._crear_sesion(domingo)
+        db.session.commit()
+
+        cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/turnos-aseo/generar',
+            data={'fecha_inicio': sabado.isoformat(), 'fecha_fin': domingo.isoformat()},
+            follow_redirects=True,
+        )
+        self.assertIsNone(TurnoAseo.query.filter_by(
+            ficha_id=self.ficha.id, fecha=sabado,
+        ).first())
+        self.assertIsNone(TurnoAseo.query.filter_by(
+            ficha_id=self.ficha.id, fecha=domingo,
+        ).first())
+
+        respuesta_fin_de_semana = cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/turnos-aseo/generar',
+            data={
+                'fecha_inicio': sabado.isoformat(),
+                'fecha_fin': domingo.isoformat(),
+                'dias_semana_present': '1',
+                'dias_semana': ['5', '6'],
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(respuesta_fin_de_semana.status_code, 200)
+        self.assertEqual(TurnoAseo.query.filter(
+            TurnoAseo.ficha_id == self.ficha.id,
+            TurnoAseo.fecha.between(sabado, domingo),
+        ).count(), 2)
+
+        cliente_aprendiz = self.app.test_client()
+        with cliente_aprendiz.session_transaction() as datos_sesion:
+            datos_sesion['aprendiz_documento'] = self.aprendices[0].documento
+            datos_sesion['aprendiz_ficha_id'] = self.ficha.id
+        respuesta_configuracion_dias = cliente_aprendiz.get(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar',
+        )
+        self.assertEqual(respuesta_configuracion_dias.status_code, 200)
+        self.assertIn('name="dias_semana_present"'.encode(), respuesta_configuracion_dias.data)
+        self.assertIn('Sábado'.encode(), respuesta_configuracion_dias.data)
+        self.assertIn('Domingo'.encode(), respuesta_configuracion_dias.data)
 
         panel = cliente.get(
             f'/aprendiz/{self.ficha.id}/panel'
@@ -601,6 +654,7 @@ class TurnosAseoTestCase(unittest.TestCase):
             fechas[0],
             fechas[-1],
             rng=random.Random(42),
+            dias_semana=range(7),
         )
         db.session.commit()
 
@@ -1061,10 +1115,13 @@ class TurnosAseoTestCase(unittest.TestCase):
                 'fecha_fin': fecha_2.isoformat(),
                 'recalcular': 'on',
                 'respetar_manuales': 'on',
+                'dias_semana_present': '1',
+                'dias_semana': ['0', '1', '2', '3', '4'],
             },
             follow_redirects=True,
         )
         self.assertEqual(resp.status_code, 200)
+        self.assertIn('name="dias_semana"'.encode(), resp.data)
 
         # El turno de fecha_1 debe conservarse con la pareja manual
         t1 = TurnoAseo.query.filter_by(ficha_id=self.ficha.id, fecha=fecha_1).first()

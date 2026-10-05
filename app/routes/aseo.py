@@ -28,6 +28,10 @@ from app.services.festivos import (
     nombre_festivo_colombia,
     obtener_festivos_colombia,
 )
+from app.services.aseo_calendario import (
+    DIAS_LABORALES,
+    OPCIONES_DIAS_SEMANA,
+)
 from app.services.permisos import (
     aprendiz_de_sesion,
     puede_administrar_ficha_como_aprendiz,
@@ -203,6 +207,8 @@ def turnos(ficha_id):
         hoy=date.today(),
         fecha_inicio_default=mes,
         fecha_fin_default=fin_mes,
+        opciones_dias_semana=OPCIONES_DIAS_SEMANA,
+        dias_laborales=DIAS_LABORALES,
         total_cumplidos=sum(1 for turno in turnos_mes if turno.estado == 'cumplido'),
         total_programados=sum(
             1 for turno in turnos_mes if turno.estado in ESTADOS_PENDIENTES
@@ -220,6 +226,11 @@ def generar(ficha_id):
     try:
         inicio = _fecha_formulario(request.form.get('fecha_inicio'), 'fecha inicial')
         fin = _fecha_formulario(request.form.get('fecha_fin'), 'fecha final')
+        dias_semana = (
+            request.form.getlist('dias_semana')
+            if 'dias_semana_present' in request.form
+            else None
+        )
         recalcular = request.form.get('recalcular', 'on') in ('on', 'true', '1')
         respetar_manuales = request.form.get('respetar_manuales', 'on') in ('on', 'true', '1')
         resultado = generar_turnos(
@@ -228,6 +239,7 @@ def generar(ficha_id):
             fin,
             recalcular_existentes=recalcular,
             respetar_manuales=respetar_manuales,
+            dias_semana=dias_semana,
         )
         db.session.commit()
     except ValueError as exc:
@@ -483,6 +495,8 @@ def gestionar(ficha_id):
         hoy=date.today(),
         fecha_inicio_default=mes,
         fecha_fin_default=fin_mes,
+        opciones_dias_semana=OPCIONES_DIAS_SEMANA,
+        dias_laborales=DIAS_LABORALES,
         festivos_mes=festivos_mes,
         total_turnos=total_turnos,
         total_cumplidos=total_cumplidos,
@@ -503,6 +517,11 @@ def generar_como_aprendiz(ficha_id):
         fin = _fecha_formulario(request.form.get('fecha_fin'), 'fecha final')
         recalcular = request.form.get('recalcular', 'on') in ('on', 'true', '1')
         respetar_manuales = request.form.get('respetar_manuales', 'on') in ('on', 'true', '1')
+        dias_semana = (
+            request.form.getlist('dias_semana')
+            if 'dias_semana_present' in request.form
+            else None
+        )
         origen_generacion = 'aprendiz_admin' if actor.rol_administrativo else 'aprendiz'
         resultado = generar_turnos(
             ficha_id,
@@ -511,6 +530,7 @@ def generar_como_aprendiz(ficha_id):
             generado_por=origen_generacion,
             recalcular_existentes=recalcular,
             respetar_manuales=respetar_manuales,
+            dias_semana=dias_semana,
         )
         db.session.commit()
     except ValueError as exc:

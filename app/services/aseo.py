@@ -17,6 +17,7 @@ from app.services.aseo_cola import (
     elegir_por_cola_justa as _elegir_por_cola_justa,
     razon_eleccion as _razon_eleccion,
 )
+from app.services.aseo_calendario import DIAS_LABORALES, normalizar_dias_semana
 from app.services.festivos import (
     es_dia_habil,
     es_festivo_colombia,
@@ -128,7 +129,7 @@ def _crear_sesiones_faltantes(ficha_id, fechas, observacion):
     return creadas
 
 
-def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
+def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin, dias_semana=DIAS_LABORALES):
     """Asegura sesiones en el rango (juicios + días hábiles) y las devuelve sin festivos."""
     ficha = db.session.get(Ficha, ficha_id)
     limite_inicio = fecha_inicio
@@ -142,7 +143,7 @@ def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
     if limite_fin >= limite_inicio:
         actual = limite_inicio
         while actual <= limite_fin:
-            if not es_festivo_colombia(actual):
+            if actual.weekday() in dias_semana and not es_festivo_colombia(actual):
                 fechas_objetivo.add(actual)
             actual += timedelta(days=1)
 
@@ -159,7 +160,11 @@ def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
             if isinstance(fecha_juicio, datetime)
             else fecha_juicio
         )
-        if fecha_inicio <= fecha <= fecha_fin and not es_festivo_colombia(fecha):
+        if (
+            fecha_inicio <= fecha <= fecha_fin
+            and fecha.weekday() in dias_semana
+            and not es_festivo_colombia(fecha)
+        ):
             fechas_objetivo.add(fecha)
 
     if fechas_objetivo:
@@ -176,7 +181,11 @@ def _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin):
 
     sesiones_unicas = {}
     for sesion in sesiones_todas:
-        if not es_festivo_colombia(sesion.fecha) and sesion.fecha not in sesiones_unicas:
+        if (
+            sesion.fecha.weekday() in dias_semana
+            and not es_festivo_colombia(sesion.fecha)
+            and sesion.fecha not in sesiones_unicas
+        ):
             sesiones_unicas[sesion.fecha] = sesion
 
     return [sesiones_unicas[f] for f in sorted(sesiones_unicas)]
@@ -191,6 +200,7 @@ def generar_turnos(
     recalcular_existentes=True,
     respetar_manuales=True,
     proteger_pasados=True,
+    dias_semana=None,
 ):
     """Genera y recalcula turnos para sesiones del rango equilibrando cargas y evitando repeticiones.
 
@@ -204,10 +214,14 @@ def generar_turnos(
     if fecha_fin < fecha_inicio:
         raise ValueError('La fecha final no puede ser anterior a la inicial.')
 
+    dias_semana = normalizar_dias_semana(dias_semana)
+
     config = obtener_configuracion(ficha_id)
     contadores = recalcular_contadores(ficha_id)
     activos = aprendices_activos(ficha_id)
-    sesiones = _sesiones_para_generacion(ficha_id, fecha_inicio, fecha_fin)
+    sesiones = _sesiones_para_generacion(
+        ficha_id, fecha_inicio, fecha_fin, dias_semana=dias_semana,
+    )
 
     existentes = {
         turno.fecha: turno
@@ -250,7 +264,8 @@ def generar_turnos(
         if turno.estado in ESTADOS_PENDIENTES:
             es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
             es_pasado = proteger_pasados and fecha < hoy
-            if es_manual or es_pasado or not recalcular_existentes:
+            dia_excluido = fecha.weekday() not in dias_semana
+            if es_manual or es_pasado or dia_excluido or not recalcular_existentes:
                 for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
                     cargas_programadas[aprendiz_id] += 1
 
@@ -440,7 +455,7 @@ def _proxima_fecha_disponible(ficha_id, despues_de):
         SesionAsistencia.fecha > despues_de,
     ).order_by(SesionAsistencia.fecha).all()
     for s in sesiones:
-        if not es_festivo_colombia(s.fecha):
+        if es_dia_habil(s.fecha):
             return s.fecha
 
     ficha = db.session.get(Ficha, ficha_id)
@@ -451,7 +466,7 @@ def _proxima_fecha_disponible(ficha_id, despues_de):
     )
     candidata = despues_de + timedelta(days=1)
     while candidata <= limite:
-        if not es_festivo_colombia(candidata):
+        if es_dia_habil(candidata):
             if not SesionAsistencia.query.filter_by(
                 ficha_id=ficha_id, fecha=candidata
             ).first():

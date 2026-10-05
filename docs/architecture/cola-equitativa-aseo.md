@@ -36,6 +36,10 @@ a alguien con mayor carga total. Si solo hay dos personas elegibles, pueden repe
 - `app/services/aseo.py` conserva la elegibilidad, la asistencia, las exclusiones,
   las consultas y la persistencia. Consume la misma selección para el calendario,
   las suplencias, los compañeros de reposición y los reemplazos por deshabilitación.
+- `app/services/aseo_calendario.py` valida la lista de días elegidos y centraliza
+  la semana predeterminada y los nombres usados en los selectores.
+- `app/routes/aseo.py` entrega las opciones al formulario del instructor y del
+  aprendiz y pasa la selección al mismo servicio de generación.
 - `tests/test_aseo_equidad.py` verifica el desempate en ambos cupos, el reparto de
   un calendario, los límites de la selección y los mensajes de auditoría.
 - La suite existente verifica permisos, festivos, exclusiones, cumplimiento
@@ -45,6 +49,14 @@ No se modifica el esquema ni se recalculan datos reales durante las pruebas.
 La generación mantiene el alcance temporal existente: los pendientes anteriores
 al rango y los protegidos dentro de este aportan carga; los futuros fuera del
 rango no adelantan la carga del periodo actual.
+
+El selector semanal se incluye en los formularios del instructor y del aprendiz.
+De lunes a viernes quedan marcados por defecto; las selecciones de sábado y
+domingo autorizan esos días para el cálculo solicitado. El servidor aplica la
+misma validación a la lista recibida y rechaza selecciones vacías o fuera del
+calendario semanal. Las sesiones que caen en días no seleccionados no se crean
+ni se recalculan; sus turnos pendientes siguen contando como cargas ya
+programadas. El ingreso por fecha manual sigue operando de forma independiente.
 
 Se extrajo la selección porque tenía dos implementaciones que podían divergir.
 Mantener ambas habría conservado el riesgo; un nuevo patrón de infraestructura

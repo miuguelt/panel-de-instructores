@@ -11,6 +11,7 @@ import pytest
 from app import create_app, db
 from app.models import Aprendiz, Ficha, Instructor, SesionAsistencia, TurnoAseo
 from app.services.aseo import _elegir_por_cola_justa, generar_turnos
+from app.services.aseo_calendario import DIAS_LABORALES, OPCIONES_DIAS_SEMANA, normalizar_dias_semana
 from app.services.festivos import es_festivo_colombia
 
 
@@ -64,7 +65,7 @@ def fechas_futuras(cantidad):
     fechas = []
     fecha = date.today() + timedelta(days=1)
     while len(fechas) < cantidad:
-        if not es_festivo_colombia(fecha):
+        if fecha.weekday() < 5 and not es_festivo_colombia(fecha):
             fechas.append(fecha)
         fecha += timedelta(days=1)
     return fechas
@@ -251,3 +252,110 @@ def test_companero_con_menos_repeticiones_resuelve_el_empate(anticipar):
         historial_parejas={(1, 9): 2, (2, 9): 1}, anticipar_parejas=anticipar,
     )
     assert elegido.id == 3
+
+
+def proximo_fin_de_semana():
+    sabado = date.today() + timedelta(days=1)
+    while sabado.weekday() != 5 or es_festivo_colombia(sabado) or es_festivo_colombia(
+        sabado + timedelta(days=1)
+    ):
+        sabado += timedelta(days=1)
+    return sabado, sabado + timedelta(days=1)
+
+
+def test_dias_de_la_semana_por_defecto_son_laborables():
+    assert DIAS_LABORALES == (0, 1, 2, 3, 4)
+    assert normalizar_dias_semana(None) == DIAS_LABORALES
+    assert [(numero, nombre) for numero, nombre in OPCIONES_DIAS_SEMANA] == [
+        (0, 'Lunes'), (1, 'Martes'), (2, 'Miércoles'), (3, 'Jueves'),
+        (4, 'Viernes'), (5, 'Sábado'), (6, 'Domingo'),
+    ]
+
+
+def test_no_admite_semanas_sin_seleccionar_dias():
+    with pytest.raises(ValueError, match='Selecciona al menos un día'):
+        normalizar_dias_semana([])
+
+
+@pytest.mark.parametrize('valores', [['x'], ['7'], ['-1'], [True]])
+def test_no_admite_dias_fuera_del_calendario_semanal(valores):
+    with pytest.raises(ValueError, match='días de la semana válidos'):
+        normalizar_dias_semana(valores)
+
+
+def test_normalizar_rechaza_valores_que_no_son_texto_ni_enteros():
+    with pytest.raises(ValueError, match='días de la semana válidos'):
+        normalizar_dias_semana([1.5])
+
+
+def test_normalizar_dias_admite_fines_de_semana_y_quita_duplicados():
+    assert normalizar_dias_semana(['6', '5', '5']) == (5, 6)
+
+
+def test_generacion_predeterminada_omite_fin_de_semana_y_no_crea_sesiones(grupo):
+    ficha, _ = grupo
+    sabado, domingo = proximo_fin_de_semana()
+
+    resultado = generar_turnos(ficha.id, sabado, domingo, rng=random.Random(2))
+
+    assert resultado['creados'] == []
+    assert resultado['sesiones'] == 0
+    assert SesionAsistencia.query.filter(
+        SesionAsistencia.ficha_id == ficha.id,
+        SesionAsistencia.fecha.between(sabado, domingo),
+    ).count() == 0
+
+
+def test_seleccion_explicita_programa_sabado_y_domingo(grupo):
+    ficha, _ = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    db.session.add_all([
+        SesionAsistencia(ficha_id=ficha.id, fecha=fecha)
+        for fecha in (sabado, domingo)
+    ])
+    db.session.commit()
+
+    resultado = generar_turnos(
+        ficha.id, sabado, domingo, rng=random.Random(4), dias_semana=['5', '6'],
+    )
+
+    assert {turno.fecha for turno in resultado['creados']} == {sabado, domingo}
+
+
+def test_generacion_respeta_solo_los_dias_seleccionados(grupo):
+    ficha, _ = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    db.session.add_all([
+        SesionAsistencia(ficha_id=ficha.id, fecha=fecha)
+        for fecha in (sabado, domingo)
+    ])
+    db.session.commit()
+
+    resultado = generar_turnos(
+        ficha.id, sabado, domingo, rng=random.Random(4), dias_semana=['6'],
+    )
+
+    assert [turno.fecha for turno in resultado['creados']] == [domingo]
+
+
+def test_generacion_conserva_pendientes_en_dias_excluidos(grupo):
+    ficha, aprendices = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    turno_fin_de_semana = registrar_turno(
+        ficha, aprendices, sabado, (0, 1), estado='programado',
+    )
+    db.session.add_all([
+        SesionAsistencia(ficha_id=ficha.id, fecha=fecha)
+        for fecha in (sabado, domingo)
+    ])
+    db.session.commit()
+
+    resultado = generar_turnos(
+        ficha.id, sabado, domingo, rng=random.Random(7), dias_semana=[6],
+    )
+
+    db.session.refresh(turno_fin_de_semana)
+    assert resultado['creados'][0].fecha == domingo
+    assert (turno_fin_de_semana.aprendiz_1_id, turno_fin_de_semana.aprendiz_2_id) == (
+        aprendices[0].id, aprendices[1].id,
+    )
