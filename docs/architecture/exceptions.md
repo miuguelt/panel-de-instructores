@@ -16,3 +16,16 @@
 - Plan: extraer por rebanadas verticales los grupos de rutas de cortes,
   asistencia y ranking en una iteración posterior, con pruebas de contrato
   antes de mover cada grupo.
+
+## Servicio de aseo heredado
+
+- Propietario: equipo de mantenimiento de Panel de Instructores.
+- Archivo: `app/services/aseo.py`.
+- Motivo: el servicio ya excedía el presupuesto modular antes de corregir
+  el desempate de turnos. La selección duplicada y la explicación se extrajeron
+  a `app/services/aseo_cola.py`; el archivo heredado se redujo en esta iteración.
+- Deuda: permanecen en el servicio la generación, los contadores, las reposiciones
+  y los intercambios. La corrección no autoriza crecimiento adicional ni rebaja
+  las compuertas de pruebas o modularidad.
+- Plan: separar esos casos de uso gradualmente con pruebas de sus transacciones
+  y contratos. La decisión de esta extracción está en `cola-equitativa-aseo.md`.

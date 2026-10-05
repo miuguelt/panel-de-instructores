@@ -1,4 +1,3 @@
-import random
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 from statistics import mean
@@ -14,6 +13,10 @@ from app.models.aseo import (
 )
 from app.models.ficha import Ficha
 from app.models.juicio import JuicioEvaluativo
+from app.services.aseo_cola import (
+    elegir_por_cola_justa as _elegir_por_cola_justa,
+    razon_eleccion as _razon_eleccion,
+)
 from app.services.festivos import (
     es_dia_habil,
     es_festivo_colombia,
@@ -90,45 +93,6 @@ def _registros_presentes(sesion):
         for registro in registros
         if registro.estado in ESTADOS_PRESENTES
     }
-
-
-def _razon_eleccion(
-    contador,
-    programados,
-    promedio,
-    solo_asistentes,
-    companero_nombre=None,
-    veces_juntos=0,
-):
-    carga = contador.veces_aseo + programados
-    partes = [
-        f'Te eligió la cola justa porque tu carga era de {carga}: '
-        f'{contador.veces_aseo} turno(s) cumplido(s) y {programados} programado(s).',
-        f'El promedio de turnos cumplidos del grupo elegible era {promedio:.1f}.',
-    ]
-    if contador.ultima_vez_aseo:
-        partes.append(
-            'En el desempate se priorizó a quien llevaba más tiempo sin hacerlo; '
-            f'tu última vez fue el {contador.ultima_vez_aseo.strftime("%d/%m/%Y")}.'
-        )
-    else:
-        partes.append('También tuviste prioridad porque nunca habías cumplido un turno.')
-    if companero_nombre:
-        if veces_juntos == 0:
-            partes.append(
-                f'Se seleccionó a {companero_nombre} como compañero para diversificar parejas (primera vez juntos).'
-            )
-        else:
-            partes.append(
-                f'Se emparejó con {companero_nombre} rotando compañeros equitativamente ({veces_juntos} vez/veces previa(s)).'
-            )
-    partes.append(
-        'Si hubo empate total, el último criterio fue un sorteo aleatorio entre '
-        'personas con la misma carga y antigüedad.'
-    )
-    if solo_asistentes:
-        partes.append('La asistencia registrada para esa sesión te marcaba como presente.')
-    return ' '.join(partes)
 
 
 def _fechas_sesion_existentes(ficha_id, fecha_inicio, fecha_fin):
@@ -290,7 +254,7 @@ def generar_turnos(
                 for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
                     cargas_programadas[aprendiz_id] += 1
 
-    aleatorio = rng or random.SystemRandom()
+    aleatorio = rng
     creados = []
     recalculados = []
     cumplidos_conservados = 0
@@ -355,95 +319,17 @@ def generar_turnos(
             contadores[aprendiz.id].veces_aseo for aprendiz in candidatos
         )
 
-        def _fecha_referencia(aprendiz_id):
-            return _ultima_fecha(
-                contadores[aprendiz_id].ultima_vez_aseo,
-                ultimo_turno_asignado.get(aprendiz_id),
-            ) or date.min
-
-        # 1. Selección del primer aprendiz (carga mínima + anti-consecutivo + antigüedad + menor cumplidos)
-        cargas_1 = {
-            a.id: contadores[a.id].veces_aseo + cargas_programadas[a.id]
-            for a in candidatos
-        }
-        min_carga_1 = min(cargas_1.values())
-        pool_1 = [a for a in candidatos if cargas_1[a.id] == min_carga_1]
-
-        if len(candidatos) > 2 and asignados_sesion_anterior:
-            sin_consecutivos_1 = [
-                a for a in pool_1 if a.id not in asignados_sesion_anterior
-            ]
-            if sin_consecutivos_1:
-                pool_1 = sin_consecutivos_1
-
-        min_fecha_1 = min(_fecha_referencia(a.id) for a in pool_1)
-        pool_antiguedad_1 = [
-            a for a in pool_1
-            if _fecha_referencia(a.id) == min_fecha_1
-        ]
-        if len(pool_antiguedad_1) > 1:
-            min_cumplidas_1 = min(contadores[a.id].veces_aseo for a in pool_antiguedad_1)
-            pool_antiguedad_1 = [
-                a for a in pool_antiguedad_1 if contadores[a.id].veces_aseo == min_cumplidas_1
-            ]
-        elegido_1 = aleatorio.choice(pool_antiguedad_1)
-
-        # 2. Selección del segundo aprendiz (compañero para elegido_1 con diversidad de parejas y equidad)
-        disponibles_2 = [a for a in candidatos if a.id != elegido_1.id]
-        cargas_2 = {
-            a.id: contadores[a.id].veces_aseo + cargas_programadas[a.id]
-            for a in disponibles_2
-        }
-        min_carga_2 = min(cargas_2.values())
-        pool_2 = [a for a in disponibles_2 if cargas_2[a.id] == min_carga_2]
-
-        if len(disponibles_2) > 1 and asignados_sesion_anterior:
-            sin_consecutivos_2 = [
-                a for a in pool_2 if a.id not in asignados_sesion_anterior
-            ]
-            if sin_consecutivos_2:
-                pool_2 = sin_consecutivos_2
-
-        min_pareja_veces = min(
-            historial_parejas.get(tuple(sorted((elegido_1.id, a.id))), 0)
-            for a in pool_2
+        elegido_1 = _elegir_por_cola_justa(
+            candidatos, contadores, cargas_programadas, ultimo_turno_asignado,
+            rng=aleatorio, evitar_ids=asignados_sesion_anterior,
         )
-        pool_parejas_2 = [
-            a for a in pool_2
-            if historial_parejas.get(tuple(sorted((elegido_1.id, a.id))), 0) == min_pareja_veces
-        ]
-
-        # Heurística de residuo: minimizar conflicto futuro entre los aprendices que quedarían sin asignar
-        if len(pool_parejas_2) > 1 and len(pool_2) > 1:
-            def _score_conflicto_residuo(cand):
-                restantes = [r for r in pool_2 if r.id != cand.id]
-                if len(restantes) == 2:
-                    return historial_parejas.get(tuple(sorted((restantes[0].id, restantes[1].id))), 0)
-                elif 2 < len(restantes) <= 6:
-                    score = 0
-                    for i in range(len(restantes)):
-                        for j in range(i + 1, len(restantes)):
-                            score += historial_parejas.get(tuple(sorted((restantes[i].id, restantes[j].id))), 0)
-                    return score
-                return 0
-
-            min_conflicto = min(_score_conflicto_residuo(a) for a in pool_parejas_2)
-            pool_parejas_2 = [
-                a for a in pool_parejas_2
-                if _score_conflicto_residuo(a) == min_conflicto
-            ]
-
-        min_fecha_2 = min(_fecha_referencia(a.id) for a in pool_parejas_2)
-        pool_antiguedad_2 = [
-            a for a in pool_parejas_2
-            if _fecha_referencia(a.id) == min_fecha_2
-        ]
-        if len(pool_antiguedad_2) > 1:
-            min_cumplidas_2 = min(contadores[a.id].veces_aseo for a in pool_antiguedad_2)
-            pool_antiguedad_2 = [
-                a for a in pool_antiguedad_2 if contadores[a.id].veces_aseo == min_cumplidas_2
-            ]
-        elegido_2 = aleatorio.choice(pool_antiguedad_2)
+        disponibles_2 = [a for a in candidatos if a.id != elegido_1.id]
+        elegido_2 = _elegir_por_cola_justa(
+            disponibles_2, contadores, cargas_programadas, ultimo_turno_asignado,
+            rng=aleatorio, companero_id=elegido_1.id,
+            historial_parejas=historial_parejas,
+            evitar_ids=asignados_sesion_anterior, anticipar_parejas=True,
+        )
 
         pareja_clave = tuple(sorted((elegido_1.id, elegido_2.id)))
         veces_juntos_previa = historial_parejas.get(pareja_clave, 0)
@@ -526,67 +412,6 @@ def _cargas_programadas(ficha_id):
                 ultima.get(aprendiz_id), turno.fecha
             )
     return cargas, ultima
-
-
-def _elegir_por_cola_justa(
-    candidatos,
-    contadores,
-    cargas_prog,
-    ultima_prog,
-    rng=None,
-    companero_id=None,
-    historial_parejas=None,
-    excluir_ids=None,
-):
-    if not candidatos:
-        return None
-    aleatorio = rng or random.SystemRandom()
-    disponibles = [
-        a for a in candidatos if not excluir_ids or a.id not in excluir_ids
-    ]
-    if not disponibles:
-        disponibles = list(candidatos)
-
-    cargas = {
-        aprendiz.id: contadores[aprendiz.id].veces_aseo + cargas_prog[aprendiz.id]
-        for aprendiz in disponibles
-    }
-    carga_minima = min(cargas.values())
-    empatados_carga = [
-        aprendiz for aprendiz in disponibles if cargas[aprendiz.id] == carga_minima
-    ]
-
-    # Prioridad de equidad: entre empatados en carga, priorizar a quien menos turnos cumplidos reales tiene
-    min_cumplidas = min(contadores[a.id].veces_aseo for a in empatados_carga)
-    empatados_carga = [
-        a for a in empatados_carga
-        if contadores[a.id].veces_aseo == min_cumplidas
-    ]
-
-    if companero_id and historial_parejas is not None and len(empatados_carga) > 1:
-        min_pareja = min(
-            historial_parejas.get(tuple(sorted((companero_id, a.id))), 0)
-            for a in empatados_carga
-        )
-        empatados_carga = [
-            a for a in empatados_carga
-            if historial_parejas.get(tuple(sorted((companero_id, a.id))), 0) == min_pareja
-        ]
-
-    fechas = {
-        aprendiz.id: _ultima_fecha(
-            contadores[aprendiz.id].ultima_vez_aseo,
-            ultima_prog.get(aprendiz.id),
-        )
-        for aprendiz in empatados_carga
-    }
-    fecha_mas_antigua = min((valor or date.min) for valor in fechas.values())
-    empatados = [
-        aprendiz
-        for aprendiz in empatados_carga
-        if (fechas[aprendiz.id] or date.min) == fecha_mas_antigua
-    ]
-    return aleatorio.choice(empatados)
 
 
 def _presentes_en_fecha(ficha_id, fecha):
