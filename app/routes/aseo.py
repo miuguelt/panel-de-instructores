@@ -252,7 +252,7 @@ def generar(ficha_id):
     cumplidos = resultado.get('cumplidos_conservados', 0)
     manuales = resultado.get('omitidos_manuales', 0)
 
-    partes = []
+    partes = [f'{resultado["eliminados"]} pendiente(s) eliminado(s)'] if resultado.get('eliminados') else []
     if creados:
         partes.append(f'{creados} nuevo(s)')
     if recalculados:
@@ -272,7 +272,7 @@ def generar(ficha_id):
             f' {len(resultado["sin_candidatos"])} sesión(es) no tenían dos '
             'aprendices elegibles.'
         )
-    flash(mensaje, 'success' if (creados or recalculados) else 'info')
+    flash(mensaje, 'success' if (creados or recalculados or resultado.get('eliminados')) else 'info')
     return redirect(
         url_for('aseo.turnos', ficha_id=ficha_id, mes=inicio.strftime('%Y-%m'))
     )
@@ -543,7 +543,7 @@ def generar_como_aprendiz(ficha_id):
     cumplidos = resultado.get('cumplidos_conservados', 0)
     manuales = resultado.get('omitidos_manuales', 0)
 
-    partes = []
+    partes = [f'{resultado["eliminados"]} pendiente(s) eliminado(s)'] if resultado.get('eliminados') else []
     if creados:
         partes.append(f'{creados} nuevo(s)')
     if recalculados:
@@ -563,7 +563,7 @@ def generar_como_aprendiz(ficha_id):
             f' {len(resultado["sin_candidatos"])} sesión(es) no tenían dos '
             'aprendices elegibles.'
         )
-    flash(mensaje, 'success' if (creados or recalculados) else 'info')
+    flash(mensaje, 'success' if (creados or recalculados or resultado.get('eliminados')) else 'info')
     
     origen = request.form.get('origen') or request.args.get('origen')
     if origen == 'panel':

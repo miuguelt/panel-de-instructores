@@ -27,6 +27,9 @@
 - Deuda: permanecen en el servicio la generación, los contadores, las reposiciones
   y los intercambios. La corrección no autoriza crecimiento adicional ni rebaja
   las compuertas de pruebas o modularidad.
+- Corrección de pendientes en días no permitidos: la limpieza se extrajo a
+  `app/services/aseo_limpieza.py`, reduciendo el servicio heredado. Las rutas
+  informan las eliminaciones sin aumentar su número de líneas.
 - Plan: separar esos casos de uso gradualmente con pruebas de sus transacciones
   y contratos. La decisión de esta extracción está en `cola-equitativa-aseo.md`.
 

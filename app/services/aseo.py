@@ -18,6 +18,7 @@ from app.services.aseo_cola import (
     razon_eleccion as _razon_eleccion,
 )
 from app.services.aseo_calendario import DIAS_LABORALES, normalizar_dias_semana
+from app.services.aseo_limpieza import eliminar_turnos_fuera_del_calendario
 from app.services.festivos import (
     es_dia_habil,
     es_festivo_colombia,
@@ -207,9 +208,9 @@ def generar_turnos(
     - Conserva siempre intactos los turnos cumplidos (históricos).
     - Si recalcular_existentes=True, recalcula cronológicamente los turnos
       pendientes/programados para equilibrar las cargas y rotar parejas sin repeticiones consecutivas.
-    - Si respetar_manuales=True, conserva las asignaciones manuales del instructor.
-    - Si proteger_pasados=True, no sobreescribe turnos de fechas anteriores a hoy.
-    - Evita programar en días festivos de Colombia.
+    - Si respetar_manuales=True, conserva asignaciones manuales en días permitidos.
+    - Si proteger_pasados=True, conserva pendientes pasados en días permitidos.
+    - Elimina pendientes en festivos o días no seleccionados antes de recalcular.
     """
     if fecha_fin < fecha_inicio:
         raise ValueError('La fecha final no puede ser anterior a la inicial.')
@@ -231,16 +232,7 @@ def generar_turnos(
         ).all()
     }
 
-    # Limpiar turnos pendientes que hayan quedado en días festivos
-    turnos_festivos = [
-        turno for turno in existentes.values()
-        if es_festivo_colombia(turno.fecha) and turno.estado in ESTADOS_PENDIENTES
-    ]
-    for turno_f in turnos_festivos:
-        existentes.pop(turno_f.fecha, None)
-        db.session.delete(turno_f)
-    if turnos_festivos:
-        db.session.flush()
+    eliminados = eliminar_turnos_fuera_del_calendario(existentes, dias_semana, ESTADOS_PENDIENTES)
     historial_parejas = _obtener_historial_parejas(ficha_id)
     cargas_programadas = defaultdict(int)
     ultimo_turno_asignado = {}
@@ -264,8 +256,7 @@ def generar_turnos(
         if turno.estado in ESTADOS_PENDIENTES:
             es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
             es_pasado = proteger_pasados and fecha < hoy
-            dia_excluido = fecha.weekday() not in dias_semana
-            if es_manual or es_pasado or dia_excluido or not recalcular_existentes:
+            if es_manual or es_pasado or not recalcular_existentes:
                 for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
                     cargas_programadas[aprendiz_id] += 1
 
@@ -406,6 +397,7 @@ def generar_turnos(
     return {
         'creados': creados,
         'recalculados': recalculados,
+        'eliminados': eliminados,
         'sesiones': len(sesiones),
         'omitidos_existentes': cumplidos_conservados + omitidos_manuales,
         'cumplidos_conservados': cumplidos_conservados,

@@ -7,9 +7,11 @@ from datetime import date, timedelta
 from types import SimpleNamespace
 
 import pytest
+from flask import current_app
+from sqlalchemy import text
 
 from app import create_app, db
-from app.models import Aprendiz, Ficha, Instructor, SesionAsistencia, TurnoAseo
+from app.models import Aprendiz, Ficha, Instructor, IntercambioAseo, SesionAsistencia, TurnoAseo
 from app.services.aseo import _elegir_por_cola_justa, generar_turnos
 from app.services.aseo_calendario import DIAS_LABORALES, OPCIONES_DIAS_SEMANA, normalizar_dias_semana
 from app.services.festivos import es_festivo_colombia
@@ -338,7 +340,7 @@ def test_generacion_respeta_solo_los_dias_seleccionados(grupo):
     assert [turno.fecha for turno in resultado['creados']] == [domingo]
 
 
-def test_generacion_conserva_pendientes_en_dias_excluidos(grupo):
+def test_generacion_elimina_pendientes_en_dias_excluidos(grupo):
     ficha, aprendices = grupo
     sabado, domingo = proximo_fin_de_semana()
     turno_fin_de_semana = registrar_turno(
@@ -354,8 +356,163 @@ def test_generacion_conserva_pendientes_en_dias_excluidos(grupo):
         ficha.id, sabado, domingo, rng=random.Random(7), dias_semana=[6],
     )
 
-    db.session.refresh(turno_fin_de_semana)
+    db.session.commit()
+    assert TurnoAseo.query.filter_by(ficha_id=ficha.id, fecha=sabado).first() is None
+    assert resultado['eliminados'] == 1
     assert resultado['creados'][0].fecha == domingo
-    assert (turno_fin_de_semana.aprendiz_1_id, turno_fin_de_semana.aprendiz_2_id) == (
-        aprendices[0].id, aprendices[1].id,
-    )
+    assert SesionAsistencia.query.filter_by(ficha_id=ficha.id, fecha=sabado).count() == 1
+
+
+@pytest.mark.parametrize('estado', ['programado', 'intercambiado'])
+@pytest.mark.parametrize('origen', ['sistema', 'instructor'])
+@pytest.mark.parametrize('pasado', [False, True])
+def test_limpia_ambos_dias_aunque_sean_manuales_o_pasados(grupo, estado, origen, pasado):
+    ficha, aprendices = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    if pasado:
+        while sabado >= date.today() or es_festivo_colombia(sabado) or es_festivo_colombia(domingo):
+            sabado -= timedelta(days=7)
+            domingo = sabado + timedelta(days=1)
+    turnos = [registrar_turno(ficha, aprendices, fecha, (0, 1), estado=estado)
+              for fecha in (sabado, domingo)]
+    for turno in turnos:
+        turno.generado_por = origen
+    db.session.commit()
+    ids = [turno.id for turno in turnos]
+
+    resultado = generar_turnos(ficha.id, sabado, domingo)
+    db.session.commit()
+
+    assert all(db.session.get(TurnoAseo, turno_id) is None for turno_id in ids)
+    assert resultado['eliminados'] == 2
+    assert resultado['sesiones'] == 0
+    assert resultado['creados'] == resultado['recalculados'] == []
+
+
+def test_recalcula_sin_carga_de_los_turnos_eliminados_y_es_idempotente(grupo):
+    ficha, aprendices = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    lunes = domingo + timedelta(days=1)
+    while es_festivo_colombia(lunes):
+        lunes += timedelta(days=1)
+    for aprendiz in aprendices[2:]:
+        aprendiz.estado = 'RETIRADO'
+    for fecha in (sabado, domingo):
+        registrar_turno(ficha, aprendices, fecha, (0, 1), estado='programado')
+    turno_laborable = registrar_turno(ficha, aprendices, lunes, (4, 5), estado='programado')
+    db.session.commit()
+    turno_id = turno_laborable.id
+
+    resultado = generar_turnos(ficha.id, sabado, lunes, rng=random.Random(7))
+    db.session.commit()
+
+    assert resultado['eliminados'] == 2
+    assert [turno.id for turno in resultado['recalculados']] == [turno_id]
+    turno = db.session.get(TurnoAseo, turno_id)
+    assert {turno.aprendiz_1_id, turno.aprendiz_2_id} == {a.id for a in aprendices[:2]}
+    assert '0 turno(s) cumplido(s) y 0 programado(s)' in turno.auditoria_1
+    assert '0 turno(s) cumplido(s) y 0 programado(s)' in turno.auditoria_2
+    assert TurnoAseo.query.count() == 1
+
+    repeticion = generar_turnos(ficha.id, sabado, lunes, rng=random.Random(7))
+    db.session.commit()
+    assert repeticion['eliminados'] == 0
+    assert TurnoAseo.query.count() == 1
+    assert {turno.aprendiz_1_id, turno.aprendiz_2_id} == {a.id for a in aprendices[:2]}
+
+
+def test_conserva_cumplidos_fuera_del_calendario_y_pendientes_fuera_del_rango(grupo):
+    ficha, aprendices = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    cumplido = registrar_turno(ficha, aprendices, sabado, (0, 1))
+    fuera_del_rango = registrar_turno(ficha, aprendices, sabado + timedelta(days=7), (2, 3), 'programado')
+    pendiente = registrar_turno(ficha, aprendices, domingo, (4, 5), 'programado')
+    db.session.commit()
+    ids = cumplido.id, fuera_del_rango.id, pendiente.id
+
+    resultado = generar_turnos(ficha.id, sabado, domingo, recalcular_existentes=False)
+    db.session.commit()
+
+    assert db.session.get(TurnoAseo, ids[0]).estado == 'cumplido'
+    assert db.session.get(TurnoAseo, ids[1]).estado == 'programado'
+    assert db.session.get(TurnoAseo, ids[2]) is None
+    assert resultado['eliminados'] == 1
+
+
+def test_seleccionar_fin_de_semana_conserva_sus_turnos_y_seleccion_vacia_no_borra(grupo):
+    ficha, aprendices = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    turno = registrar_turno(ficha, aprendices, sabado, (0, 1), 'programado')
+    db.session.commit()
+    turno_id = turno.id
+
+    with pytest.raises(ValueError, match='Selecciona al menos un día'):
+        generar_turnos(ficha.id, sabado, domingo, dias_semana=[])
+    assert db.session.get(TurnoAseo, turno_id) is not None
+
+    resultado = generar_turnos(ficha.id, sabado, domingo, dias_semana=[5, 6])
+    db.session.commit()
+    assert resultado['eliminados'] == 0
+    assert db.session.get(TurnoAseo, turno_id) is not None
+    assert {turno.fecha for turno in TurnoAseo.query.all()} == {sabado, domingo}
+
+
+@pytest.mark.parametrize('estado', ['pendiente', 'aceptado'])
+def test_limpieza_resuelve_intercambios_reciprocos_y_borra_los_propios(grupo, estado):
+    ficha, aprendices = grupo
+    db.session.execute(text('PRAGMA foreign_keys=ON'))
+    assert db.session.execute(text('PRAGMA foreign_keys')).scalar() == 1
+    sabado, domingo = proximo_fin_de_semana()
+    viernes = sabado - timedelta(days=1)
+    eliminado = registrar_turno(ficha, aprendices, sabado, (0, 1), 'intercambiado')
+    conservado = registrar_turno(ficha, aprendices, viernes, (2, 3), 'programado')
+    db.session.flush()
+    propio = IntercambioAseo(turno_id=eliminado.id, aprendiz_solicita_id=aprendices[0].id,
+                            aprendiz_recibe_id=aprendices[2].id)
+    reciproco = IntercambioAseo(turno_id=conservado.id, turno_reciproco_id=eliminado.id,
+                              aprendiz_solicita_id=aprendices[2].id,
+                              aprendiz_recibe_id=aprendices[0].id, estado=estado)
+    db.session.add_all([propio, reciproco])
+    db.session.commit()
+    ids = propio.id, reciproco.id
+
+    generar_turnos(ficha.id, sabado, domingo)
+    db.session.commit()
+
+    assert db.session.get(IntercambioAseo, ids[0]) is None
+    restante = db.session.get(IntercambioAseo, ids[1])
+    assert restante.turno_reciproco_id is None
+    assert restante.estado == ('rechazado' if estado == 'pendiente' else estado)
+    assert (restante.respondido_en is not None) == (estado == 'pendiente')
+
+
+@pytest.mark.parametrize('actor', ['instructor', 'aprendiz'])
+def test_generacion_http_confirma_la_limpieza_incluso_sin_dias_laborables(grupo, actor):
+    ficha, aprendices = grupo
+    sabado, domingo = proximo_fin_de_semana()
+    for fecha in (sabado, domingo):
+        registrar_turno(ficha, aprendices, fecha, (0, 1), 'programado')
+    db.session.commit()
+    cliente = current_app.test_client()
+    with cliente.session_transaction() as sesion:
+        if actor == 'instructor':
+            sesion['_user_id'] = str(ficha.instructor_id)
+            sesion['_fresh'] = True
+        else:
+            sesion['aprendiz_documento'] = aprendices[0].documento
+            sesion['aprendiz_ficha_id'] = ficha.id
+    prefijo = '/instructor/fichas' if actor == 'instructor' else '/aprendiz'
+
+    respuesta = cliente.post(f'{prefijo}/{ficha.id}/turnos-aseo/generar', data={
+        'fecha_inicio': sabado.isoformat(), 'fecha_fin': domingo.isoformat(),
+    })
+
+    assert respuesta.status_code == 302
+    assert TurnoAseo.query.count() == 0
+    with cliente.session_transaction() as sesion:
+        assert any(categoria == 'success' and '2 pendiente(s) eliminado(s)' in mensaje
+                   for categoria, mensaje in sesion['_flashes'])
+    vista = cliente.get(respuesta.headers['Location'])
+    assert vista.status_code == 200
+    assert 'Los aseos cumplidos se conservan.'.encode() in vista.data
+    assert 'Mantiene asignaciones manuales en los días seleccionados'.encode() in vista.data
