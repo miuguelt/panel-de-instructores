@@ -27,6 +27,7 @@ from app.services.festivos import (
     es_festivo_colombia,
     obtener_festivos_colombia,
 )
+from tests.test_aseo_equidad import fechas_futuras
 
 
 class TurnosAseoTestCase(unittest.TestCase):
@@ -643,8 +644,8 @@ class TurnosAseoTestCase(unittest.TestCase):
             )
 
     def test_diversidad_parejas_evita_repetir_mismo_companero(self):
-        # 6 sesiones = 2 ciclos completos para 6 aprendices
-        fechas = [date.today() + timedelta(days=i) for i in range(1, 7)]
+        # Seis días hábiles permiten dos ciclos completos para seis aprendices.
+        fechas = fechas_futuras(6)
         for f in fechas:
             self._crear_sesion(f)
         db.session.commit()
@@ -654,7 +655,6 @@ class TurnosAseoTestCase(unittest.TestCase):
             fechas[0],
             fechas[-1],
             rng=random.Random(42),
-            dias_semana=range(7),
         )
         db.session.commit()
 
@@ -663,16 +663,15 @@ class TurnosAseoTestCase(unittest.TestCase):
             TurnoAseo.fecha.between(fechas[0], fechas[-1]),
         ).order_by(TurnoAseo.fecha).all()
 
-        parejas = set()
-        for t in turnos:
-            p = tuple(sorted((t.aprendiz_1_id, t.aprendiz_2_id)))
-            parejas.add(p)
-
-        # En 6 sesiones (2 rotaciones de 3 turnos), las 6 parejas deben ser todas distintas (máxima diversidad)
+        self.assertEqual([turno.fecha for turno in turnos], fechas)
+        parejas = {tuple(sorted((t.aprendiz_1_id, t.aprendiz_2_id))) for t in turnos}
         self.assertEqual(len(parejas), 6, "No se diversificaron las parejas en los dos ciclos de rotación")
 
     def test_proteger_fechas_pasadas_al_recalcular_mes(self):
         fecha_pasada = date.today() - timedelta(days=3)
+        while fecha_pasada.weekday() >= 5 or es_festivo_colombia(fecha_pasada):
+            fecha_pasada -= timedelta(days=1)
+        self.ficha.fecha_inicio = fecha_pasada
         self._crear_sesion(fecha_pasada)
         turno_pasado = TurnoAseo(
             ficha_id=self.ficha.id,
@@ -684,9 +683,10 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
         db.session.add(turno_pasado)
 
-        fecha_futura = date.today() + timedelta(days=2)
+        fecha_futura = fechas_futuras(1)[0]
         self._crear_sesion(fecha_futura)
         db.session.commit()
+        anteriores = {c.name: getattr(turno_pasado, c.name) for c in TurnoAseo.__table__.columns}
 
         resultado = generar_turnos(
             self.ficha.id,
@@ -698,10 +698,12 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
         db.session.commit()
 
-        turno_pasado_bd = db.session.get(TurnoAseo, turno_pasado.id)
-        # El turno de la fecha pasada no debe haber sido sobreescrito
-        self.assertEqual(turno_pasado_bd.aprendiz_1_id, self.aprendices[4].id)
-        self.assertEqual(turno_pasado_bd.aprendiz_2_id, self.aprendices[5].id)
+        conservado = db.session.get(TurnoAseo, anteriores['id'])
+        self.assertIsNotNone(conservado)
+        self.assertEqual({c.name: getattr(conservado, c.name) for c in TurnoAseo.__table__.columns}, anteriores)
+        self.assertEqual(resultado['eliminados'], 0)
+        self.assertNotIn(conservado.id, [turno.id for turno in resultado['recalculados']])
+        self.assertIn(fecha_futura, [turno.fecha for turno in resultado['creados']])
 
     def test_marcar_cumplido_persiste_y_afecta_recalculo_futuro(self):
         # 1. Creamos turno hoy con Ana (0) y Bruno (1)
