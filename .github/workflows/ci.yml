@@ -70,8 +70,14 @@ jobs:
       - name: Verificar el testigo de carga y su cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/loading-indicator.js --test tests_js/loading_indicator.test.cjs
 
+      - name: Verificar selector aleatorio del instructor y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/selector_aprendiz.js --test-reporter=spec --test tests_js/selector_aprendiz.test.cjs
+
       - name: Verificar la disposición del panel de grupos
         run: node --test tests_js/grupos_layout.test.cjs
+
+      - name: Verificar personalización del aprendiz y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_personalizacion.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=test-results/coverage-personalizacion.lcov --test tests_js/aprendiz_personalizacion.test.cjs
 
       - name: Instalar el navegador de pruebas
         run: |
@@ -94,6 +100,7 @@ jobs:
             test-results/cronograma-*.png
             test-results/evaluaciones-*.png
             test-results/aprendices-carga.png
+            test-results/personalizacion-*.png
           if-no-files-found: ignore
 
       - name: Guardar cobertura de navegación
@@ -105,6 +112,7 @@ jobs:
             coverage-planeacion.lcov
             coverage-evaluaciones.lcov
             coverage-gantt.lcov
+            test-results/coverage-personalizacion.lcov
           if-no-files-found: ignore
           retention-days: 14
 

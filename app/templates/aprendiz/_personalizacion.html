@@ -1,0 +1,97 @@
+<script type="application/json" id="learner-personalization-config">{{ {'learnerId': aprendiz.id, 'endpoint': url_for('personalizacion_aprendiz.preferencias', ficha_id=ficha.id), 'displayName': aprendiz.nombre}|tojson }}</script>
+<dialog id="personalizacion-modal" class="app-modal-overlay" aria-modal="true" aria-labelledby="personalizacion-modal-title" data-backdrop-close="false">
+    <div class="personalizacion-modal-shell app-modal-content">
+        <header class="personalizacion-modal-header app-modal-header">
+            <div>
+                <span class="eyebrow">Tu cuenta de aprendiz</span>
+                <h2 id="personalizacion-modal-title">Personaliza tu espacio</h2>
+            </div>
+            <button type="button" class="app-modal-close" data-close-personalizacion-modal aria-label="Cerrar personalización">&times;</button>
+        </header>
+        <div class="personalizacion-modal-body app-modal-body">
+            <p class="text-muted">Elige cómo quieres ver tu panel. Tus cambios se guardan en tu cuenta cuando presionas <strong>Guardar cambios</strong> y se conservan al volver a ingresar desde otro dispositivo.</p>
+            <div id="personalizacion-feedback" class="personalizacion-feedback" aria-live="polite" aria-atomic="true">
+                <p id="personalizacion-status" role="status">Cargando tus preferencias guardadas…</p>
+                <button type="button" id="personalizacion-retry" class="btn btn-outline" hidden>Reintentar</button>
+                <button type="button" id="personalizacion-reload" class="btn btn-outline" hidden>Recargar preferencias guardadas</button>
+            </div>
+            <button type="button" id="personalizacion-legacy" class="btn btn-outline personalizacion-legacy" hidden>Recuperar mi personalización anterior de este navegador</button>
+            <fieldset id="personalizacion-form-fields" disabled>
+                <legend class="personalizacion-visually-hidden">Opciones de personalización</legend>
+                <div class="customizer-section">
+                    <h3 class="customizer-label">Foto y avatar</h3>
+                    <div class="customizer-photo-row">
+                        <div class="customizer-photo-frame">
+                            <img id="customizer-photo-preview" alt="Vista previa de tu foto" hidden>
+                            <span id="customizer-photo-symbol" aria-hidden="true">💻</span>
+                        </div>
+                        <div class="customizer-photo-controls">
+                            <label for="customizer-photo-input" class="customizer-label">Sube tu foto</label>
+                            <input type="file" id="customizer-photo-input" class="form-control" accept="image/jpeg,image/png,image/webp" aria-describedby="customizer-photo-help">
+                            <p id="customizer-photo-help" class="text-muted">JPEG, PNG o WebP, máximo 2 MiB. Elige una foto tuya y evita imágenes de documentos o de otras personas. Tu foto aparece en tu panel privado.</p>
+                            <button type="button" id="customizer-remove-photo" class="btn btn-sm btn-outline" disabled>Quitar foto y usar avatar</button>
+                        </div>
+                    </div>
+                    <p class="text-muted">Si no tienes una foto, se mostrará el avatar que elijas.</p>
+                    <div class="avatar-picker-grid" id="avatar-picker-grid" role="group" aria-label="Elige tu avatar">
+                        {% for av in ['💻', '🚀', '⚡', '🎯', '🧠', '🎨', '🔬', '🦊', '🦁', '🦉', '🌟', '💡', '🛡️', '⚙️', '📚', '🏆'] %}
+                        <button type="button" class="avatar-option-btn" data-avatar="{{ av }}" aria-label="Avatar {{ av }}" aria-pressed="false"><span aria-hidden="true">{{ av }}</span></button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="customizer-section customizer-identity-grid">
+                    <div>
+                        <label for="customizer-alias-input" class="customizer-label">Nombre que prefieres en el saludo</label>
+                        <input type="text" id="customizer-alias-input" class="form-control" maxlength="30" placeholder="{{ aprendiz.nombre }}" aria-describedby="customizer-alias-help">
+                        <small id="customizer-alias-help" class="text-muted">Tu nombre en los registros académicos se conserva.</small>
+                    </div>
+                    <div>
+                        <label for="customizer-motto-input" class="customizer-label">Tu lema o meta</label>
+                        <input type="text" id="customizer-motto-input" class="form-control" maxlength="80" placeholder="Una meta que te motive">
+                        <div class="motto-suggestions" role="group" aria-label="Ideas para tu lema">
+                            <button type="button" class="motto-suggestion-chip" data-motto="Construyendo software con impacto">Con impacto</button>
+                            <button type="button" class="motto-suggestion-chip" data-motto="Disciplina, código y constancia">Constancia</button>
+                            <button type="button" class="motto-suggestion-chip" data-motto="Cada día un paso más cerca de la meta">Mi meta</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="customizer-section">
+                    <h3 class="customizer-label">Color de acento</h3>
+                    <div class="theme-color-grid" id="theme-color-grid" role="group" aria-label="Elige el color del panel">
+                        {% for theme, color, label in [('sena', '#39a900', 'SENA'), ('indigo', '#2563eb', 'Índigo'), ('cyan', '#0891b2', 'Cian'), ('purple', '#7c3aed', 'Púrpura'), ('amber', '#d97706', 'Ámbar'), ('emerald', '#059669', 'Esmeralda'), ('rose', '#e11d48', 'Rosa'), ('slate', '#475569', 'Pizarra')] %}
+                        <button type="button" class="color-option-btn" data-theme-name="{{ theme }}" data-accent="{{ color }}" style="--btn-color: {{ color }};" aria-pressed="false">
+                            <span class="color-circle" aria-hidden="true"></span><span>{{ label }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="customizer-section customizer-identity-grid">
+                    <div>
+                        <label for="customizer-background-input" class="customizer-label">Fondo del panel</label>
+                        <select id="customizer-background-input" class="form-control">
+                            <option value="plain">Liso</option><option value="dots">Puntos suaves</option><option value="grid">Cuadrícula suave</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="customizer-view-mode-input" class="customizer-label">Organización de la vista</label>
+                        <select id="customizer-view-mode-input" class="form-control">
+                            <option value="tabs">Por pestañas</option><option value="cascade">Continua: todas las secciones</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="customizer-section">
+                    <h3 class="customizer-label" id="personalizacion-order-title">Orden de las tarjetas</h3>
+                    <p class="text-muted">Usa Subir y Bajar para ordenar las tarjetas de tu panel. En cada pestaña se mantiene este orden entre las tarjetas visibles; la vista continua las muestra todas.</p>
+                    <ol id="personalizacion-order-list" class="personalizacion-order-list" aria-labelledby="personalizacion-order-title"></ol>
+                </div>
+            </fieldset>
+        </div>
+        <footer class="personalizacion-modal-footer app-modal-footer">
+            <button type="button" id="btn-reset-personalizacion" class="btn btn-outline" disabled>Restablecer valores</button>
+            <div class="personalizacion-footer-actions">
+                <button type="button" class="btn btn-ghost" data-close-personalizacion-modal>Cancelar</button>
+                <button type="button" id="btn-save-personalizacion" class="btn btn-primary" disabled>Guardar cambios</button>
+            </div>
+        </footer>
+    </div>
+</dialog>

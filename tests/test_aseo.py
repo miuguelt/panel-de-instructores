@@ -480,7 +480,8 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertNotIn(self.aprendices[1].id, asignados_futuros)
 
     def test_recalcular_actualiza_turnos_programados_existentes(self):
-        fecha_futura = date.today() + timedelta(days=3)
+        # La sesión debe caer en un día habilitado, incluso si la prueba corre un fin de semana.
+        fecha_futura = fechas_futuras(1)[0]
         self._crear_sesion(fecha_futura)
         # Turno programado inicialmente con Ana y Bruno
         turno_existente = TurnoAseo(

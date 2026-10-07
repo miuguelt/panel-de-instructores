@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "project": "panel de instructores",
+  "jurisdiction": "CO",
+  "last_reviewed": "2026-10-07",
+  "verdict": {
+    "technical_implementation": "verificada localmente con datos de pruebas",
+    "production_with_real_personal_data": "BLOCKED",
+    "scope": "Incorporación de fotos reales en la nueva funcionalidad; no modifica el estado declarado de la operación heredada."
+  },
+  "pending_blockers": [
+    { "id": "responsable", "owner": "institución por confirmar", "action": "Confirmar el responsable del tratamiento y la autorización aplicable a la foto opcional.", "evidence": null },
+    { "id": "población-y-retención", "owner": "institución por confirmar", "action": "Confirmar si hay menores y documentar retención, eliminación y acceso institucional a las fotos.", "evidence": null }
+  ],
+  "audit_trail": {
+    "last_legal_change_reviewed_on": "2026-10-07",
+    "review_scope": "Inventario técnico de campos, rutas, aislamiento y nueva carga de imágenes; aprobación institucional pendiente.",
+    "evidence": ["docs/architecture/personalizacion-aprendiz.md", "tests/test_personalizacion_aprendiz.py", "tests_browser/aprendiz_personalizacion.test.cjs"]
+  },
+  "ai_resume_contract": {
+    "preserve": ["No marcar aprobaciones institucionales sin evidencia humana.", "No cargar fotos reales para las pruebas.", "Mantener la identidad de sesión y el aislamiento por aprendiz."],
+    "verification": ["python -m pytest tests/test_personalizacion_aprendiz.py tests/test_personalizacion_migration.py", "node --test tests_browser/aprendiz_personalizacion.test.cjs"]
+  }
+}

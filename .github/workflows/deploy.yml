@@ -45,6 +45,7 @@ jobs:
           node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/modal-system.js --test tests_js/modal_system.test.cjs
           node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/loading-indicator.js --test tests_js/loading_indicator.test.cjs
           node --test tests_js/grupos_layout.test.cjs
+          node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_personalizacion.js --test tests_js/aprendiz_personalizacion.test.cjs
 
       - name: Run Backend Pytest Suite
         env:

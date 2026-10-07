@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Aprendices - {{ ficha.codigo }} - SENA Control{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/selector_aprendiz.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
@@ -11,6 +15,50 @@
         </div>
     </div>
 </div>
+
+<section class="selector-aprendiz card" id="selector-aprendiz" aria-labelledby="selector-aprendiz-titulo" aria-busy="false">
+    <div class="selector-aprendiz__encabezado">
+        <span class="selector-aprendiz__icono" aria-hidden="true">🎲</span>
+        <div>
+            <p class="selector-aprendiz__sobretitulo">Dinámica de formación</p>
+            <h2 id="selector-aprendiz-titulo">¿Quién participa?</h2>
+            <p class="selector-aprendiz__descripcion">Sortea un turno para hacer una pregunta o asignar una actividad al grupo.</p>
+        </div>
+        <span class="selector-aprendiz__contador" id="selector-aprendiz-contador">{{ aprendices_administrables|length }} participantes disponibles</span>
+    </div>
+
+    <div class="selector-aprendiz__resultado" aria-live="polite" aria-atomic="true">
+        <span class="selector-aprendiz__etiqueta">Próximo turno</span>
+        <strong class="selector-aprendiz__nombre" id="selector-aprendiz-nombre">Elige a alguien al azar</strong>
+        <span class="selector-aprendiz__estado" id="selector-aprendiz-estado"></span>
+    </div>
+
+    <div class="selector-aprendiz__acciones">
+        <button type="button" class="btn btn-primary selector-aprendiz__sortear" id="selector-aprendiz-sortear" {% if not aprendices_administrables %}disabled{% endif %}>
+            <span aria-hidden="true">🎯</span> Sortear aprendiz
+        </button>
+        <button type="button" class="btn btn-outline selector-aprendiz__expandir" id="selector-aprendiz-expandir" aria-label="Abrir el selector en pantalla completa">
+            <span aria-hidden="true">⛶</span> Pantalla completa
+        </button>
+        <button type="button" class="btn btn-outline selector-aprendiz__salir" id="selector-aprendiz-salir" hidden>
+            <span aria-hidden="true">↙</span> Salir de pantalla completa
+        </button>
+    </div>
+
+    <p class="selector-aprendiz__mensaje" id="selector-aprendiz-mensaje" role="status">
+        {% if aprendices_administrables %}
+        Participan aprendices activos en formación o condicionados. Cada persona tendrá un turno antes de repetir el grupo.
+        {% else %}
+        No hay aprendices activos disponibles para participar.
+        {% endif %}
+    </p>
+
+    <div class="selector-aprendiz__lista" hidden aria-hidden="true">
+        {% for aprendiz in aprendices_administrables %}
+        <span data-selector-aprendiz data-id="{{ aprendiz.id }}" data-nombre="{{ aprendiz.nombre_completo }}" data-estado="{{ aprendiz.estado|etiqueta_estado }}"></span>
+        {% endfor %}
+    </div>
+</section>
 
 {% set importacion_id = request.args.get('importacion_id')|int %}
 {% if importacion_id %}
@@ -2100,6 +2148,7 @@
 {% block scripts %}
 <!-- Librería QR Code -->
 <script src="{{ url_for('static', filename='vendor/qrcodejs/qrcode.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/selector_aprendiz.js') }}" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // 1. Manejo del código QR, Proyección TV en Máxima Resolución y Enlace

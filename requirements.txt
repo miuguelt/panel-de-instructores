@@ -17,3 +17,4 @@ Flask-Compress==1.17
 redis==5.2.1
 watchdog==6.0.0
 tzdata==2026.4
+Pillow==12.3.0

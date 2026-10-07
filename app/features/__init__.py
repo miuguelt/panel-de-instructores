@@ -1,0 +1,1 @@
+"""Funcionalidades organizadas por responsabilidad."""

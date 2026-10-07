@@ -11,7 +11,9 @@ let servidor, browser, url;
 
 test.before(async () => {
     const destinoHtml = path.join(raiz, 'test-results', 'aprendices-navegador.html');
-    if (!fs.existsSync(destinoHtml)) {
+    const htmlActualizado = fs.existsSync(destinoHtml)
+        && fs.readFileSync(destinoHtml, 'utf8').includes('selector-aprendiz-sortear');
+    if (!htmlActualizado) {
         const pythonBin = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
         try {
             execFileSync(pythonBin, ['-m', 'tests.exportar_rendimiento'], { cwd: raiz, stdio: 'ignore' });
@@ -53,6 +55,39 @@ test('el directorio y los QR funcionan sin conexión a los CDN', async () => {
     assert.equal(await page.locator('#app-loading-overlay').isVisible(), false);
     assert.equal(await page.evaluate(() => htmx.version), '2.0.4');
     await page.waitForFunction(() => document.querySelector('#qr-code canvas')?.width === 320);
+
+    const botonSorteo = page.locator('#selector-aprendiz-sortear');
+    assert.equal(await botonSorteo.isVisible(), true, 'el selector debe estar a la vista del instructor');
+    const roster = await page.locator('[data-selector-aprendiz]').evaluateAll(elementos =>
+        elementos.map(elemento => elemento.dataset.nombre),
+    );
+    assert.equal(roster.length, 4, 'debe incluir a las personas activas que asisten a clase');
+    await botonSorteo.click();
+    await page.waitForFunction(() => document.querySelector('#selector-aprendiz-mensaje')?.textContent.includes('Turno asignado'));
+    const primerNombre = await page.locator('#selector-aprendiz-nombre').textContent();
+    assert.ok(roster.includes(primerNombre), 'el resultado debe pertenecer al grupo elegible');
+
+    await page.locator('#selector-aprendiz-expandir').click();
+    await page.waitForFunction(() => {
+        const panel = document.querySelector('#selector-aprendiz');
+        return document.fullscreenElement === panel || panel?.classList.contains('is-fullscreen-fallback');
+    });
+    assert.equal(await page.locator('#selector-aprendiz-salir').isVisible(), true);
+    await page.locator('#selector-aprendiz-salir').click();
+    await page.waitForFunction(() => {
+        const panel = document.querySelector('#selector-aprendiz');
+        return document.fullscreenElement !== panel && !panel?.classList.contains('is-fullscreen-fallback');
+    });
+
+    const seleccionados = [primerNombre];
+    while (seleccionados.length < roster.length) {
+        await botonSorteo.click();
+        await page.waitForFunction(() => /Turno asignado|Ronda completa/.test(document.querySelector('#selector-aprendiz-mensaje')?.textContent || ''));
+        seleccionados.push(await page.locator('#selector-aprendiz-nombre').textContent());
+    }
+    assert.equal(new Set(seleccionados).size, roster.length, 'la ronda debe dar un turno a cada persona antes de repetir');
+    assert.match(await page.locator('#selector-aprendiz-mensaje').textContent(), /ronda completa/i);
+
     await page.locator('#aprendices-search').fill('9000001');
     await page.waitForFunction(() => document.querySelector('#search-counter').textContent.includes('1 encontrado'));
     assert.equal(await page.locator('#tabla-aprendices tbody tr:visible').count(), 1);

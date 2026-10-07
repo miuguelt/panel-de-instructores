@@ -116,3 +116,12 @@ La interfaz usa un tablero operativo de inspiración Bento: superficies agrupada
 - Dado que la actualización parcial falla, cuando HTMX informa el error, entonces aparece una alerta descriptiva con botón de reintento y la lista anterior permanece disponible.
 - Dado que no hay aprendices, cuando se abre el ranking, entonces aparece un estado vacío con acceso al directorio de aprendices.
 - Dado un parámetro de periodo inválido, un usuario sin autorización o una creación de corte duplicada, cuando el servidor responde con validación, prohibición o conflicto, entonces esta mejora conserva las respuestas y protecciones existentes sin simular éxito en la interfaz.
+
+# Contrato de diseño — espacio del aprendiz (7 de octubre de 2026)
+
+- Dirección visual: dashboard Bento existente, tarjetas con superficies sólidas y acentos del catálogo institucional.
+- Personalización: foto o avatar, saludo, lema, ocho colores, tres fondos, orden de tarjetas y vista por pestañas o continua.
+- Confirmación: la interfaz aplica únicamente el estado confirmado por el servidor; el borrador se conserva cuando falla el guardado. Los conflictos permiten recargar preferencias.
+- Accesibilidad: controles de 44 px, navegación por teclado, ordenación con Subir/Bajar, estado anunciado y aviso compartido de éxito. La selección de color usa texto e indicador adicional, con primer plano calculado por contraste.
+- Jerarquía: cabecera y alertas operativas conservan su posición; solo se ordenan las tarjetas disponibles. Las distinciones de oro, plata y bronce proceden del ranking real.
+- Verificación: persistencia después de recarga y reinicio, aislamiento de sesión, recuperación de preferencias antiguas y pruebas a 320, 390, 768, 1440, 1920 y 2560 px, con zoom del 200 %.

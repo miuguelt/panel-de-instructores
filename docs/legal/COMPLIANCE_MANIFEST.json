@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "project": "panel de instructores",
+  "jurisdiction": "CO",
+  "profile": "personalización de un panel educativo con foto opcional",
+  "status": "review_required",
+  "controller": { "status": "pendiente de confirmación institucional", "name": null },
+  "last_reviewed": "2026-10-07",
+  "scope": "Preferencias visuales y foto opcional del aprendiz; no acredita controles de toda la aplicación heredada.",
+  "required_profiles": ["personal_data", "education", "public_entity", "file_uploads"],
+  "population": { "minors": "por confirmar", "evidence": null },
+  "controls": [
+    { "id": "aislamiento", "status": "implemented", "evidence": "app/features/personalizacion_aprendiz/routes.py", "verification": "tests/test_personalizacion_aprendiz.py" },
+    { "id": "imagen-y-metadatos", "status": "implemented", "evidence": "app/features/personalizacion_aprendiz/service.py", "verification": "tests/test_personalizacion_aprendiz.py" },
+    { "id": "borrado-opcional", "status": "implemented", "evidence": "app/features/personalizacion_aprendiz/service.py", "verification": "tests_browser/aprendiz_personalizacion.test.cjs" },
+    { "id": "autorización-y-retención", "status": "pending", "owner": "responsable institucional por confirmar", "evidence": null }
+  ],
+  "release_rule": "La incorporación de fotos reales requiere confirmar la autorización vigente, la población, la retención y el responsable institucional. La implementación técnica no constituye una aprobación.",
+  "evidence_directory": "test-results"
+}

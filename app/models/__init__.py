@@ -34,6 +34,7 @@ from app.models.archivo_ficha import (
 )
 from app.models.observador import NotaObservador
 from app.models.resultado_calculado import ResultadoCalculadoFicha
+from app.features.personalizacion_aprendiz.models import PersonalizacionAprendiz
 
 __all__ = [
     'Instructor', 'Ficha', 'Corte', 'Aprendiz',
@@ -49,4 +50,5 @@ __all__ = [
     'MaterialFicha', 'ImportacionJob', 'ArchivoFichaVersion',
     'TIPO_PLANEACION', 'TIPO_REPORTE_JUICIOS', 'TIPO_PROGRAMA', 'ETIQUETAS_TIPO', 'NotaObservador',
     'ResultadoCalculadoFicha',
+    'PersonalizacionAprendiz',
 ]

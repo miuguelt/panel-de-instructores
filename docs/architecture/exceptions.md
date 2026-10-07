@@ -1,5 +1,14 @@
 # Excepciones de modularidad
 
+## Controlador de personalización del aprendiz
+
+- Propietario: equipo de mantenimiento de Panel de Instructores.
+- Archivo: `app/static/js/aprendiz_personalizacion.js`.
+- Motivo: sus 340 líneas contienen un único controlador público y funciones privadas para el ciclo de borrador, confirmación, foto y orden. Los efectos del editor comparten el mismo estado y no tienen consumidores independientes. Se revisó la cohesión; permanece por debajo del límite de 400 líneas.
+- Verificación: pruebas observables de interfaz, cobertura del 100 % de funciones y recorrido de navegador con base de datos real de pruebas.
+- Límite: nuevas capacidades con razones de cambio independientes se extraerán antes de ampliar este controlador. La excepción no reduce los umbrales de cobertura ni modifica el baseline.
+- Registro de aplicación: `app/__init__.py` solo agrega una llamada de registro; el incremento de esta tarea es de una línea. El aviso del baseline incluye crecimiento anterior a esta iteración.
+
 ## Archivos de rutas y ranking heredados
 
 - Propietario: equipo de mantenimiento de Panel de Instructores.
