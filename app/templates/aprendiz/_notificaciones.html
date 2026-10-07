@@ -1,0 +1,83 @@
+{% macro avisos_agrupados(grupos) %}
+{% for grupo in grupos %}
+<section class="notification-group" aria-label="{{ grupo.categoria }} del {{ grupo.fecha }}">
+    <h3>{{ grupo.fecha }} · {{ grupo.categoria }}</h3>
+    <div class="notification-list">
+        {% for aviso in grupo.avisos %}
+        {% set notificacion = aviso.notificacion %}
+        <article class="notification-item{% if not notificacion.leida %} notification-unread{% endif %}">
+            <div class="notification-icon" aria-hidden="true"><svg class="notification-symbol" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg></div>
+            <div class="notification-copy">
+                <p>{{ notificacion.mensaje }}</p>
+                <div class="notification-meta">
+                    <time datetime="{{ aviso.fecha_local.isoformat() }}">{{ aviso.fecha_local.hour % 12 or 12 }}:{{ aviso.fecha_local.strftime('%M') }} {% if aviso.fecha_local.hour < 12 %}a. m.{% else %}p. m.{% endif %}</time>
+                    {% if aviso.importante %}<span class="badge badge-warning">Para revisar</span>{% endif %}
+                    {% if notificacion.leida %}<span class="badge">Leída</span>{% else %}<span class="badge badge-info">Sin leer</span>{% endif %}
+                </div>
+            </div>
+            <div class="notification-actions">
+                <a href="{{ aviso.destino }}" class="btn btn-sm btn-outline">{% if aviso.categoria == 'Retroalimentación' %}Revisar comentarios{% elif aviso.categoria == 'Evidencias' %}Ver evidencias{% else %}Abrir en mi panel{% endif %}</a>
+                {% if not notificacion.leida %}
+                <form method="POST" action="{{ url_for('aprendiz_seguimiento.marcar_notificacion_aprendiz', ficha_id=ficha.id, notificacion_id=notificacion.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="learner_context" value="{{ aprendiz.id }}">
+                    <button type="submit" class="btn btn-sm btn-primary">Marcar como leída</button>
+                </form>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endfor %}
+{% endmacro %}
+
+<div class="learner-notifications" data-notification-mode="{{ centro_avisos.modo }}">
+    <div class="page-header">
+        <div class="page-title-cluster">
+            <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back">&larr; Volver a mi panel</a>
+            <h1>Mis notificaciones</h1>
+        </div>
+    </div>
+    <div class="notification-toolbar">
+        <div>
+            <span class="badge badge-info" role="status" aria-live="polite">{{ centro_avisos.sin_leer }} sin leer</span>
+            <p class="notification-muted">Leer un aviso no confirma que hayas realizado la actividad.</p>
+        </div>
+        {% if centro_avisos.sin_leer %}
+        <form method="POST" action="{{ url_for('aprendiz_seguimiento.marcar_todas_aprendiz', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="learner_context" value="{{ aprendiz.id }}">
+            <button type="submit" class="btn btn-sm btn-outline">Marcar todas como leídas</button>
+        </form>
+        {% endif %}
+    </div>
+    {% if centro_avisos.modo == 'quiet' %}
+    <p class="notification-mode-note"><strong>Modo silencioso.</strong> Los avisos de seguimiento, fechas y retroalimentación permanecen visibles. Puedes consultar los demás cuando lo necesites.</p>
+    {% elif centro_avisos.modo == 'important' %}
+    <p class="notification-mode-note">Los avisos para revisar aparecen primero. Los demás están en «Otros avisos».</p>
+    {% else %}
+    <p class="notification-mode-note">Tus avisos están agrupados por fecha y tema.</p>
+    {% endif %}
+    <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}#tab-resumen" class="btn btn-sm btn-outline">Ajustar los avisos en mi panel</a>
+
+    {% if centro_avisos.total %}
+    {{ avisos_agrupados(centro_avisos.principales) }}
+    {% if not centro_avisos.principales %}
+    <p class="notification-mode-note">No hay avisos importantes para revisar. Los demás siguen disponibles abajo.</p>
+    {% endif %}
+    {% if centro_avisos.secundarios %}
+    <details class="notification-details">
+        <summary>{% if centro_avisos.modo == 'quiet' %}{{ centro_avisos.opcionales }} avisos adicionales{% else %}Otros avisos ({{ centro_avisos.opcionales }}){% endif %}</summary>
+        {{ avisos_agrupados(centro_avisos.secundarios) }}
+    </details>
+    {% endif %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon" aria-hidden="true"><svg class="notification-symbol" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg></div>
+        <h2>No tienes notificaciones</h2>
+        <p>Cuando recibas comentarios, recordatorios o avisos de seguimiento, podrás consultarlos aquí.</p>
+        <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn btn-primary">Volver a mi panel</a>
+    </div>
+    {% endif %}
+</div>

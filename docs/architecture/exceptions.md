@@ -1,5 +1,14 @@
 # Excepciones de modularidad
 
+## Integración de experiencia en rutas heredadas del aprendiz
+
+- Propietario: equipo de mantenimiento de Panel de Instructores.
+- Archivos: `app/routes/aprendiz.py`, `app/routes/seguimiento.py` y `app/__init__.py`.
+- Motivo: estas rutas ya superaban el presupuesto de tamaño. La integración agrega la proyección del recorrido al panel existente y conserva los contratos de lectura de notificaciones compartidos con el instructor.
+- Límite: las reglas de metas, hitos, persistencia, concurrencia y agrupación viven en `app/features/experiencia_aprendiz/`. El registro de la aplicación agrega una sola llamada. La excepción no cambia el baseline ni los umbrales de cobertura.
+- Verificación: suite completa de Python, compuerta de funciones y recorridos reales de navegador. Los avisos de tamaño del gate se conservan como deuda visible.
+- Plan: cualquier crecimiento independiente requiere extraer la responsabilidad correspondiente con pruebas de contrato, antes de ampliar las rutas heredadas.
+
 ## Controlador de personalización del aprendiz
 
 - Propietario: equipo de mantenimiento de Panel de Instructores.

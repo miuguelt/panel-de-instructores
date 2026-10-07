@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, text
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REVISION_MERGE = 'e025798e7b92'
-REVISION_HEAD = 'q40personalizacionaprendiz'
+REVISION_HEAD = 'r41experienciaaprendiz'
 REVISION_PORTAFOLIO = 'p39portafolioaprendiz'
 REVISION_DOCUMENTOS = 'o38persistirdocumentos'
 REVISION_ACTIVO_APRENDICES = 'c8e3f2b1a950'
@@ -50,6 +50,10 @@ class MigrationHeadsTestCase(unittest.TestCase):
         )
         self.assertEqual(
             scripts.get_revision(REVISION_HEAD).down_revision,
+            'q40personalizacionaprendiz',
+        )
+        self.assertEqual(
+            scripts.get_revision('q40personalizacionaprendiz').down_revision,
             REVISION_PORTAFOLIO,
         )
         self.assertEqual(

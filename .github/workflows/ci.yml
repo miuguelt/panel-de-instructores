@@ -79,6 +79,9 @@ jobs:
       - name: Verificar personalización del aprendiz y cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_personalizacion.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=test-results/coverage-personalizacion.lcov --test tests_js/aprendiz_personalizacion.test.cjs
 
+      - name: Verificar metas, recorrido y ajustes del aprendiz
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_experiencia.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=test-results/coverage-experiencia.lcov --test tests_js/aprendiz_experiencia.test.cjs
+
       - name: Instalar el navegador de pruebas
         run: |
           npm ci
@@ -101,6 +104,7 @@ jobs:
             test-results/evaluaciones-*.png
             test-results/aprendices-carga.png
             test-results/personalizacion-*.png
+            test-results/experiencia-*.png
           if-no-files-found: ignore
 
       - name: Guardar cobertura de navegación
@@ -113,6 +117,7 @@ jobs:
             coverage-evaluaciones.lcov
             coverage-gantt.lcov
             test-results/coverage-personalizacion.lcov
+            test-results/coverage-experiencia.lcov
           if-no-files-found: ignore
           retention-days: 14
 

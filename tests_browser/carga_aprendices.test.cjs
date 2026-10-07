@@ -11,8 +11,10 @@ let servidor, browser, url;
 
 test.before(async () => {
     const destinoHtml = path.join(raiz, 'test-results', 'aprendices-navegador.html');
+    const plantilla = path.join(raiz, 'app', 'templates', 'instructor', 'aprendices.html');
     const htmlActualizado = fs.existsSync(destinoHtml)
-        && fs.readFileSync(destinoHtml, 'utf8').includes('selector-aprendiz-sortear');
+        && fs.readFileSync(destinoHtml, 'utf8').includes('selector-aprendiz-sortear')
+        && fs.statSync(destinoHtml).mtimeMs >= fs.statSync(plantilla).mtimeMs;
     if (!htmlActualizado) {
         const pythonBin = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
         try {
@@ -58,6 +60,7 @@ test('el directorio y los QR funcionan sin conexión a los CDN', async () => {
 
     const botonSorteo = page.locator('#selector-aprendiz-sortear');
     assert.equal(await botonSorteo.isVisible(), true, 'el selector debe estar a la vista del instructor');
+    assert.equal(await page.locator('#selector-aprendiz-salir').isVisible(), false, 'el control de salida solo aparece en pantalla completa');
     const roster = await page.locator('[data-selector-aprendiz]').evaluateAll(elementos =>
         elementos.map(elemento => elemento.dataset.nombre),
     );
@@ -66,6 +69,7 @@ test('el directorio y los QR funcionan sin conexión a los CDN', async () => {
     await page.waitForFunction(() => document.querySelector('#selector-aprendiz-mensaje')?.textContent.includes('Turno asignado'));
     const primerNombre = await page.locator('#selector-aprendiz-nombre').textContent();
     assert.ok(roster.includes(primerNombre), 'el resultado debe pertenecer al grupo elegible');
+    await page.locator('#selector-aprendiz').screenshot({ path: path.join(raiz, 'test-results', 'selector-aprendiz.png') });
 
     await page.locator('#selector-aprendiz-expandir').click();
     await page.waitForFunction(() => {
@@ -78,6 +82,8 @@ test('el directorio y los QR funcionan sin conexión a los CDN', async () => {
         const panel = document.querySelector('#selector-aprendiz');
         return document.fullscreenElement !== panel && !panel?.classList.contains('is-fullscreen-fallback');
     });
+    assert.equal(await page.locator('#selector-aprendiz-expandir').isVisible(), true);
+    assert.equal(await page.locator('#selector-aprendiz-salir').isVisible(), false);
 
     const seleccionados = [primerNombre];
     while (seleccionados.length < roster.length) {

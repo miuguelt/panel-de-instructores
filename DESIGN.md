@@ -125,3 +125,12 @@ La interfaz usa un tablero operativo de inspiración Bento: superficies agrupada
 - Accesibilidad: controles de 44 px, navegación por teclado, ordenación con Subir/Bajar, estado anunciado y aviso compartido de éxito. La selección de color usa texto e indicador adicional, con primer plano calculado por contraste.
 - Jerarquía: cabecera y alertas operativas conservan su posición; solo se ordenan las tarjetas disponibles. Las distinciones de oro, plata y bronce proceden del ranking real.
 - Verificación: persistencia después de recarga y reinicio, aislamiento de sesión, recuperación de preferencias antiguas y pruebas a 320, 390, 768, 1440, 1920 y 2560 px, con zoom del 200 %.
+
+## Contrato de diseño — recorrido del aprendiz (7 de octubre de 2026)
+
+- Jerarquía: siguiente acción y meta semanal → confirmación de ajustes → estado de evidencias → competencias, equipo e hitos bajo demanda. El inicio conserva las alertas operativas.
+- Motivación: metas ajustables y pausables, progreso propio y reconocimientos permanentes por evidencias registradas. El avance grupal aprovecha los trabajos asignados; ninguna preferencia altera los juicios oficiales.
+- Personalización de lectura: espaciado cómodo o compacto, movimiento reducido, ranking opcional y avisos agrupados. Los modos de avisos conservan la información importante y permiten consultar la adicional.
+- Continuidad: los accesos revelan la evidencia, limpian filtros y abren acordeones; el punto guardado se recupera desde el servidor.
+- Estados: datos iniciales del servidor, confirmación después del commit, error con reintento, conflicto con recarga y orientación cuando faltan tareas o resultados.
+- Accesibilidad: controles de 44 px, foco visible y acentos con primer plano contrastado. El portafolio y el calendario se reestructuran en celular sin ampliar la página.

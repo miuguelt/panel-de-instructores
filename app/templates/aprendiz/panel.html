@@ -5,13 +5,16 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/aprendiz_personalizacion.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/aprendiz_experiencia.css') }}">
 <script src="{{ url_for('static', filename='js/aprendiz_personalizacion.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/aprendiz_experiencia.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/grupo_chat.js') }}" defer></script>
 {% endblock %}
 
 {# REGLA: No mostrar números de documento/cédula en esta vista #}
 {% block content %}
-<div class="panel-aprendiz" id="panel-aprendiz-root">
+<div class="panel-aprendiz" id="panel-aprendiz-root" data-learner-id="{{ aprendiz.id }}"
+     data-experiencia-url="{{ url_for('experiencia_aprendiz.preferencias', ficha_id=ficha.id) }}">
     {% set tareas_individuales = [] %}
     {% for item in tareas_estado|default([]) %}
         {% if not item.tarea.es_grupal %}{% set _ = tareas_individuales.append(item) %}{% endif %}
@@ -51,7 +54,7 @@
                 </p>
 
                 {% if fila_propia and fila_propia.posicion in [1, 2, 3] %}
-                <p class="learner-podium-badge podium-{{ ['gold', 'silver', 'bronze'][fila_propia.posicion - 1] }}" aria-label="Reconocimiento por posición {{ fila_propia.posicion }} en el ranking de la ficha">
+                <p data-experience-ranking class="learner-podium-badge podium-{{ ['gold', 'silver', 'bronze'][fila_propia.posicion - 1] }}" aria-label="Reconocimiento por posición {{ fila_propia.posicion }} en el ranking de la ficha">
                     <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" />
                         <path d="M7 7H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4" />
@@ -61,7 +64,7 @@
                 {% endif %}
 
                 <!-- Lema o frase personal editable -->
-                <div class="learner-motto-wrapper" id="learner-motto-wrapper" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="personalizacion-modal" title="Haz clic para cambiar tu frase o meta semanal">
+                <div class="learner-motto-wrapper" id="learner-motto-wrapper" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="personalizacion-modal" title="Haz clic para cambiar tu lema">
                     <span class="motto-icon" aria-hidden="true">🎯</span>
                     <span class="motto-text" id="learner-motto-text">¡Constancia y enfoque para alcanzar tus metas de formación!</span>
                     <span class="motto-edit-icon" aria-hidden="true">✎</span>
@@ -80,7 +83,7 @@
                     📄 Reporte PDF
                 </a>
                 <a href="{{ url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline" title="Ver notificaciones">
-                    🔔 Notificaciones{% if notificaciones_aprendiz %} <span class="badge badge-danger">({{ notificaciones_aprendiz|length }})</span>{% endif %}
+                    🔔 Notificaciones{% if notificaciones %} <span class="badge badge-danger">({{ notificaciones|length }})</span>{% endif %}
                 </a>
                 <a href="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-ghost" title="Cambiar usuario o salir">
                     Cerrar sesión
@@ -226,6 +229,8 @@
     <!-- ============================================================ -->
     <!-- RESUMEN PRIORIZADO: ASEO, RENDIMIENTO Y ALERTAS              -->
     <!-- ============================================================ -->
+    {% if experiencia_data %}{% include 'aprendiz/_experiencia.html' %}{% endif %}
+
     <section class="learner-priority-dashboard" aria-labelledby="priority-dashboard-title">
         <div class="priority-dashboard-heading">
             <div>
@@ -290,7 +295,7 @@
             <article class="priority-card priority-card-performance" aria-labelledby="priority-performance-title">
                 <div class="priority-card-topline">
                     <span class="priority-kicker"><span class="priority-index">02</span> Rendimiento académico</span>
-                    {% if fila_propia %}<span class="priority-status priority-status-info">Puesto #{{ fila_propia.posicion }}</span>{% endif %}
+                    {% if fila_propia %}<span data-experience-ranking class="priority-status priority-status-info">Puesto #{{ fila_propia.posicion }}</span>{% endif %}
                 </div>
                 <h3 id="priority-performance-title">Tu avance en cifras</h3>
                 <div class="priority-metric-grid">
@@ -834,7 +839,7 @@
             </div>
 
             {# ── Ranking ── #}
-            <div class="progress-card">
+            <div class="progress-card" data-experience-ranking>
                 {% set pct_rank = fila_propia.barra_puntaje if fila_propia else 0 %}
                 {% set c_rank = 'var(--success)' if pct_rank >= 80 else ('var(--warning)' if pct_rank >= 50 else 'var(--danger)') %}
                 <div class="progress-card-header">
@@ -1287,7 +1292,9 @@
         </div>
         <div class="learner-rec-list">
             {% for rec in recomendaciones_aprendiz %}
-                {{ render_banner_recomendacion(rec) }}
+                <div {% if rec.severidad in ('sugerencia', 'positiva') %}data-experience-notice="optional"{% endif %}>
+                    {{ render_banner_recomendacion(rec) }}
+                </div>
             {% endfor %}
         </div>
     </section>
@@ -1721,7 +1728,7 @@
             <div class="curve-kpi-item">
                 <span class="curve-kpi-label">Puntaje Actual</span>
                 <strong class="curve-kpi-val">{{ '%.1f'|format(curva_rendimiento.puntaje_actual) }} <small>/ 100</small></strong>
-                <span class="curve-kpi-sub">Puesto #{{ curva_rendimiento.posicion_actual }} en la ficha</span>
+                <span data-experience-ranking class="curve-kpi-sub">Puesto #{{ curva_rendimiento.posicion_actual }} en la ficha</span>
             </div>
             <div class="curve-kpi-item">
                 <span class="curve-kpi-label">Meta Mínima Aprobatoria</span>
@@ -1903,7 +1910,7 @@
     {% endif %}
 
     {% if ranking %}
-    <section class="card my-ranking-card" id="seccion-ranking" data-learner-tab="rendimiento">
+    <section class="card my-ranking-card" id="seccion-ranking" data-learner-tab="rendimiento" data-experience-ranking>
         <div class="my-ranking-top">
             <div>
                 <span class="eyebrow">Mi participación</span>
@@ -1933,7 +1940,7 @@
         <p class="ranking-disclaimer">Este es un indicador de participación; no es una nota oficial.</p>
     </section>
 
-    <section class="card learner-leaderboard" data-learner-tab="rendimiento">
+    <section class="card learner-leaderboard" data-learner-tab="rendimiento" data-experience-ranking>
         <div class="section-header compact">
             <div>
                 <span class="eyebrow">Para inspirarte</span>
@@ -1967,7 +1974,7 @@
     <!-- ============================================================ -->
     <!-- LIGA DE ESCUADRONES Y RETOS EN EQUIPO                       -->
     <!-- ============================================================ -->
-    <section class="card learner-squad-league" data-learner-tab="rendimiento" id="seccion-liga-grupos">
+    <section class="card learner-squad-league" data-learner-tab="rendimiento" id="seccion-liga-grupos" data-experience-ranking>
         <div class="section-header compact">
             <div>
                 <span class="eyebrow">Cooperación y Desafíos Colectivos</span>
@@ -2178,6 +2185,7 @@
         <div class="tasks-list-aprendiz">
             {% for item in pendientes %}
             <div class="task-item task-{{ item.estado }}"
+                 id="experiencia-tarea-{{ item.tarea.id }}" tabindex="-1" data-experience-task-id="{{ item.tarea.id }}"
                  data-task-item
                  data-task-title="{{ item.tarea.titulo|lower }}"
                  data-task-desc="{{ item.tarea.descripcion|lower if item.tarea.descripcion else '' }}"
@@ -2187,6 +2195,9 @@
             <div class="task-item-header">
                 <div class="task-info">
                     <h3 class="task-title">{{ item.tarea.titulo }}</h3>
+                    {% if item.experience_status %}
+                    <p class="experience-evidence-status"><strong>{{ item.experience_status.title }}</strong><span>{{ item.experience_status.help }}</span></p>
+                    {% endif %}
                     <p class="task-deadline">
                         <span aria-hidden="true">🕒</span>
                         {% if item.limite_efectivo %}
@@ -2393,6 +2404,7 @@
         <div class="tasks-list-aprendiz tasks-inner">
             {% for item in entregadas %}
             <div class="task-item task-{{ item.estado }}"
+                 id="experiencia-tarea-{{ item.tarea.id }}" tabindex="-1" data-experience-task-id="{{ item.tarea.id }}"
                  data-task-item
                  data-task-title="{{ item.tarea.titulo|lower }}"
                  data-task-desc="{{ item.tarea.descripcion|lower if item.tarea.descripcion else '' }}"
@@ -2402,6 +2414,9 @@
                 <div class="task-item-header">
                     <div class="task-info">
                         <h3 class="task-title">{{ item.tarea.titulo }}</h3>
+                        {% if item.experience_status %}
+                        <p class="experience-evidence-status"><strong>{{ item.experience_status.title }}</strong><span>{{ item.experience_status.help }}</span></p>
+                        {% endif %}
                         <p class="task-deadline">
                             <span aria-hidden="true">🕒</span>
                             {% if item.limite_efectivo %}
@@ -4281,7 +4296,7 @@
             if (isCascade) {
                 const firstEl = document.querySelector(`[data-learner-tab="${tabTarget}"]`);
                 if (firstEl) {
-                    firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    firstEl.scrollIntoView({ behavior: rootEl.classList.contains('experience-reduced-motion') ? 'auto' : 'smooth', block: 'start' });
                 }
             }
         }
@@ -4297,11 +4312,12 @@
             btn.addEventListener('click', () => {
                 const target = btn.dataset.jumpTab;
                 activateTab(target, true);
+                window.dispatchEvent(new CustomEvent('learner:location', { detail: { tab: target, taskId: null } }));
                 const firstEl = btn.dataset.jumpTargetId
                     ? document.getElementById(btn.dataset.jumpTargetId)
                     : document.querySelector(`[data-learner-tab="${target}"]`);
                 if (firstEl) {
-                    firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    firstEl.scrollIntoView({ behavior: rootEl.classList.contains('experience-reduced-motion') ? 'auto' : 'smooth', block: 'start' });
                 }
             });
         });
@@ -4337,6 +4353,7 @@
 
                 if (targetTab) {
                     activateTab(targetTab, false);
+                    window.dispatchEvent(new CustomEvent('learner:location', { detail: { tab: targetTab, taskId: null } }));
                 }
             });
         });
@@ -4489,6 +4506,31 @@
                 applyTaskFilters();
             });
         }
+
+        // Los accesos del inicio revelan la evidencia aunque haya filtros o un acordeón cerrado.
+        window.addEventListener('learner:navigate', function (event) {
+            const destination = event.detail;
+            activateTab(destination.tab, true);
+            let target = document.querySelector(`[data-learner-tab="${destination.tab}"]`);
+            if (destination.taskId) {
+                if (searchInput) searchInput.value = '';
+                searchQuery = '';
+                activeFilter = 'all';
+                if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+                filterChips.forEach(chip => chip.classList.toggle('is-active', chip.dataset.taskFilter === 'all'));
+                applyTaskFilters();
+                target = document.getElementById('experiencia-tarea-' + destination.taskId) || target;
+                if (target) {
+                    let parent = target.parentElement;
+                    while (parent && parent !== rootEl) {
+                        if (parent.tagName === 'DETAILS') parent.open = true;
+                        parent = parent.parentElement;
+                    }
+                    target.focus({ preventScroll: true });
+                }
+            }
+            if (target) target.scrollIntoView({ behavior: rootEl.classList.contains('experience-reduced-motion') ? 'auto' : 'smooth', block: 'start' });
+        });
 
         // -------------------------------------------------------------
         // 5. INICIALIZACIÓN GENERAL

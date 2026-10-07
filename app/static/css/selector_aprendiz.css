@@ -87,13 +87,13 @@
     padding: 1.2rem;
     border-radius: 16px;
     color: #fff;
-    background: linear-gradient(135deg, #155d29, #228b36 58%, #39a900);
+    background: linear-gradient(135deg, #155d29, #176b28 68%, #176b28);
     text-align: center;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .selector-aprendiz__etiqueta {
-    color: rgba(255, 255, 255, 0.78);
+    color: #f0f7f1;
     font-size: 0.76rem;
     font-weight: 800;
     letter-spacing: 0.1em;
@@ -109,7 +109,7 @@
 
 .selector-aprendiz__estado {
     min-height: 1.2em;
-    color: rgba(255, 255, 255, 0.82);
+    color: #e0f0e3;
     font-size: 0.88rem;
 }
 
@@ -122,6 +122,10 @@
 
 .selector-aprendiz__acciones .btn {
     min-height: 44px;
+}
+
+.selector-aprendiz__acciones .btn[hidden] {
+    display: none;
 }
 
 .selector-aprendiz__sortear {

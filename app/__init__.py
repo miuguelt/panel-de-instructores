@@ -361,6 +361,7 @@ def create_app(test_config=None):
     _register('app.routes.seguimiento', 'seguimiento_bp', url_prefix='/instructor')
     _register('app.routes.aprendiz', 'aprendiz_bp', url_prefix='/aprendiz')
     _register('app.features.personalizacion_aprendiz.routes', 'personalizacion_aprendiz_bp')
+    _register('app.features.experiencia_aprendiz.routes', 'experiencia_aprendiz_bp')
     _register('app.routes.grupo_aprendiz', 'grupo_aprendiz_bp')
     _register('app.routes.aseo', 'aseo_aprendiz_bp', url_prefix='/aprendiz')
     _register('app.routes.seguimiento', 'aprendiz_seguimiento_bp', url_prefix='/aprendiz')

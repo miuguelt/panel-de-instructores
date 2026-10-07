@@ -1,0 +1,108 @@
+<script id="aprendiz-experiencia-data" type="application/json">{{ experiencia_data|tojson }}</script>
+<section class="learner-experience" id="aprendiz-experiencia" aria-labelledby="experience-title">
+    <div class="experience-heading">
+        <div><span class="eyebrow">Tu recorrido de aprendizaje</span><h2 id="experience-title">Un paso a la vez</h2></div>
+        <button type="button" id="experience-resume" class="btn btn-outline" hidden>Continuar donde ibas</button>
+    </div>
+    <div class="experience-focus-grid">
+        <article class="experience-card experience-next-card" aria-labelledby="experience-next-title">
+            <span class="experience-kicker">Tu siguiente paso</span>
+            <h3 id="experience-next-title">{{ experiencia_data.next_action.title }}</h3>
+            <p>{{ experiencia_data.next_action.reason }}</p>
+            <button type="button" id="experience-next-action" class="btn btn-primary">{{ experiencia_data.next_action.button }}</button>
+        </article>
+        <article class="experience-card" aria-labelledby="experience-weekly-title">
+            <span class="experience-kicker">Una meta a tu ritmo</span>
+            <h3 id="experience-weekly-title">Tus entregas de esta semana</h3>
+            <p class="experience-weekly-score"><strong id="experience-weekly-count">{{ experiencia_data.weekly.count }}</strong> evidencias entregadas</p>
+            <p>Objetivo confirmado: <strong id="experience-weekly-target">{{ experiencia_data.preferences.weeklyGoal }}</strong> entregas.</p>
+            <div id="experience-weekly-progress" class="experience-progress" role="progressbar" aria-label="Avance de tu meta semanal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ experiencia_data.weekly.percent }}" style="--experience-percent: {{ experiencia_data.weekly.percent }}%;"><span aria-hidden="true"></span></div>
+            <p id="experience-weekly-summary">{% if experiencia_data.preferences.weeklyGoal == 0 %}Tu meta semanal está en pausa.{% elif experiencia_data.weekly.count >= experiencia_data.preferences.weeklyGoal %}Alcanzaste tu meta de esta semana.{% else %}Cada entrega te acerca a tu meta.{% endif %}</p>
+            <label for="experience-weekly-goal" class="experience-field-label">Mi objetivo semanal</label>
+            <input type="number" id="experience-weekly-goal" class="form-control experience-goal-input" min="0" max="20" step="1" value="{{ experiencia_data.preferences.weeklyGoal }}" aria-describedby="experience-goal-help">
+            <small id="experience-goal-help">De 0 a 20 entregas. Usa 0 para pausar la meta. Incluye los ajustes reenviados; cada actividad cuenta una sola vez por semana. Este objetivo personal se guarda automáticamente y conserva los plazos de tus evidencias.</small>
+            <p class="experience-date-range">Semana del <time datetime="{{ experiencia_data.weekly.start }}">{{ experiencia_data.weekly.start }}</time> al <time datetime="{{ experiencia_data.weekly.end }}">{{ experiencia_data.weekly.end }}</time>.</p>
+        </article>
+    </div>
+    <div class="experience-feedback" aria-live="polite" aria-atomic="true">
+        <p id="experience-status" role="status">{% if experiencia_data.revision == 0 %}Tus ajustes iniciales están cargados. Los cambios se guardan automáticamente.{% else %}Tus ajustes están guardados en tu cuenta.{% endif %}</p>
+        <button type="button" id="experience-retry" class="btn btn-outline" hidden>Reintentar guardado</button>
+        <button type="button" id="experience-reload" class="btn btn-outline" hidden>Recargar ajustes guardados</button>
+    </div>
+    <div class="experience-evidence-summary">
+        <div class="experience-official-progress">
+            <strong>{{ experiencia_data.progress.approved }} de {{ experiencia_data.progress.total }}</strong>
+            <span>Resultados de aprendizaje aprobados</span>
+            <span class="experience-percent">{{ experiencia_data.progress.pct }} % de avance</span>
+        </div>
+        <div class="experience-evidence-pipeline" role="group" aria-label="Evidencias por estado">
+            {% for key, label in [('submitted', 'Entregadas'), ('review', 'En revisión'), ('changes', 'Con cambios solicitados'), ('approved', 'Revisión aprobada')] %}
+            <div class="experience-evidence-status"><strong>{{ experiencia_data.evidence[key] }}</strong><span>{{ label }}</span></div>
+            {% endfor %}
+        </div>
+    </div>
+    <details class="experience-insights">
+        <summary>Ver competencias, avance del grupo e hitos</summary>
+        <div class="experience-insight-grid">
+            <article class="experience-card" aria-labelledby="experience-competencies-title">
+                <h3 id="experience-competencies-title">Tu avance por competencia</h3>
+                {% if experiencia_data.competencies %}
+                <ul class="experience-competency-list">
+                    {% for competency in experiencia_data.competencies %}
+                    <li>
+                        <strong>{{ competency.name }}</strong>
+                        <span>{{ competency.approved }} de {{ competency.total }} resultados aprobados · {{ competency.pct }} %</span>
+                        <div class="experience-progress" role="progressbar" aria-label="Avance en {{ competency.name }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ competency.pct }}" style="--experience-percent: {{ competency.pct }}%;"><span aria-hidden="true"></span></div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="experience-empty"><span aria-hidden="true">📘</span> Aún no hay resultados por competencia para mostrar. Aquí verás tu avance cuando estén registrados.</p>
+                {% endif %}
+            </article>
+            <article class="experience-card" aria-labelledby="experience-team-title">
+                <h3 id="experience-team-title">Avanzamos en equipo</h3>
+                {% if experiencia_data.team %}
+                <p><strong>{{ experiencia_data.team.name }}</strong></p>
+                <p>{{ experiencia_data.team.completed }} de {{ experiencia_data.team.total }} trabajos grupales entregados · {{ experiencia_data.team.pct }} %</p>
+                <div class="experience-progress" role="progressbar" aria-label="Avance de los trabajos de tu grupo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ experiencia_data.team.pct }}" style="--experience-percent: {{ experiencia_data.team.pct }}%;"><span aria-hidden="true"></span></div>
+                <p>El avance se construye con las entregas reales de tu grupo. Revisa los trabajos y coordina el siguiente paso con tus compañeros.</p>
+                <button type="button" class="btn btn-outline action-jump-btn" data-jump-tab="grupo">Ver los trabajos de mi grupo</button>
+                {% else %}
+                <p class="experience-empty"><span aria-hidden="true">👥</span> Cuando tengas un grupo asignado, aquí podrás seguir sus trabajos y el avance conjunto.</p>
+                {% endif %}
+            </article>
+            <article class="experience-card experience-milestones" aria-labelledby="experience-milestones-title">
+                <h3 id="experience-milestones-title">Los hitos que has alcanzado</h3>
+                {% if experiencia_data.milestones %}
+                <ul class="experience-milestone-list">
+                    {% for milestone in experiencia_data.milestones %}
+                    <li><span aria-hidden="true">✓</span><div><strong>{{ milestone.title }}</strong><p>{{ milestone.description }}</p></div></li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="experience-empty"><span aria-hidden="true">🌱</span> Tu recorrido está comenzando. Los hitos que alcances quedarán registrados aquí.</p>
+                {% endif %}
+            </article>
+        </div>
+    </details>
+    <details class="experience-settings" id="experience-settings">
+        <summary>Ajustar avisos, lectura y ranking</summary>
+        <div class="experience-settings-grid">
+            <div>
+                <label for="experience-notification-mode" class="experience-field-label">Avisos que quieres ver</label>
+                <select id="experience-notification-mode" class="form-control">
+                    <option value="all">Todos</option><option value="important">Importantes primero</option><option value="quiet">Lectura tranquila</option>
+                </select>
+                <small>Las alertas importantes, los plazos y los cambios solicitados permanecen visibles. Puedes consultar los demás avisos en tu centro de notificaciones. La lectura tranquila también evita avisos flotantes duplicados de guardado.</small>
+            </div>
+            <div>
+                <label for="experience-density" class="experience-field-label">Espaciado del panel</label>
+                <select id="experience-density" class="form-control"><option value="comfortable">Cómodo</option><option value="compact">Compacto</option></select>
+            </div>
+            <label class="experience-check"><input type="checkbox" id="experience-ranking-visible"><span>Mostrar mi posición y el ranking en este panel<small>Esta opción cambia lo que tú ves; conserva las evaluaciones y los resultados de tu ficha.</small></span></label>
+            <label class="experience-check"><input type="checkbox" id="experience-reduced-motion"><span>Reducir animaciones y movimiento</span></label>
+        </div>
+        <div class="experience-settings-footer"><p>Los ajustes se guardan automáticamente. También puedes confirmar el guardado aquí.</p><button type="button" id="experience-save" class="btn btn-primary">Guardar ajustes</button></div>
+    </details>
+</section>

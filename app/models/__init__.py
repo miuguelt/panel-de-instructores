@@ -35,6 +35,7 @@ from app.models.archivo_ficha import (
 from app.models.observador import NotaObservador
 from app.models.resultado_calculado import ResultadoCalculadoFicha
 from app.features.personalizacion_aprendiz.models import PersonalizacionAprendiz
+from app.features.experiencia_aprendiz.models import ExperienciaAprendiz
 
 __all__ = [
     'Instructor', 'Ficha', 'Corte', 'Aprendiz',

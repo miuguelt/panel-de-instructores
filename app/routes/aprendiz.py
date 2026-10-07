@@ -619,10 +619,27 @@ def panel(ficha_id):
     from app.services.atencion_service import AtencionService
     turno_actual = AtencionService.obtener_turno_actual_aprendiz(ficha_id, aprendiz.id)
 
+    from app.features.experiencia_aprendiz.context import construir_experiencia, estado_evidencia
+    from app.features.experiencia_aprendiz.service import leer_experiencia, registrar_hitos
+    for item in tareas_estado:
+        item['experience_status'] = estado_evidencia(item)
+    total_digitales = sum(
+        bool(item['entrega'] and not item['tarea'].es_actividad_clase
+             and not item['entrega'].registrada_por_instructor)
+        for item in tareas_estado
+    )
+    hitos = registrar_hitos(aprendiz.id, total_digitales)
+    experiencia = leer_experiencia(aprendiz.id)
+    experiencia_data = construir_experiencia(
+        tareas_estado, trabajos_grupo, stats_juicios, competencias_aprendiz_orden,
+        grupo_actual, experiencia['preferences'], experiencia['revision'], hitos,
+    )
+
     return render_template('panel.html',
                            ficha=ficha,
                            ficha_id=ficha_id,
                            aprendiz=aprendiz,
+                           experiencia_data=experiencia_data,
                            turno_actual=turno_actual,
                            resumen_rapido=resumen_rapido,
                            recomendaciones_aprendiz=recomendaciones_aprendiz,

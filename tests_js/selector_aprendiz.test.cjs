@@ -65,6 +65,20 @@ test('reparte turnos sin repetir dentro de la ronda y evita repetir al iniciar l
     assert.equal(bolsa.restantes(), 2);
 });
 
+test('rechaza un índice inválido al evitar repetir en el límite de dos rondas', () => {
+    const resultadosAzar = [2, 1, 0, 1, 2];
+    const bolsa = selector.crearBolsa([
+        { id: 1, nombre: 'Ana' },
+        { id: 2, nombre: 'Luis' },
+        { id: 3, nombre: 'Sara' },
+    ], () => resultadosAzar.shift());
+
+    bolsa.siguiente();
+    bolsa.siguiente();
+    bolsa.siguiente();
+    assert.throws(() => bolsa.siguiente(), RangeError);
+});
+
 test('valida la lista de participantes y sus identificadores', () => {
     assert.throws(() => selector.crearBolsa([]), /al menos un aprendiz/i);
     assert.throws(() => selector.crearBolsa([{ id: 1 }, { id: 1 }]), /identificadores únicos/i);

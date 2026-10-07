@@ -16,15 +16,21 @@
     </div>
 </div>
 
+{% if estado_seleccionado == 'todos' %}
+{% set aprendices_selector = aprendices_administrables %}
+{% else %}
+{% set aprendices_selector = aprendices_administrables|selectattr('estado', 'equalto', estado_seleccionado)|list %}
+{% endif %}
+
 <section class="selector-aprendiz card" id="selector-aprendiz" aria-labelledby="selector-aprendiz-titulo" aria-busy="false">
     <div class="selector-aprendiz__encabezado">
         <span class="selector-aprendiz__icono" aria-hidden="true">🎲</span>
         <div>
             <p class="selector-aprendiz__sobretitulo">Dinámica de formación</p>
             <h2 id="selector-aprendiz-titulo">¿Quién participa?</h2>
-            <p class="selector-aprendiz__descripcion">Sortea un turno para hacer una pregunta o asignar una actividad al grupo.</p>
+            <p class="selector-aprendiz__descripcion">Elige a quién hacerle una pregunta o asignarle una tarea durante la clase.</p>
         </div>
-        <span class="selector-aprendiz__contador" id="selector-aprendiz-contador">{{ aprendices_administrables|length }} participantes disponibles</span>
+        <span class="selector-aprendiz__contador" id="selector-aprendiz-contador">{{ aprendices_selector|length }} participantes disponibles</span>
     </div>
 
     <div class="selector-aprendiz__resultado" aria-live="polite" aria-atomic="true">
@@ -34,7 +40,7 @@
     </div>
 
     <div class="selector-aprendiz__acciones">
-        <button type="button" class="btn btn-primary selector-aprendiz__sortear" id="selector-aprendiz-sortear" {% if not aprendices_administrables %}disabled{% endif %}>
+        <button type="button" class="btn btn-primary selector-aprendiz__sortear" id="selector-aprendiz-sortear" {% if not aprendices_selector %}disabled{% endif %}>
             <span aria-hidden="true">🎯</span> Sortear aprendiz
         </button>
         <button type="button" class="btn btn-outline selector-aprendiz__expandir" id="selector-aprendiz-expandir" aria-label="Abrir el selector en pantalla completa">
@@ -46,15 +52,19 @@
     </div>
 
     <p class="selector-aprendiz__mensaje" id="selector-aprendiz-mensaje" role="status">
-        {% if aprendices_administrables %}
+        {% if aprendices_selector %}
+        {% if estado_seleccionado == 'todos' %}
         Participan aprendices activos en formación o condicionados. Cada persona tendrá un turno antes de repetir el grupo.
+        {% else %}
+        Participan los aprendices activos del estado {{ estado_seleccionado|etiqueta_estado }}. Cada persona tendrá un turno antes de repetir el grupo.
+        {% endif %}
         {% else %}
         No hay aprendices activos disponibles para participar.
         {% endif %}
     </p>
 
     <div class="selector-aprendiz__lista" hidden aria-hidden="true">
-        {% for aprendiz in aprendices_administrables %}
+        {% for aprendiz in aprendices_selector %}
         <span data-selector-aprendiz data-id="{{ aprendiz.id }}" data-nombre="{{ aprendiz.nombre_completo }}" data-estado="{{ aprendiz.estado|etiqueta_estado }}"></span>
         {% endfor %}
     </div>

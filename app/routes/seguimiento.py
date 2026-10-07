@@ -2,8 +2,9 @@ from datetime import datetime, timedelta
 from xml.sax.saxutils import escape
 import io
 
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for, session
+from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for, make_response
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
 from app import db
@@ -32,7 +33,7 @@ from app.services.alertas import (
     registrar_notificacion,
     vencer_planes_pendientes,
 )
-from app.services.permisos import puede_gestionar_ficha
+from app.services.permisos import aprendiz_de_sesion, puede_gestionar_ficha
 from app.models.alertas import PlanMejoramiento
 
 
@@ -464,48 +465,69 @@ def _generar_reporte_comite(ficha, aprendiz, alertas, timeline):
 
 @aprendiz_seguimiento_bp.route('/<int:ficha_id>/notificaciones')
 def notificaciones_aprendiz(ficha_id):
-    documento = session.get('aprendiz_documento', '') or request.args.get('documento', '').strip()
-    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
+    from app.features.experiencia_aprendiz.notifications import organizar_notificaciones
+    from app.features.experiencia_aprendiz.service import leer_experiencia
+
+    aprendiz = aprendiz_de_sesion(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
-    if not ficha or not aprendiz:
-        flash('Documento no válido para esta ficha.', 'error')
+    if not ficha or not aprendiz or not aprendiz.activo:
+        flash('Inicia sesión en tu ficha para consultar las notificaciones.', 'error')
         return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
     notificaciones = Notificacion.query.filter_by(
         destinatario_tipo='aprendiz', destinatario_id=aprendiz.id, ficha_id=ficha_id
-    ).order_by(Notificacion.fecha_creada.desc()).limit(100).all()
-    return render_template(
+    ).order_by(Notificacion.fecha_creada.desc(), Notificacion.id.desc()).all()
+    modo = leer_experiencia(aprendiz.id)['preferences']['notificationMode']
+    respuesta = make_response(render_template(
         'notificaciones.html', notificaciones=notificaciones, aprendiz=aprendiz,
-        ficha=ficha,
-    )
+        ficha=ficha, centro_avisos=organizar_notificaciones(notificaciones, modo, ficha_id),
+    ))
+    respuesta.headers['Cache-Control'] = 'private, no-store, max-age=0'
+    return respuesta
 
 
 @aprendiz_seguimiento_bp.route('/<int:ficha_id>/notificaciones/<int:notificacion_id>/leer', methods=['POST'])
 def marcar_notificacion_aprendiz(ficha_id, notificacion_id):
-    documento = session.get('aprendiz_documento', '') or request.form.get('documento', '').strip()
-    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
-    notificacion = db.session.get(Notificacion, notificacion_id)
-    if not aprendiz or not notificacion or not (
-        notificacion.destinatario_tipo == 'aprendiz'
-        and notificacion.destinatario_id == aprendiz.id
-        and notificacion.ficha_id == ficha_id
-    ):
+    aprendiz = aprendiz_de_sesion(ficha_id)
+    if not aprendiz or not aprendiz.activo:
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+    if request.form.getlist('learner_context') != [str(aprendiz.id)]:
+        flash('La sesión cambió de aprendiz. Recarga tus notificaciones antes de continuar.', 'error')
+        return redirect(url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha_id))
+    notificacion = Notificacion.query.filter_by(
+        id=notificacion_id, destinatario_tipo='aprendiz', destinatario_id=aprendiz.id,
+        ficha_id=ficha_id,
+    ).first()
+    if not notificacion:
         flash('Notificación no encontrada.', 'error')
         return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
-    notificacion.leida = True
-    notificacion.leida_en = datetime.utcnow()
-    db.session.commit()
+    try:
+        if not notificacion.leida:
+            notificacion.leida = True
+            notificacion.leida_en = datetime.utcnow()
+            db.session.commit()
+        flash('Notificación marcada como leída.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('No se pudo guardar la lectura. Vuelve a intentarlo.', 'error')
     return redirect(url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha_id))
 
 
 @aprendiz_seguimiento_bp.route('/<int:ficha_id>/notificaciones/leer-todas', methods=['POST'])
 def marcar_todas_aprendiz(ficha_id):
-    documento = session.get('aprendiz_documento', '') or request.form.get('documento', '').strip()
-    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
-    if not aprendiz:
+    aprendiz = aprendiz_de_sesion(ficha_id)
+    if not aprendiz or not aprendiz.activo:
         return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
-    Notificacion.query.filter_by(
-        destinatario_tipo='aprendiz', destinatario_id=aprendiz.id,
-        ficha_id=ficha_id, leida=False,
-    ).update({'leida': True, 'leida_en': datetime.utcnow()}, synchronize_session=False)
-    db.session.commit()
+    if request.form.getlist('learner_context') != [str(aprendiz.id)]:
+        flash('La sesión cambió de aprendiz. Recarga tus notificaciones antes de continuar.', 'error')
+        return redirect(url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha_id))
+    try:
+        Notificacion.query.filter_by(
+            destinatario_tipo='aprendiz', destinatario_id=aprendiz.id,
+            ficha_id=ficha_id, leida=False,
+        ).update({'leida': True, 'leida_en': datetime.utcnow()}, synchronize_session='fetch')
+        db.session.commit()
+        flash('Tus notificaciones quedaron marcadas como leídas.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('No se pudo guardar la lectura. Vuelve a intentarlo.', 'error')
     return redirect(url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha_id))
