@@ -27,7 +27,7 @@
 .personalizacion-global-status { margin: .75rem 0 0; font-size: .88rem; }
 .personalizacion-global-status:empty { display: none; }
 #personalizacion-modal, #personalizacion-modal * { box-sizing: border-box; min-width: 0; }
-#personalizacion-modal .personalizacion-modal-shell { width: min(100%, 720px); max-width: 720px; border-radius: 16px; }
+#personalizacion-modal .personalizacion-modal-shell { width: min(100%, 720px); max-width: 720px; border-radius: 16px; animation: none; }
 #personalizacion-modal fieldset { border: 0; padding: 0; margin: 0; }
 #personalizacion-modal fieldset:disabled { opacity: .65; }
 #personalizacion-modal[aria-busy="true"] .personalizacion-feedback { animation: personalizacion-loading 1.4s ease-in-out infinite alternate; }

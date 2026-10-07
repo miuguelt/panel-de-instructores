@@ -221,6 +221,7 @@ test('el personalizador conserva controles legibles en celular, escritorio y zoo
     const zoomPage = await ampliado.newPage();
     await ingresar(zoomPage);
     await zoomPage.locator('#btn-open-customizer').click();
+    await zoomPage.locator('#personalizacion-modal[open]').waitFor();
     await zoomPage.locator('#btn-save-personalizacion').click({ trial: true });
     const zoom = await zoomPage.locator('#personalizacion-modal .app-modal-content').boundingBox();
     assert.ok(zoom.x >= 0 && zoom.x + zoom.width <= 321, 'El diálogo debe caber al ampliar el 200 %.');
