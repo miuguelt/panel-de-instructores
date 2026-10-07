@@ -197,6 +197,7 @@ test('el personalizador conserva controles legibles en celular, escritorio y zoo
     }
     await page.setViewportSize({ width: 390, height: 900 });
     await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('btn-save-personalizacion')).color !== 'rgb(255, 255, 255)');
     await page.locator('#btn-save-personalizacion').click({ trial: true });
     const temaOscuro = await page.locator('#personalizacion-modal .app-modal-content').evaluate(el => ({ fondo: getComputedStyle(el).backgroundColor, texto: getComputedStyle(el).color }));
     assert.notEqual(temaOscuro.fondo, 'rgb(255, 255, 255)');

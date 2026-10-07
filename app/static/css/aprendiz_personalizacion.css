@@ -39,7 +39,7 @@
 #personalizacion-modal .btn,
 #personalizacion-modal .app-modal-close,
 #personalizacion-modal .motto-suggestion-chip { min-height: 44px; white-space: normal; }
-#personalizacion-modal .btn-primary { color: var(--button-on-accent); }
+#personalizacion-modal .btn-primary { color: var(--button-on-accent); transition: none; }
 #personalizacion-modal .avatar-picker-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
 #personalizacion-modal .avatar-option-btn { min-height: 48px; width: 100%; border-radius: 12px; border: 2px solid var(--border-divider, #cbd5e1); background: var(--bg-surface, #fff); font-size: 1.5rem; cursor: pointer; }
 #personalizacion-modal .theme-color-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
