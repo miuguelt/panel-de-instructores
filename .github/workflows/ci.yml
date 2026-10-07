@@ -77,10 +77,10 @@ jobs:
         run: node --test tests_js/grupos_layout.test.cjs
 
       - name: Verificar personalización del aprendiz y cobertura de funciones
-        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_personalizacion.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=test-results/coverage-personalizacion.lcov --test tests_js/aprendiz_personalizacion.test.cjs
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_personalizacion.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-personalizacion.lcov --test tests_js/aprendiz_personalizacion.test.cjs
 
       - name: Verificar metas, recorrido y ajustes del aprendiz
-        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_experiencia.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=test-results/coverage-experiencia.lcov --test tests_js/aprendiz_experiencia.test.cjs
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_experiencia.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-experiencia.lcov --test tests_js/aprendiz_experiencia.test.cjs
 
       - name: Instalar el navegador de pruebas
         run: |
@@ -116,8 +116,8 @@ jobs:
             coverage-planeacion.lcov
             coverage-evaluaciones.lcov
             coverage-gantt.lcov
-            test-results/coverage-personalizacion.lcov
-            test-results/coverage-experiencia.lcov
+            coverage-personalizacion.lcov
+            coverage-experiencia.lcov
           if-no-files-found: ignore
           retention-days: 14
 
