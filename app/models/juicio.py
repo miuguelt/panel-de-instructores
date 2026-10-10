@@ -74,6 +74,7 @@ class FichaCompetenciaProgramacion(db.Model):
     fecha_inicio = db.Column(db.Date, nullable=True)
     fecha_fin = db.Column(db.Date, nullable=True)
     instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=True, index=True)
+    observacion = db.Column(db.Text, nullable=True)
     creado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
     actualizado_en = db.Column(db.DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
@@ -82,4 +83,26 @@ class FichaCompetenciaProgramacion(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('ficha_id', 'competencia', name='uq_ficha_comp_prog'),
+        db.CheckConstraint(
+            'fecha_fin IS NULL OR fecha_inicio IS NULL OR fecha_fin >= fecha_inicio',
+            name='ck_ficha_comp_prog_fechas'
+        ),
     )
+
+    @property
+    def dias_duracion(self) -> int | None:
+        """Calcula los días calendario comprendidos entre fecha_inicio y fecha_fin."""
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin >= self.fecha_inicio:
+            return (self.fecha_fin - self.fecha_inicio).days + 1
+        return None
+
+    @property
+    def semanas(self) -> float | None:
+        """Calcula las semanas aproximadas de duración con un decimal."""
+        dias = self.dias_duracion
+        return round(dias / 7.0, 1) if dias is not None else None
+
+    @property
+    def esta_definida(self) -> bool:
+        """Indica si ambas fechas de la competencia han sido fijadas."""
+        return bool(self.fecha_inicio and self.fecha_fin)

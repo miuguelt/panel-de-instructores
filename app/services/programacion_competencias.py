@@ -160,11 +160,7 @@ def calcular_fechas_competencias_y_raps(
         return competencias_summary
 
     programadas_map = obtener_programacion_competencias(ficha.id)
-    version_plan = (
-        ArchivoFichaVersion.query
-        .filter_by(ficha_id=ficha.id, tipo=TIPO_PLANEACION, estado='procesado')
-        .order_by(ArchivoFichaVersion.version.desc()).first()
-    )
+    version_plan = ArchivoFichaVersion.obtener_version_activa(ficha.id, TIPO_PLANEACION)
 
     unidades_plan = []
     if version_plan and version_plan.contenido_extraido_json:

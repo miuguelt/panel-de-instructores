@@ -392,3 +392,94 @@ class ProgramacionCompetenciasTestCase(unittest.TestCase):
         self.assertIsNone(res[0]['fecha_inicio'])
         self.assertIsNone(res[0]['fecha_fin'])
 
+    def test_modelo_propiedades_calculadas_y_observacion(self):
+        """Verifica las propiedades calculadas y el campo observación de FichaCompetenciaProgramacion."""
+        prog = FichaCompetenciaProgramacion(
+            ficha_id=self.ficha.id,
+            competencia='38362 - Diseñar',
+            fecha_inicio=date(2025, 8, 1),
+            fecha_fin=date(2025, 8, 14),
+            instructor_id=self.inst1.id,
+            observacion='Programación oficial concertada con el equipo técnico',
+        )
+        db.session.add(prog)
+        db.session.commit()
+
+        # Rango válido: 14 días (del 1 al 14 inclusive)
+        self.assertEqual(prog.dias_duracion, 14)
+        self.assertEqual(prog.semanas, 2.0)
+        self.assertTrue(prog.esta_definida)
+        self.assertEqual(prog.observacion, 'Programación oficial concertada con el equipo técnico')
+
+        # Sin fecha_fin
+        prog.fecha_fin = None
+        self.assertIsNone(prog.dias_duracion)
+        self.assertIsNone(prog.semanas)
+        self.assertFalse(prog.esta_definida)
+
+        # Sin fechas
+        prog.fecha_inicio = None
+        self.assertIsNone(prog.dias_duracion)
+        self.assertIsNone(prog.semanas)
+        self.assertFalse(prog.esta_definida)
+
+        # Fechas incoherentes
+        prog.fecha_inicio = date(2025, 8, 20)
+        prog.fecha_fin = date(2025, 8, 10)
+        self.assertIsNone(prog.dias_duracion)
+
+    def test_archivo_ficha_version_metadata_dict_y_obtener_version_activa(self):
+        """Verifica metadata_dict seguro y la recuperación de la versión activa de un archivo."""
+        v1 = ArchivoFichaVersion(
+            ficha_id=self.ficha.id,
+            instructor_id=self.inst1.id,
+            tipo=TIPO_PLANEACION,
+            version=1,
+            nombre_archivo='planeacion_v1.xlsx',
+            ruta_archivo='/tmp/v1.xlsx',
+            estado='procesado',
+            metadata_json='{"total_horas": 120, "fase": "Analisis"}',
+        )
+        v2 = ArchivoFichaVersion(
+            ficha_id=self.ficha.id,
+            instructor_id=self.inst1.id,
+            tipo=TIPO_PLANEACION,
+            version=2,
+            nombre_archivo='planeacion_v2.xlsx',
+            ruta_archivo='/tmp/v2.xlsx',
+            estado='error',
+            metadata_json='no-es-json-valido',
+        )
+        v3 = ArchivoFichaVersion(
+            ficha_id=self.ficha.id,
+            instructor_id=self.inst1.id,
+            tipo=TIPO_PLANEACION,
+            version=3,
+            nombre_archivo='planeacion_v3.xlsx',
+            ruta_archivo='/tmp/v3.xlsx',
+            estado='procesado',
+            metadata_json=None,
+        )
+        db.session.add_all([v1, v2, v3])
+        db.session.commit()
+
+        # metadata_dict
+        self.assertEqual(v1.metadata_dict, {'total_horas': 120, 'fase': 'Analisis'})
+        self.assertEqual(v2.metadata_dict, {})
+        self.assertEqual(v3.metadata_dict, {})
+
+        # Caso en que metadata_json ya es un diccionario (ej. asignado en memoria o dialecto nativo)
+        v_temp = ArchivoFichaVersion()
+        v_temp.metadata_json = {'horas': 40}
+        self.assertEqual(v_temp.metadata_dict, {'horas': 40})
+
+        # obtener_version_activa debe retornar la v3 (la más reciente con estado='procesado')
+        activa = ArchivoFichaVersion.obtener_version_activa(self.ficha.id, TIPO_PLANEACION)
+        self.assertIsNotNone(activa)
+        self.assertEqual(activa.version, 3)
+        self.assertEqual(activa.nombre_archivo, 'planeacion_v3.xlsx')
+
+        # Para un tipo que no tiene versiones
+        sin_activa = ArchivoFichaVersion.obtener_version_activa(self.ficha.id, 'tipo_inexistente')
+        self.assertIsNone(sin_activa)
+

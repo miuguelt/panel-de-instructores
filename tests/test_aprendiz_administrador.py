@@ -99,7 +99,10 @@ class AprendizAdministradorTestCase(unittest.TestCase):
         self.aprendices[0].rol_administrativo = True
         db.session.commit()
         self._sesion_aprendiz()
+        from app.services.festivos import es_dia_habil
         fecha = date.today() + timedelta(days=1)
+        while not es_dia_habil(fecha):
+            fecha += timedelta(days=1)
 
         generar = self.cliente.post(
             f'/aprendiz/{self.ficha.id}/turnos-aseo/generar',
@@ -163,9 +166,9 @@ class AprendizAdministradorTestCase(unittest.TestCase):
 
     def test_aprendiz_sin_rol_puede_generar_y_cumplir_aseo_pero_no_asistencia(self):
         self._sesion_aprendiz(self.aprendices[1])
+        from app.services.festivos import es_dia_habil
         fecha = date.today() + timedelta(days=1)
-        from app.services.festivos import es_festivo_colombia
-        while es_festivo_colombia(fecha):
+        while not es_dia_habil(fecha):
             fecha += timedelta(days=1)
 
         # 1. Puede generar turnos de aseo

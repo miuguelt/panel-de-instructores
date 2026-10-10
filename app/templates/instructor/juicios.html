@@ -1007,16 +1007,12 @@
         if (!fIni || !fFin) {
             if (window.mostrarAviso) {
                 window.mostrarAviso('Por favor selecciona las fechas de inicio y fin para programar la competencia.', { title: 'Fechas incompletas', intent: 'warning' });
-            } else {
-                alert('Por favor selecciona las fechas de inicio y fin.');
             }
             return;
         }
         if (fFin < fIni) {
             if (window.mostrarAviso) {
                 window.mostrarAviso('La fecha de fin no puede ser anterior a la fecha de inicio.', { title: 'Rango inválido', intent: 'danger' });
-            } else {
-                alert('La fecha de fin no puede ser anterior a la fecha de inicio.');
             }
             return;
         }

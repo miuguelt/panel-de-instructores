@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import json
+from typing import Any
+
 from app.helpers import utc_now
 
 from app import db
@@ -46,5 +51,28 @@ class ArchivoFichaVersion(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('ficha_id', 'tipo', 'version', name='uq_archivo_ficha_tipo_version'),
+        db.Index('ix_archivos_ficha_lookup_version', 'ficha_id', 'tipo', 'estado', 'version'),
     )
+
+    @property
+    def metadata_dict(self) -> dict[str, Any]:
+        """Devuelve metadata_json parseado como diccionario de manera segura."""
+        if not self.metadata_json:
+            return {}
+        if isinstance(self.metadata_json, dict):
+            return self.metadata_json
+        try:
+            return json.loads(self.metadata_json)
+        except (ValueError, TypeError):
+            return {}
+
+    @classmethod
+    def obtener_version_activa(cls, ficha_id: int, tipo: str) -> ArchivoFichaVersion | None:
+        """Recupera la versión procesada más reciente para una ficha y tipo documental."""
+        return (
+            cls.query
+            .filter_by(ficha_id=ficha_id, tipo=tipo, estado='procesado')
+            .order_by(cls.version.desc())
+            .first()
+        )
 
