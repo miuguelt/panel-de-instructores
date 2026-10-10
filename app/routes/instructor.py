@@ -756,6 +756,7 @@ def vision_general(ficha_id):
         'vision_general.html',
         ficha=ficha,
         resumen=resumen,
+        fases_data=resumen.get('fases_data') if resumen else None,
         cortes=cortes,
         corte_actual=corte_sel,
     )
@@ -3399,6 +3400,9 @@ def juicios(ficha_id):
         ficha_id, instructor_id=current_user.id, categorias={CAT_JUICIOS},
     )
 
+    from app.services.programacion_competencias import calcular_fechas_competencias_y_raps
+    competencias_ordenadas_juicios = calcular_fechas_competencias_y_raps(ficha, competencias_ordenadas_juicios)
+
     return render_template('juicios.html', ficha=ficha, estadisticas=estadisticas, 
                            aprendices_stats=aprendices_stats, cronograma=obtener_cronograma(ficha),
                            pct_global_juicios=pct_global_juicios,
@@ -3477,6 +3481,75 @@ def toggle_competencia_seleccionada(ficha_id):
                 'fecha_seleccion': nueva_sel.fecha_seleccion.strftime('%d/%m/%Y %H:%M')
             }
         })
+
+
+@instructor_bp.route('/fichas/<int:ficha_id>/competencias/programar', methods=['POST'])
+@login_required
+def programar_competencia(ficha_id):
+    ficha = db.session.get(Ficha, ficha_id)
+    if not puede_gestionar_ficha(ficha):
+        return jsonify({'success': False, 'error': 'No tienes permisos en esta ficha.'}), 403
+
+    data = request.get_json() or {}
+    competencia_nombre = (data.get('competencia') or '').strip()
+    if not competencia_nombre:
+        return jsonify({'success': False, 'error': 'Nombre de competencia requerido.'}), 400
+
+    limpiar = bool(data.get('limpiar'))
+    from app.services.programacion_competencias import (
+        guardar_programacion_competencia,
+        limpiar_programacion_competencia,
+        calcular_fechas_competencias_y_raps,
+        _parsear_fecha,
+    )
+
+    if limpiar:
+        limpiar_programacion_competencia(ficha_id, competencia_nombre)
+    else:
+        f_ini_str = data.get('fecha_inicio')
+        f_fin_str = data.get('fecha_fin')
+        f_ini = _parsear_fecha(f_ini_str)
+        f_fin = _parsear_fecha(f_fin_str)
+        if f_ini and f_fin and f_fin < f_ini:
+            return jsonify({'success': False, 'error': 'La fecha de finalización no puede ser anterior a la de inicio.'}), 400
+
+        try:
+            guardar_programacion_competencia(
+                ficha_id=ficha_id,
+                competencia_nombre=competencia_nombre,
+                fecha_inicio=f_ini,
+                fecha_fin=f_fin,
+                instructor_id=current_user.id,
+            )
+        except ValueError as err:
+            return jsonify({'success': False, 'error': str(err)}), 400
+
+    juicios_comp = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id, competencia=competencia_nombre).all()
+    raps_unicos = []
+    for j in juicios_comp:
+        if j.resultado_aprendizaje and j.resultado_aprendizaje not in raps_unicos:
+            raps_unicos.append(j.resultado_aprendizaje)
+
+    dummy_summary = [{
+        'nombre': competencia_nombre,
+        'detalles': [{'rap': r} for r in raps_unicos],
+    }]
+    recalculado = calcular_fechas_competencias_y_raps(ficha, dummy_summary)[0]
+
+    return jsonify({
+        'success': True,
+        'competencia': competencia_nombre,
+        'fecha_inicio': recalculado.get('fecha_inicio'),
+        'fecha_fin': recalculado.get('fecha_fin'),
+        'fecha_inicio_texto': recalculado.get('fecha_inicio_texto'),
+        'fecha_fin_texto': recalculado.get('fecha_fin_texto'),
+        'fecha_inicio_estimada_texto': recalculado.get('fecha_inicio_estimada_texto'),
+        'fecha_fin_estimada_texto': recalculado.get('fecha_fin_estimada_texto'),
+        'es_manual': recalculado.get('es_programacion_manual'),
+        'instructor_programo': recalculado.get('instructor_programo'),
+        'raps_distribucion': recalculado.get('raps_distribucion', []),
+        'raps_tiempo': recalculado.get('raps_distribucion', []),
+    })
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/estadisticas')

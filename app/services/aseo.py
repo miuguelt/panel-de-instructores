@@ -1033,6 +1033,26 @@ def resumen_aprendiz(ficha_id, aprendiz):
     }
 
 
+def contar_cumplidos_en_periodo(ficha_id, fecha_inicio, fecha_fin):
+    """Calcula la cantidad de turnos de aseo cumplidos por aprendiz en un rango de fechas.
+
+    Solo se cuentan las asignaciones en estado 'cumplido' donde el aprendiz no haya
+    sido marcado como ausente (completado_1 / completado_2 no sea explícitamente False).
+    """
+    conteos = defaultdict(int)
+    turnos = TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.estado == 'cumplido',
+        TurnoAseo.fecha.between(fecha_inicio, fecha_fin),
+    ).all()
+    for turno in turnos:
+        if turno.aprendiz_1_id and turno.completado_1 is not False:
+            conteos[turno.aprendiz_1_id] += 1
+        if turno.aprendiz_2_id and turno.completado_2 is not False:
+            conteos[turno.aprendiz_2_id] += 1
+    return dict(conteos)
+
+
 def datos_transparencia(ficha_id, mes=None):
     if mes is None:
         mes = date.today().replace(day=1)
@@ -1055,6 +1075,7 @@ def datos_transparencia(ficha_id, mes=None):
     }
 
     contadores = recalcular_contadores(ficha_id)
+    cumplidos_periodo = contar_cumplidos_en_periodo(ficha_id, mes, fin_mes)
     activos = aprendices_activos(ficha_id)
     proximos = {}
     for turno in TurnoAseo.query.filter(
@@ -1069,13 +1090,15 @@ def datos_transparencia(ficha_id, mes=None):
         {
             'aprendiz': aprendiz,
             'contador': contadores[aprendiz.id],
+            'veces_periodo': cumplidos_periodo.get(aprendiz.id, 0),
+            'veces_total': contadores[aprendiz.id].veces_aseo,
             'proxima': proximos.get(aprendiz.id),
         }
         for aprendiz in activos
     ]
     equidad.sort(
         key=lambda fila: (
-            fila['contador'].veces_aseo,
+            fila['veces_total'],
             fila['contador'].ultima_vez_aseo or date.min,
         )
     )

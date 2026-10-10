@@ -1,4 +1,5 @@
 {# Componente visual del Tracker de Fases del Proyecto Formativo #}
+{% set fases_data = fases_data if (fases_data is defined and fases_data) else (resumen.fases_data if (resumen is defined and resumen.fases_data) else none) %}
 {% if fases_data and fases_data.disponible %}
 <section class="ficha-fases-tracker" aria-label="Seguimiento de fases del proyecto formativo">
     <div class="fases-tracker-header">
@@ -69,7 +70,20 @@
             </div>
             <p class="fases-corte-detalle">
                 {% if fases_data.planeacion_sincronizada %}
-                Por calendario del proyecto GFPI-F-134, las fases de <strong>Análisis</strong> (21 RAPs) y <strong>Planeación</strong> (27 RAPs) ya culminaron su ventana formativa. En <strong>Ejecución</strong> deberían ir {{ fases_data.fases[2].resultados_esperados|default(7) if (fases_data.fases and fases_data.fases|length > 2) else 7 }} RAPs evaluados a la fecha.
+                    {% set f_vencidas = [] %}
+                    {% set f_en_curso = none %}
+                    {% for f in fases_data.fases|default([]) %}
+                        {% if f.estado_tiempo == 'vencida' %}
+                            {% set _ = f_vencidas.append(f) %}
+                        {% elif f.estado_tiempo == 'en_curso' and not f_en_curso %}
+                            {% set f_en_curso = f %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if f_vencidas %}
+                    Por calendario del proyecto GFPI-F-134, las fases de {% for fv in f_vencidas %}<strong>{{ fv.nombre|title }}</strong> ({{ fv.resultados_total }} RAPs){% if not loop.last %}{% if loop.index == f_vencidas|length - 1 %} y {% else %}, {% endif %}{% endif %}{% endfor %} ya culminaron su ventana formativa.{% if f_en_curso %} En <strong>{{ f_en_curso.nombre|title }}</strong> deberían ir {{ f_en_curso.resultados_esperados|default(0) }} RAPs evaluados a la fecha.{% endif %}
+                    {% else %}
+                    Según el calendario del proyecto GFPI-F-134, la ficha debería haber alcanzado {{ esperados_cnt }} RAPs evaluados en la fase de <strong>{{ fases_data.fase_esperada.nombre|title if fases_data.fase_esperada else 'Ejecución' }}</strong>.
+                    {% endif %}
                 {% else %}
                 Según el tiempo lectivo transcurrido, la ficha debería haber cubierto el {{ pct_esp }}% de los resultados de aprendizaje.
                 {% endif %}
@@ -90,7 +104,7 @@
                 <span class="fases-alerta-vencidas">⚠️ Rezago en fases culminadas:</span>
                 Hay <strong>{{ vencidos_pend }} RAPs pendientes</strong> en fases que ya terminaron ({% for fv in fases_venc_list %}{{ fv.nombre|title }}: {{ fv.pendientes }}{% if not loop.last %}, {% endif %}{% endfor %}), lo cual mantiene a la ficha anclada en {{ fases_data.fase_real.nombre|title if fases_data.fase_real else 'fases previas' }}.
                 <br>
-                <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="window.abrirModal('modal-raps-vencidos')" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;">
+                <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;">
                     <span>🔍</span> <span>Ver auditoría de RAPs y fechas límites</span>
                 </button>
                 {% else %}

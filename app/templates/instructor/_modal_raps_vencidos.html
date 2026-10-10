@@ -1,5 +1,6 @@
 {# Componente Modal Accesible para Auditoría de RAPs Vencidos en la Ficha #}
-{% set raps_vencidos = resumen.fases_data.resumen_raps.raps_vencidos_detalle if (resumen.fases_data and resumen.fases_data.resumen_raps and resumen.fases_data.resumen_raps.raps_vencidos_detalle) else [] %}
+{% set fd = fases_data if (fases_data is defined and fases_data) else (resumen.fases_data if (resumen is defined and resumen.fases_data) else none) %}
+{% set raps_vencidos = fd.resumen_raps.raps_vencidos_detalle if (fd and fd.resumen_raps and fd.resumen_raps.raps_vencidos_detalle) else [] %}
 <dialog id="modal-raps-vencidos" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalRapsVencidosTitulo" aria-describedby="modalRapsVencidosDesc">
     <section class="app-modal-content app-modal-content--large raps-vencidos-modal-shell" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
         <header class="app-modal-header" style="flex-shrink: 0;">
@@ -14,7 +15,7 @@
                     </p>
                 </div>
             </div>
-            <button type="button" class="btn-close" aria-label="Cerrar modal" onclick="window.cerrarModal('modal-raps-vencidos')">&times;</button>
+            <button type="button" class="btn-close" aria-label="Cerrar modal" onclick="if (window.cerrarModal) { window.cerrarModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.close(); }">&times;</button>
         </header>
 
         <!-- Barra de filtros rápidos -->
@@ -120,7 +121,7 @@
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCopiarRapsModal" onclick="copiarListadoRapsModal()">
                 📋 Copiar listado para requerimiento
             </button>
-            <button type="button" class="btn btn-sm btn-secondary" onclick="window.cerrarModal('modal-raps-vencidos')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="if (window.cerrarModal) { window.cerrarModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.close(); }">
                 Cerrar
             </button>
         </footer>

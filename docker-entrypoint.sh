@@ -118,6 +118,9 @@ else
     echo "[ERROR] Falló la creación del admin. Revise ADSO_ADMIN_EMAIL / ADSO_ADMIN_PASSWORD en Coolify." >&2
     exit 1
   fi
+  # Precalentamiento de snapshots para evitar latencias de primera carga
+  echo "Precalentando vistas y snapshots de fichas..."
+  python3 warmup.py || echo "[WARNING] Precalentamiento no completado al 100%, continuará bajo demanda."
 fi
 
 # --- Arrancar proceso ---

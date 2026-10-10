@@ -397,6 +397,15 @@
             "pct": {{ comp.pct }},
             "esta_seleccionada": {{ (comp.esta_seleccionada if comp.esta_seleccionada is defined and comp.esta_seleccionada else false) | tojson }},
             "seleccionada_por": {{ (comp.seleccionada_por if comp.seleccionada_por is defined and comp.seleccionada_por is not none else none) | tojson }},
+            "fecha_inicio": {{ (comp.fecha_inicio or '') | tojson }},
+            "fecha_fin": {{ (comp.fecha_fin or '') | tojson }},
+            "fecha_inicio_texto": {{ (comp.fecha_inicio_texto or '') | tojson }},
+            "fecha_fin_texto": {{ (comp.fecha_fin_texto or '') | tojson }},
+            "fecha_inicio_estimada_texto": {{ (comp.fecha_inicio_estimada_texto or '') | tojson }},
+            "fecha_fin_estimada_texto": {{ (comp.fecha_fin_estimada_texto or '') | tojson }},
+            "es_programacion_manual": {{ (comp.es_programacion_manual if comp.es_programacion_manual is defined else false) | tojson }},
+            "instructor_programo": {{ (comp.instructor_programo or '') | tojson }},
+            "raps_distribucion_mapa": {{ (comp.raps_distribucion_mapa or {}) | tojson }},
             "detalles": [
                 {% for det in comp.detalles %}
                 {
@@ -460,6 +469,23 @@
                     📌 Seleccionar
                 {% endif %}
             </button>
+        </div>
+        <div class="comp-fechas-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.65rem; padding:.35rem .65rem; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:8px; font-size:.78rem;">
+            <div style="display:flex; align-items:center; gap:.4rem; color:var(--text-strong); font-weight:600;">
+                <span aria-hidden="true">📅</span>
+                <span id="comp-fechas-txt-{{ loop.index0 }}">
+                    {% if comp.fecha_inicio_texto and comp.fecha_fin_texto %}
+                        {{ comp.fecha_inicio_texto }} &ndash; {{ comp.fecha_fin_texto }}
+                    {% elif comp.fecha_inicio_texto %}
+                        Desde {{ comp.fecha_inicio_texto }}
+                    {% else %}
+                        Fechas por definir
+                    {% endif %}
+                </span>
+            </div>
+            <span id="comp-fechas-badge-{{ loop.index0 }}" class="badge" style="font-size:.7rem; padding:2px 7px; font-weight:700; {% if comp.es_programacion_manual %}background:rgba(16,185,129,0.15); color:#059669; border:1px solid rgba(16,185,129,0.3);{% else %}background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border-subtle);{% endif %}">
+                {{ 'Programada' if comp.es_programacion_manual else 'Estimada' }}
+            </span>
         </div>
         <div class="comp-prog-row">
             <span>Aprobados {{ comp.aprobados }}/{{ comp.total }}</span>
@@ -568,6 +594,37 @@
 
         <!-- Body -->
         <div class="app-modal-body" id="modal-body">
+            <!-- Programación temporal de la competencia -->
+            <div class="comp-programacion-card" style="background:var(--bg-surface); border:1.5px solid var(--border-subtle); border-radius:12px; padding:1rem 1.25rem; margin-bottom:1.25rem;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.5rem; margin-bottom:.85rem;">
+                    <div>
+                        <div style="font-size:.92rem; font-weight:700; color:var(--text-strong); display:flex; align-items:center; gap:.45rem;">
+                            <span aria-hidden="true">📅</span> Programación de fechas de la competencia
+                            <span id="modal-comp-prog-badge" class="badge" style="font-size:.7rem; padding:2px 7px;">—</span>
+                        </div>
+                        <p id="modal-comp-prog-desc" style="margin:.3rem 0 0; font-size:.78rem; color:var(--text-muted); line-height:1.4;">
+                            Calculada de manera aproximada según planeación pedagógica y etapa lectiva.
+                        </p>
+                    </div>
+                    <button type="button" id="modal-btn-restablecer-fecha" class="btn btn-sm btn-outline" style="display:none; font-size:.76rem; padding:3px 9px;" onclick="restablecerFechaEstimada()">
+                        ↺ Restablecer a fecha estimada
+                    </button>
+                </div>
+                <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:.5rem;">
+                        <label for="modal-input-fecha-inicio" style="font-size:.8rem; font-weight:700; color:var(--text-strong);">Fecha inicio:</label>
+                        <input type="date" id="modal-input-fecha-inicio" class="form-control" style="font-size:.82rem; padding:.35rem .6rem; border-radius:8px; border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-strong);">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:.5rem;">
+                        <label for="modal-input-fecha-fin" style="font-size:.8rem; font-weight:700; color:var(--text-strong);">Fecha fin:</label>
+                        <input type="date" id="modal-input-fecha-fin" class="form-control" style="font-size:.82rem; padding:.35rem .6rem; border-radius:8px; border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-strong);">
+                    </div>
+                    <button type="button" id="modal-btn-guardar-fecha" class="btn btn-sm btn-primary" style="font-size:.82rem; padding:.45rem 1rem; border-radius:8px; display:inline-flex; align-items:center; gap:.4rem;" onclick="guardarProgramacionFechas()">
+                        <span aria-hidden="true">💾</span> Guardar fechas
+                    </button>
+                </div>
+            </div>
+
             <!-- KPI Row -->
             <div class="app-modal-kpi-grid" id="modal-kpis"></div>
 
@@ -728,10 +785,43 @@
 
     const CIRC = 2 * Math.PI * 46; // circumference for r=46
 
+    let currentCompIdx = null;
+
     // ─── Open Modal ─────────────────────────────────────────
     window.openCompModal = function (idx) {
+        currentCompIdx = idx;
         const comp = ALL_COMPS[idx];
         if (!comp) return;
+
+        // Actualizar controles de programación de fecha
+        const inputIni = document.getElementById('modal-input-fecha-inicio');
+        const inputFin = document.getElementById('modal-input-fecha-fin');
+        const progBadge = document.getElementById('modal-comp-prog-badge');
+        const progDesc = document.getElementById('modal-comp-prog-desc');
+        const btnReset = document.getElementById('modal-btn-restablecer-fecha');
+        if (inputIni) inputIni.value = comp.fecha_inicio || '';
+        if (inputFin) inputFin.value = comp.fecha_fin || '';
+        if (progBadge) {
+            if (comp.es_programacion_manual) {
+                progBadge.className = 'badge badge-solid-success';
+                progBadge.textContent = '✓ Programada';
+                progBadge.style.cssText = 'font-size:.7rem; padding:2px 7px; background:#059669; color:#fff;';
+                if (btnReset) btnReset.style.display = 'inline-flex';
+                if (progDesc) progDesc.innerHTML = `📌 <strong>Fecha programada por el instructor</strong> (${escapeHtml(comp.instructor_programo || 'Instructor')}). Los RAPs se encuentran distribuidos acorde a este periodo.`;
+            } else {
+                progBadge.className = 'badge';
+                progBadge.textContent = 'Estimada';
+                progBadge.style.cssText = 'font-size:.7rem; padding:2px 7px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border-subtle);';
+                if (btnReset) btnReset.style.display = 'none';
+                if (progDesc) {
+                    if (comp.fecha_inicio_texto && comp.fecha_fin_texto) {
+                        progDesc.textContent = `Calculada de manera aproximada (${comp.fecha_inicio_texto} – ${comp.fecha_fin_texto}) según planeación pedagógica y etapa lectiva.`;
+                    } else {
+                        progDesc.textContent = 'No se encontraron fechas en planeación; define aquí las fechas para esta competencia.';
+                    }
+                }
+            }
+        }
 
         // title + meta
         titleEl.textContent = comp.nombre;
@@ -822,10 +912,19 @@
                     </div>
                 </div>`).join('');
 
+            const rapDist = (comp.raps_distribucion_mapa && comp.raps_distribucion_mapa[rap]) || null;
+            let rapFechaHtml = '';
+            if (rapDist && rapDist.fecha_inicio_texto && rapDist.fecha_fin_texto) {
+                rapFechaHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">📅 ${escapeHtml(rapDist.fecha_inicio_texto)} al ${escapeHtml(rapDist.fecha_fin_texto)} · ${rapDist.dias} días</span>`;
+            }
+
             return `
             <div class="rap-item" style="margin-bottom:.75rem; border:1px solid var(--border-subtle); border-radius:10px; overflow:hidden; background:var(--bg-surface);">
                 <div class="rap-item-header" onclick="toggleRap(this)" data-open="false" style="padding:.8rem 1rem; display:flex; justify-content:space-between; align-items:center; gap:.8rem; cursor:pointer; background:var(--bg-card);">
-                    <div class="rap-item-title" style="font-size:.88rem; font-weight:700; color:var(--text-strong); line-height:1.4; flex:1;">📋 ${escapeHtml(rap)}</div>
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:.3rem;">
+                        <div class="rap-item-title" style="font-size:.88rem; font-weight:700; color:var(--text-strong); line-height:1.4;">📋 ${escapeHtml(rap)}</div>
+                        ${rapFechaHtml ? `<div style="display:flex; align-items:center; gap:.4rem;">${rapFechaHtml}</div>` : ''}
+                    </div>
                     <div class="rap-item-stats" style="display:flex; gap:.6rem; align-items:center; flex-shrink:0;">
                         <span class="badge" style="background:rgba(255,255,255,0.06); color:${rapColor}; border:1px solid ${rapColor}; font-weight:800; font-size:.78rem;">${rapAprobados}/${dets.length} (${rapPct}%)</span>
                         ${statusBadge(rapAprobados === dets.length ? 'APROBADO' : 'POR EVALUAR')}
@@ -898,6 +997,146 @@
     };
 
     // ─── Toggle Competencia Selection AJAX ─────────────────
+    // ─── Guardar / Restablecer Programación de Fechas ───────
+    window.guardarProgramacionFechas = function() {
+        if (currentCompIdx === null) return;
+        const comp = ALL_COMPS[currentCompIdx];
+        if (!comp) return;
+        const fIni = document.getElementById('modal-input-fecha-inicio').value;
+        const fFin = document.getElementById('modal-input-fecha-fin').value;
+        if (!fIni || !fFin) {
+            if (window.mostrarAviso) {
+                window.mostrarAviso('Por favor selecciona las fechas de inicio y fin para programar la competencia.', { title: 'Fechas incompletas', intent: 'warning' });
+            } else {
+                alert('Por favor selecciona las fechas de inicio y fin.');
+            }
+            return;
+        }
+        if (fFin < fIni) {
+            if (window.mostrarAviso) {
+                window.mostrarAviso('La fecha de fin no puede ser anterior a la fecha de inicio.', { title: 'Rango inválido', intent: 'danger' });
+            } else {
+                alert('La fecha de fin no puede ser anterior a la fecha de inicio.');
+            }
+            return;
+        }
+
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.content : "";
+
+        fetch(`/instructor/fichas/{{ ficha.id }}/competencias/programar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                competencia: comp.nombre,
+                fecha_inicio: fIni,
+                fecha_fin: fFin
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                if (window.mostrarAviso) {
+                    window.mostrarAviso(data.error || 'No se pudo guardar la fecha.', { title: 'Error al programar', intent: 'danger' });
+                }
+                return;
+            }
+            comp.fecha_inicio = data.fecha_inicio;
+            comp.fecha_fin = data.fecha_fin;
+            comp.fecha_inicio_texto = data.fecha_inicio_texto;
+            comp.fecha_fin_texto = data.fecha_fin_texto;
+            comp.es_programacion_manual = data.es_manual;
+            comp.instructor_programo = data.instructor_programo;
+            if (data.raps_tiempo) {
+                comp.raps_distribucion_mapa = {};
+                data.raps_tiempo.forEach(rt => { comp.raps_distribucion_mapa[rt.rap] = rt; });
+            }
+
+            const txtEl = document.getElementById(`comp-fechas-txt-${currentCompIdx}`);
+            if (txtEl) txtEl.textContent = `${data.fecha_inicio_texto} – ${data.fecha_fin_texto}`;
+            const badgeEl = document.getElementById(`comp-fechas-badge-${currentCompIdx}`);
+            if (badgeEl) {
+                badgeEl.textContent = 'Programada';
+                badgeEl.style.cssText = 'font-size:.7rem; padding:2px 7px; font-weight:700; background:rgba(16,185,129,0.15); color:#059669; border:1px solid rgba(16,185,129,0.3);';
+            }
+
+            openCompModal(currentCompIdx);
+            if (window.mostrarAviso) {
+                window.mostrarAviso('Fechas y distribución de resultados de aprendizaje guardadas correctamente.', { title: 'Competencia programada', intent: 'success' });
+            }
+        })
+        .catch(err => {
+            console.error('Error guardando fechas:', err);
+            if (window.mostrarAviso) {
+                window.mostrarAviso('Ocurrió un error al conectar con el servidor.', { title: 'No se pudo conectar', intent: 'danger' });
+            }
+        });
+    };
+
+    window.restablecerFechaEstimada = function() {
+        if (currentCompIdx === null) return;
+        const comp = ALL_COMPS[currentCompIdx];
+        if (!comp) return;
+
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.content : "";
+
+        fetch(`/instructor/fichas/{{ ficha.id }}/competencias/programar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                competencia: comp.nombre,
+                limpiar: true
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                if (window.mostrarAviso) {
+                    window.mostrarAviso(data.error || 'No se pudo restablecer la fecha.', { title: 'Error', intent: 'danger' });
+                }
+                return;
+            }
+            comp.fecha_inicio = data.fecha_inicio;
+            comp.fecha_fin = data.fecha_fin;
+            comp.fecha_inicio_texto = data.fecha_inicio_texto;
+            comp.fecha_fin_texto = data.fecha_fin_texto;
+            comp.es_programacion_manual = data.es_manual;
+            comp.instructor_programo = data.instructor_programo;
+            if (data.raps_tiempo) {
+                comp.raps_distribucion_mapa = {};
+                data.raps_tiempo.forEach(rt => { comp.raps_distribucion_mapa[rt.rap] = rt; });
+            }
+
+            const txtEl = document.getElementById(`comp-fechas-txt-${currentCompIdx}`);
+            if (txtEl) {
+                txtEl.textContent = data.fecha_inicio_texto && data.fecha_fin_texto ? `${data.fecha_inicio_texto} – ${data.fecha_fin_texto}` : 'Fechas por definir';
+            }
+            const badgeEl = document.getElementById(`comp-fechas-badge-${currentCompIdx}`);
+            if (badgeEl) {
+                badgeEl.textContent = 'Estimada';
+                badgeEl.style.cssText = 'font-size:.7rem; padding:2px 7px; font-weight:700; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border-subtle);';
+            }
+
+            openCompModal(currentCompIdx);
+            if (window.mostrarAviso) {
+                window.mostrarAviso('Se restablecieron las fechas aproximadas según la planeación.', { title: 'Fechas restablecidas', intent: 'info' });
+            }
+        })
+        .catch(err => {
+            console.error('Error restableciendo fechas:', err);
+            if (window.mostrarAviso) {
+                window.mostrarAviso('Ocurrió un error al conectar con el servidor.', { title: 'No se pudo conectar', intent: 'danger' });
+            }
+        });
+    };
+
     window.toggleSeleccionCompetencia = function(fichaId, compNombre, idx) {
         if (!compNombre && ALL_COMPS[idx]) {
             compNombre = ALL_COMPS[idx].nombre;

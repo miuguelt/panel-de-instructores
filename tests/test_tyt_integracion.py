@@ -177,3 +177,38 @@ class SeguimientoTyTTest(unittest.TestCase):
         assert resultado_lote['promedio_aprobados'] == individual['promedio_aprobados']
         assert resultado_lote['promedio_evaluados'] == individual['promedio_evaluados']
 
+    def test_obtener_seguimiento_persiste_y_reutiliza_snapshot(self):
+        from app.models import ResultadoCalculadoFicha
+        from app.tyt.consulta import obtener_seguimiento
+
+        # Primera llamada persiste snapshot
+        res_marzo = obtener_seguimiento(self.ficha, hoy=date(2026, 3, 1))
+        snap = ResultadoCalculadoFicha.query.filter_by(
+            ficha_id=self.ficha.id, tipo='tyt', revision_calculo=self.ficha.revision_calculos or 1
+        ).first()
+        assert snap is not None
+        assert snap.payload_json['total_aprendices'] == 2
+
+        # Segunda llamada con otra fecha adapta el snapshot
+        res_junio = obtener_seguimiento(self.ficha, hoy=date(2026, 6, 1))
+        assert res_junio['total_aprendices'] == res_marzo['total_aprendices']
+        assert res_junio['total_resultados'] == res_marzo['total_resultados']
+        assert res_junio['tiempo']['porcentaje'] > res_marzo['tiempo']['porcentaje']
+
+    def test_incremento_revision_invalida_snapshot_tyt(self):
+        from app.models import ResultadoCalculadoFicha
+        from app.tyt.consulta import obtener_seguimiento
+
+        obtener_seguimiento(self.ficha, hoy=date(2026, 3, 1))
+        self.ficha.revision_calculos = (self.ficha.revision_calculos or 1) + 1
+        db.session.commit()
+
+        # Al llamar con nueva revisión, debe generar nuevo snapshot
+        obtener_seguimiento(self.ficha, hoy=date(2026, 3, 1))
+        snaps = ResultadoCalculadoFicha.query.filter_by(
+            ficha_id=self.ficha.id, tipo='tyt'
+        ).all()
+        revisiones = {s.revision_calculo for s in snaps}
+        assert self.ficha.revision_calculos in revisiones
+
+

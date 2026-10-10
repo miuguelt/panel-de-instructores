@@ -11,10 +11,14 @@ from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_PLANEACION
 from app.models.instructor import Instructor
 from app.services.fases_dashboard import (
     UMBRALES_ESTANDAR_FASES,
+    _adaptar_fases_a_hoy,
     _buscar_version_planeacion,
     _calcular_estimado_por_juicios,
+    _obtener_planeacion_parseada,
+    _obtener_snapshot_fases_reciente,
     obtener_seguimiento_fases_dashboard,
 )
+from app.models.resultado_calculado import ResultadoCalculadoFicha
 
 
 class FasesDashboardTestCase(unittest.TestCase):
@@ -305,6 +309,172 @@ class FasesDashboardTestCase(unittest.TestCase):
         db.session.add(v1)
         db.session.commit()
         self.assertEqual(_buscar_version_planeacion(ficha1).id, v1.id)
+
+    def test_obtener_snapshot_fases_reciente(self):
+        """Busca el snapshot persistido más reciente para la revisión actual."""
+        ficha = Ficha(
+            id=77771,
+            codigo='77771',
+            nombre_programa='Programa Snapshot Test',
+            instructor_id=self.instructor.id,
+            fecha_inicio=date(2025, 1, 1),
+            fecha_fin=date(2025, 12, 31),
+            revision_calculos=1,
+        )
+        db.session.add(ficha)
+        db.session.commit()
+
+        # No hay snapshot
+        self.assertIsNone(_obtener_snapshot_fases_reciente(ficha.id, 1))
+
+        # Crear snapshot para fecha pasada
+        snap = ResultadoCalculadoFicha(
+            ficha_id=ficha.id,
+            tipo='fases',
+            fecha_corte=date(2025, 5, 1),
+            revision_calculo=1,
+            version_algoritmo='resultados-v2',
+            huella_fuentes='huella123',
+            payload_json={'disponible': True, 'estado': 'al_dia', 'fases': []},
+        )
+        db.session.add(snap)
+        db.session.commit()
+
+        # Coincide revisión
+        encontrado = _obtener_snapshot_fases_reciente(ficha.id, 1)
+        self.assertIsNotNone(encontrado)
+        self.assertEqual(encontrado['estado'], 'al_dia')
+
+        # Si la revisión sube a 2, no se debe reutilizar
+        self.assertIsNone(_obtener_snapshot_fases_reciente(ficha.id, 2))
+
+    def test_adaptar_fases_a_hoy_recalcula_tiempos_y_veredicto(self):
+        """Adapta un payload previo recalculando fechas, avances esperados y mensajes."""
+        ficha = Ficha(
+            id=77772,
+            codigo='77772',
+            nombre_programa='Programa Adaptar Test',
+            fecha_inicio=date(2025, 1, 1),
+            fecha_fin=date(2025, 12, 31),
+        )
+        cronograma = {
+            'configurado': True,
+            'porcentaje': 60.0,
+            'porcentaje_lectiva': 60.0,
+            'fase': 'lectiva',
+        }
+        hoy = date(2025, 7, 1)
+        payload = {
+            'disponible': True,
+            'fase_real': {'orden': 1, 'nombre': 'PLANEACIÓN', 'porcentaje_aprobados': 30.0},
+            'resumen_raps': {'total': 20, 'aprobados': 6},
+            'fases': [
+                {
+                    'nombre': 'ANÁLISIS',
+                    'inicio': '2025-01-01',
+                    'fin': '2025-03-31',
+                    'estado_tiempo': 'en_curso',
+                    'resultados_total': 5,
+                    'resultados_aprobados': 5,
+                    'resultados_pendientes': 0,
+                    'porcentaje_aprobados': 100.0,
+                },
+                {
+                    'nombre': 'PLANEACIÓN',
+                    'inicio': '2025-04-01',
+                    'fin': '2025-06-30',
+                    'estado_tiempo': 'en_curso',
+                    'resultados_total': 5,
+                    'resultados_aprobados': 1,
+                    'resultados_pendientes': 4,
+                    'porcentaje_aprobados': 20.0,
+                },
+                {
+                    'nombre': 'EJECUCIÓN',
+                    'inicio': '2025-07-01',
+                    'fin': '2025-10-31',
+                    'estado_tiempo': 'futura',
+                    'resultados_total': 7,
+                    'resultados_aprobados': 0,
+                    'resultados_pendientes': 7,
+                    'porcentaje_aprobados': 0.0,
+                },
+                {
+                    'nombre': 'EVALUACIÓN',
+                    'inicio': '2025-11-01',
+                    'fin': '2025-12-31',
+                    'estado_tiempo': 'futura',
+                    'resultados_total': 3,
+                    'resultados_aprobados': 0,
+                    'resultados_pendientes': 3,
+                    'porcentaje_aprobados': 0.0,
+                },
+            ],
+        }
+
+        adaptado = _adaptar_fases_a_hoy(payload, ficha, cronograma, hoy)
+        self.assertTrue(adaptado['disponible'])
+        # A 60% de tiempo estamos en Ejecución (orden 2), mientras que fase real es Planeación (orden 1)
+        self.assertEqual(adaptado['fase_esperada']['nombre'], 'EJECUCIÓN')
+        self.assertEqual(adaptado['estado'], 'atrasado')
+        self.assertEqual(adaptado['desfase_fases'], 1)
+        self.assertIn('Retraso de 1 fase', adaptado['mensaje_veredicto'])
+
+        # Comprobar que ANÁLISIS pasó a 'cumplida' porque hoy (2025-07-01) > fin (2025-03-31)
+        fase_analisis = adaptado['fases'][0]
+        self.assertEqual(fase_analisis['estado_tiempo'], 'cumplida')
+
+        # Comprobar que PLANEACIÓN pasó a 'vencida' porque fin (2025-06-30) < hoy y tiene pendientes
+        fase_plan = adaptado['fases'][1]
+        self.assertEqual(fase_plan['estado_tiempo'], 'vencida')
+
+        # Caso donde no está disponible
+        no_disponible = _adaptar_fases_a_hoy({'disponible': False}, ficha, cronograma, hoy)
+        self.assertFalse(no_disponible['disponible'])
+
+    def test_obtener_planeacion_parseada_con_cache_y_error(self):
+        """Valida memoización y captura de fallos en _obtener_planeacion_parseada."""
+        v = ArchivoFichaVersion(
+            id=99988,
+            ficha_id=77772,
+            instructor_id=self.instructor.id,
+            tipo=TIPO_PLANEACION,
+            version=1,
+            estado='procesado',
+            nombre_archivo='plan_cache.xlsx',
+            ruta_archivo='plan_cache.xlsx',
+            tamano_bytes=100,
+            hash_sha256='hash_cache_123',
+            contenido_extraido_json={'unidades': [{'fase': 'ANÁLISIS'}]},
+            contenido_extraido_version='planeacion-v1',
+        )
+        db.session.add(v)
+        db.session.commit()
+
+        # Primera lectura populea caché
+        contenido = _obtener_planeacion_parseada(v)
+        self.assertIsNotNone(contenido)
+        self.assertIn('unidades', contenido)
+
+        # Segunda lectura reutiliza caché
+        contenido2 = _obtener_planeacion_parseada(v)
+        self.assertEqual(contenido, contenido2)
+
+        # Si falla el parser/documento, captura elegante y retorna None
+        with patch('app.services.fases_dashboard.obtener_contenido_documento', side_effect=ValueError('Corrupto')):
+            v_fallo = ArchivoFichaVersion(
+                id=99989,
+                ficha_id=77772,
+                instructor_id=self.instructor.id,
+                tipo=TIPO_PLANEACION,
+                version=2,
+                estado='procesado',
+                nombre_archivo='fallo.xlsx',
+                ruta_archivo='fallo.xlsx',
+                tamano_bytes=200,
+                hash_sha256='hash_fallo_123',
+            )
+            self.assertIsNone(_obtener_planeacion_parseada(v_fallo))
 
 
 if __name__ == '__main__':

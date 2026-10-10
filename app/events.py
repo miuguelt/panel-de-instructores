@@ -43,3 +43,29 @@ def invalidar_resultados_al_guardar(session, _flush_context, _instances):
         for ficha in session.identity_map.values():
             if isinstance(ficha, Ficha) and ficha.id == ficha_id:
                 session.expire(ficha, ['revision_calculos'])
+
+
+def _invalidar_fichas_en_lote(ctx):
+    """Invalida cálculos cuando se ejecutan sentencias de actualización o borrado en lote."""
+    from app.models import Aprendiz, ArchivoFichaVersion, Ficha, JuicioEvaluativo
+
+    entidad = getattr(ctx.mapper, 'class_', None)
+    if entidad in (Aprendiz, ArchivoFichaVersion, Ficha, JuicioEvaluativo):
+        session = ctx.session
+        session.execute(
+            update(Ficha).values(revision_calculos=Ficha.revision_calculos + 1)
+        )
+        for ficha in session.identity_map.values():
+            if isinstance(ficha, Ficha):
+                session.expire(ficha, ['revision_calculos'])
+
+
+@event.listens_for(Session, 'after_bulk_update')
+def invalidar_resultados_tras_bulk_update(update_context):
+    _invalidar_fichas_en_lote(update_context)
+
+
+@event.listens_for(Session, 'after_bulk_delete')
+def invalidar_resultados_tras_bulk_delete(delete_context):
+    _invalidar_fichas_en_lote(delete_context)
+

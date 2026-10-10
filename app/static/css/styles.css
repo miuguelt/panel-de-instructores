@@ -10008,41 +10008,57 @@ select optgroup {
 }
 
 .card-ficha .time-hero-more,
-.card-ficha .ficha-phase-details {
+.ficha-phase-details {
     overflow: hidden;
     background: var(--bg-card);
     border: 1px solid var(--border-divider);
-    border-radius: 12px;
-    box-shadow: 0 2px 7px rgba(15, 23, 42, .04);
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .04);
+    transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.ficha-phase-details:hover {
+    border-color: color-mix(in srgb, var(--accent-primary, #6366f1) 32%, var(--border-divider));
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .06);
 }
 
 .card-ficha .time-hero-more > summary,
-.card-ficha .ficha-phase-details > summary {
+.ficha-phase-details > summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    min-height: 42px;
-    padding: 8px 11px;
+    gap: 14px;
+    min-height: 48px;
+    padding: 10px 14px;
     color: var(--text-main);
     cursor: pointer;
     list-style: none;
+    user-select: none;
+    border-left: 4px solid var(--ficha-accent, var(--accent-primary, #6366f1));
+    transition: background .18s ease;
 }
 
 .card-ficha .time-hero-more > summary::-webkit-details-marker,
-.card-ficha .ficha-phase-details > summary::-webkit-details-marker {
-    display: none;
+.ficha-phase-details > summary::-webkit-details-marker,
+.card-ficha .time-hero-more > summary::marker,
+.ficha-phase-details > summary::marker {
+    display: none !important;
+    content: "" !important;
 }
 
 .card-ficha .time-hero-more > summary:hover,
-.card-ficha .ficha-phase-details > summary:hover {
-    background: var(--ficha-accent-soft);
+.ficha-phase-details > summary:hover {
+    background: var(--ficha-accent-soft, color-mix(in srgb, var(--accent-primary, #6366f1) 6%, var(--bg-card)));
 }
 
 .card-ficha .time-hero-more > summary:focus-visible,
-.card-ficha .ficha-phase-details > summary:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--ficha-accent) 30%, transparent);
-    outline-offset: -3px;
+.ficha-phase-details > summary:focus-visible {
+    outline: 2px solid var(--ficha-accent, var(--accent-primary, #6366f1));
+    outline-offset: -2px;
+}
+
+.ficha-phase-details[open] > summary {
+    border-bottom: 1px solid var(--border-divider);
 }
 
 .time-hero-more-copy,
@@ -10067,10 +10083,94 @@ select optgroup {
     line-height: 1.3;
 }
 
+.ficha-phase-summary-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.ficha-phase-summary-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent-primary, #6366f1) 10%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--accent-primary, #6366f1) 20%, transparent);
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.ficha-phase-summary-header-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ficha-phase-title {
+    color: var(--text-strong);
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.ficha-phase-summary-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 11.5px;
+    color: var(--text-muted);
+}
+
+.ficha-phase-subtitle {
+    color: var(--text-muted);
+    font-size: 11.5px;
+}
+
+.ficha-phase-sep {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.fases-chip-vencidos {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    color: #dc2626;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.18s ease;
+    font-family: inherit;
+    line-height: 1.25;
+}
+
+.fases-chip-vencidos:hover {
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #b91c1c;
+    transform: translateY(-0.5px);
+}
+
+.fases-chip-vencidos-action {
+    text-decoration: underline;
+    font-weight: 700;
+}
+
 .time-hero-more-icon,
 .ficha-phase-summary-action {
     flex: 0 0 auto;
-    color: var(--ficha-accent);
+    color: var(--ficha-accent, var(--accent-primary, #6366f1));
     font-size: 11px;
     font-weight: 800;
 }
@@ -10088,17 +10188,43 @@ select optgroup {
 .ficha-phase-summary-action {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ficha-accent, var(--accent-primary, #6366f1)) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ficha-accent, var(--accent-primary, #6366f1)) 22%, transparent);
     white-space: nowrap;
+    transition: all .18s ease;
 }
 
-.ficha-phase-summary-action span {
-    font-size: 19px;
-    font-weight: 500;
-    transition: transform .18s ease;
+.ficha-phase-details > summary:hover .ficha-phase-summary-action {
+    background: color-mix(in srgb, var(--ficha-accent, var(--accent-primary, #6366f1)) 18%, transparent);
+    border-color: color-mix(in srgb, var(--ficha-accent, var(--accent-primary, #6366f1)) 38%, transparent);
 }
 
-.ficha-phase-details[open] .ficha-phase-summary-action span {
+.ficha-phase-action-text.is-opened {
+    display: none;
+}
+
+.ficha-phase-details[open] .ficha-phase-action-text.is-closed {
+    display: none;
+}
+
+.ficha-phase-details[open] .ficha-phase-action-text.is-opened {
+    display: inline;
+}
+
+.ficha-phase-summary-action span,
+.ficha-phase-action-icon {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-block;
+    transition: transform .22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ficha-phase-details[open] .ficha-phase-summary-action span,
+.ficha-phase-details[open] .ficha-phase-action-icon {
     transform: rotate(45deg);
 }
 
@@ -10106,8 +10232,8 @@ select optgroup {
 .ficha-phase-details-content {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px;
+    gap: 12px;
+    padding: 16px 18px;
     background: var(--bg-surface);
     border-top: 1px solid var(--border-divider);
 }
@@ -10126,12 +10252,34 @@ select optgroup {
     border-left: 3px solid var(--ficha-accent);
 }
 
-.card-ficha .ficha-phase-details .ficha-fases-tracker {
+.ficha-phase-details .ficha-fases-tracker,
+.ficha-phase-details-content .ficha-fases-tracker {
     gap: 12px;
-    padding: 4px 0 2px;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-top: none !important;
+    margin-top: 0 !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 640px) {
+    .ficha-phase-details > summary {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+    .ficha-phase-summary-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 15px;
+    }
+    .ficha-phase-title {
+        font-size: 12.5px;
+    }
+    .ficha-phase-summary-action {
+        padding: 5px 10px;
+        font-size: 10.5px;
+    }
 }
 
 .card-ficha .ficha-bento-kpis {
@@ -10441,9 +10589,15 @@ select optgroup {
 }
 
 .vision-phase-accordion {
-    margin-top: 16px;
-    border-top: 1px solid var(--border-divider);
-    padding-top: 12px;
+    margin-top: 18px;
+    border: 1px solid color-mix(in srgb, var(--accent-primary, #6366f1) 22%, var(--border-divider));
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .04);
+}
+
+.vision-phase-accordion:hover {
+    border-color: color-mix(in srgb, var(--accent-primary, #6366f1) 36%, var(--border-divider));
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .07);
 }
 
 .vision-two-col {

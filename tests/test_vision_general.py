@@ -241,3 +241,25 @@ class VisionGeneralTestCase(unittest.TestCase):
         self.assertIn('Resultados de Aprendizaje Vencidos por Calificar', contenido)
         self.assertIn('btnCopiarRapsModal', contenido)
         self.assertIn('rapsFaseTabs', contenido)
+
+    def test_acordeon_fases_y_tracker_renderizado(self):
+        """Verifica que el acordeón de fases y el componente tracker se rendericen plenamente."""
+        self._login()
+        res = self.client.get(f'/instructor/fichas/{self.ficha.id}')
+        self.assertEqual(res.status_code, 200)
+        contenido = res.get_data(as_text=True)
+
+        # 1. Estructura del acordeón elegante
+        self.assertIn('ficha-phase-details', contenido)
+        self.assertIn('vision-phase-accordion', contenido)
+        self.assertIn('Desglose de fases del proyecto formativo', contenido)
+        self.assertIn('Ver fases', contenido)
+
+        # 2. Componente Tracker renderizado dentro del contenido
+        self.assertIn('ficha-fases-tracker', contenido)
+        self.assertIn('fases-stepper', contenido)
+        self.assertIn('fases-corte-banner', contenido)
+        self.assertIn('fases-veredicto-caption', contenido)
+        self.assertIn('ANÁLISIS', contenido.upper())
+        self.assertIn('PLANEACIÓN', contenido.upper())
+

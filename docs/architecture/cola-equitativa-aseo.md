@@ -99,3 +99,28 @@ Se extrajo la selección porque tenía dos implementaciones que podían divergir
 Mantener ambas habría conservado el riesgo; un nuevo patrón de infraestructura
 o una migración de datos no son necesarios. Las pruebas usan SQLite en memoria
 y forman parte de la suite que CI ejecuta con la compuerta de funciones al 100 %.
+
+## Término general acumulativo y cortes pedagógicos
+
+1. **Independencia frente a cortes pedagógicos:**
+   Los cortes pedagógicos estructuran las calificaciones y las asistencias por etapas,
+   pero no reinician ni alteran el contador acumulado de turnos de aseo. La equidad
+   del aseo es un compromiso formativo transversal a toda la ficha; por ende, el
+   contador `ContadorAseo.veces_aseo` se mantiene en término general sin reiniciarse
+   al abrir, cerrar o cambiar de corte.
+
+2. **Doble métrica en transparencia y gestión:**
+   Para brindar claridad tanto del periodo en curso como del balance general, las
+   interfaces del instructor y del aprendiz presentan dos columnas diferenciadas:
+   - **En periodo (`veces_periodo`):** Muestra los turnos efectivamente cumplidos
+     por el aprendiz dentro del mes o rango de fechas visualizado (calculado con
+     `contar_cumplidos_en_periodo`).
+   - **Total (`veces_total`):** Muestra la totalidad histórica de turnos cumplidos
+     por el aprendiz en la formación (`ContadorAseo.veces_aseo`).
+
+3. **Criterio rector de asignación:**
+   El cálculo de cola justa (`app/services/aseo_cola.py`) prioriza la carga acumulada
+   general y la fecha de referencia más antigua (quien lleva más tiempo sin realizar
+   aseo o nunca lo ha hecho), garantizando que todos los aprendices alcancen el mismo
+   número de turnos a lo largo del proceso formativo.
+

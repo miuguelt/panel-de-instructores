@@ -16,7 +16,12 @@ from app.models.insignia import Insignia, InsigniaOtorgada
 from app.models.grupo import Grupo, GrupoAprendiz, GrupoMensaje
 from app.models.atencion import TurnoAtencion
 from app.models.ficha_instructor import FichaInstructor
-from app.models.juicio import JuicioEvaluativo, JuicioEvaluativoInstructor, FichaCompetenciaSeleccionada
+from app.models.juicio import (
+    JuicioEvaluativo,
+    JuicioEvaluativoInstructor,
+    FichaCompetenciaSeleccionada,
+    FichaCompetenciaProgramacion,
+)
 from app.models.aseo import (
     ConfiguracionAseo,
     ContadorAseo,
@@ -46,10 +51,11 @@ __all__ = [
     'Insignia', 'InsigniaOtorgada',
     'Grupo', 'GrupoAprendiz', 'GrupoMensaje', 'TurnoAtencion',
     'FichaInstructor', 'JuicioEvaluativo', 'JuicioEvaluativoInstructor',
-    'FichaCompetenciaSeleccionada',
+    'FichaCompetenciaSeleccionada', 'FichaCompetenciaProgramacion',
     'ConfiguracionAseo', 'ContadorAseo', 'TurnoAseo', 'IntercambioAseo',
     'MaterialFicha', 'ImportacionJob', 'ArchivoFichaVersion',
     'TIPO_PLANEACION', 'TIPO_REPORTE_JUICIOS', 'TIPO_PROGRAMA', 'ETIQUETAS_TIPO', 'NotaObservador',
     'ResultadoCalculadoFicha',
     'PersonalizacionAprendiz',
+    'ExperienciaAprendiz',
 ]

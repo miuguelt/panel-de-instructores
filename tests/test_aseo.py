@@ -102,7 +102,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         return cliente
 
     def test_generacion_por_rango_es_pareja_y_auditable(self):
-        fechas = [date.today() + timedelta(days=numero) for numero in range(3)]
+        fechas = fechas_futuras(3)
         for fecha in fechas:
             self._crear_sesion(fecha)
         db.session.commit()
@@ -129,7 +129,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
 
     def test_ausentes_y_excluidos_no_entran_en_la_asignacion(self):
-        fecha = date.today()
+        fecha = fechas_futuras(1)[0]
         ausente = self.aprendices[0]
         excluido = self.aprendices[1]
         self._crear_sesion(fecha, ausentes={ausente.id})
@@ -148,7 +148,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertFalse(turno.incluye(excluido.id))
 
     def test_cumplimiento_y_override_recalculan_contadores(self):
-        fecha = date.today()
+        fecha = fechas_futuras(1)[0]
         self._crear_sesion(fecha)
         turno = generar_turnos(
             self.ficha.id, fecha, fecha, rng=random.Random(5)
@@ -181,7 +181,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertEqual(turno.generado_por, 'instructor')
 
     def test_ausente_no_suma_en_contador_y_conserva_puesto(self):
-        fecha = date.today()
+        fecha = fechas_futuras(1)[0]
         ausente = self.aprendices[0]
         self._crear_sesion(fecha, ausentes={ausente.id})
         db.session.commit()
@@ -245,7 +245,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertEqual(turno.estado, 'intercambiado')
 
     def test_calendario_panel_y_generacion_http_responden(self):
-        fecha = date.today() + timedelta(days=1)
+        fecha = fechas_futuras(1)[0]
         self._crear_sesion(fecha)
         db.session.commit()
         cliente = self._cliente_instructor()
@@ -324,7 +324,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertIn('Turno de aseo'.encode(), panel.data)
 
     def test_guardar_asistencia_crea_turno_del_dia_automaticamente(self):
-        fecha = date.today()
+        fecha = fechas_futuras(1)[0]
         cliente = self._cliente_instructor()
         datos = {'fecha': fecha.isoformat()}
         for aprendiz in self.aprendices:
@@ -344,7 +344,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertEqual(turno.generado_por, 'sistema')
 
     def test_asistencia_reemplaza_ausente_y_reserva_reposicion(self):
-        fecha = date.today()
+        fecha = fechas_futuras(1)[0]
         self._crear_sesion(fecha)
         turno_original = generar_turnos(
             self.ficha.id, fecha, fecha, rng=random.Random(11)
@@ -401,7 +401,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertIn('Tabla de equidad'.encode(), respuesta.data)
 
     def test_modificacion_asistencia_actualiza_contadores(self):
-        fecha = date.today()
+        fecha = fechas_futuras(1)[0]
         self._crear_sesion(fecha)
         turno = generar_turnos(
             self.ficha.id, fecha, fecha, rng=random.Random(13)
@@ -452,8 +452,9 @@ class TurnosAseoTestCase(unittest.TestCase):
         db.session.commit()
 
         # Creamos 2 fechas futuras (4 cupos)
-        fecha_futura_1 = date.today() + timedelta(days=1)
-        fecha_futura_2 = date.today() + timedelta(days=2)
+        fechas = fechas_futuras(2)
+        fecha_futura_1 = fechas[0]
+        fecha_futura_2 = fechas[1]
         self._crear_sesion(fecha_futura_1)
         self._crear_sesion(fecha_futura_2)
         db.session.commit()
@@ -527,7 +528,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertFalse(turno_actualizado.incluye(self.aprendices[1].id))
 
     def test_turnos_cumplidos_no_se_modifican_al_recalcular(self):
-        fecha = date.today()
+        fecha = fechas_futuras(1)[0]
         self._crear_sesion(fecha)
         turno = TurnoAseo(
             ficha_id=self.ficha.id,
@@ -558,7 +559,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertEqual(turno_bd.estado, 'cumplido')
 
     def test_respetar_ajustes_manuales_al_recalcular(self):
-        fecha_futura = date.today() + timedelta(days=2)
+        fecha_futura = fechas_futuras(1)[0]
         self._crear_sesion(fecha_futura)
         turno_manual = TurnoAseo(
             ficha_id=self.ficha.id,
@@ -708,7 +709,8 @@ class TurnosAseoTestCase(unittest.TestCase):
 
     def test_marcar_cumplido_persiste_y_afecta_recalculo_futuro(self):
         # 1. Creamos turno hoy con Ana (0) y Bruno (1)
-        fecha_hoy = date.today()
+        fechas = fechas_futuras(3)
+        fecha_hoy = fechas[0]
         self._crear_sesion(fecha_hoy)
         turno_hoy = TurnoAseo(
             ficha_id=self.ficha.id,
@@ -738,8 +740,8 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertEqual(c_bruno.ultima_vez_aseo, fecha_hoy)
 
         # 4. Creamos 2 sesiones futuras y recalculamos todo el rango (incluyendo hoy)
-        f1 = fecha_hoy + timedelta(days=1)
-        f2 = fecha_hoy + timedelta(days=2)
+        f1 = fechas[1]
+        f2 = fechas[2]
         self._crear_sesion(f1)
         self._crear_sesion(f2)
         db.session.commit()
@@ -1198,12 +1200,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         db.session.commit()
 
         # Creamos 2 sesiones hábiles a futuro
-        dias = []
-        actual = date.today() + timedelta(days=1)
-        while len(dias) < 2:
-            if not es_festivo_colombia(actual):
-                dias.append(actual)
-            actual += timedelta(days=1)
+        dias = fechas_futuras(2)
 
         for d in dias:
             self._crear_sesion(d)
@@ -1248,10 +1245,8 @@ class TurnosAseoTestCase(unittest.TestCase):
         ))
         db.session.commit()
 
-        # Generar turnos para mañana (solo 1 sesión)
-        fecha_manana = date.today() + timedelta(days=1)
-        while es_festivo_colombia(fecha_manana):
-            fecha_manana += timedelta(days=1)
+        # Generar turnos para el próximo día hábil (solo 1 sesión)
+        fecha_manana = fechas_futuras(1)[0]
         self._crear_sesion(fecha_manana)
         db.session.commit()
 

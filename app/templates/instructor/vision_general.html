@@ -371,14 +371,50 @@
             </div>
         </div>
 
-        {% if resumen.fases_data and resumen.fases_data.disponible %}
-        <details class="ficha-phase-details vision-phase-accordion">
-            <summary>
-                <span class="ficha-phase-summary-copy">
-                    <strong>Desglose de fases del proyecto formativo</strong>
-                    <small>{% if resumen.fases_data.resumen_raps and (resumen.fases_data.resumen_raps.raps_vencidos_pendientes|default(0)) > 0 %}<button type="button" class="btn btn-link p-0 text-danger" style="font-size: inherit; font-weight: 700; text-decoration: underline;" onclick="window.abrirModal('modal-raps-vencidos'); event.preventDefault(); event.stopPropagation();" title="Ver qué RAPs debieron calificarse y sus fechas límites">⚠️ {{ resumen.fases_data.resumen_raps.raps_vencidos_pendientes }} RAPs pendientes de fases culminadas (Ver fechas 🔍)</button> · {% endif %}Avance según GFPI y reporte de juicios</small>
-                </span>
-                <span class="ficha-phase-summary-action">Ver fases <span aria-hidden="true">＋</span></span>
+        {% set fases_data = resumen.fases_data %}
+        {% if fases_data and fases_data.disponible %}
+        <details class="ficha-phase-details vision-phase-accordion" id="vision-phase-details">
+            <summary class="ficha-phase-summary">
+                <div class="ficha-phase-summary-main">
+                    <span class="ficha-phase-summary-icon" aria-hidden="true">🗺️</span>
+                    <div class="ficha-phase-summary-copy">
+                        <div class="ficha-phase-summary-header-line">
+                            <strong class="ficha-phase-title">Desglose de fases del proyecto formativo</strong>
+                            {% if fases_data.desfase_fases|default(0) > 0 %}
+                            <span class="fases-status-pill is-danger" title="El tiempo lectivo ha avanzado más rápido que los RAPs aprobados">
+                                <span class="fases-dot"></span> Retraso de {{ fases_data.desfase_fases }} {{ 'fase' if fases_data.desfase_fases == 1 else 'fases' }}
+                            </span>
+                            {% elif fases_data.desfase_fases|default(0) < 0 %}
+                            <span class="fases-status-pill is-info" title="Los RAPs aprobados van por delante del tiempo programado">
+                                <span class="fases-dot"></span> Adelantada
+                            </span>
+                            {% else %}
+                            <span class="fases-status-pill is-success" title="El avance de RAPs coincide con la fase esperada por tiempo">
+                                <span class="fases-dot"></span> Al día con el cronograma
+                            </span>
+                            {% endif %}
+                            {% if fases_data.planeacion_sincronizada %}
+                            <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">✓ GFPI-F-134</span>
+                            {% endif %}
+                        </div>
+                        <div class="ficha-phase-summary-meta">
+                            <span class="ficha-phase-subtitle">Avance según GFPI y reporte de juicios</span>
+                            {% if fases_data.resumen_raps and (fases_data.resumen_raps.raps_vencidos_pendientes|default(0)) > 0 %}
+                            <span class="ficha-phase-sep" aria-hidden="true">·</span>
+                            <button type="button" class="fases-chip-vencidos" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" title="Ver qué RAPs debieron calificarse y sus fechas límites">
+                                <span class="fases-chip-vencidos-icon" aria-hidden="true">⚠️</span>
+                                <span class="fases-chip-vencidos-text"><strong>{{ fases_data.resumen_raps.raps_vencidos_pendientes }} RAPs</strong> pendientes de fases culminadas</span>
+                                <span class="fases-chip-vencidos-action">Ver fechas 🔍</span>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="ficha-phase-summary-action">
+                    <span class="ficha-phase-action-text is-closed">Ver fases</span>
+                    <span class="ficha-phase-action-text is-opened">Ocultar fases</span>
+                    <span class="ficha-phase-action-icon" aria-hidden="true">＋</span>
+                </div>
             </summary>
             <div class="ficha-phase-details-content">
                 {% include 'instructor/_ficha_fases_tracker.html' with context %}

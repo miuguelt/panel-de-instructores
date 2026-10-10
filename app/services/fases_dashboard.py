@@ -529,6 +529,166 @@ def _calcular_estimado_por_juicios(
     }
 
 
+def _obtener_snapshot_fases_reciente(ficha_id: int, revision: int) -> Optional[Dict[str, Any]]:
+    """Recupera el snapshot más reciente de fases para la misma revisión de datos."""
+    if not ficha_id:
+        return None
+    try:
+        import json
+        from app.models.resultado_calculado import ResultadoCalculadoFicha
+        from app.services.resultados_persistidos import ALGORITMO_RESULTADOS, _json_object_hook
+
+        fila = (
+            ResultadoCalculadoFicha.query.filter_by(
+                ficha_id=ficha_id,
+                tipo='fases',
+                revision_calculo=revision or 1,
+                version_algoritmo=ALGORITMO_RESULTADOS,
+            )
+            .order_by(ResultadoCalculadoFicha.fecha_corte.desc())
+            .first()
+        )
+        if fila and fila.payload_json:
+            return json.loads(json.dumps(fila.payload_json), object_hook=_json_object_hook)
+    except Exception:
+        current_app.logger.exception('Error leyendo snapshot previo de fases para ficha %s', ficha_id)
+    return None
+
+
+def _adaptar_fases_a_hoy(
+    payload: Dict[str, Any],
+    ficha: Ficha,
+    cronograma: Dict[str, Any],
+    hoy: date,
+) -> Dict[str, Any]:
+    """Adapta un snapshot existente de fases a la fecha actual en microsegundos."""
+    if not payload or not payload.get('disponible'):
+        return payload
+
+    import copy
+    configurado = bool(cronograma.get('configurado'))
+    pct_tiempo = float(cronograma.get('porcentaje_lectiva') or cronograma.get('porcentaje') or 0.0)
+
+    resultado = copy.deepcopy(payload)
+    fases = resultado.get('fases', [])
+
+    # 1. Determinar fase esperada por tiempo
+    fase_esperada_nombre = 'ANÁLISIS'
+    fase_esperada_icono = '🔍'
+    idx_esperada = 0
+    if configurado and pct_tiempo > 0:
+        for idx, (fase_nom, icono, min_pct, max_pct) in enumerate(UMBRALES_ESTANDAR_FASES):
+            if min_pct <= pct_tiempo <= max_pct or (idx == len(UMBRALES_ESTANDAR_FASES) - 1 and pct_tiempo >= min_pct):
+                fase_esperada_nombre = fase_nom
+                fase_esperada_icono = icono
+                idx_esperada = idx
+                break
+
+    fase_real = resultado.get('fase_real', {})
+    idx_real = fase_real.get('orden', 0)
+    desfase = (idx_esperada - idx_real) if configurado else 0
+
+    pct_aprobados = fase_real.get('porcentaje_aprobados', 0)
+    total_raps = resultado.get('resumen_raps', {}).get('total', 0)
+
+    # 2. Actualizar estado y mensaje de veredicto
+    if not configurado:
+        estado = 'sin_datos'
+        mensaje_veredicto = 'Configura las fechas de la ficha para calcular el avance por fases.'
+    elif pct_aprobados >= 100:
+        estado = 'completado'
+        mensaje_veredicto = 'Todos los resultados de aprendizaje han sido aprobados.'
+    elif desfase > 0:
+        estado = 'atrasado'
+        mensaje_veredicto = (
+            f"Fase esperada por tiempo: {fase_esperada_nombre.title()} · "
+            f"Fase según RAPs: {fase_real.get('nombre', '').title()} (Retraso de {desfase} "
+            f"{'fase' if desfase == 1 else 'fases'})."
+        )
+    elif desfase < 0:
+        estado = 'adelantado'
+        mensaje_veredicto = (
+            f"Fase según RAPs: {fase_real.get('nombre', '').title()} (Adelantada respecto al cronograma)."
+        )
+    else:
+        estado = 'al_dia'
+        mensaje_veredicto = f"Al día: Proyecto sincronizado en fase de {fase_esperada_nombre.title()}."
+
+    # 3. Actualizar fases individuales
+    fases_formateadas = []
+    for fase in fases:
+        fase_dict = dict(fase)
+        ini_raw = fase_dict.get('inicio')
+        fin_raw = fase_dict.get('fin')
+        ini = date.fromisoformat(ini_raw) if isinstance(ini_raw, str) else ini_raw
+        fin = date.fromisoformat(fin_raw) if isinstance(fin_raw, str) else fin_raw
+
+        if ini and fin:
+            if hoy > fin:
+                fase_dict['estado_tiempo'] = 'cumplida'
+                t_pct = 100.0
+            elif hoy >= ini:
+                fase_dict['estado_tiempo'] = 'en_curso'
+                dias_tot = (fin - ini).days + 1
+                dias_trans = max(0, min((hoy - ini).days + 1, dias_tot))
+                t_pct = round((dias_trans / dias_tot) * 100.0) if dias_tot else 100.0
+            else:
+                fase_dict['estado_tiempo'] = 'futura'
+                t_pct = 0.0
+
+            fase_dict['porcentaje_tiempo'] = t_pct
+            tot = fase_dict.get('resultados_total', 0)
+            esp = min(round(tot * (t_pct / 100.0)), tot)
+            fase_dict['resultados_esperados'] = esp
+            fase_dict['brecha_resultados'] = fase_dict.get('resultados_aprobados', 0) - esp
+            fase_dict['estado_ritmo'] = 'al_dia' if fase_dict.get('porcentaje_aprobados', 0) >= t_pct else 'atrasado'
+            if fase_dict['estado_tiempo'] == 'cumplida' and (tot - fase_dict.get('resultados_aprobados', 0)) > 0:
+                fase_dict['estado_tiempo'] = 'vencida'
+        fases_formateadas.append(fase_dict)
+
+    # 4. Actualizar resumen RAPs
+    esperados_totales = sum(f.get('resultados_esperados', 0) for f in fases_formateadas) if total_raps else 0
+    raps_vencidos = sum(
+        f.get('resultados_pendientes', 0)
+        for f in fases_formateadas
+        if f.get('estado_tiempo') in ('cumplida', 'vencida')
+    )
+    fases_vencidas_info = [
+        {
+            'nombre': f['nombre'],
+            'pendientes': f.get('resultados_pendientes', 0),
+            'total': f.get('resultados_total', 0),
+            'aprobados': f.get('resultados_aprobados', 0),
+        }
+        for f in fases_formateadas
+        if f.get('estado_tiempo') in ('cumplida', 'vencida') and f.get('resultados_pendientes', 0) > 0
+    ]
+
+    resultado['estado'] = estado
+    resultado['desfase_fases'] = desfase
+    resultado['fase_esperada'] = {
+        'orden': idx_esperada,
+        'nombre': fase_esperada_nombre if configurado else 'Fechas pendientes',
+        'icono': fase_esperada_icono if configurado else '📅',
+        'porcentaje_tiempo': round(pct_tiempo),
+    }
+    resultado['fases'] = fases_formateadas
+    if 'resumen_raps' in resultado:
+        resumen = dict(resultado['resumen_raps'])
+        resumen['esperados'] = esperados_totales
+        resumen['porcentaje_esperados'] = (
+            round((esperados_totales / total_raps * 100), 1)
+            if total_raps
+            else (round(pct_tiempo, 1) if configurado else 0.0)
+        )
+        resumen['raps_vencidos_pendientes'] = raps_vencidos
+        resumen['fases_vencidas'] = fases_vencidas_info
+        resultado['resumen_raps'] = resumen
+
+    resultado['mensaje_veredicto'] = mensaje_veredicto
+    return resultado
+
+
 def obtener_seguimiento_fases_dashboard(
     ficha: Ficha,
     cronograma: Optional[Dict[str, Any]] = None,
@@ -553,6 +713,11 @@ def obtener_seguimiento_fases_dashboard(
         )
 
     def _construir():
+        # Reutilizar snapshot reciente si la revisión no ha cambiado
+        snapshot_previo = _obtener_snapshot_fases_reciente(ficha.id, ficha.revision_calculos)
+        if snapshot_previo:
+            return _adaptar_fases_a_hoy(snapshot_previo, ficha, cronograma, hoy)
+
         if version_plan:
             contenido = _obtener_planeacion_parseada(version_plan)
             if contenido and contenido.get('unidades'):

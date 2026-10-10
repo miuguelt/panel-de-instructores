@@ -114,7 +114,7 @@
         </div>
         <span class="badge badge-info">{{ equidad|length }} activos</span>
     </div>
-    <p class="text-muted">Los contadores solo suben cuando el aprendiz está presente el día de su turno. Si falta, su puesto se conserva y el sistema lo prioriza la próxima vez.</p>
+    <p class="text-muted">Los contadores en término general registran el total histórico acumulado de la ficha y no se reinician al crear cortes pedagógicos. El sistema asigna los turnos buscando que todos alcancen la misma cantidad en total, iniciando por quien menos veces lo ha hecho y quien lleva más tiempo sin turno.</p>
     <div class="table-container">
     <div class="table-responsive">
         <table class="table equity-table">
@@ -122,7 +122,8 @@
             <thead>
                 <tr>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='nombre') }}">Aprendiz</a></th>
-                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Veces</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='periodo') }}">En periodo</a></th>
+                    <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Total</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='ultima') }}">Última vez</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='proxima') }}">Próxima</a></th>
                 </tr>
@@ -131,7 +132,8 @@
                 {% for fila in equidad %}
                 <tr data-estado="{{ fila.aprendiz.estado }}"{% if aprendiz and fila.aprendiz.id == aprendiz.id %} class="is-me"{% endif %}>
                     <td data-label="Aprendiz"><strong>{{ fila.aprendiz.nombre_completo }}</strong></td>
-                    <td data-label="Veces"><span class="equity-count">{{ fila.contador.veces_aseo }}</span></td>
+                    <td data-label="En periodo"><span class="equity-count">{{ fila.veces_periodo }}</span></td>
+                    <td data-label="Total"><span class="equity-count equity-count-total">{{ fila.veces_total }}</span></td>
                     <td data-label="Última vez">{{ fila.contador.ultima_vez_aseo.strftime('%d/%m/%Y') if fila.contador.ultima_vez_aseo else 'Nunca' }}</td>
                     <td data-label="Próxima">{{ fila.proxima.strftime('%d/%m/%Y') if fila.proxima else 'Sin programar' }}</td>
                 </tr>

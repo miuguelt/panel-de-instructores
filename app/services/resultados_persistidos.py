@@ -226,4 +226,11 @@ def precargar_resultados_ficha(ficha_id, hoy=None):
             ),
         )
     fases = obtener_seguimiento_fases_dashboard(ficha, hoy=fecha_corte)
-    return {'ficha_id': ficha.id, 'panorama': bool(version_plan), 'fases': fases['disponible']}
+    from app.tyt.consulta import obtener_seguimiento as obtener_seguimiento_tyt
+    tyt = obtener_seguimiento_tyt(ficha, hoy=fecha_corte)
+    return {
+        'ficha_id': ficha.id,
+        'panorama': bool(version_plan),
+        'fases': fases['disponible'],
+        'tyt': bool(tyt),
+    }

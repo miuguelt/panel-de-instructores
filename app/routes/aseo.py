@@ -17,6 +17,7 @@ from app.services.aseo import (
     asegurar_contadores,
     asignar_o_actualizar_turno,
     completar_turno,
+    contar_cumplidos_en_periodo,
     datos_transparencia,
     generar_turnos,
     obtener_configuracion,
@@ -147,6 +148,7 @@ def turnos(ficha_id):
         for contador in ContadorAseo.query.filter_by(ficha_id=ficha_id).all()
     }
     aprendices = aprendices_activos(ficha_id)
+    cumplidos_periodo = contar_cumplidos_en_periodo(ficha_id, mes, fin_mes)
     proximos = {}
     for turno in TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
@@ -160,6 +162,8 @@ def turnos(ficha_id):
         {
             'aprendiz': aprendiz,
             'contador': contadores[aprendiz.id],
+            'veces_periodo': cumplidos_periodo.get(aprendiz.id, 0),
+            'veces_total': contadores[aprendiz.id].veces_aseo,
             'proxima': proximos.get(aprendiz.id),
         }
         for aprendiz in aprendices
@@ -172,6 +176,14 @@ def turnos(ficha_id):
                 fila['aprendiz'].nombre.lower(),
             )
         )
+    elif orden == 'periodo':
+        equidad.sort(
+            key=lambda fila: (
+                fila['veces_periodo'],
+                fila['veces_total'],
+                fila['contador'].ultima_vez_aseo or date.min,
+            )
+        )
     elif orden == 'ultima':
         equidad.sort(
             key=lambda fila: fila['contador'].ultima_vez_aseo or date.min
@@ -181,7 +193,7 @@ def turnos(ficha_id):
     else:
         equidad.sort(
             key=lambda fila: (
-                fila['contador'].veces_aseo,
+                fila['veces_total'],
                 fila['contador'].ultima_vez_aseo or date.min,
             )
         )
@@ -427,6 +439,7 @@ def gestionar(ficha_id):
         for contador in ContadorAseo.query.filter_by(ficha_id=ficha_id).all()
     }
     aprendices = aprendices_activos(ficha_id)
+    cumplidos_periodo = contar_cumplidos_en_periodo(ficha_id, mes, fin_mes)
     proximos = {}
     for turno in TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
@@ -440,6 +453,8 @@ def gestionar(ficha_id):
         {
             'aprendiz': aprendiz,
             'contador': contadores.get(aprendiz.id),
+            'veces_periodo': cumplidos_periodo.get(aprendiz.id, 0),
+            'veces_total': contadores[aprendiz.id].veces_aseo if contadores.get(aprendiz.id) else 0,
             'proxima': proximos.get(aprendiz.id),
         }
         for aprendiz in aprendices
@@ -453,6 +468,14 @@ def gestionar(ficha_id):
                 fila['aprendiz'].nombre.lower(),
             )
         )
+    elif orden == 'periodo':
+        equidad.sort(
+            key=lambda fila: (
+                fila['veces_periodo'],
+                fila['veces_total'],
+                fila['contador'].ultima_vez_aseo or date.min,
+            )
+        )
     elif orden == 'ultima':
         equidad.sort(
             key=lambda fila: fila['contador'].ultima_vez_aseo or date.min
@@ -462,7 +485,7 @@ def gestionar(ficha_id):
     else:
         equidad.sort(
             key=lambda fila: (
-                fila['contador'].veces_aseo,
+                fila['veces_total'],
                 fila['contador'].ultima_vez_aseo or date.min,
             )
         )
@@ -899,6 +922,14 @@ def transparencia(ficha_id):
                 fila['aprendiz'].nombre.lower(),
             )
         )
+    elif orden == 'periodo':
+        datos['equidad'].sort(
+            key=lambda fila: (
+                fila['veces_periodo'],
+                fila['veces_total'],
+                fila['contador'].ultima_vez_aseo or date.min,
+            )
+        )
     elif orden == 'ultima':
         datos['equidad'].sort(
             key=lambda fila: fila['contador'].ultima_vez_aseo or date.min
@@ -906,6 +937,13 @@ def transparencia(ficha_id):
     elif orden == 'proxima':
         datos['equidad'].sort(
             key=lambda fila: fila['proxima'] or date.max
+        )
+    else:
+        datos['equidad'].sort(
+            key=lambda fila: (
+                fila['veces_total'],
+                fila['contador'].ultima_vez_aseo or date.min,
+            )
         )
 
     db.session.commit()

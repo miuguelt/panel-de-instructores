@@ -63,3 +63,23 @@ class FichaCompetenciaSeleccionada(db.Model):
         db.UniqueConstraint('ficha_id', 'competencia', name='uq_ficha_competencia_sel'),
     )
 
+
+
+class FichaCompetenciaProgramacion(db.Model):
+    __tablename__ = 'fichas_competencias_programacion'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
+    competencia = db.Column(db.String(300), nullable=False)
+    fecha_inicio = db.Column(db.Date, nullable=True)
+    fecha_fin = db.Column(db.Date, nullable=True)
+    instructor_id = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=True, index=True)
+    creado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
+    actualizado_en = db.Column(db.DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    ficha = db.relationship('Ficha', backref=db.backref('competencias_programadas', lazy='dynamic', cascade='all, delete-orphan'))
+    instructor = db.relationship('Instructor', backref=db.backref('competencias_programadas', lazy='dynamic'))
+
+    __table_args__ = (
+        db.UniqueConstraint('ficha_id', 'competencia', name='uq_ficha_comp_prog'),
+    )
