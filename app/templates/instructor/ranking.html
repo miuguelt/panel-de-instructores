@@ -365,6 +365,10 @@
                 </button>
             </div>
             <section id="ranking-lista"
+                     role="region"
+                     aria-label="Lista dinámica del ranking"
+                     aria-live="polite"
+                     aria-atomic="true"
                      hx-get="{{ url_for('ranking.ranking_lista', ficha_id=ficha.id, periodo=periodo, corte_id=corte_actual.id if corte_actual else None) }}"
                      hx-trigger="every 30s"
                      hx-swap="innerHTML"

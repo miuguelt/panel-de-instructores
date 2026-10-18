@@ -81,19 +81,21 @@ def _estado_horas(diferencia, referencia):
 
 def _resultados_faltantes(competencia, planeados):
     faltantes = []
-    for resultado in competencia['resultados']:
-        clave = clave_resultado(resultado['nombre'])
+    for resultado in competencia.get('resultados', []):
+        clave = clave_resultado(resultado.get('nombre', ''))
         if clave and not any(clave in planeado or planeado in clave for planeado in planeados):
             faltantes.append({
-                'competencia': competencia['nombre'],
-                'numero': resultado['numero'],
-                'nombre': resultado['nombre'],
+                'competencia': competencia.get('nombre', ''),
+                'numero': resultado.get('numero', ''),
+                'nombre': resultado.get('nombre', ''),
             })
     return faltantes
 
 
 def _intensidad(programa, meses_lectivos):
-    horas = programa['metadata'].get('horas_lectiva') or programa['resumen']['horas_lectivas_declaradas']
+    meta = programa.get('metadata') or {}
+    resumen = programa.get('resumen') or {}
+    horas = meta.get('horas_lectiva') or resumen.get('horas_lectivas_declaradas')
     if not horas or not meses_lectivos:
         return {}
     horas_mes = horas / meses_lectivos
@@ -206,7 +208,7 @@ def contrastar_con_programa(unidades_planeacion, programa, meses_lectivos=0):
         return _vacio()
 
     planeadas, planeadas_unicas = _horas_planeadas(unidades_planeacion)
-    lectivas = [c for c in programa['competencias'] if c['tipo'] != 'productiva']
+    lectivas = [c for c in programa['competencias'] if c.get('tipo') != 'productiva']
     asignadas = _emparejar_planeadas(lectivas, planeadas_unicas)
     por_competencia = {id(comp): asignadas[indice] for indice, comp in enumerate(lectivas)}
     comparadas = []
@@ -226,18 +228,18 @@ def contrastar_con_programa(unidades_planeacion, programa, meses_lectivos=0):
         if competencia.get('norma'):
             diccionario_pedagogico[clave_resultado(competencia['norma'])] = competencia
 
-        if competencia['tipo'] == 'productiva':
+        if competencia.get('tipo') == 'productiva':
             continue
 
         rotulos = por_competencia.get(id(competencia)) or []
         if not rotulos:
             sin_planear.append({
-                'nombre': competencia['nombre'],
-                'norma': competencia.get('norma', competencia['nombre']),
-                'codigo_norma': competencia['codigo_norma'],
-                'horas': competencia['horas'],
-                'tipo': competencia['tipo'],
-                'resultados': len(competencia['resultados']),
+                'nombre': competencia.get('nombre', ''),
+                'norma': competencia.get('norma', competencia.get('nombre', '')),
+                'codigo_norma': competencia.get('codigo_norma', ''),
+                'horas': competencia.get('horas', 0),
+                'tipo': competencia.get('tipo', 'tecnica'),
+                'resultados': len(competencia.get('resultados', [])),
                 'conocimientos_proceso': competencia.get('conocimientos_proceso', []),
                 'conocimientos_saber': competencia.get('conocimientos_saber', []),
                 'criterios_evaluacion': competencia.get('criterios_evaluacion', []),
@@ -257,17 +259,18 @@ def contrastar_con_programa(unidades_planeacion, programa, meses_lectivos=0):
             'resultados': set().union(*(rotulo['resultados'] for rotulo in rotulos)),
             'rotulos': [rotulo.get('nombre') or '' for rotulo in rotulos],
         }
-        diferencia = round(encontrada['horas'] - competencia['horas'], 1)
+        comp_h = float(competencia.get('horas') or 0)
+        diferencia = round(encontrada['horas'] - comp_h, 1)
         comparadas.append({
-            'nombre': competencia['nombre'],
-            'norma': competencia.get('norma', competencia['nombre']),
-            'codigo_norma': competencia['codigo_norma'],
-            'tipo': competencia['tipo'],
-            'horas_programa': round(competencia['horas']),
+            'nombre': competencia.get('nombre', ''),
+            'norma': competencia.get('norma', competencia.get('nombre', '')),
+            'codigo_norma': competencia.get('codigo_norma', ''),
+            'tipo': competencia.get('tipo', 'tecnica'),
+            'horas_programa': round(comp_h),
             'horas_planeacion': round(encontrada['horas']),
             'diferencia': diferencia,
-            'estado': _estado_horas(diferencia, competencia['horas']),
-            'resultados_programa': len(competencia['resultados']),
+            'estado': _estado_horas(diferencia, comp_h),
+            'resultados_programa': len(competencia.get('resultados', [])),
             'resultados_planeacion': len(encontrada['resultados']),
             'rotulos_planeacion': encontrada['rotulos'],
             'resultados_lista': competencia.get('resultados', []),
@@ -278,20 +281,22 @@ def contrastar_con_programa(unidades_planeacion, programa, meses_lectivos=0):
         })
         resultados_sin_planear.extend(_resultados_faltantes(competencia, encontrada['resultados']))
 
+    meta = programa.get('metadata') or {}
+    resumen = programa.get('resumen') or {}
     horas_plan = round(sum(dato['horas'] for dato in planeadas_unicas))
-    horas_programa = programa['metadata'].get('horas_lectiva') or programa['resumen']['horas_lectivas_declaradas']
+    horas_programa = meta.get('horas_lectiva') or resumen.get('horas_lectivas_declaradas') or 0
     return {
         'disponible': True,
         'horas': {
             'programa_lectiva': round(horas_programa),
-            'programa_total': round(programa['metadata'].get('horas_total') or 0),
-            'programa_productiva': round(programa['metadata'].get('horas_productiva') or 0),
+            'programa_total': round(meta.get('horas_total') or 0),
+            'programa_productiva': round(meta.get('horas_productiva') or 0),
             'planeacion': horas_plan,
             'diferencia': round(horas_plan - horas_programa),
             'estado': _estado_horas(horas_plan - horas_programa, horas_programa),
-            'tecnicas': programa['resumen']['horas_tecnicas'],
-            'transversales': programa['resumen']['horas_transversales'],
-            'ingles': programa['resumen']['horas_ingles'],
+            'tecnicas': resumen.get('horas_tecnicas', 0),
+            'transversales': resumen.get('horas_transversales', 0),
+            'ingles': resumen.get('horas_ingles', 0),
         },
         'competencias': sorted(comparadas, key=lambda dato: dato['diferencia']),
         'competencias_sin_planear': sin_planear,

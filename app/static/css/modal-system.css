@@ -71,21 +71,34 @@ dialog.app-modal-overlay:not([open]) {
 
 .app-modal-close,
 .app-modal-content button,
+.app-modal-content a,
+.app-modal-content select,
+.app-modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
 .pl-modal-backdrop button,
-.pl-modal-raps button {
+.pl-modal-backdrop a,
+.pl-modal-backdrop select,
+.pl-modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.pl-modal-raps button,
+.pl-modal-raps a,
+.pl-modal-raps select,
+.pl-modal-raps input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
     min-height: 42px;
+    min-height: 44px;
+    min-width: 44px;
 }
 
 .app-modal-close {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
 }
 
 .app-modal-content :focus-visible,
 .pl-modal-backdrop :focus-visible,
 .pl-modal-raps :focus-visible {
-    outline: 3px solid var(--accent-primary);
-    outline-offset: 2px;
+    outline: 3px solid var(--accent-primary) !important;
+    outline-offset: 2px !important;
 }
 
 .app-modal-content :focus:not(:focus-visible),
@@ -270,9 +283,11 @@ dialog.app-modal-overlay:not([open]) {
 
 .app-notice-close {
     display: inline-grid;
-    flex: 0 0 42px;
-    width: 42px;
-    height: 42px;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     place-items: center;
     color: var(--text-muted);
     background: transparent;

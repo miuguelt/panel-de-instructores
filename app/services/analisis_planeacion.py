@@ -22,6 +22,7 @@ from app.services.emparejamiento_juicios import (
     texto_limpio as _texto,
 )
 from app.services.planeacion import calcular_fechas_estimadas, comparar_fuentes
+from app.services.periodo_formacion import obtener_periodo_formacion
 from app.services.evaluacion_planeacion import evaluar_resultado
 
 
@@ -191,10 +192,13 @@ def construir_analisis(ficha, contenido_planeacion, version_planeacion=None, ver
     if fecha_corte is None:
         fecha_corte = _fecha_corte(version_reporte, juicios) or date.today()
     por_clave, por_codigo = indexar_juicios(juicios)
+    periodo = obtener_periodo_formacion(ficha)
+    ini_lectiva = periodo.get('inicio_lectiva') or ficha.fecha_inicio
+    fin_lectiva = periodo.get('fin_lectiva') or ficha.fecha_fin
     unidades = calcular_fechas_estimadas(
         contenido_planeacion.get('unidades', []),
-        ficha.fecha_inicio,
-        ficha.fecha_fin,
+        ini_lectiva,
+        fin_lectiva,
     )
     items = []
     juicios_coincidentes = set()

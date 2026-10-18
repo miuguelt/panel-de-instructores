@@ -88,9 +88,10 @@
 
                 <!-- Nombre + estado -->  
                 <div class="col-nombre">
-                    <span class="aprendiz-name" id="aprendiz-{{ ap.id }}"
-                          hx-get="{{ url_for('instructor.asistencia_aprendiz_modal', ficha_id=ficha.id, aprendiz_id=ap.id, corte_id=corte_actual.id if corte_actual else None) }}"
-                          hx-target="#modal-container" hx-trigger="click">{{ ap.nombre }} {{ ap.apellidos }}</span>
+                    <button type="button" class="aprendiz-name" id="aprendiz-{{ ap.id }}"
+                            hx-get="{{ url_for('instructor.asistencia_aprendiz_modal', ficha_id=ficha.id, aprendiz_id=ap.id, corte_id=corte_actual.id if corte_actual else None) }}"
+                            hx-target="#modal-container" hx-trigger="click"
+                            aria-label="Ver detalles y novedades de {{ ap.nombre }} {{ ap.apellidos }}">{{ ap.nombre }} {{ ap.apellidos }}</button>
                     <span class="badge badge-{{ ap.estado|tono_estado }} estado-mini">{{ ap.estado|etiqueta_estado }}</span>
                     {% if stats.faltas_no_justificadas >= 3 %}
                     <span class="racha-alerta" title="Atención: acumula {{ stats.faltas_no_justificadas }} faltas no justificadas">⚠️ {{ stats.faltas_no_justificadas }}F</span>
@@ -259,8 +260,14 @@
     text-decoration-style: dotted;
     text-underline-offset: 3px;
     transition: color 0.15s;
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: left;
+    font-family: inherit;
 }
-.aprendiz-name:hover { color: var(--accent-primary); }
+.aprendiz-name:hover,
+.aprendiz-name:focus-visible { color: var(--accent-primary); }
 .aprendiz-doc {
     font-size: 11px;
     color: var(--text-muted);

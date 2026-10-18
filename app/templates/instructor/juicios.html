@@ -373,6 +373,29 @@
                 <input type="text" id="comp-search" placeholder="🔍 Buscar competencia…" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; width:100%; border-radius:8px;">
             </div>
         </div>
+
+        {% if auditoria_duracion and auditoria_duracion.configurado %}
+        <div style="margin-bottom:.85rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:8px; padding:.5rem .85rem; font-size:.8rem;">
+            <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+                <span style="font-weight:700; color:var(--text-strong); display:flex; align-items:center; gap:.35rem;">
+                    ⏱️ Etapa lectiva: {{ auditoria_duracion.meses_lectivos }} meses
+                </span>
+                <span style="color:var(--text-muted);">({{ auditoria_duracion.inicio_lectiva_texto }} – {{ auditoria_duracion.fin_lectiva_texto }})</span>
+                {% if auditoria_duracion.meses_productivos > 0 %}
+                <span style="color:var(--border-subtle);">|</span>
+                <span style="color:var(--text-muted);">Etapa productiva: {{ auditoria_duracion.meses_productivos }} meses ({{ auditoria_duracion.inicio_productiva_texto }} – {{ auditoria_duracion.fin_productiva_texto }})</span>
+                {% endif %}
+            </div>
+            <div>
+                {% if auditoria_duracion.cumple_21_meses %}
+                <span class="badge badge-solid-success" style="font-size:.72rem; padding:2px 8px; font-weight:700;">✓ 21 meses lectiva</span>
+                {% else %}
+                <span class="badge" style="font-size:.72rem; padding:2px 8px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border-subtle);">{{ auditoria_duracion.meses_lectivos }} meses</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="comp-filter-pills" style="display:flex; gap:8px; flex-wrap:wrap;">
             <button type="button" class="btn btn-sm btn-primary comp-filter-pill is-active" data-filter="">Todas</button>
             <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="mis-competencias">⭐ Mis Competencias</button>
@@ -405,6 +428,10 @@
             "fecha_fin_estimada_texto": {{ (comp.fecha_fin_estimada_texto or '') | tojson }},
             "es_programacion_manual": {{ (comp.es_programacion_manual if comp.es_programacion_manual is defined else false) | tojson }},
             "instructor_programo": {{ (comp.instructor_programo or '') | tojson }},
+            "horas": {{ (comp.horas if comp.horas is defined and comp.horas else 0) | tojson }},
+            "horas_programa": {{ (comp.horas_programa if comp.horas_programa is defined and comp.horas_programa else 0) | tojson }},
+            "horas_planeadas": {{ (comp.horas_planeadas if comp.horas_planeadas is defined and comp.horas_planeadas else 0) | tojson }},
+            "es_productiva": {{ (comp.es_productiva if comp.es_productiva is defined and comp.es_productiva else false) | tojson }},
             "raps_distribucion_mapa": {{ (comp.raps_distribucion_mapa or {}) | tojson }},
             "detalles": [
                 {% for det in comp.detalles %}
@@ -456,6 +483,11 @@
         <div class="comp-card-meta">
             <span class="badge {{ badge_cls }}" style="font-size:.72rem; padding:2px 7px;">{{ tipo_label }}</span>
             <span style="font-size:.82rem; color:var(--text-muted)">{{ comp.detalles | map(attribute='rap') | unique | list | length }} RAPs</span>
+            {% if comp.horas %}
+                <span class="badge" style="font-size:.72rem; padding:2px 7px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;" title="Horas de formación">⏱️ {{ comp.horas | round(0) | int }} h</span>
+            {% elif comp.horas_planeadas %}
+                <span class="badge" style="font-size:.72rem; padding:2px 7px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;" title="Horas planeadas">⏱️ {{ comp.horas_planeadas | round(0) | int }} h</span>
+            {% endif %}
 
             <button type="button"
                     class="comp-select-btn {{ 'is-own' if is_own else ('is-other' if is_sel else '') }}"
@@ -517,7 +549,7 @@
     <div class="card" style="margin-top:.5rem;">
         <h2 style="color:var(--text-strong); margin-bottom:1rem;">Avance Global por Aprendiz</h2>
         <div class="table-container">
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabla de avance global por aprendiz">
                 <table class="table table-sena table-striped">
                     <thead>
                         <tr>
@@ -838,7 +870,15 @@
             selBadgeHtml = `<button type="button" class="comp-select-btn" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">📌 Seleccionar competencia</button>`;
         }
 
-        metaEl.innerHTML = badgeHtml(comp.tipo) +
+        let horasBadge = '';
+        if (comp.horas) {
+            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${comp.horas} horas</span> `;
+        } else if (comp.horas_planeadas) {
+            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${comp.horas_planeadas} horas planeadas</span> `;
+        }
+
+        metaEl.innerHTML = badgeHtml(comp.tipo) + ' ' +
+            horasBadge +
             `<span style="font-size:.82rem;color:var(--text-muted)">${comp.total} juicios totales</span> ` +
             selBadgeHtml;
 
@@ -852,7 +892,11 @@
         const pctAprendices = uniqueAprendices.length > 0
             ? Math.round(aprobadosAprendices.length / uniqueAprendices.length * 100) : 0;
 
+        const horasVal = comp.horas ? `${comp.horas}h` : (comp.horas_planeadas ? `${comp.horas_planeadas}h` : '—');
+        const horasLabel = comp.horas_programa ? 'Horas programa' : 'Horas formación';
+
         kpisEl.innerHTML = [
+            { val: horasVal,                   color: 'var(--accent)', label: horasLabel },
             { val: comp.aprobados,             color: 'var(--success)', label: 'Juicios aprobados' },
             { val: comp.pendientes,             color: 'var(--warning)', label: 'Pendientes' },
             { val: uniqueRaps.length,           color: 'var(--accent-hover)', label: 'RAPs distintos' },
@@ -917,13 +961,17 @@
             if (rapDist && rapDist.fecha_inicio_texto && rapDist.fecha_fin_texto) {
                 rapFechaHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">📅 ${escapeHtml(rapDist.fecha_inicio_texto)} al ${escapeHtml(rapDist.fecha_fin_texto)} · ${rapDist.dias} días</span>`;
             }
+            let rapHorasHtml = '';
+            if (rapDist && rapDist.horas) {
+                rapHorasHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">⏱️ ${escapeHtml(String(rapDist.horas))} h</span>`;
+            }
 
             return `
             <div class="rap-item" style="margin-bottom:.75rem; border:1px solid var(--border-subtle); border-radius:10px; overflow:hidden; background:var(--bg-surface);">
                 <div class="rap-item-header" onclick="toggleRap(this)" data-open="false" style="padding:.8rem 1rem; display:flex; justify-content:space-between; align-items:center; gap:.8rem; cursor:pointer; background:var(--bg-card);">
                     <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:.3rem;">
                         <div class="rap-item-title" style="font-size:.88rem; font-weight:700; color:var(--text-strong); line-height:1.4;">📋 ${escapeHtml(rap)}</div>
-                        ${rapFechaHtml ? `<div style="display:flex; align-items:center; gap:.4rem;">${rapFechaHtml}</div>` : ''}
+                        ${(rapHorasHtml || rapFechaHtml) ? `<div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">${rapHorasHtml}${rapFechaHtml}</div>` : ''}
                     </div>
                     <div class="rap-item-stats" style="display:flex; gap:.6rem; align-items:center; flex-shrink:0;">
                         <span class="badge" style="background:rgba(255,255,255,0.06); color:${rapColor}; border:1px solid ${rapColor}; font-weight:800; font-size:.78rem;">${rapAprobados}/${dets.length} (${rapPct}%)</span>

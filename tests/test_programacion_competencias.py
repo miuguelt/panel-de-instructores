@@ -483,3 +483,202 @@ class ProgramacionCompetenciasTestCase(unittest.TestCase):
         sin_activa = ArchivoFichaVersion.obtener_version_activa(self.ficha.id, 'tipo_inexistente')
         self.assertIsNone(sin_activa)
 
+    def test_auditar_duracion_programa_completo_y_casos_borde(self):
+        """Verifica la auditoría de duración del programa: 21 meses lectivos, 6 productivos y casos borde."""
+        from app.services.programacion_competencias import auditar_duracion_programa
+
+        # Caso 1: Ficha estándar ADSO (21 meses lectivos: 25/07/2025 al 23/04/2027, fin total 24/10/2027)
+        ficha_adso = Ficha(
+            codigo=3235642,
+            nombre_programa='ANALISIS Y DESARROLLO DE SOFTWARE',
+            instructor_id=self.inst1.id,
+            fecha_inicio=date(2025, 7, 25),
+            fecha_fin=date(2027, 10, 24),
+            duracion_productiva_meses=6,
+        )
+        db.session.add(ficha_adso)
+        db.session.commit()
+
+        auditoria = auditar_duracion_programa(ficha_adso)
+        self.assertTrue(auditoria['configurado'])
+        self.assertTrue(auditoria['cumple_21_meses'])
+        self.assertAlmostEqual(auditoria['meses_lectivos'], 21.0, delta=0.5)
+        self.assertAlmostEqual(auditoria['meses_productivos'], 6.0, delta=0.2)
+        self.assertAlmostEqual(auditoria['meses_totales'], 27.0, delta=0.5)
+        self.assertEqual(auditoria['inicio_lectiva_texto'], '25/07/2025')
+        self.assertEqual(auditoria['fin_lectiva_texto'], '23/04/2027')
+        self.assertEqual(auditoria['inicio_productiva_texto'], '24/04/2027')
+        self.assertEqual(auditoria['fin_productiva_texto'], '24/10/2027')
+        self.assertIn('21', auditoria['resumen_texto'])
+        self.assertIn('Etapa lectiva', auditoria['resumen_texto'])
+
+        # Caso 2: Ficha sin fechas
+        ficha_incompleta = Ficha(
+            codigo=999888,
+            nombre_programa='PROGRAMA SIN FECHAS',
+            instructor_id=self.inst1.id,
+            fecha_inicio=None,
+            fecha_fin=None,
+        )
+        db.session.add(ficha_incompleta)
+        db.session.commit()
+
+        aud_inc = auditar_duracion_programa(ficha_incompleta)
+        self.assertFalse(aud_inc['configurado'])
+        self.assertFalse(aud_inc['cumple_21_meses'])
+        self.assertEqual(aud_inc['meses_lectivos'], 0.0)
+        self.assertEqual(aud_inc['resumen_texto'], 'Fechas de formación incompletas o no configuradas.')
+
+        # Caso 3: Ficha con duración menor a 21 meses (ej. tecnólogo corto de 12 meses lectivos)
+        ficha_corta = Ficha(
+            codigo=555444,
+            nombre_programa='TECNICO CORTO',
+            instructor_id=self.inst1.id,
+            fecha_inicio=date(2025, 1, 1),
+            fecha_fin=date(2026, 6, 30),
+            duracion_productiva_meses=6,
+        )
+        db.session.add(ficha_corta)
+        db.session.commit()
+
+        aud_corta = auditar_duracion_programa(ficha_corta)
+        self.assertTrue(aud_corta['configurado'])
+        self.assertFalse(aud_corta['cumple_21_meses'])
+        self.assertLess(aud_corta['meses_lectivos'], 19.5)
+
+    def test_calcular_fechas_competencias_horas_y_distribucion_21_meses(self):
+        """Verifica que las competencias reciban horas oficiales/planeadas, los RAPs sus horas y la etapa lectiva respete 21 meses."""
+        from app.models.archivo_ficha import TIPO_PROGRAMA
+        from app.services.programacion_competencias import calcular_fechas_competencias_y_raps
+
+        # Ficha configurada con 21 meses lectivos + 6 productivos
+        ficha_prog = Ficha(
+            codigo=777888,
+            nombre_programa='ANALISIS Y DESARROLLO DE SOFTWARE',
+            instructor_id=self.inst1.id,
+            fecha_inicio=date(2025, 7, 25),
+            fecha_fin=date(2027, 10, 24),
+            duracion_productiva_meses=6,
+        )
+        db.session.add(ficha_prog)
+        db.session.commit()
+
+        # Versión de programa curricular con horas oficiales
+        v_prog = ArchivoFichaVersion(
+            ficha_id=ficha_prog.id,
+            instructor_id=self.inst1.id,
+            tipo=TIPO_PROGRAMA,
+            version=1,
+            nombre_archivo='programa.pdf',
+            ruta_archivo='fichas/777888/programa.pdf',
+            estado='procesado',
+            contenido_extraido_json={
+                'metadata': {'horas_productiva': 864.0},
+                'competencias': [
+                    {
+                        'codigo_norma': '220501096',
+                        'nombre': 'Desarrollar la solución de software',
+                        'horas': 384.0,
+                    }
+                ]
+            }
+        )
+
+        # Versión de planeación pedagógica con horas por RAP
+        v_plan = ArchivoFichaVersion(
+            ficha_id=ficha_prog.id,
+            instructor_id=self.inst1.id,
+            tipo=TIPO_PLANEACION,
+            version=1,
+            nombre_archivo='planeacion.xlsx',
+            ruta_archivo='fichas/777888/planeacion.xlsx',
+            estado='procesado',
+            contenido_extraido_json={
+                'unidades': [
+                    {
+                        'competencia': '220501096 - Desarrollar la solución de software',
+                        'rap': 'Construir la interfaz de usuario',
+                        'horas_total': 120.0,
+                        'fecha_inicio_estimada': '2025-08-01',
+                        'fecha_fin_estimada': '2025-09-30',
+                    },
+                    {
+                        'competencia': '220501096 - Desarrollar la solución de software',
+                        'rap': 'Codificar el backend del sistema',
+                        'horas_total': 264.0,
+                        'fecha_inicio_estimada': '2025-10-01',
+                        'fecha_fin_estimada': '2025-12-15',
+                    }
+                ]
+            }
+        )
+        db.session.add_all([v_prog, v_plan])
+        db.session.commit()
+
+        resumen_comps = [
+            {
+                'nombre': '220501096 - Desarrollar la solución de software',
+                'detalles': [
+                    {'rap': 'Construir la interfaz de usuario'},
+                    {'rap': 'Codificar el backend del sistema'},
+                ]
+            },
+            {
+                'nombre': '2 - RESULTADOS DE APRENDIZAJE ETAPA PRACTICA',
+                'detalles': [
+                    {'rap': 'APLICAR EN LA RESOLUCIÓN DE PROBLEMAS REALES DEL SECTOR PRODUCTIVO'},
+                ]
+            }
+        ]
+
+        resultado = calcular_fechas_competencias_y_raps(ficha_prog, resumen_comps)
+        self.assertEqual(len(resultado), 2)
+
+        # Competencia Lectiva
+        comp_lect = resultado[0]
+        self.assertEqual(comp_lect['horas'], 384.0)
+        self.assertEqual(comp_lect['horas_programa'], 384.0)
+        self.assertFalse(comp_lect['es_productiva'])
+        self.assertIsNotNone(comp_lect['fecha_inicio'])
+        self.assertIsNotNone(comp_lect['fecha_fin'])
+        # Las fechas lectivas no deben exceder el fin de etapa lectiva (abril 2027)
+        self.assertLessEqual(comp_lect['fecha_fin'], '2027-04-23')
+
+        # Distribución de RAPs con horas específicas
+        raps_dist = comp_lect['raps_distribucion']
+        self.assertEqual(len(raps_dist), 2)
+        rap_ui = next(r for r in raps_dist if 'interfaz' in r['rap'])
+        rap_be = next(r for r in raps_dist if 'backend' in r['rap'])
+        self.assertEqual(rap_ui['horas'], 120.0)
+        self.assertEqual(rap_be['horas'], 264.0)
+
+        # Competencia Productiva
+        comp_prod = resultado[1]
+        self.assertTrue(comp_prod['es_productiva'])
+        self.assertEqual(comp_prod['horas'], 864.0)
+        self.assertEqual(comp_prod['horas_programa'], 864.0)
+        self.assertEqual(comp_prod['fecha_inicio'], '2027-04-24')
+        self.assertEqual(comp_prod['fecha_fin'], '2027-10-24')
+        self.assertEqual(len(comp_prod['raps_distribucion']), 1)
+        self.assertEqual(comp_prod['raps_distribucion'][0]['horas'], 864.0)
+
+    def test_api_programar_competencia_retorna_horas(self):
+        """Verifica que el endpoint de programar competencia retorne horas de programa y planeación."""
+        self._autenticar(self.inst1)
+
+        resp = self.client.post(
+            f'/instructor/fichas/{self.ficha.id}/competencias/programar',
+            json={
+                'competencia': '38362 - Diseñar la solución de software',
+                'fecha_inicio': '2025-08-10',
+                'fecha_fin': '2025-10-20',
+            }
+        )
+        self.assertEqual(resp.status_code, 200)
+        datos = resp.get_json()
+        self.assertTrue(datos['success'])
+        self.assertIn('horas', datos)
+        self.assertIn('horas_programa', datos)
+        self.assertIn('horas_planeadas', datos)
+
+

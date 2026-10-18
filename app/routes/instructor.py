@@ -3400,8 +3400,12 @@ def juicios(ficha_id):
         ficha_id, instructor_id=current_user.id, categorias={CAT_JUICIOS},
     )
 
-    from app.services.programacion_competencias import calcular_fechas_competencias_y_raps
+    from app.services.programacion_competencias import (
+        calcular_fechas_competencias_y_raps,
+        auditar_duracion_programa,
+    )
     competencias_ordenadas_juicios = calcular_fechas_competencias_y_raps(ficha, competencias_ordenadas_juicios)
+    auditoria_duracion = auditar_duracion_programa(ficha)
 
     return render_template('juicios.html', ficha=ficha, estadisticas=estadisticas, 
                            aprendices_stats=aprendices_stats, cronograma=obtener_cronograma(ficha),
@@ -3411,7 +3415,8 @@ def juicios(ficha_id):
                            rango_aprobacion=rango_aprobacion,
                            primera_evaluacion=primera_evaluacion,
                            ultima_evaluacion=ultima_evaluacion,
-                           recomendaciones_juicios=recomendaciones_juicios)
+                           recomendaciones_juicios=recomendaciones_juicios,
+                           auditoria_duracion=auditoria_duracion)
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/competencias/toggle', methods=['POST'])
@@ -3547,6 +3552,9 @@ def programar_competencia(ficha_id):
         'fecha_fin_estimada_texto': recalculado.get('fecha_fin_estimada_texto'),
         'es_manual': recalculado.get('es_programacion_manual'),
         'instructor_programo': recalculado.get('instructor_programo'),
+        'horas': recalculado.get('horas'),
+        'horas_programa': recalculado.get('horas_programa'),
+        'horas_planeadas': recalculado.get('horas_planeadas'),
         'raps_distribucion': recalculado.get('raps_distribucion', []),
         'raps_tiempo': recalculado.get('raps_distribucion', []),
     })

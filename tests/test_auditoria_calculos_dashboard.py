@@ -9,6 +9,7 @@ Verifica la precisión matemática y consistencia pedagógica de:
 """
 
 import unittest
+import unittest.mock
 from datetime import date, datetime, timedelta, timezone
 
 from app import create_app, db

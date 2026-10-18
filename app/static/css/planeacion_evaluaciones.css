@@ -74,3 +74,10 @@
 .pl-eval-rap-info strong { font-size: .83rem; color: var(--text-strong); line-height: 1.35; white-space: normal; }
 .pl-eval-rap-info small { color: var(--text-muted); font-size: .75rem; line-height: 1.3; }
 
+@media (max-width: 420px) {
+    .pl-eval-metricas {
+        grid-template-columns: 1fr;
+    }
+}
+
+
