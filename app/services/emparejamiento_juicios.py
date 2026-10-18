@@ -81,21 +81,19 @@ def juicios_de(unidad, por_clave, por_codigo):
     # Solo se acepta una similitud alta y un único candidato para evitar que
     # textos parecidos de resultados distintos se mezclen en el avance.
     candidato = None
-    mejor_ratio = 0.0
-    palabras_clave = {w for w in clave.split() if len(w) > 3}
+    caracteres = Counter(clave)
     for otra_clave, registros in por_clave.items():
-        ratio = SequenceMatcher(None, clave, otra_clave).ratio()
-        if ratio >= SIMILITUD_MINIMA:
-            if candidato is not None and abs(ratio - mejor_ratio) < 0.02:
+        longitud = len(clave) + len(otra_clave)
+        # Las mismas cotas de real_quick_ratio y quick_ratio descartan
+        # imposibles antes de construir el índice costoso de SequenceMatcher.
+        if longitud and 2.0 * min(len(clave), len(otra_clave)) / longitud < SIMILITUD_MINIMA:
+            continue
+        comunes = sum((caracteres & Counter(otra_clave)).values())
+        if longitud and 2.0 * comunes / longitud < SIMILITUD_MINIMA:
+            continue
+        if SequenceMatcher(None, clave, otra_clave).ratio() >= SIMILITUD_MINIMA:
+            if candidato is not None:
                 return []
-            if ratio > mejor_ratio:
-                mejor_ratio = ratio
-                candidato = registros
-        elif ratio >= 0.50 and palabras_clave:
-            palabras_otra = {w for w in otra_clave.split() if len(w) > 3}
-            if len(palabras_clave & palabras_otra) >= 4:
-                if ratio > mejor_ratio:
-                    mejor_ratio = ratio
-                    candidato = registros
+            candidato = registros
     return candidato if candidato is not None else []
 
