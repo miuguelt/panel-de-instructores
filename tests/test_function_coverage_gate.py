@@ -132,6 +132,13 @@ class FunctionCoverageGateTestCase(unittest.TestCase):
         registro.guardar(reporte)
         self.assertEqual(revisar_cobertura_funciones(self.raiz / 'app', self.reporte, llamadas_json=reporte), (2, []))
 
+def test_workflow_deploy_registra_y_verifica_las_invocaciones_reales():
+    ruta = Path(__file__).resolve().parents[1] / '.github/workflows/deploy.yml'
+    workflow = ruta.read_text(encoding='utf-8')
+
+    assert '--function-calls-json=test-results/function-calls.json' in workflow
+    assert '--calls-json test-results/function-calls.json' in workflow
+
 
 if __name__ == '__main__':
     unittest.main()

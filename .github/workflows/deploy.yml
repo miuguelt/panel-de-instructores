@@ -53,10 +53,10 @@ jobs:
           DATABASE_URL: "sqlite:///:memory:"
         run: |
           echo "Ejecutando pruebas de validación previas al despliegue..."
-          python -m pytest tests/ -v --tb=short --cov=app --cov-branch --cov-report=xml:coverage.xml --cov-fail-under=75
+          python -m pytest tests/ -v --tb=short --cov=app --cov=config --cov=worker --cov=wsgi --cov=seed_admin --cov-branch --cov-report=xml:coverage.xml --cov-fail-under=75 --function-calls-json=test-results/function-calls.json
 
       - name: Verificar Cobertura de Funciones al 100%
-        run: python scripts/check_function_coverage.py --source app --coverage-xml coverage.xml
+        run: python scripts/check_function_coverage.py --source app --coverage-xml coverage.xml --calls-json test-results/function-calls.json --runtime-files config.py worker.py wsgi.py seed_admin.py
 
   trigger-coolify:
     name: Desplegar a Producción en Coolify
