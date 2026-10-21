@@ -30,7 +30,9 @@ async function iniciar() {
 async function detener() {
     if (!proceso || proceso.exitCode !== null) return;
     const terminado = new Promise(resolve => proceso.once('exit', resolve));
-    await fetch(`${url}/__pruebas__/detener`, { method: 'POST' });
+    const respuesta = await fetch(`${url}/__pruebas__/detener`, { method: 'POST' });
+    assert.equal(respuesta.status, 200);
+    assert.deepEqual(await respuesta.json(), { ok: true });
     await terminado;
 }
 

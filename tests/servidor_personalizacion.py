@@ -5,6 +5,7 @@ import sys
 from threading import Thread
 from pathlib import Path
 
+from flask import jsonify
 from werkzeug.serving import make_server
 
 from app import create_app, csrf, db
@@ -41,8 +42,9 @@ def crear_servidor(ruta_base):
     @app.post('/__pruebas__/detener')
     @csrf.exempt
     def detener_servidor():
-        Thread(target=servidor.shutdown, daemon=True).start()
-        return {'ok': True}
+        respuesta = jsonify(ok=True)
+        respuesta.call_on_close(lambda: Thread(target=servidor.shutdown, daemon=True).start())
+        return respuesta
 
     return servidor
 
