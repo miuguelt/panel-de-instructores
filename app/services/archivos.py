@@ -333,7 +333,8 @@ class ArchivoService:
             raise ErrorArchivo('No fue posible leer el archivo. Selecciónalo nuevamente e inténtalo de nuevo.') from exc
         if tamano == 0:
             raise ErrorArchivoVacio('El archivo está vacío.')
-        limite = current_app.config.get('MAX_UPLOAD_BYTES') or current_app.config.get('MAX_CONTENT_LENGTH') or 0
+        limite = (getattr(archivo, '_limite_verificado', None) or
+                  current_app.config.get('MAX_UPLOAD_BYTES') or current_app.config.get('MAX_CONTENT_LENGTH') or 0)
         if limite and tamano > limite:
             raise ErrorTamano(
                 f'El archivo pesa {tamano / (1024 * 1024):.1f} MiB y el máximo '
@@ -440,7 +441,8 @@ class ArchivoService:
         ruta_completa = os.path.join(directorio, nombre_archivo)
         ruta_parcial = f'{ruta_completa}.part'
         limite = (
-            current_app.config.get('MAX_UPLOAD_BYTES')
+            getattr(archivo, '_limite_verificado', None)
+            or current_app.config.get('MAX_UPLOAD_BYTES')
             or current_app.config.get('MAX_CONTENT_LENGTH')
             or 0
         )
@@ -661,7 +663,7 @@ def resolver_archivo_subido(filename: str):
         relativa = destino.relative_to(raiz)
     except ValueError as exc:
         raise FileNotFoundError(filename) from exc
-    if not destino.is_file():
+    if '.cargas' in relativa.parts or not destino.is_file():
         raise FileNotFoundError(filename)
 
     candidatos = {

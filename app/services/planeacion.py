@@ -9,8 +9,10 @@ from copy import deepcopy
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from difflib import SequenceMatcher
+from xml.etree.ElementTree import iterparse
 
 import openpyxl
+from openpyxl.utils.cell import range_boundaries
 
 from app.services.importacion_ficha import clasificar_competencia
 
@@ -62,18 +64,41 @@ def _fecha(valor):
 
 
 def _valor_combinado(hoja, mapa, fila, columna):
-    valor = mapa.get((fila, columna), hoja.cell(fila, columna).value)
-    return _texto(valor)
+    return _texto(hoja[columna - 1])
 
 
 def _mapa_combinadas(hoja):
+    """Lee rangos compactos desde el XML; no expande cada celda combinada."""
     mapa = {}
-    for rango in hoja.merged_cells.ranges:
-        valor = hoja.cell(rango.min_row, rango.min_col).value
-        for fila in range(rango.min_row, rango.max_row + 1):
-            for columna in range(rango.min_col, rango.max_col + 1):
-                mapa[(fila, columna)] = valor
+    with hoja.parent._archive.open(hoja._worksheet_path) as xml:
+        padres = []
+        for evento, elemento in iterparse(xml, events=('start', 'end')):
+            if evento == 'start':
+                padres.append(elemento)
+                continue
+            if elemento.tag.endswith('}mergeCell'):
+                min_col, min_row, max_col, max_row = range_boundaries(elemento.attrib['ref'])
+                mapa.setdefault(min_row, []).append((min_col, max_col, max_row))
+            if len(padres) > 1:
+                padres[-2].remove(elemento)
+            padres.pop()
+            elemento.clear()
     return mapa
+
+
+def _filas_combinadas(hoja, mapa):
+    """Propaga únicamente los rangos activos durante la lectura secuencial."""
+    activos = []
+    for numero, fila in enumerate(hoja.iter_rows(max_col=17, values_only=True), start=1):
+        valores = list(fila)
+        activos = [rango for rango in activos if rango[2] >= numero]
+        for min_col, max_col, max_row in mapa.pop(numero, []):
+            if min_col <= 17:
+                activos.append((min_col, min(max_col, 17), max_row, valores[min_col - 1]))
+        for min_col, max_col, _, valor in activos:
+            for columna in range(min_col - 1, max_col):
+                valores[columna] = valor
+        yield numero, valores
 
 
 def _identificar_campo(clave: str) -> str | None:
@@ -93,8 +118,8 @@ def _identificar_campo(clave: str) -> str | None:
 
 def _metadatos(hoja):
     resultado = {}
-    for fila in range(1, min(hoja.max_row, 25) + 1):
-        valores = [_texto(hoja.cell(fila, columna).value) for columna in range(1, hoja.max_column + 1)]
+    for fila in hoja.iter_rows(max_row=25, values_only=True):
+        valores = [_texto(valor) for valor in fila]
         for posicion, valor in enumerate(valores):
             clave = _clave(valor)
             campo = _identificar_campo(clave)
@@ -102,15 +127,16 @@ def _metadatos(hoja):
                 continue
             siguiente = next((item for item in valores[posicion + 1:] if item), '')
             if campo == 'fecha_elaboracion':
-                resultado[campo] = _fecha(hoja.cell(fila, posicion + 2).value) or _fecha(siguiente)
+                siguiente_crudo = fila[posicion + 1] if posicion + 1 < len(fila) else None
+                resultado[campo] = _fecha(siguiente_crudo) or _fecha(siguiente)
             else:
                 resultado[campo] = siguiente
     return resultado
 
 
 def _fila_encabezado(hoja):
-    for fila in range(1, min(hoja.max_row, 30) + 1):
-        primera = _clave(hoja.cell(fila, 1).value)
+    for fila, valores in enumerate(hoja.iter_rows(max_row=30, max_col=1, values_only=True), start=1):
+        primera = _clave(valores[0])
         if 'fase de proyecto formativo' in primera:
             return fila
     raise ValueError('No se encontró la fila de encabezados de la planeación pedagógica.')
@@ -197,7 +223,7 @@ def componente_instructor(nombre_normalizado: str) -> dict:
 
 def parsear_planeacion(ruta):
     """Lee la hoja PLANEACION y agrupa filas repetidas del mismo resultado."""
-    libro = openpyxl.load_workbook(Path(ruta), read_only=False, data_only=True)
+    libro = openpyxl.load_workbook(Path(ruta), read_only=True, data_only=True)
     try:
         nombre_hoja = 'PLANEACION' if 'PLANEACION' in libro.sheetnames else libro.sheetnames[0]
         hoja = libro[nombre_hoja]
@@ -207,13 +233,15 @@ def parsear_planeacion(ruta):
         filas_validas = 0
         total_directas = total_independientes = 0.0
 
-        for fila in range(fila_encabezado + 2, hoja.max_row + 1):
-            fase = _valor_combinado(hoja, mapa, fila, 1)
-            actividad = _valor_combinado(hoja, mapa, fila, 2)
-            competencia = _valor_combinado(hoja, mapa, fila, 3)
-            rap = _valor_combinado(hoja, mapa, fila, 4)
-            directas = _numero(mapa.get((fila, 9), hoja.cell(fila, 9).value))
-            independientes = _numero(mapa.get((fila, 10), hoja.cell(fila, 10).value))
+        for fila, valores in _filas_combinadas(hoja, mapa):
+            if fila < fila_encabezado + 2:
+                continue
+            fase = _valor_combinado(valores, mapa, fila, 1)
+            actividad = _valor_combinado(valores, mapa, fila, 2)
+            competencia = _valor_combinado(valores, mapa, fila, 3)
+            rap = _valor_combinado(valores, mapa, fila, 4)
+            directas = _numero(valores[8])
+            independientes = _numero(valores[9])
             if not rap or (not competencia and not actividad):
                 continue
             if not (rap or directas or independientes):
@@ -222,8 +250,8 @@ def parsear_planeacion(ruta):
             filas_validas += 1
             total_directas += directas
             total_independientes += independientes
-            instructor = _valor_combinado(hoja, mapa, fila, 15)
-            trimestre = _valor_combinado(hoja, mapa, fila, 17)
+            instructor = _valor_combinado(valores, mapa, fila, 15)
+            trimestre = _valor_combinado(valores, mapa, fila, 17)
             clave = (_clave(competencia), _clave(rap))
             unidad = unidades_por_clave.get(clave)
             if unidad is None:

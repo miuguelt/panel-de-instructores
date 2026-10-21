@@ -20,6 +20,7 @@ from app.services.archivos import (
     ErrorArchivoVacio,
     ErrorMimeType,
     TiposCarpeta,
+    _borrar_silencioso,
     mimetype_de,
     nombre_original_desde_ruta,
 )
@@ -323,6 +324,15 @@ class ArchivosTestCase(unittest.TestCase):
             self.app.config['MAX_CONTENT_LENGTH'],
             self.app.config['MAX_UPLOAD_BYTES'] + 1024 * 1024,
         )
+
+    def test_borrar_silencioso_elimina_y_tolera_inexistente(self):
+        ruta = os.path.join(self.uploads.name, 'temporal.tmp')
+        with open(ruta, 'w', encoding='utf-8') as f:
+            f.write('prueba')
+        self.assertTrue(os.path.exists(ruta))
+        _borrar_silencioso(ruta)
+        self.assertFalse(os.path.exists(ruta))
+        _borrar_silencioso(ruta)
 
     # ------------------------------------------------------------------
     def _listar_uploads(self):

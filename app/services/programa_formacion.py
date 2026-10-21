@@ -33,9 +33,11 @@ _NOMBRE_PRODUCTIVA = re.compile(r'etapa\s+(practica|práctica|productiva)', re.I
 
 
 def _texto_pdf(ruta):
-    lector = PdfReader(Path(ruta))
-    paginas = [pagina.extract_text() or '' for pagina in lector.pages]
-    texto = '\n'.join(paginas)
+    # PdfReader duplica el PDF completo cuando recibe una ruta. El stream
+    # permite leer los objetos que necesita sin copiar adjuntos ni imágenes.
+    with Path(ruta).open('rb') as stream:
+        lector = PdfReader(stream)
+        texto = '\n'.join(pagina.extract_text() or '' for pagina in lector.pages)
     # Limpiar encabezados multilínea y pies de página oficiales
     texto = re.sub(
         r'LÍNEA TECNOLÓGICA:.*?RED DE CONOCIMIENTO[^\n]*(\n[^\n]+)?\n',

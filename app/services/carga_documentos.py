@@ -8,9 +8,8 @@ se informan sin eliminar versiones confirmadas ni archivos históricos.
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import uuid4
 
-from flask import current_app
+from flask import current_app, g
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -116,14 +115,10 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                 validar_reporte_ficha(ficha, meta_rep)
             ver_rep = crear_version(archivo_juicios, ficha.id, instructor_id, TIPO_REPORTE_JUICIOS, metadata=meta_rep, permitir_existente=True, archivos_creados=archivos_creados)
 
-            if current_app.config.get('IMPORTACIONES_ASINCRONAS'):
+            if current_app.config.get('IMPORTACIONES_ASINCRONAS') and not getattr(g, 'carga_trabajo', False):
                 archivo_juicios.stream.seek(0)
                 nom_arch = secure_filename(archivo_juicios.filename) or 'reporte.xls'
-                ruta_cruda = ArchivoService.guardar_crudo(
-                    archivo_juicios,
-                    carpeta='importaciones',
-                    nombre_archivo=f'{uuid4().hex}_{nom_arch}',
-                )
+                ruta_cruda = str(Path(current_app.config['UPLOAD_FOLDER']) / ver_rep.ruta_archivo)
                 job = ImportacionJob(
                     ficha_id=ficha.id,
                     instructor_id=instructor_id,
@@ -147,9 +142,8 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                     job.error = 'No fue posible conectar con la cola de procesamiento.'
                     actualizar_estado(ver_rep, 'error', detalle=job.error)
                     db.session.commit()
-                    if ruta_cruda:
-                        ArchivoService.eliminar(Path(ruta_cruda).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix())
-                        ruta_cruda = None
+                    # La cola usa el original versionado; se conserva para
+                    # consulta y recuperación sin volver a transferirlo.
                     return False, ('Los documentos quedaron guardados, pero el procesamiento del reporte no pudo iniciarse. '
                                    'Vuelva a cargar el reporte más tarde o informe al administrador.'), 503
             else:
@@ -177,8 +171,6 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                 ArchivoService.eliminar(ruta_nueva)
             except Exception:
                 pass
-        if ruta_cruda and not guardado_confirmado:
-            ArchivoService.eliminar(Path(ruta_cruda).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix())
         if guardado_confirmado:
             if procesamiento_pendiente:
                 return False, 'El reporte quedó guardado, pero no se confirmó el inicio de su procesamiento. Consulte el estado de la importación antes de reintentarlo.', 503
@@ -191,8 +183,6 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                 ArchivoService.eliminar(ruta_nueva)
             except Exception:
                 pass
-        if ruta_cruda and not guardado_confirmado:
-            ArchivoService.eliminar(Path(ruta_cruda).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix())
         current_app.logger.exception('Error inesperado al cargar documentos')
         if guardado_confirmado:
             if procesamiento_pendiente:

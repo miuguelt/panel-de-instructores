@@ -357,6 +357,7 @@ def create_app(test_config=None):
             log.exception('Fallo al registrar blueprints de %s', module_path)
 
     _register('app.routes.auth', 'auth_bp')
+    _register('app.routes.cargas', 'cargas_bp')
     _register('app.routes.api', 'api_bp', url_prefix='/api')
     _register('app.routes.instructor', 'instructor_bp', url_prefix='/instructor')
     _register('app.routes.planeacion', 'planeacion_bp', url_prefix='/instructor')
@@ -372,6 +373,8 @@ def create_app(test_config=None):
     _register('app.routes.grupos', 'grupos_bp', url_prefix='/instructor')
     _register('app.routes.atencion', 'atencion_bp', url_prefix='/instructor')
     _register('app.tyt.vistas', 'tyt_bp', url_prefix='/instructor')
+    from app.services.cargas_confirmacion import registrar_confirmaciones
+    registrar_confirmaciones(app)
 
     if app.config['STARTUP_ERRORS']:
         log.critical(
@@ -456,8 +459,17 @@ def create_app(test_config=None):
         return {
             'notificaciones_no_leidas': no_leidas,
             'datetime': datetime,
-            'max_upload_bytes': app.config.get('MAX_UPLOAD_BYTES') or 0,
+            'max_upload_bytes': (app.config.get('MAX_RESUMABLE_UPLOAD_BYTES')
+                                 if app.config.get('CARGAS_REANUDABLES_ENABLED')
+                                 else app.config.get('MAX_UPLOAD_BYTES')) or 0,
+            'max_legacy_upload_bytes': app.config.get('MAX_UPLOAD_BYTES') or 0,
             'max_request_bytes': app.config.get('MAX_CONTENT_LENGTH') or 0,
+            'resumable_upload': {
+                'enabled': app.config.get('CARGAS_REANUDABLES_ENABLED', False),
+                'maxBytes': app.config.get('MAX_RESUMABLE_UPLOAD_BYTES', 2 * 1024**3),
+                'chunkBytes': app.config.get('CARGAS_BLOQUE_BYTES', 4 * 1024**2),
+                'url': '/cargas',
+            },
             'extensiones_carga': ','.join('.' + ext for ext in sorted(app.config['ALLOWED_EXTENSIONS'])),
             'static_v': static_v,
             'alertas_modulo': _alertas_modulo,
@@ -552,6 +564,11 @@ def create_app(test_config=None):
         """
         from flask import flash, redirect, request, url_for
         from app.services.cargas_http import es_carga_xhr
+        if request.blueprint == 'cargas':
+            from app.services.cargas_errores import ErrorCarga, respuesta_error
+            return respuesta_error(ErrorCarga('csrf_vencido',
+                'La sesión del formulario venció. Recargue la página para continuar; el avance confirmado se conserva.',
+                400, 'recargar_formulario'))
         if es_carga_xhr():
             from flask import jsonify
             return jsonify(ok=False, reload=True, message=

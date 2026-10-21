@@ -174,7 +174,9 @@
     <script src="{{ url_for('static', filename='js/filter-view.js') }}" defer></script>
     {% block scripts %}{% endblock %}
     <script src="{{ url_for('static', filename='js/table-filters.js') }}" defer></script>
-    <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_upload_bytes | int }}; window.ADSO_MAX_REQUEST_BYTES = {{ max_request_bytes | int }};</script>
+    <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_legacy_upload_bytes | int }}; window.ADSO_MAX_REQUEST_BYTES = {{ max_request_bytes | int }};</script>
+    <script>window.ADSO_RESUMABLE_UPLOAD = {{ resumable_upload | tojson }};</script>
+    <script src="{{ url_for('static', filename='js/uploads_reanudables.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/uploads.js') }}" defer></script>
     <script>
         // 1. Inicialización de componentes comunes (funciona en carga inicial y navegación HTMX)

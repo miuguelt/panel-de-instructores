@@ -1,13 +1,22 @@
 """Importación de plantillas de aprendices y reportes oficiales de juicios SENA."""
 
 from datetime import datetime, date, timedelta
+from contextlib import closing
 from difflib import SequenceMatcher
 import hashlib
 import io
+import os
+import pickle
 import re
+import shutil
+import sqlite3
+import tempfile
 import unicodedata
+from itertools import chain, islice
+from pathlib import Path
 
 import openpyxl
+from flask import current_app, has_app_context
 from sqlalchemy import or_
 
 from app import db
@@ -149,7 +158,7 @@ def _metadata_fila(label, value, metadata):
 def _extraer_metadata(filas):
     """Lee las parejas etiqueta/valor aunque el formato cambie de columnas."""
     metadata = {}
-    for fila in filas[:20]:
+    for fila in islice(filas, 20):
         for posicion, celda in enumerate(fila):
             if not _texto(celda):
                 continue
@@ -215,9 +224,59 @@ def _actualizar_datos_juicio(juicio, registro, nombre_archivo):
     return cambios
 
 
+def _directorio_temporal():
+    """Conserva los temporales del worker en el volumen privado persistente."""
+    if not has_app_context():
+        return None
+    carpeta = Path(current_app.config['UPLOAD_FOLDER']) / '.cargas' / 'lecturas'
+    carpeta.mkdir(parents=True, exist_ok=True)
+    return str(carpeta)
+
+
+class _RegistrosDisco:
+    """Secuencia re-iterable que conserva las filas en un temporal privado."""
+
+    def __init__(self, registros):
+        self.archivo = tempfile.TemporaryFile(mode='w+b', dir=_directorio_temporal())
+        self.cantidad = 0
+        try:
+            for registro in registros:
+                pickle.dump(registro, self.archivo, protocol=pickle.HIGHEST_PROTOCOL)
+                self.cantidad += 1
+        except BaseException:
+            self.archivo.close()
+            raise
+
+    def __len__(self):
+        return self.cantidad
+
+    def __iter__(self):
+        self.archivo.seek(0)
+        for _ in range(self.cantidad):
+            yield pickle.load(self.archivo)
+
+    def __getitem__(self, indice):
+        if indice < 0:
+            indice += self.cantidad
+        if indice < 0 or indice >= self.cantidad:
+            raise IndexError(indice)
+        return next(islice(iter(self), indice, indice + 1))
+
+    def close(self):
+        self.archivo.close()
+
+
 def _parse_rows(rows):
+    """Interpreta las filas sin retener el libro ni todos sus registros en RAM."""
+    filas = _RegistrosDisco(list(row) for row in rows)
+    try:
+        return _RegistrosDisco(_iterar_registros(filas))
+    finally:
+        filas.close()
+
+
+def _iterar_registros(filas):
     """Convierte filas tabulares en registros; soporta encabezados con tildes."""
-    filas = [list(row) for row in rows]
     encabezado_idx = None
     indices = {}
     for i, fila in enumerate(filas):
@@ -253,8 +312,7 @@ def _parse_rows(rows):
     p_fecha = pos('fecha y hora del juicio evaluativo', 'fecha juicio', 'fecha')
     p_funcionario = pos('funcionario que registro el juicio evaluativo', 'funcionario')
 
-    registros = []
-    for numero_fila, fila in enumerate(filas[encabezado_idx + 1:], start=encabezado_idx + 2):
+    for numero_fila, fila in enumerate(islice(filas, encabezado_idx + 1, None), start=encabezado_idx + 2):
         def get(posicion):
             return fila[posicion] if posicion is not None and posicion < len(fila) else ''
 
@@ -275,8 +333,7 @@ def _parse_rows(rows):
             'fecha_juicio': _fecha(get(p_fecha)),
             'funcionario_registro': _texto(get(p_funcionario)),
         }
-        registros.append(registro)
-    return registros
+        yield registro
 
 
 class _ErrorApertura(Exception):
@@ -286,37 +343,55 @@ class _ErrorApertura(Exception):
 
 def _leer_con_xlrd(contenido, solo_metadata=False):
     import xlrd
+    stream = io.BytesIO(contenido) if isinstance(contenido, bytes) else contenido
+    ruta = getattr(stream, 'name', None)
+    temporal = None
     try:
-        libro = xlrd.open_workbook(file_contents=contenido, on_demand=solo_metadata)
-    except Exception as exc:
-        raise _ErrorApertura('No se pudo abrir como formato .xls (BIFF)') from exc
-
-    try:
-        hoja = libro.sheet_by_index(0)
-        limite = min(hoja.nrows, 20) if solo_metadata else hoja.nrows
-        filas = [hoja.row_values(i) for i in range(limite)]
-        return _extraer_metadata(filas), [] if solo_metadata else _parse_rows(filas)
+        if not isinstance(ruta, (str, os.PathLike)) or not Path(ruta).is_file():
+            temporal = tempfile.NamedTemporaryFile(suffix='.xls', delete=False, dir=_directorio_temporal())
+            ruta = temporal.name
+            stream.seek(0)
+            with temporal:
+                shutil.copyfileobj(stream, temporal, length=1024 * 1024)
+        try:
+            libro = xlrd.open_workbook(filename=str(ruta), on_demand=True, use_mmap=True)
+        except Exception as exc:
+            raise _ErrorApertura('No se pudo abrir como formato .xls (BIFF)') from exc
+        try:
+            hoja = libro.sheet_by_index(0)
+            limite = min(hoja.nrows, 20) if solo_metadata else hoja.nrows
+            filas = (hoja.row_values(i) for i in range(limite))
+            primeras = list(islice(filas, 20))
+            metadata = _extraer_metadata(primeras)
+            return metadata, [] if solo_metadata else _parse_rows(chain(primeras, filas))
+        finally:
+            libro.release_resources()
     finally:
-        libro.release_resources()
+        if temporal is not None:
+            Path(temporal.name).unlink(missing_ok=True)
 
 
 def _leer_con_openpyxl(contenido, solo_metadata=False):
+    stream = io.BytesIO(contenido) if isinstance(contenido, bytes) else contenido
+    stream.seek(0)
     try:
-        libro = openpyxl.load_workbook(io.BytesIO(contenido), read_only=True, data_only=True)
+        libro = openpyxl.load_workbook(stream, read_only=True, data_only=True)
     except Exception as exc:
         raise _ErrorApertura('No se pudo abrir como formato .xlsx (OpenXML)') from exc
 
     try:
         hoja = libro.active
-        filas = list(hoja.iter_rows(max_row=20 if solo_metadata else None, values_only=True))
-        metadata = _extraer_metadata(filas)
-        return metadata, [] if solo_metadata else _parse_rows(filas)
+        filas = iter(hoja.iter_rows(max_row=20 if solo_metadata else None, values_only=True))
+        primeras = list(islice(filas, 20))
+        metadata = _extraer_metadata(primeras)
+        return metadata, [] if solo_metadata else _parse_rows(chain(primeras, filas))
     finally:
         libro.close()
 
 
 def _leer_archivo(archivo, solo_metadata=False):
-    contenido = archivo.read()
+    contenido = archivo.stream
+    contenido.seek(0)
     extension = (archivo.filename or '').lower().rsplit('.', 1)[-1]
     if extension == 'xls':
         try:
@@ -489,7 +564,41 @@ def _resolver_ficha(ficha_actual, metadata, instructor_id, crear_ficha):
 
 
 def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
+    """Importa por lotes, en la transacción del llamador y sin commits parciales."""
     metadata, registros = _leer_archivo(archivo)
+    resultado = None
+    try:
+        with tempfile.TemporaryDirectory(prefix='adso-importacion-', dir=_directorio_temporal()) as carpeta:
+            with closing(sqlite3.connect(str(Path(carpeta) / 'juicios.sqlite'))) as vistos:
+                vistos.execute('CREATE TABLE nuevos (huella TEXT PRIMARY KEY)')
+                iterador = iter(registros)
+                while True:
+                    lote = list(islice(iterador, 1000))
+                    if not lote and resultado is not None:
+                        break
+                    parcial = _importar_lote(
+                        archivo, ficha_actual, instructor_id, crear_ficha,
+                        metadata, lote, vistos,
+                    )
+                    if resultado is None:
+                        resultado = parcial
+                    else:
+                        for contador in ('nuevos', 'actualizados', 'juicios_nuevos',
+                                         'juicios_actualizados', 'juicios_repetidos', 'sesiones_creadas'):
+                            resultado[contador] += parcial[contador]
+                        resultado['errores'].extend(parcial['errores'])
+                    ficha_actual = resultado['ficha']
+                    if not lote:
+                        break
+        from app.services.resultados_persistidos import invalidar_resultados_ficha
+        invalidar_resultados_ficha(resultado['ficha'].id)
+        return resultado
+    finally:
+        registros.close()
+
+
+def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, registros, vistos):
+    """Resuelve un lote acotado y conserva la identidad de juicios entre lotes."""
     ficha, ficha_creada = _resolver_ficha(
         ficha_actual, metadata, instructor_id, crear_ficha
     )
@@ -518,7 +627,10 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
     # round-trip a PostgreSQL por cada aprendiz o juicio.
     aprendices_db = {
         a.documento: a
-        for a in Aprendiz.query.filter_by(ficha_id=ficha.id).all()
+        for a in Aprendiz.query.filter(
+            Aprendiz.ficha_id == ficha.id,
+            Aprendiz.documento.in_({r['documento'] for r in registros}),
+        ).all()
     }
 
     # Primera pasada: preparar aprendices nuevos y actualizar los existentes.
@@ -562,6 +674,9 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
                     cambios = True
             if cambios:
                 actualizados += 1
+                if documento in aprendices_pendientes:
+                    for campo in ('nombre', 'apellidos', 'tipo_documento', 'estado'):
+                        aprendices_pendientes[documento][campo] = getattr(aprendiz, campo)
         registros_validos.append((registro, documento))
 
     if aprendices_pendientes:
@@ -613,7 +728,7 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
                 JuicioEvaluativo.aprendiz_id.in_(aprendices_con_juicios),
             )
             .order_by(JuicioEvaluativo.id)
-            .all()
+            .yield_per(500)
         )
         for juicio in juicios_existentes:
             clave = _clave_juicio(
@@ -662,13 +777,18 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
                 'importado_en': utc_now(),
             }
             juicios_nuevos += 1
+            vistos.execute('INSERT OR IGNORE INTO nuevos (huella) VALUES (?)', (registro['huella_calc'],))
         else:
             if _actualizar_datos_juicio(
                 juicios_db[clave],
                 registro,
                 archivo.filename,
             ):
-                juicios_actualizados += 1
+                if vistos.execute('SELECT 1 FROM nuevos WHERE huella = ?',
+                                  (registro['huella_calc'],)).fetchone():
+                    juicios_repetidos += 1
+                else:
+                    juicios_actualizados += 1
             else:
                 juicios_repetidos += 1
 
@@ -765,11 +885,7 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
             )
             sesiones_creadas = len(sesiones_pendientes)
 
-    from app.services.resultados_persistidos import invalidar_resultados_ficha
-
-    # Las filas nuevas de este importador se insertan en bloque y no pasan por
-    # los eventos ORM. Este incremento asegura que los snapshots queden vencidos.
-    invalidar_resultados_ficha(ficha.id)
+    db.session.flush()
     return {
         'ficha': ficha, 'ficha_creada': ficha_creada,
         'metadata': metadata, 'nuevos': nuevos,

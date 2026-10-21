@@ -39,6 +39,8 @@ services:
       - IMPORT_QUEUE_NAME=${IMPORT_QUEUE_NAME:-adso:importaciones}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER:-/app/uploads}
       - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-52428800}
+        - MAX_RESUMABLE_UPLOAD_BYTES=${MAX_RESUMABLE_UPLOAD_BYTES:-2147483648}
+        - CARGAS_REANUDABLES_ENABLED=${CARGAS_REANUDABLES_ENABLED:-false}
     volumes:
       - uploads:/app/uploads
     ports:
@@ -97,6 +99,8 @@ services:
       - FLASK_ENV=${FLASK_ENV:-production}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER:-/app/uploads}
       - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-52428800}
+        - MAX_RESUMABLE_UPLOAD_BYTES=${MAX_RESUMABLE_UPLOAD_BYTES:-2147483648}
+        - CARGAS_REANUDABLES_ENABLED=${CARGAS_REANUDABLES_ENABLED:-false}
     volumes:
       - uploads:/app/uploads
     healthcheck:

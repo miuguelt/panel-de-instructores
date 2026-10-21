@@ -80,7 +80,7 @@ jobs:
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/loading-indicator.js --test tests_js/loading_indicator.test.cjs
 
       - name: Verificar carga de archivos y cobertura de funciones
-        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/uploads.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-cargas.lcov --test tests_js/uploads.test.cjs
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/uploads.js --test-coverage-include=app/static/js/uploads_reanudables.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-cargas.lcov --test tests_js/uploads*.test.cjs
 
       - name: Verificar selector aleatorio del instructor y cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/selector_aprendiz.js --test-reporter=spec --test tests_js/selector_aprendiz.test.cjs

@@ -1459,12 +1459,7 @@ def cargar_excel(ficha_id):
             nombre_archivo = secure_filename(archivo.filename) or 'reporte.xls'
             # Dentro de UPLOAD_FOLDER porque el worker corre en otro contenedor
             # y solo comparte con el web el volumen `uploads`.
-            ruta = ArchivoService.guardar_crudo(
-                archivo,
-                carpeta='importaciones',
-                nombre_archivo=f'{uuid4().hex}_{nombre_archivo}',
-            )
-            ruta_temporal = Path(ruta).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix()
+            ruta = str(Path(current_app.config['UPLOAD_FOLDER']) / version.ruta_archivo)
 
             job = ImportacionJob(
                 ficha_id=ficha.id,
@@ -1484,10 +1479,7 @@ def cargar_excel(ficha_id):
                 encolar_importacion(job.id, current_app.config['IMPORT_QUEUE_NAME'])
             except ColaImportacionesNoDisponible as exc:
                 db.session.rollback()
-                try:
-                    os.remove(ruta)
-                except OSError:
-                    pass
+                # El trabajo apunta al original versionado; no es un temporal.
                 job = db.session.get(ImportacionJob, job.id)
                 if job:
                     job.estado = 'error'

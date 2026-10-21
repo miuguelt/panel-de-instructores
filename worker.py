@@ -142,6 +142,12 @@ def _conectar_redis():
 
 
 def _procesar(job_id):
+    texto_job = job_id.decode('utf-8', errors='replace') if isinstance(job_id, bytes) else str(job_id)
+    if texto_job.startswith('carga:'):
+        from app.services.cargas_trabajos import procesar_envio
+        with app.app_context():
+            procesar_envio(texto_job.removeprefix('carga:'))
+        return
     try:
         job_id = int(job_id)
         if job_id <= 0:
@@ -225,9 +231,15 @@ def _procesar(job_id):
             log.exception('Falló la importación #%s', job_id)
         finally:
             try:
-                if archivo_path and os.path.isfile(archivo_path):
+                from pathlib import Path
+                version_persistida = (db.session.get(ArchivoFichaVersion, job.archivo_version_id)
+                                     if job and job.archivo_version_id else None)
+                es_original = bool(version_persistida and
+                    Path(archivo_path).resolve() ==
+                    (Path(app.config['UPLOAD_FOLDER']) / version_persistida.ruta_archivo).resolve())
+                if archivo_path and os.path.isfile(archivo_path) and not es_original:
                     os.remove(archivo_path)
-            except OSError:
+            except Exception:
                 log.warning('No se pudo eliminar el archivo temporal del trabajo %s', job_id)
             db.session.remove()
 
@@ -255,7 +267,11 @@ def _procesar_resumen(job):
 
 
 def main():
-    redis_client: Redis = _conectar_redis()
+    try:
+        redis_client: Redis = _conectar_redis()
+    except RuntimeError:
+        redis_client = None
+        log.warning('La cola no está disponible; se recuperarán las cargas pendientes desde la base de datos.')
     queue_name = app.config['IMPORT_QUEUE_NAME']
     log.info(
         'WORKER_START pid=%s destino=%s cola=%s blpop_timeout=%ss socket_timeout=%ss',
@@ -265,6 +281,22 @@ def main():
     ultima_revision_tyt = -300
     ultima_fecha_precarga = None
     while True:
+        if app.config.get('CARGAS_REANUDABLES_ENABLED'):
+            from app.services.cargas_trabajos import procesar_pendientes
+            from app.services.cargas_limpieza import limpiar_cargas
+            with app.app_context():
+                try:
+                    procesar_pendientes()
+                    limpiar_cargas()
+                except Exception:
+                    db.session.rollback()
+                    log.exception('No se pudieron recuperar todas las cargas pendientes.')
+        if redis_client is None:
+            try:
+                redis_client = _cliente_redis(socket_timeout=WORKER_SOCKET_TIMEOUT)
+            except Exception:
+                time.sleep(5)
+                continue
         try:
             ultima_fecha_precarga = _programar_precargas_si_nuevo_dia(ultima_fecha_precarga)
         except Exception:
@@ -298,7 +330,10 @@ def main():
                 redis_client.close()
             except RedisError:
                 pass
-            redis_client = _conectar_redis()
+            try:
+                redis_client = _conectar_redis()
+            except RuntimeError:
+                redis_client = None
             continue
         if job_id:
             _procesar(job_id)

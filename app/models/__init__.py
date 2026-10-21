@@ -30,6 +30,7 @@ from app.models.aseo import (
 )
 from app.models.material import MaterialFicha
 from app.models.importacion import ImportacionJob
+from app.models.carga import CargaArchivo, EnvioCarga
 from app.models.archivo_ficha import (
     ArchivoFichaVersion,
     ETIQUETAS_TIPO,
@@ -53,7 +54,7 @@ __all__ = [
     'FichaInstructor', 'JuicioEvaluativo', 'JuicioEvaluativoInstructor',
     'FichaCompetenciaSeleccionada', 'FichaCompetenciaProgramacion',
     'ConfiguracionAseo', 'ContadorAseo', 'TurnoAseo', 'IntercambioAseo',
-    'MaterialFicha', 'ImportacionJob', 'ArchivoFichaVersion',
+    'MaterialFicha', 'ImportacionJob', 'ArchivoFichaVersion', 'CargaArchivo', 'EnvioCarga',
     'TIPO_PLANEACION', 'TIPO_REPORTE_JUICIOS', 'TIPO_PROGRAMA', 'ETIQUETAS_TIPO', 'NotaObservador',
     'ResultadoCalculadoFicha',
     'PersonalizacionAprendiz',

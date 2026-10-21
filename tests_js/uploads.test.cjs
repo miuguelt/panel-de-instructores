@@ -64,6 +64,16 @@ function entorno(opciones = {}) {
         ADSO_MAX_REQUEST_BYTES: opciones.limiteTotal ?? 1500,
         location: { href: '/origen', reload() { recargas++; } },
     };
+    const reanudadas = [];
+    let restauraciones = 0;
+    if (opciones.reanudable) {
+        window.ADSO_RESUMABLE_UPLOAD = { enabled: true, maxBytes: 10000, url: '/cargas' };
+        window.crypto = { subtle: {}, randomUUID() { return 'id-de-prueba'; } }; window.fetch = () => {};
+        window.ADSOCargasReanudables = {
+            restaurar() { restauraciones++; },
+            iniciar(...args) { reanudadas.push(args); },
+        };
+    }
     global.document = document;
     global.window = window;
     global.XMLHttpRequest = XHR;
@@ -94,7 +104,7 @@ function entorno(opciones = {}) {
         document.emitir('submit', evento);
         return evento;
     }
-    return { solicitudes, document, window, formulario, enviar, recargas: () => recargas };
+    return { solicitudes, document, window, formulario, enviar, reanudadas, restauraciones: () => restauraciones, recargas: () => recargas };
 }
 
 test('evita envíos simultáneos y conserva la acción del botón antes de bloquear', () => {
@@ -181,7 +191,7 @@ test('muestra progreso y navega únicamente cuando se confirma la carga', () => 
     xhr.upload.emitir('progress', { lengthComputable: true, loaded: 50, total: 100 });
     assert.match(form.querySelector('.upload-progress-text').textContent, /50%/);
     xhr.upload.emitir('load');
-    assert.match(form.querySelector('.upload-progress-text').textContent, /Procesando/);
+    assert.match(form.querySelector('.upload-progress-text').textContent, /Esperando confirmación/);
     xhr.responder(200, { ok: true, redirect: '/confirmado' });
     assert.equal(e.window.location.href, '/confirmado');
 });
@@ -251,4 +261,21 @@ test('recupera fallas de red, cancelación, tiempo agotado y arranque de XHR', (
         assert.match(form.querySelector('.upload-error').textContent, /iniciar la subida/);
         assert.equal(form.botones[0].disabled, false);
     }
+});
+
+test('el flujo reanudable admite el límite por archivo y conserva los campos y la acción del formulario', () => {
+    const e = entorno({ reanudable: true, limite: 10, limiteTotal: 15 });
+    const form = e.formulario([{ name: 'grande.zip', size: 2000, type: 'application/zip' }]);
+    e.enviar(form, { submitter: form.botones[0] });
+    assert.equal(e.restauraciones(), 1);
+    assert.equal(e.reanudadas.length, 1);
+    const [recibido, datos, seleccion, _ui, callbacks, config] = e.reanudadas[0];
+    assert.equal(recibido, form);
+    assert.equal(seleccion[0].archivo.size, 2000);
+    assert.deepEqual(datos.anexos, [['accion', 'subir']]);
+    assert.equal(config.maxBytes, 10000);
+    assert.equal(e.solicitudes.filter(xhr => xhr.datos).length, 0);
+    callbacks.fallar('Conservamos el avance.');
+    assert.equal(form.botones[0].disabled, false);
+    assert.match(form.querySelector('.upload-error').textContent, /avance/);
 });

@@ -119,6 +119,11 @@ class Config:
         'MAX_CONTENT_LENGTH', 50 * 1024 * 1024, minimum=1
     )
     MAX_CONTENT_LENGTH = MAX_UPLOAD_BYTES + 1024 * 1024
+    MAX_RESUMABLE_UPLOAD_BYTES = _env_int('MAX_RESUMABLE_UPLOAD_BYTES', 2 * 1024**3, minimum=1)
+    CARGAS_BLOQUE_BYTES = 4 * 1024**2
+    CARGAS_RESERVA_BYTES = 2 * 1024**3
+    CARGAS_RESERVA_PORCENTAJE = 0.10
+    CARGAS_REANUDABLES_ENABLED = os.getenv('CARGAS_REANUDABLES_ENABLED', 'false').lower() == 'true'
     ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'zip', 'rar', '7z', 'xlsx', 'xls', 'doc', 'docx', 'ppt', 'pptx'}
     SMTP_HOST = os.getenv('SMTP_HOST')
     SMTP_PORT = _env_int('SMTP_PORT', 587, minimum=1, maximum=65535)

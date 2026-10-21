@@ -5,9 +5,13 @@
   if (typeof window.FormData !== 'function' || typeof window.XMLHttpRequest !== 'function' ||
       !('upload' in new XMLHttpRequest())) return;
 
-  var LIMITE_BYTES = window.ADSO_MAX_UPLOAD_BYTES || 0;
+  var CONFIG_REANUDABLE = window.ADSO_RESUMABLE_UPLOAD;
+  var REANUDABLE = CONFIG_REANUDABLE && CONFIG_REANUDABLE.enabled && window.ADSOCargasReanudables &&
+    window.crypto && window.crypto.subtle && typeof window.crypto.randomUUID === 'function' && typeof window.fetch === 'function';
+  var LIMITE_BYTES = (REANUDABLE ? CONFIG_REANUDABLE.maxBytes : window.ADSO_MAX_UPLOAD_BYTES) || 0;
   var LIMITE_SOLICITUD = window.ADSO_MAX_REQUEST_BYTES || (LIMITE_BYTES ? LIMITE_BYTES + 1024 * 1024 : 0);
   var activos = new WeakMap();
+  if (REANUDABLE) window.ADSOCargasReanudables.restaurar();
 
   function formatearTamano(bytes) {
     var unidades = ['B', 'KiB', 'MiB', 'GiB'];
@@ -60,7 +64,7 @@
       }
       total += archivo.size;
     }
-    if (LIMITE_SOLICITUD && total > LIMITE_SOLICITUD) {
+    if (!REANUDABLE && LIMITE_SOLICITUD && total > LIMITE_SOLICITUD) {
       return 'La subida pesa ' + formatearTamano(total) + ' y el máximo permitido por envío es ' +
         formatearTamano(LIMITE_SOLICITUD) + '. Carga los archivos en envíos separados.';
     }
@@ -166,6 +170,10 @@
       for (var j = 0; j < botones.length; j += 1) { estados.push(botones[j].disabled); botones[j].disabled = true; }
       form.setAttribute('aria-busy', 'true');
       ui.texto.textContent = 'Preparando la subida…';
+      if (REANUDABLE) {
+        window.ADSOCargasReanudables.iniciar(form, datos, seleccion, ui, { fallar: fallar }, CONFIG_REANUDABLE);
+        return;
+      }
       var xhr = new XMLHttpRequest();
       xhr.open(form.method || 'POST', form.action, true);
       xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
@@ -178,7 +186,7 @@
       });
       xhr.upload.addEventListener('load', function () {
         ui.relleno.style.width = '100%';
-        ui.texto.textContent = 'Archivo recibido. Procesando en el servidor…';
+        ui.texto.textContent = 'Transferencia enviada. Esperando confirmación del servidor…';
       });
       xhr.addEventListener('load', function () {
         var cuerpo = cuerpoJson(xhr);
