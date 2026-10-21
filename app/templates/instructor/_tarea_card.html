@@ -222,7 +222,7 @@
 
             <div class="form-group">
                 <label for="material-{{ tarea.id }}">Reemplazar material de apoyo</label>
-                <input type="file" id="material-{{ tarea.id }}" name="material_apoyo">
+                <input type="file" id="material-{{ tarea.id }}" name="material_apoyo" accept="{{ extensiones_carga }}">
                 {% if tarea.material_apoyo_url %}
                 <div class="material-actual" style="margin-top: 8px;">
                     <span>Material actual cargado.</span>

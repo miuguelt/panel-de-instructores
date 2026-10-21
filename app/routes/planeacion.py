@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
@@ -13,7 +12,6 @@ from app import db
 from app.models import (
     ArchivoFichaVersion,
     ETIQUETAS_TIPO,
-    Ficha,
     TIPO_PLANEACION,
     TIPO_PROGRAMA,
     TIPO_REPORTE_JUICIOS,
@@ -23,7 +21,6 @@ from app.services.carga_documentos import procesar_carga_unificada
 from app.services.importacion_ficha import ErrorImportacion
 from app.services.importacion_jobs import encolar_recalculo_resumen
 from app.services.panorama_planeacion import construir_panorama
-from app.services.permisos import puede_gestionar_ficha
 from app.services.planeacion import comparar_fuentes, parsear_planeacion
 from app.services.programa_formacion import parsear_programa
 from app.services.resultados_persistidos import (
@@ -35,6 +32,14 @@ from app.services.resultados_persistidos import (
 from app.services.recuperacion_fuentes import recuperar_fuentes_ficha
 from app.services.recuperacion_planeacion import asegurar_version_planeacion
 from app.services.recuperacion_programa import asegurar_version_programa
+from app.services.respuestas_planeacion import (
+    es_xhr as _es_xhr,
+    ficha_autorizada as _ficha_autorizada,
+    mensaje_recuperacion as _mensaje_recuperacion,
+    metadata_ficha as _metadata_ficha,
+    programa_vigente as _programa_vigente,
+    respuesta_carga as _respuesta_carga,
+)
 from app.services.versiones_archivos import (
     actualizar_estado,
     asegurar_version_reporte,
@@ -45,48 +50,6 @@ from app.services.versiones_archivos import (
 
 
 planeacion_bp = Blueprint('planeacion', __name__)
-
-
-def _ficha_autorizada(ficha_id):
-    ficha = db.session.get(Ficha, ficha_id)
-    return ficha if ficha and puede_gestionar_ficha(ficha) else None
-
-
-def _metadata_ficha(ficha):
-    return {
-        'codigo_programa': ficha.codigo_programa,
-        'nombre_programa': ficha.nombre_programa,
-    }
-
-
-def _programa_vigente(version_programa):
-    """Lee el programa cargado sin tumbar la vista si el PDF quedó ilegible."""
-    if not version_programa:
-        return None
-    try:
-        return obtener_contenido_documento(
-            version_programa, parsear_programa, parser_version='programa-v1',
-        )
-    except Exception:
-        current_app.logger.exception(
-            'No se pudo leer el programa de formación de la versión %s', version_programa.id
-        )
-        return None
-
-
-def _es_xhr():
-    """Indica si la subida fue interceptada por el cliente con XHR."""
-    return request.headers.get('X-Requested-With', '').lower() == 'xmlhttprequest'
-
-
-def _respuesta_carga(ficha_id, ok, mensaje, status=200):
-    """Devuelve JSON para la subida con progreso y redirect para HTML plano."""
-    if _es_xhr():
-        cuerpo = {'ok': ok, 'message': mensaje}
-        if ok:
-            cuerpo['redirect'] = url_for('planeacion.analisis', ficha_id=ficha_id)
-        return jsonify(cuerpo), status
-    return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))
 
 
 @planeacion_bp.route('/fichas/<int:ficha_id>/planeacion')
@@ -190,6 +153,7 @@ def cargar_planeacion(ficha_id):
         return _respuesta_carga(ficha_id, False, mensaje, status=422)
 
     version = None
+    guardado_confirmado = False
     try:
         version = crear_version(archivo, ficha_id, current_user.id, TIPO_PLANEACION)
         ruta = Path(current_app.config['UPLOAD_FOLDER']) / version.ruta_archivo
@@ -211,24 +175,36 @@ def cargar_planeacion(ficha_id):
         guardar_contenido_documento(version, contenido, 'planeacion-v1')
         actualizar_estado(version, 'procesado', metadata=contenido['metadata'])
         db.session.commit()
-        encolar_recalculo_resumen(ficha.id, current_user.id)
+        guardado_confirmado = True
+        trabajo_resumen = encolar_recalculo_resumen(ficha.id, current_user.id)
         mensaje = (
             f'Planeación cargada como versión {version.version}. '
             f'Se identificaron {contenido["resumen"]["resultados"]} resultados y '
             f'{contenido["resumen"]["horas_total"]:g} horas planificadas.'
         )
-        flash(mensaje, 'success')
+        resumen_pendiente = trabajo_resumen is not None and trabajo_resumen.estado == 'error'
+        if resumen_pendiente:
+            mensaje += ' El archivo quedó guardado, pero los indicadores están pendientes porque no se pudo iniciar su actualización. Recargue la página más tarde o informe al administrador.'
+        flash(mensaje, 'warning' if resumen_pendiente else 'success')
         return _respuesta_carga(ficha_id, True, mensaje)
     except (ErrorArchivo, ErrorImportacion, ValueError, OSError) as exc:
         db.session.rollback()
-        if version:
+        if guardado_confirmado:
+            mensaje = 'La planeación quedó guardada en el historial, pero no fue posible actualizar los indicadores. Recargue la página más tarde.'
+            flash(mensaje, 'warning')
+            return _respuesta_carga(ficha_id, True, mensaje)
+        if version and not guardado_confirmado:
             ArchivoService.eliminar(version.ruta_archivo)
         mensaje = f'No fue posible cargar la planeación: {exc}'
         flash(mensaje, 'error')
         return _respuesta_carga(ficha_id, False, mensaje, status=422)
     except Exception:
         db.session.rollback()
-        if version:
+        if guardado_confirmado:
+            mensaje = 'La planeación quedó guardada en el historial, pero no fue posible actualizar los indicadores. Recargue la página más tarde.'
+            flash(mensaje, 'warning')
+            return _respuesta_carga(ficha_id, True, mensaje)
+        if version and not guardado_confirmado:
             ArchivoService.eliminar(version.ruta_archivo)
         current_app.logger.exception('Error inesperado al cargar la planeación')
         mensaje = (
@@ -254,6 +230,7 @@ def cargar_programa(ficha_id):
         return _respuesta_carga(ficha_id, False, mensaje, status=422)
 
     version = None
+    guardado_confirmado = False
     try:
         version = crear_version(archivo, ficha_id, current_user.id, TIPO_PROGRAMA)
         ruta = Path(current_app.config['UPLOAD_FOLDER']) / version.ruta_archivo
@@ -267,25 +244,37 @@ def cargar_programa(ficha_id):
         guardar_contenido_documento(version, programa, 'programa-v1')
         actualizar_estado(version, 'procesado', metadata=programa['metadata'])
         db.session.commit()
-        encolar_recalculo_resumen(ficha.id, current_user.id)
+        guardado_confirmado = True
+        trabajo_resumen = encolar_recalculo_resumen(ficha.id, current_user.id)
         mensaje = (
             f'Programa de formación cargado como versión {version.version}. '
             f'Se leyeron {programa["resumen"]["competencias"]} competencias, '
             f'{programa["resumen"]["resultados"]} resultados y '
             f'{programa["resumen"]["horas_lectivas_declaradas"]:g} horas lectivas.'
         )
-        flash(mensaje, 'success')
+        resumen_pendiente = trabajo_resumen is not None and trabajo_resumen.estado == 'error'
+        if resumen_pendiente:
+            mensaje += ' El archivo quedó guardado, pero los indicadores están pendientes porque no se pudo iniciar su actualización. Recargue la página más tarde o informe al administrador.'
+        flash(mensaje, 'warning' if resumen_pendiente else 'success')
         return _respuesta_carga(ficha_id, True, mensaje)
     except (ErrorArchivo, ErrorImportacion, ValueError, OSError) as exc:
         db.session.rollback()
-        if version:
+        if guardado_confirmado:
+            mensaje = 'El programa de formación quedó guardado en el historial, pero no fue posible actualizar los indicadores. Recargue la página más tarde.'
+            flash(mensaje, 'warning')
+            return _respuesta_carga(ficha_id, True, mensaje)
+        if version and not guardado_confirmado:
             ArchivoService.eliminar(version.ruta_archivo)
         mensaje = f'No fue posible cargar el programa de formación: {exc}'
         flash(mensaje, 'error')
         return _respuesta_carga(ficha_id, False, mensaje, status=422)
     except Exception:
         db.session.rollback()
-        if version:
+        if guardado_confirmado:
+            mensaje = 'El programa de formación quedó guardado en el historial, pero no fue posible actualizar los indicadores. Recargue la página más tarde.'
+            flash(mensaje, 'warning')
+            return _respuesta_carga(ficha_id, True, mensaje)
+        if version and not guardado_confirmado:
             ArchivoService.eliminar(version.ruta_archivo)
         current_app.logger.exception('Error inesperado al cargar el programa de formación')
         mensaje = (
@@ -332,6 +321,8 @@ def descargar_todos(ficha_id):
     import zipfile
 
     buffer = io.BytesIO()
+    incluidos = 0
+    faltantes = []
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         for ver in docs:
             try:
@@ -339,8 +330,19 @@ def descargar_todos(ficha_id):
                 ruta_fisica = raiz / relativa
                 nombre_en_zip = secure_filename(ver.nombre_archivo) or ver.nombre_archivo
                 zf.write(ruta_fisica, arcname=nombre_en_zip)
-            except Exception:
+                incluidos += 1
+            except OSError:
+                faltantes.append(ver.nombre_archivo or f'Versión {ver.id}')
                 current_app.logger.warning('No se pudo incluir en ZIP la versión %s de la ficha %s', ver.id, ficha_id)
+        if incluidos and faltantes:
+            zf.writestr('AVISO_ARCHIVOS_FALTANTES.txt',
+                'Este paquete está incompleto. No fue posible recuperar estos archivos del almacenamiento:\n'
+                + '\n'.join(faltantes)
+                + '\n\nSolicite al administrador que revise el almacenamiento o vuelva a cargar los originales.\n')
+
+    if not incluidos:
+        flash('No fue posible recuperar los archivos del almacenamiento. Revise las fuentes o vuelva a cargar los originales.', 'error')
+        return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))
 
     buffer.seek(0)
     nombre_zip = f'fuentes_ficha_{secure_filename(ficha.codigo or str(ficha.id))}.zip'
@@ -390,10 +392,8 @@ def recuperar_fuentes(ficha_id):
         return redirect(url_for('instructor.fichas'))
 
     res = recuperar_fuentes_ficha(ficha, current_user.id)
-    msg = (
-        f'Se recuperaron exitosamente {res["total_nuevas"]} archivo(s): {", ".join(res["nuevas"])}.'
-        if res['total_nuevas'] > 0
-        else 'No se encontraron nuevos archivos para recuperar o ya están al día.'
-    )
+    msg = _mensaje_recuperacion(res)
     flash(msg, 'success' if res['total_nuevas'] > 0 else 'info')
+    for advertencia in res.get('advertencias', []):
+        flash(advertencia, 'warning')
     return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))

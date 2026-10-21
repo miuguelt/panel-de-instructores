@@ -35,6 +35,7 @@ from app.services.alertas import (
 )
 from app.services.permisos import aprendiz_de_sesion, puede_gestionar_ficha
 from app.models.alertas import PlanMejoramiento
+from app.routes.auth import _destino_interno
 
 
 seguimiento_bp = Blueprint('seguimiento', __name__, template_folder='../templates/instructor')
@@ -49,7 +50,8 @@ def _ficha_autorizada(ficha_id):
 
 
 def _notificacion_destino(url_fallback=None):
-    return request.form.get('redirect_url') or request.args.get('redirect_url') or url_fallback
+    destino = request.form.get('redirect_url') or request.args.get('redirect_url')
+    return _destino_interno(destino) or url_fallback
 
 
 @seguimiento_bp.route('/notificaciones')
@@ -166,6 +168,15 @@ def configurar_alertas_comite(ficha_id):
         # El cero es válido: desactiva la regla de la bitácora sin borrar notas.
         config.umbral_notas_negativas = max(0, int(request.form.get('umbral_notas_negativas', 3)))
         config.periodo_dias_notas = max(1, int(request.form.get('periodo_dias_notas', 30)))
+        maximos = {
+            'umbral_fallas_consecutivas': 30, 'umbral_fallas_acumuladas': 100,
+            'umbral_fallas_esporadicas': 100, 'periodo_dias_esporadicas': 365,
+            'umbral_tareas_incumplidas': 100, 'dias_plazo_justificacion': 30,
+            'auto_escalar_dias': 365, 'umbral_notas_negativas': 50,
+            'periodo_dias_notas': 365,
+        }
+        if any(getattr(config, campo) > maximo for campo, maximo in maximos.items()):
+            raise ValueError('Los umbrales superan los máximos definidos en el formulario.')
         config.correo_habilitado = 'correo_habilitado' in request.form
         db.session.commit()
     except (TypeError, ValueError):
@@ -300,7 +311,9 @@ def gestionar_planes(ficha_id):
     tareas_ficha = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite.desc()).all()
     aprendiz_preseleccionado = request.args.get('aprendiz_id', type=int)
     tarea_preseleccionada_id = request.args.get('tarea_id', type=int)
-    tarea_preseleccionada = db.session.get(Tarea, tarea_preseleccionada_id) if tarea_preseleccionada_id else None
+    tarea_preseleccionada = Tarea.query.filter_by(
+        id=tarea_preseleccionada_id, ficha_id=ficha_id,
+    ).first() if tarea_preseleccionada_id else None
     actividades_sugeridas = ''
     if tarea_preseleccionada:
         actividades_sugeridas = (

@@ -126,9 +126,14 @@ def _enviar_correo_recuperacion(instructor, enlace):
 
 def _destino_interno(destino):
     """Acepta únicamente rutas locales para evitar redirecciones fuera de la app."""
-    if not destino:
+    if (not isinstance(destino, str) or not destino.startswith('/')
+            or destino.startswith('//') or '\\' in destino
+            or any(ord(caracter) < 32 or ord(caracter) == 127 for caracter in destino)):
         return None
-    partes = urlsplit(destino)
+    try:
+        partes = urlsplit(destino)
+    except ValueError:
+        return None
     if partes.scheme or partes.netloc or not partes.path.startswith('/') or partes.path.startswith('//'):
         return None
     return destino

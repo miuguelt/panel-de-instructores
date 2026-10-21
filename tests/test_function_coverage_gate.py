@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import sys
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -10,6 +11,7 @@ from scripts.check_function_coverage import (
     main,
     revisar_cobertura_funciones,
 )
+from tests.conftest import RegistroFunciones
 
 
 class FunctionCoverageGateTestCase(unittest.TestCase):
@@ -99,6 +101,36 @@ class FunctionCoverageGateTestCase(unittest.TestCase):
             ])
         self.assertEqual(resultado_incompleto, 1)
         self.assertIn('pendiente', salida.getvalue())
+
+    def test_lambda_creada_no_cuenta_como_ejecutada(self):
+        self.modulo.write_text('def fabrica():\n    return lambda valor: valor + 1\n', encoding='utf-8')
+        self.reporte.write_text('<coverage><class filename="app/modulo.py"><lines>'
+            '<line number="2" hits="1"/></lines></class></coverage>', encoding='utf-8')
+        registro = RegistroFunciones(self.raiz)
+        espacio = {}
+        exec(compile(self.modulo.read_text(encoding='utf-8'), str(self.modulo), 'exec'), espacio)
+        anterior = sys.getprofile()
+        try:
+            sys.setprofile(registro.perfilar)
+            callback = espacio['fabrica']()
+        finally:
+            sys.setprofile(anterior)
+        self.assertTrue(callable(callback))
+        registro.confirmar('prueba_fabrica')
+        reporte = self.raiz / 'llamadas.json'
+        registro.guardar(reporte)
+        total, pendientes = revisar_cobertura_funciones(self.raiz / 'app', self.reporte, llamadas_json=reporte)
+        self.assertEqual(total, 2)
+        self.assertEqual([funcion['nombre'] for funcion in pendientes], ['<lambda>'])
+        try:
+            sys.setprofile(registro.perfilar)
+            valor = callback(5)
+        finally:
+            sys.setprofile(anterior)
+        self.assertEqual(valor, 6)
+        registro.confirmar('prueba_callback')
+        registro.guardar(reporte)
+        self.assertEqual(revisar_cobertura_funciones(self.raiz / 'app', self.reporte, llamadas_json=reporte), (2, []))
 
 
 if __name__ == '__main__':

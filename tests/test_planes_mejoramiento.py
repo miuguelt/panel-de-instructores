@@ -519,7 +519,8 @@ class PlanesMejoramientoWebTestCase(unittest.TestCase):
         self.assertIn(f'id="{guia_id}"'.encode(), panel.data)
         self.assertIn('al menos una opción'.encode(), panel.data)
         self.assertIn(f'id="{formatos_id}"'.encode(), panel.data)
-        self.assertIn('Formatos admitidos: PDF, PNG, JPG/JPEG, DOC y DOCX.'.encode(), panel.data)
+        formatos = ', '.join(sorted(self.app.config['ALLOWED_EXTENSIONS'])).upper()
+        self.assertTrue(f'Formatos admitidos: {formatos}.' in panel.text)
 
     def test_turnos_del_aprendiz_tienen_un_solo_formulario_con_csrf_y_completan_el_flujo(self):
         cliente = self._aprendiz_cliente()

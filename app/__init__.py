@@ -250,6 +250,8 @@ def create_app(test_config=None):
     # SQLite (ej. SQLiteDialect_pysqlite/StaticPool en tests) no acepta pool_size,
     # max_overflow ni pool_timeout en create_engine().
     db_uri = str(app.config.get('SQLALCHEMY_DATABASE_URI') or '')
+    if not db_uri.strip():
+        raise RuntimeError('DATABASE_URL debe configurarse antes de iniciar el panel. Defina la conexión en el entorno protegido.')
     if db_uri.startswith('sqlite'):
         engine_opts = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS') or {})
         for invalid_key in ('pool_size', 'max_overflow', 'pool_timeout'):
@@ -265,6 +267,8 @@ def create_app(test_config=None):
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Debes iniciar sesion para acceder a esta pagina.'
     migrate.init_app(app, db)
+    from app.services.cargas_http import registrar_respuestas_carga
+    registrar_respuestas_carga(app)
     csrf.init_app(app)
 
     # --- Soporte para proxy inverso (Traefik / Coolify) ---
@@ -453,6 +457,8 @@ def create_app(test_config=None):
             'notificaciones_no_leidas': no_leidas,
             'datetime': datetime,
             'max_upload_bytes': app.config.get('MAX_UPLOAD_BYTES') or 0,
+            'max_request_bytes': app.config.get('MAX_CONTENT_LENGTH') or 0,
+            'extensiones_carga': ','.join('.' + ext for ext in sorted(app.config['ALLOWED_EXTENSIONS'])),
             'static_v': static_v,
             'alertas_modulo': _alertas_modulo,
             'alertas_aprendiz': _alertas_aprendiz,
@@ -509,8 +515,9 @@ def create_app(test_config=None):
                 pass
         except Exception as exc:
             estado['status'] = 'degraded'
-            estado['database'] = f'{type(exc).__name__}: {exc}'
-            log.error('Health check: sin conexion a la base de datos.', exc_info=True)
+            estado['database'] = 'unavailable'
+            estado['database_error'] = type(exc).__name__
+            log.error('Health check: sin conexión a la base de datos (%s).', type(exc).__name__)
 
         # Inventario bajo demanda: recorrer el volumen en cada latido del
         # healthcheck de Docker seria I/O gratuito cada 30 s.
@@ -544,6 +551,11 @@ def create_app(test_config=None):
         en vez de mostrar un error tecnico al aprendiz.
         """
         from flask import flash, redirect, request, url_for
+        from app.services.cargas_http import es_carga_xhr
+        if es_carga_xhr():
+            from flask import jsonify
+            return jsonify(ok=False, reload=True, message=
+                'La sesión del formulario expiró. Recarga la página, selecciona el archivo y vuelve a intentarlo.'), 400
         log.info('CSRF rechazado en %s: %s', request.path, error.description)
         flash(
             'La sesión del formulario expiró. Vuelve a intentarlo.',
@@ -586,6 +598,13 @@ def create_app(test_config=None):
         limite_bytes = app.config.get('MAX_UPLOAD_BYTES') or app.config['MAX_CONTENT_LENGTH']
         limite_mb = limite_bytes / (1024 * 1024)
         limite_texto = f'{limite_mb:.1f}'.rstrip('0').rstrip('.')
+        from app.services.cargas_http import es_carga_xhr
+        if es_carga_xhr():
+            from flask import jsonify
+            return jsonify(ok=False, message=(
+                f'La carga supera el límite de {limite_texto} MiB. '
+                'Reduce el tamaño del archivo o carga los documentos por separado.'
+            )), 413
         if (
             request.endpoint == 'aprendiz.subir_evidencia'
             and request.view_args

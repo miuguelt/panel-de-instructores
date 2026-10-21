@@ -660,11 +660,13 @@ def ejecutar_revision_automatica():
     ).all()
     evaluadas = 0
     for ficha in fichas:
+        ficha_id = ficha.id
         try:
-            actualizar_alertas_ficha(ficha.id, ahora)
+            actualizar_alertas_ficha(ficha_id, ahora)
             evaluadas += 1
-        except Exception as error:
-            current_app.logger.error('Error auto-evaluando ficha %s: %s', ficha.id, error)
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('No se pudieron revisar automáticamente las alertas de la ficha %s.', ficha_id)
     return evaluadas
 
 

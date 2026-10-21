@@ -19,6 +19,8 @@ document.body.addEventListener('htmx:afterSwap', function() {
 
 function initClickableRows() {
     document.querySelectorAll('.table-clickable, .ranking-card').forEach(el => {
+        if (el.dataset.clickableReady === 'true') return;
+        el.dataset.clickableReady = 'true';
         el.addEventListener('click', function(e) {
             if (e.target.closest('a, button, input, select, textarea, details, summary, .badge-icon')) return;
             const url = this.getAttribute('data-url');

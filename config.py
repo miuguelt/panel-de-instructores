@@ -40,9 +40,9 @@ _INSECURE_SECRETS = {
     'cambiar-esta-clave-en-produccion',
     'cambiar-esta-clave-en-produccion-usar-valor-aleatorio-largo',
 }
-_secret_key = os.getenv('SECRET_KEY', 'dev-key-change-me')
+_secret_key = (os.getenv('SECRET_KEY') or '').strip()
 SECRET_KEY_IS_EPHEMERAL = False
-if os.getenv('FLASK_ENV') == 'production' and _secret_key in _INSECURE_SECRETS:
+if _secret_key in _INSECURE_SECRETS:
     # No abortar el proceso: una excepcion aqui mata a gunicorn en el arranque y
     # el contenedor entra en bucle de reinicios sin dejar rastro legible. Se
     # degrada a una clave efimera (mas segura que un default conocido) y se
@@ -50,7 +50,7 @@ if os.getenv('FLASK_ENV') == 'production' and _secret_key in _INSECURE_SECRETS:
     SECRET_KEY_IS_EPHEMERAL = True
     _secret_key = secrets.token_hex(64)
     log.critical(
-        'SECRET_KEY insegura o vacia con FLASK_ENV=production. '
+        'SECRET_KEY insegura o vacia. '
         'Se genero una clave EFIMERA: las sesiones se invalidaran en cada reinicio. '
         'Defina SECRET_KEY en Coolify con un valor aleatorio largo y SIN el caracter "$" '
         '(Docker Compose lo expande y vacia el valor).'
@@ -68,9 +68,7 @@ def _normalize_db_url(url):
     return url
 
 
-_db_url = _normalize_db_url(
-    os.getenv('DATABASE_URL') or 'postgresql://adso:adso_pass@127.0.0.1:5434/adso_control'
-)
+_db_url = _normalize_db_url((os.getenv('DATABASE_URL') or '').strip())
 
 
 def _env_int(name, default, minimum=None, maximum=None):
@@ -121,7 +119,7 @@ class Config:
         'MAX_CONTENT_LENGTH', 50 * 1024 * 1024, minimum=1
     )
     MAX_CONTENT_LENGTH = MAX_UPLOAD_BYTES + 1024 * 1024
-    ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'zip', 'rar', 'xlsx', 'xls', 'doc', 'docx', 'pptx'}
+    ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'zip', 'rar', '7z', 'xlsx', 'xls', 'doc', 'docx', 'ppt', 'pptx'}
     SMTP_HOST = os.getenv('SMTP_HOST')
     SMTP_PORT = _env_int('SMTP_PORT', 587, minimum=1, maximum=65535)
     SMTP_USER = os.getenv('SMTP_USER')

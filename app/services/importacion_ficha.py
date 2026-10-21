@@ -110,7 +110,10 @@ def _fecha(valor):
     if not texto:
         return None
     if isinstance(valor, (int, float)) and float(valor) > 20000:
-        return datetime(1899, 12, 30) + timedelta(days=float(valor))
+        try:
+            return datetime(1899, 12, 30) + timedelta(days=float(valor))
+        except (OverflowError, ValueError):
+            return None
     for formato in ('%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M', '%d/%m/%Y',
                     '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
         try:

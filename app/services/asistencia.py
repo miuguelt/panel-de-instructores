@@ -220,6 +220,16 @@ def guardar_asistencia(ficha_id, fecha, registros, corte_id=None, max_intentos=2
                     registro.causal_justificacion = causal
 
             db.session.commit()
+            try:
+                from app.services.aseo import ajustar_turno_por_asistencia
+                ajustar_turno_por_asistencia(ficha_id, fecha)
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                import logging
+                logging.getLogger(__name__).warning(
+                    'No fue posible ajustar turno de aseo tras guardar asistencia: %s', exc
+                )
             return sesion
         except (IntegrityError, OperationalError):
             db.session.rollback()

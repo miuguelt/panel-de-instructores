@@ -17,8 +17,9 @@ from app import db
 from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_PROGRAMA
 from app.models.ficha import Ficha
 from app.services.programa_formacion import parsear_programa
+from app.services.planeacion import comparar_fuentes
 from app.services.resultados_persistidos import guardar_contenido_documento
-from app.services.archivos import resolver_archivo_subido
+from app.services.archivos import ArchivoService, resolver_archivo_subido
 from app.services.versiones_archivos import (
     actualizar_estado,
     crear_version,
@@ -69,11 +70,17 @@ def buscar_archivo_programa_original(ficha: Ficha) -> Optional[Dict[str, Any]]:
         try:
             programa = parsear_programa(cand)
             meta = programa.get('metadata', {})
-            cand_cod = str(meta.get('codigo') or '').strip()
-            cand_nom = str(meta.get('denominacion') or '').strip().lower()
+            alineacion = comparar_fuentes(meta, {
+                'codigo_programa': ficha.codigo_programa,
+                'nombre_programa': ficha.nombre_programa,
+            })
+            if not alineacion['alineado']:
+                continue
+            cand_cod = alineacion['codigo_planeacion']
+            cand_nom = str(meta.get('nombre_programa') or '').strip().lower()
 
             coincide = False
-            if codigo_prog and cand_cod == codigo_prog:
+            if alineacion['codigo_ficha'] and cand_cod == alineacion['codigo_ficha']:
                 coincide = True
             elif nombre_prog and cand_nom and (nombre_prog in cand_nom or cand_nom in nombre_prog):
                 coincide = True
@@ -120,10 +127,11 @@ def asegurar_version_programa(
     if match_orig:
         cand_path = match_orig['path']
         programa = match_orig['programa']
+        archivos_creados = []
         try:
             with open(cand_path, 'rb') as fp:
                 storage = FileStorage(stream=io.BytesIO(fp.read()), filename=cand_path.name)
-                version = crear_version(storage, ficha.id, inst_id, TIPO_PROGRAMA, permitir_existente=True)
+                version = crear_version(storage, ficha.id, inst_id, TIPO_PROGRAMA, permitir_existente=True, archivos_creados=archivos_creados)
                 guardar_contenido_documento(version, programa, 'programa-v1')
                 actualizar_estado(
                     version,
@@ -135,6 +143,8 @@ def asegurar_version_programa(
                 return version
         except Exception:
             db.session.rollback()
+            for ruta_nueva in archivos_creados:
+                ArchivoService.eliminar(ruta_nueva)
             current_app.logger.exception('Fallo al recuperar programa para ficha %s', ficha.id)
 
     # 2. Reutilizar programa de ficha hermana con el mismo código de programa
@@ -151,13 +161,14 @@ def asegurar_version_programa(
             .first()
         )
         if hermana:
+            archivos_creados = []
             try:
                 raiz, relativa, _ = resolver_archivo_subido(hermana.ruta_archivo)
                 ruta_fisica = raiz / relativa
                 if ruta_fisica.is_file():
                     with open(ruta_fisica, 'rb') as fp:
                         storage = FileStorage(stream=io.BytesIO(fp.read()), filename=hermana.nombre_archivo)
-                        version = crear_version(storage, ficha.id, inst_id, TIPO_PROGRAMA, permitir_existente=True)
+                        version = crear_version(storage, ficha.id, inst_id, TIPO_PROGRAMA, permitir_existente=True, archivos_creados=archivos_creados)
                         programa = parsear_programa(ruta_fisica)
                         guardar_contenido_documento(version, programa, 'programa-v1')
                         actualizar_estado(
@@ -170,6 +181,8 @@ def asegurar_version_programa(
                         return version
             except Exception:
                 db.session.rollback()
+                for ruta_nueva in archivos_creados:
+                    ArchivoService.eliminar(ruta_nueva)
                 current_app.logger.exception('Fallo al vincular programa hermano para ficha %s', ficha.id)
 
     return None

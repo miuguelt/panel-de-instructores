@@ -37,7 +37,8 @@ def _hash_stream(stream):
     return digest.hexdigest()
 
 
-def crear_version(archivo, ficha_id, instructor_id, tipo, metadata=None, permitir_existente=False):
+def crear_version(archivo, ficha_id, instructor_id, tipo, metadata=None, permitir_existente=False,
+                  archivos_creados=None):
     """Guarda un archivo en la ruta persistente y crea su registro de versión."""
     if tipo not in TIPOS_VERSIONADOS:
         raise ValueError(f'Tipo de archivo no soportado: {tipo}.')
@@ -83,8 +84,14 @@ def crear_version(archivo, ficha_id, instructor_id, tipo, metadata=None, permiti
         estado='pendiente',
         metadata_json=metadata_json,
     )
-    db.session.add(version)
-    db.session.flush()
+    try:
+        db.session.add(version)
+        db.session.flush()
+    except Exception:
+        ArchivoService.eliminar(version.ruta_archivo)
+        raise
+    if archivos_creados is not None:
+        archivos_creados.append(version.ruta_archivo)
     archivo.stream.seek(0)
     return version
 

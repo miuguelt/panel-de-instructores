@@ -238,61 +238,7 @@
         <strong>Solicitud recibida: importación en segundo plano</strong>
         <p id="import-status-message" class="text-muted" role="status" aria-live="polite">El archivo fue recibido y está en cola (trabajo #{{ importacion_id }}). El sistema te avisará cuando termine; puedes seguir usando el panel.</p>
     </div>
-    <script>
-    (function () {
-        const box = document.getElementById('import-status');
-        const message = document.getElementById('import-status-message');
-        if (!box || !message) return;
-        let intentos = 0;
-        const consultar = () => fetch(box.dataset.statusUrl, { credentials: 'same-origin' })
-            .then(res => res.json())
-            .then(job => {
-                if (job.estado === 'completado') {
-                    const r = job.resultado || {};
-                    const partes = [];
-                    if (r.nuevos > 0) partes.push(`${r.nuevos} aprendices nuevos`);
-                    if (r.actualizados > 0) partes.push(`${r.actualizados} aprendices actualizados`);
-                    if (r.juicios_nuevos > 0) partes.push(`${r.juicios_nuevos} juicios evaluativos incorporados`);
-                    if (r.juicios_actualizados > 0) partes.push(`${r.juicios_actualizados} juicios evaluativos actualizados`);
-                    if (r.juicios_repetidos > 0) {
-                        if (!r.juicios_nuevos && !r.juicios_actualizados) {
-                            partes.push(`${r.juicios_repetidos} juicios evaluativos verificados y conservados al día`);
-                        } else {
-                            partes.push(`${r.juicios_repetidos} juicios ya estaban en el historial`);
-                        }
-                    }
-                    const detalle = partes.length > 0 ? partes.join(', ') : 'Datos procesados correctamente';
-                    message.textContent = `Importación completada con éxito: ${detalle}. Actualizando vista…`;
-                    box.classList.remove('alert-error');
-                    box.classList.add('alert', 'alert-success');
-                    box.setAttribute('aria-busy', 'false');
-                    setTimeout(() => {
-                        const url = new URL(window.location.href);
-                        url.searchParams.delete('importacion_id');
-                        window.location.replace(url.toString());
-                    }, 1200);
-                    return;
-                }
-                if (job.estado === 'error') {
-                    message.textContent = 'La importación no se pudo completar: ' + (job.error || 'revisa el archivo o consulta los logs.');
-                    box.classList.add('alert', 'alert-error');
-                    box.setAttribute('aria-busy', 'false');
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('importacion_id');
-                    window.history.replaceState({}, document.title, url.toString());
-                    return;
-                }
-                message.textContent = job.estado === 'procesando'
-                    ? 'El sistema está leyendo y guardando el reporte. No vuelvas a enviarlo; puedes seguir navegando por el panel.'
-                    : 'El reporte está en cola y será atendido por el worker. Puedes seguir navegando por el panel.';
-                if (++intentos < 150) setTimeout(consultar, 2000);
-            })
-            .catch(() => {
-                if (++intentos < 150) setTimeout(consultar, 4000);
-            });
-        consultar();
-    })();
-    </script>
+    <script src="{{ url_for('static', filename='js/importaciones.js') }}" defer></script>
     {% endif %}
 
     <dialog id="modal-cargar-juicios" class="modal-dialog" style="border:none; border-radius:16px; padding:0; max-width:540px; width:90%; background:var(--bg-card); color:var(--text-strong); box-shadow:var(--shadow-xl);">
@@ -789,7 +735,7 @@
     function badgeHtml(tipo) {
         const map = { tecnica: ['badge-solid-tech','Técnica'], transversal: ['badge-solid-transversal','Transversal'], ingles: ['badge-solid-ingles','Inglés'] };
         const [badgeClass, label] = map[tipo] || ['badge-solid-secondary', tipo];
-        return `<span class="badge ${badgeClass}">${label}</span>`;
+        return `<span class="badge ${badgeClass}">${escapeHtml(label)}</span>`;
     }
 
     function statusBadge(estado) {
@@ -1228,7 +1174,7 @@
                         card.classList.add('is-selected-other');
                         if (btn) {
                             btn.className = 'comp-select-btn is-other';
-                            btn.innerHTML = `👤 ${data.seleccionada_por.nombre}`;
+                            btn.textContent = `👤 ${data.seleccionada_por.nombre}`;
                             btn.title = `Seleccionada por ${data.seleccionada_por.nombre} - Clic para tomarla`;
                         }
                     }

@@ -39,7 +39,7 @@ class AtencionService:
         ).filter(TurnoAtencion.estado.in_(['esperando', 'en_atencion'])).first()
 
     @staticmethod
-    def cambiar_estado(turno_id, nuevo_estado):
+    def cambiar_estado(turno_id, nuevo_estado, *, confirmar=True):
         turno = db.session.get(TurnoAtencion, turno_id)
         if not turno:
             return None
@@ -50,5 +50,6 @@ class AtencionService:
         elif nuevo_estado in ['atendido', 'cancelado', 'ausente']:
             turno.completado_en = datetime.utcnow()
             
-        db.session.commit()
+        if confirmar:
+            db.session.commit()
         return turno

@@ -67,14 +67,14 @@ class RecuperacionFuentesCompletaTestCase(unittest.TestCase):
         # 1. Crear archivo de planeacion en la carpeta de uploads simulada
         ruta_plan = Path(self.temp_dir.name) / '1. GPFI-F-134PlaneacionPedagogicaProyectoFormativo.xlsx'
         ruta_creada = crear_planeacion_xlsx(ruta_plan.parent)
-        if ruta_creada.is_file():
-            ruta_creada.rename(ruta_plan)
+        self.assertTrue(ruta_creada.is_file())
+        ruta_creada.rename(ruta_plan)
 
         version = asegurar_version_planeacion(self.ficha)
-        if version:
-            self.assertEqual(version.tipo, TIPO_PLANEACION)
-            self.assertEqual(version.estado, 'procesado')
-            self.assertIn('recuperada', version.detalle.lower())
+        self.assertIsNotNone(version, 'La planeación existente debe recuperarse.')
+        self.assertEqual(version.tipo, TIPO_PLANEACION)
+        self.assertEqual(version.estado, 'procesado')
+        self.assertIn('recuperada', version.detalle.lower())
 
     def test_asegurar_version_planeacion_desde_ficha_hermana(self):
         # Ficha 2 con el mismo codigo_programa ya tiene planeacion procesada

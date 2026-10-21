@@ -16,9 +16,9 @@ from werkzeug.datastructures import FileStorage
 from app import db
 from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_PLANEACION
 from app.models.ficha import Ficha
-from app.services.planeacion import parsear_planeacion
+from app.services.planeacion import comparar_fuentes, parsear_planeacion
 from app.services.resultados_persistidos import guardar_contenido_documento
-from app.services.archivos import resolver_archivo_subido
+from app.services.archivos import ArchivoService, resolver_archivo_subido
 from app.services.versiones_archivos import (
     actualizar_estado,
     crear_version,
@@ -70,14 +70,20 @@ def buscar_archivo_planeacion_original(ficha: Ficha) -> Optional[Dict[str, Any]]
         try:
             contenido = parsear_planeacion(cand)
             meta = contenido.get('metadata', {})
-            cand_cod_prog = str(meta.get('codigo_programa') or '').strip()
+            alineacion = comparar_fuentes(meta, {
+                'codigo_programa': ficha.codigo_programa,
+                'nombre_programa': ficha.nombre_programa,
+            })
+            if not alineacion['alineado']:
+                continue
+            cand_cod_prog = alineacion['codigo_planeacion']
             cand_nom_prog = str(meta.get('nombre_programa') or '').strip().lower()
             cand_cod_ficha = str(meta.get('codigo_ficha') or '').strip()
 
             coincide = False
             if codigo_ficha and cand_cod_ficha == codigo_ficha:
                 coincide = True
-            elif codigo_prog and cand_cod_prog == codigo_prog:
+            elif alineacion['codigo_ficha'] and cand_cod_prog == alineacion['codigo_ficha']:
                 coincide = True
             elif nombre_prog and cand_nom_prog and (nombre_prog in cand_nom_prog or cand_nom_prog in nombre_prog):
                 coincide = True
@@ -126,10 +132,11 @@ def asegurar_version_planeacion(
     if match_orig:
         cand_path = match_orig['path']
         contenido = match_orig['contenido']
+        archivos_creados = []
         try:
             with open(cand_path, 'rb') as fp:
                 storage = FileStorage(stream=io.BytesIO(fp.read()), filename=cand_path.name)
-                version = crear_version(storage, ficha.id, inst_id, TIPO_PLANEACION, permitir_existente=True)
+                version = crear_version(storage, ficha.id, inst_id, TIPO_PLANEACION, permitir_existente=True, archivos_creados=archivos_creados)
                 guardar_contenido_documento(version, contenido, 'planeacion-v1')
                 actualizar_estado(
                     version,
@@ -141,6 +148,8 @@ def asegurar_version_planeacion(
                 return version
         except Exception:
             db.session.rollback()
+            for ruta_nueva in archivos_creados:
+                ArchivoService.eliminar(ruta_nueva)
             current_app.logger.exception('Fallo al crear versión recuperada de planeación para ficha %s', ficha.id)
 
     # 2. Reutilizar planeación procesada de otra ficha hermana con el mismo programa
@@ -157,13 +166,14 @@ def asegurar_version_planeacion(
             .first()
         )
         if hermana:
+            archivos_creados = []
             try:
                 raiz, relativa, _ = resolver_archivo_subido(hermana.ruta_archivo)
                 ruta_fisica = raiz / relativa
                 if ruta_fisica.is_file():
                     with open(ruta_fisica, 'rb') as fp:
                         storage = FileStorage(stream=io.BytesIO(fp.read()), filename=hermana.nombre_archivo)
-                        version = crear_version(storage, ficha.id, inst_id, TIPO_PLANEACION, permitir_existente=True)
+                        version = crear_version(storage, ficha.id, inst_id, TIPO_PLANEACION, permitir_existente=True, archivos_creados=archivos_creados)
                         contenido = parsear_planeacion(ruta_fisica)
                         guardar_contenido_documento(version, contenido, 'planeacion-v1')
                         actualizar_estado(
@@ -176,6 +186,8 @@ def asegurar_version_planeacion(
                         return version
             except Exception:
                 db.session.rollback()
+                for ruta_nueva in archivos_creados:
+                    ArchivoService.eliminar(ruta_nueva)
                 current_app.logger.exception('Fallo al vincular planeación hermana para ficha %s', ficha.id)
 
     return None

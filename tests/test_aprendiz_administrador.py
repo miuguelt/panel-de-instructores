@@ -1,7 +1,9 @@
 import unittest
 from datetime import date, timedelta
 from io import BytesIO
-from unittest.mock import patch
+from tempfile import TemporaryDirectory
+
+import openpyxl
 
 from app import create_app, db
 from app.models import (
@@ -14,13 +16,16 @@ from app.models import (
     SesionAsistencia,
     TurnoAseo,
     ArchivoFichaVersion,
+    JuicioEvaluativo,
 )
 
 
 class AprendizAdministradorTestCase(unittest.TestCase):
     def setUp(self):
+        self.uploads = TemporaryDirectory()
         self.app = create_app({
             'TESTING': True,
+            'UPLOAD_FOLDER': self.uploads.name,
             'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
             'SQLALCHEMY_ENGINE_OPTIONS': {},
             'WTF_CSRF_ENABLED': False,
@@ -69,6 +74,7 @@ class AprendizAdministradorTestCase(unittest.TestCase):
         db.session.remove()
         db.drop_all()
         self.contexto.pop()
+        self.uploads.cleanup()
 
     def _sesion_aprendiz(self, aprendiz=None):
         aprendiz = aprendiz or self.aprendices[0]
@@ -266,43 +272,37 @@ class AprendizAdministradorTestCase(unittest.TestCase):
 
     def test_la_carga_de_documentos_puede_dejar_asignado_el_rol(self):
         self._sesion_instructor()
-        version = ArchivoFichaVersion(
-            ficha_id=self.ficha.id,
-            instructor_id=self.instructor.id,
-            tipo='reporte_juicios',
-            version=1,
-            nombre_archivo='reporte.xlsx',
-            ruta_archivo='fichas/reporte.xlsx',
-            tamano_bytes=1,
-            estado='pendiente',
+        self.ficha.codigo_programa = '228117'
+        db.session.commit()
+        libro = openpyxl.Workbook()
+        hoja = libro.active
+        hoja.append(['Ficha de Caracterización:', '', self.ficha.codigo])
+        hoja.append(['Código:', '', self.ficha.codigo_programa])
+        hoja.append(['Denominación:', '', self.ficha.nombre_programa])
+        for _ in range(10):
+            hoja.append([])
+        hoja.append(['Tipo de Documento', 'Número de Documento', 'Nombre', 'Apellidos', 'Estado',
+                     'Competencia', 'Resultado de Aprendizaje', 'Juicio de Evaluación',
+                     'Fecha y Hora del Juicio Evaluativo', 'Funcionario que registro el juicio evaluativo'])
+        aprendiz = self.aprendices[2]
+        hoja.append(['CC', aprendiz.documento, aprendiz.nombre, aprendiz.apellidos, 'EN_FORMACION',
+                     'Competencia de prueba', 'Resultado de prueba', 'APROBADO', '01/10/2026', 'Instructor de prueba'])
+        contenido = BytesIO()
+        libro.save(contenido)
+        datos_originales = contenido.getvalue()
+        contenido.seek(0)
+        respuesta = self.cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/cargar-excel',
+            data={'aprendiz_administrativo_id': aprendiz.id, 'archivo': (contenido, 'reporte.xlsx')},
+            content_type='multipart/form-data',
         )
-        resultado = {
-            'ficha': self.ficha,
-            'nuevos': 0,
-            'actualizados': 0,
-            'juicios_nuevos': 0,
-            'juicios_actualizados': 0,
-            'juicios_repetidos': 0,
-            'errores': [],
-        }
-        with patch('app.routes.instructor.leer_metadata_archivo', return_value={}), \
-                patch('app.routes.instructor.validar_reporte_ficha'), \
-                patch('app.routes.instructor.crear_version', return_value=version), \
-                patch('app.routes.instructor.importar_archivo', return_value=resultado), \
-                patch('app.routes.instructor.actualizar_alertas_ficha'), \
-                patch('app.routes.instructor.actualizar_participacion_ficha'):
-            respuesta = self.cliente.post(
-                f'/instructor/fichas/{self.ficha.id}/cargar-excel',
-                data={
-                    'aprendiz_administrativo_id': self.aprendices[2].id,
-                    'archivo': (BytesIO(b'archivo de prueba'), 'reporte.xlsx'),
-                },
-                content_type='multipart/form-data',
-            )
-
         self.assertEqual(respuesta.status_code, 302)
-        db.session.refresh(self.aprendices[2])
-        self.assertTrue(self.aprendices[2].rol_administrativo)
+        db.session.refresh(aprendiz)
+        self.assertTrue(aprendiz.rol_administrativo)
+        self.assertEqual(JuicioEvaluativo.query.filter_by(aprendiz_id=aprendiz.id).count(), 1)
+        version = ArchivoFichaVersion.query.filter_by(ficha_id=self.ficha.id).one()
+        from pathlib import Path
+        self.assertEqual(Path(self.uploads.name, version.ruta_archivo).read_bytes(), datos_originales)
 
     def test_aprendiz_administrador_asigna_turno_manual_y_crea_sesion(self):
         self.aprendices[0].rol_administrativo = True

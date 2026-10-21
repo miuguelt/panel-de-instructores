@@ -69,6 +69,7 @@ MIME_POR_EXTENSION: dict[str, set[str]] = {
     'jpeg': {'image/jpeg'},
     'zip': {'application/zip', 'application/x-zip-compressed'},
     'rar': {'application/vnd.rar', 'application/x-rar-compressed'},
+    '7z': {'application/x-7z-compressed'},
     'xlsx': {'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},
     'xls': {'application/vnd.ms-excel'},
     'doc': {'application/msword'},
@@ -93,6 +94,7 @@ _MAGIC: list[tuple[bytes, int, set[str]]] = [
     (b'PK\x07\x08', 0, {'zip', 'xlsx', 'docx', 'pptx'}),
     (b'Rar!\x1a\x07', 0, {'rar'}),
     (b'Rar!\x1a\x07\x01\x00', 0, {'rar'}),
+    (b'7z\xbc\xaf\x27\x1c', 0, {'7z'}),
     (b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1', 0, {'xls', 'doc', 'ppt'}),
 ]
 
@@ -254,7 +256,9 @@ class ArchivoService:
             ErrorMimeType: Si el MIME no coincide.
         """
         mime_recibido = (archivo.content_type or '').split(';', 1)[0].strip().lower()
-        if not mime_recibido:
+        if not mime_recibido or mime_recibido in {'application/octet-stream', 'binary/octet-stream'}:
+            # El navegador puede desconocer el formato. La firma del contenido
+            # se valida por separado antes de guardar el archivo.
             return
         esperados = {
             tipo.lower()
@@ -268,6 +272,7 @@ class ArchivoService:
                 'application/octet-stream',
                 'application/x-zip',
                 'multipart/x-zip',
+                'application/x-compressed',
             })
         if esperados and mime_recibido not in esperados:
             raise ErrorMimeType(
@@ -318,11 +323,22 @@ class ArchivoService:
         Raises:
             ErrorArchivoVacio: Si el archivo está vacío.
         """
-        archivo.stream.seek(0, os.SEEK_END)
-        tamano = archivo.stream.tell()
-        archivo.stream.seek(0)
+        if archivo is None or not archivo.filename:
+            raise ErrorArchivoVacio('No se seleccionó ningún archivo. Para enviar una carpeta, comprímela en ZIP.')
+        try:
+            archivo.stream.seek(0, os.SEEK_END)
+            tamano = archivo.stream.tell()
+            archivo.stream.seek(0)
+        except (OSError, ValueError) as exc:
+            raise ErrorArchivo('No fue posible leer el archivo. Selecciónalo nuevamente e inténtalo de nuevo.') from exc
         if tamano == 0:
             raise ErrorArchivoVacio('El archivo está vacío.')
+        limite = current_app.config.get('MAX_UPLOAD_BYTES') or current_app.config.get('MAX_CONTENT_LENGTH') or 0
+        if limite and tamano > limite:
+            raise ErrorTamano(
+                f'El archivo pesa {tamano / (1024 * 1024):.1f} MiB y el máximo '
+                f'permitido es {limite / (1024 * 1024):.1f} MiB. Reduce su tamaño e inténtalo de nuevo.'
+            )
 
     @staticmethod
     def validar(archivo: FileStorage, check_mime: bool = True, check_magic: bool = True) -> str:
@@ -489,6 +505,7 @@ class ArchivoService:
             ErrorArchivoVacio: El archivo llegó vacío.
             ErrorArchivo: Fallo de escritura.
         """
+        ArchivoService.validar_no_vacio(archivo)
         destino = os.path.join(current_app.config['UPLOAD_FOLDER'], carpeta)
         ruta_completa = os.path.join(destino, nombre_archivo)
         ruta_parcial = f'{ruta_completa}.part'

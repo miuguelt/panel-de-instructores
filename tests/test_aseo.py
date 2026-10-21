@@ -1304,6 +1304,555 @@ class TurnosAseoTestCase(unittest.TestCase):
         # El suplente elegido DEBE ser Carmen (2) porque tiene 0 turnos cumplidos vs Ana y Bruno que tienen 1
         self.assertEqual(turno.aprendiz_2_id, self.aprendices[2].id)
 
+    def test_guardar_asistencia_servicio_sustituye_inmediatamente_ausente_por_cola_justa(self):
+        """guardar_asistencia sustituye inmediatamente al ausente en turno de la fecha por el de menor carga."""
+        from app.services.asistencia import guardar_asistencia
+        from app.services.aseo import recalcular_contadores
+
+        # Histórico: Bruno (1), Elena (4) y Felipe (5) tienen 1 turno previo, Carmen (2) tiene 0
+        fecha_pasada = date.today() - timedelta(days=5)
+        self._crear_sesion(fecha_pasada)
+        db.session.add(TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_pasada,
+            aprendiz_1_id=self.aprendices[1].id,
+            aprendiz_2_id=self.aprendices[5].id,
+            estado='cumplido',
+            completado_1=True,
+            completado_2=True,
+            generado_por='sistema',
+        ))
+        db.session.add(TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_pasada - timedelta(days=1),
+            aprendiz_1_id=self.aprendices[4].id,
+            aprendiz_2_id=self.aprendices[5].id,
+            estado='cumplido',
+            completado_1=True,
+            completado_2=True,
+            generado_por='sistema',
+        ))
+        db.session.commit()
+        recalcular_contadores(self.ficha.id)
+
+        fecha_hoy = date.today()
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_hoy,
+            aprendiz_1_id=self.aprendices[0].id,  # Ana (va a faltar)
+            aprendiz_2_id=self.aprendices[3].id,  # Diego (presente)
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        # Guardar asistencia marcando falta a Ana
+        registros = {
+            self.aprendices[0].id: ('FALTA', None),
+            self.aprendices[1].id: ('ASISTE', None),  # Bruno (carga 1)
+            self.aprendices[2].id: ('ASISTE', None),  # Carmen (carga 0)
+            self.aprendices[3].id: ('ASISTE', None),  # Diego (en turno)
+            self.aprendices[4].id: ('ASISTE', None),  # Elena (carga 1)
+            self.aprendices[5].id: ('ASISTE', None),  # Felipe (carga 2)
+        }
+        guardar_asistencia(self.ficha.id, fecha_hoy, registros)
+
+        # El turno debe haberse actualizado inmediatamente
+        db.session.refresh(turno)
+        self.assertFalse(turno.incluye(self.aprendices[0].id))
+        self.assertTrue(turno.incluye(self.aprendices[3].id))
+        # Carmen (2) entra como suplente por tener menor carga (0) vs los demás asistentes
+        self.assertEqual(turno.aprendiz_1_id, self.aprendices[2].id)
+        self.assertIn('Suplencia por inasistencia', turno.auditoria_1)
+        self.assertIn('Suplente por ausencia de', turno.observacion)
+
+        # Ana conserva 0 aseos cumplidos
+        contadores = recalcular_contadores(self.ficha.id)
+        self.assertEqual(contadores[self.aprendices[0].id].veces_aseo, 0)
+
+    def test_acceso_turnos_aseo_sustituye_proactivamente_ausente_confirmado(self):
+        """Acceder a turnos-aseo para una fecha con inasistencia confirmada actualiza los asignados."""
+        fecha = fechas_futuras(1)[0]
+        # Crear sesión con Ana ausente
+        self._crear_sesion(fecha, ausentes=(self.aprendices[0].id,))
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,  # Ana (ausente confirmada)
+            aprendiz_2_id=self.aprendices[1].id,  # Bruno (presente)
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        # El turno aún tiene a Ana asignada antes de la petición GET
+        self.assertEqual(turno.aprendiz_1_id, self.aprendices[0].id)
+
+        cliente = self._cliente_instructor()
+        mes_param = fecha.strftime('%Y-%m')
+        respuesta = cliente.get(f'/instructor/fichas/{self.ficha.id}/turnos-aseo?mes={mes_param}')
+        self.assertEqual(respuesta.status_code, 200)
+
+        # Tras consultar el calendario, el turno se actualizó proactivamente
+        db.session.refresh(turno)
+        self.assertFalse(turno.incluye(self.aprendices[0].id))
+        self.assertTrue(turno.incluye(self.aprendices[1].id))
+        suplente_id = turno.aprendiz_1_id
+        self.assertIn(suplente_id, [a.id for a in self.aprendices[2:]])
+        # La tarjeta en el HTML muestra limpiamente el nombre del suplente
+        suplente = db.session.get(Aprendiz, suplente_id)
+        self.assertIn(suplente.nombre.encode(), respuesta.data)
+        # La explicación detallada está registrada en la auditoría
+        self.assertIn('Suplencia por inasistencia', turno.auditoria_1)
+
+    def test_ausente_no_desaloja_turnos_futuros_de_otros_aprendices(self):
+        """Un ausente no desaloja turnos futuros ya asignados a otros aprendices."""
+        fechas = fechas_futuras(2)
+        fecha_1 = fechas[0]
+        fecha_2 = fechas[1]
+
+        # Turno 1 en fecha_1: Ana (0) y Bruno (1)
+        turno_1 = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_1,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        # Turno 2 en fecha_2: Carmen (2) y Diego (3)
+        turno_2 = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_2,
+            aprendiz_1_id=self.aprendices[2].id,
+            aprendiz_2_id=self.aprendices[3].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add_all([turno_1, turno_2])
+        db.session.commit()
+
+        # Ana falta en fecha_1
+        from app.services.asistencia import guardar_asistencia
+        registros = {a.id: ('FALTA' if a.id == self.aprendices[0].id else 'ASISTE', None)
+                     for a in self.aprendices}
+        guardar_asistencia(self.ficha.id, fecha_1, registros)
+
+        # Turno 1 sustituyó a Ana
+        db.session.refresh(turno_1)
+        self.assertFalse(turno_1.incluye(self.aprendices[0].id))
+
+        # Turno 2 en fecha_2 CONSERVA intactos a Carmen (2) y Diego (3); ninguno fue desalojado
+        db.session.refresh(turno_2)
+        self.assertEqual(turno_2.aprendiz_1_id, self.aprendices[2].id)
+        self.assertEqual(turno_2.aprendiz_2_id, self.aprendices[3].id)
+
+    def test_verificar_ausencias_en_turnos_respeta_configuracion_excluir_ausentes(self):
+        """verificar_ausencias_en_turnos no modifica turnos si excluir_ausentes está inactivo."""
+        from app.services.aseo import verificar_ausencias_en_turnos, obtener_configuracion
+
+        fecha = fechas_futuras(1)[0]
+        self._crear_sesion(fecha, ausentes=(self.aprendices[0].id,))
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        config = obtener_configuracion(self.ficha.id)
+        config.excluir_ausentes = False
+        db.session.commit()
+
+        resultado = verificar_ausencias_en_turnos(self.ficha.id, fecha, fecha)
+        self.assertEqual(resultado, [])
+        db.session.refresh(turno)
+        self.assertEqual(turno.aprendiz_1_id, self.aprendices[0].id)
+
+        # Si activamos excluir_ausentes, sustituye y retorna el turno
+        config.excluir_ausentes = True
+        db.session.commit()
+        resultado_activo = verificar_ausencias_en_turnos(self.ficha.id, fecha, fecha)
+        self.assertEqual(len(resultado_activo), 1)
+        db.session.refresh(turno)
+        self.assertNotEqual(turno.aprendiz_1_id, self.aprendices[0].id)
+
+
+    def test_guardar_asistencia_100_por_ciento_ausentes_no_falla(self):
+        """Si todos los aprendices faltan, no falla y el turno permanece pendiente."""
+        from app.services.asistencia import guardar_asistencia
+        fecha = date.today()
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        registros = {a.id: ('FALTA', None) for a in self.aprendices}
+        sesion = guardar_asistencia(self.ficha.id, fecha, registros)
+        self.assertIsNotNone(sesion)
+        db.session.refresh(turno)
+        self.assertEqual(turno.estado, 'programado')
+        self.assertEqual(turno.aprendiz_1_id, self.aprendices[0].id)
+        self.assertEqual(turno.aprendiz_2_id, self.aprendices[1].id)
+
+    def test_guardar_asistencia_reiterada_mantiene_idempotencia_auditoria(self):
+        """Guardar asistencia consecutivamente con la misma inasistencia no duplica auditoría."""
+        from app.services.asistencia import guardar_asistencia
+        fecha = date.today()
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        registros = {a.id: ('FALTA' if a.id == self.aprendices[0].id else 'ASISTE', None)
+                     for a in self.aprendices}
+        guardar_asistencia(self.ficha.id, fecha, registros)
+        db.session.refresh(turno)
+        suplente_1 = turno.aprendiz_1_id
+        obs_1 = turno.observacion
+
+        # Guardar exactamente la misma asistencia de nuevo
+        guardar_asistencia(self.ficha.id, fecha, registros)
+        db.session.refresh(turno)
+        self.assertEqual(turno.aprendiz_1_id, suplente_1)
+        self.assertEqual(turno.observacion, obs_1)
+
+    def test_guardar_asistencia_con_un_solo_presente_evita_duplicidad(self):
+        """Si solo hay un aprendiz presente disponible, no se duplica en ambos cupos."""
+        from app.services.asistencia import guardar_asistencia
+        fecha = date.today()
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        # Solo Carmen (2) asiste; todos los demás faltan
+        registros = {a.id: ('ASISTE' if a.id == self.aprendices[2].id else 'FALTA', None)
+                     for a in self.aprendices}
+        guardar_asistencia(self.ficha.id, fecha, registros)
+        db.session.refresh(turno)
+        # Carmen entró en el cupo 1
+        self.assertEqual(turno.aprendiz_1_id, self.aprendices[2].id)
+        # El cupo 2 no puede tener a Carmen dos veces
+        self.assertNotEqual(turno.aprendiz_2_id, self.aprendices[2].id)
+
+    def test_reemplazar_ausentes_con_slot_nulo_es_seguro(self):
+        """_reemplazar_ausentes_del_dia no falla si un cupo no tiene aprendiz asignado."""
+        from types import SimpleNamespace
+        from app.services.aseo import _reemplazar_ausentes_del_dia
+        fecha = date.today()
+        # Objeto simulado con slot 1 nulo (sin violar constraint de DB)
+        turno_mock = SimpleNamespace(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=None,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            observacion=None,
+            auditoria_1=None,
+            auditoria_2=None,
+            generado_por='sistema',
+        )
+
+        presentes = {self.aprendices[2].id, self.aprendices[3].id}
+        resultado = _reemplazar_ausentes_del_dia(turno_mock, presentes)
+        self.assertEqual(len(resultado), 1)
+        self.assertEqual(resultado[0].id, self.aprendices[1].id)
+        self.assertIsNone(turno_mock.aprendiz_1_id)
+        self.assertIn(turno_mock.aprendiz_2_id, presentes)
+
+    def test_programar_reposicion_ramas_de_guarda(self):
+        """Verifica todas las ramas de guarda de _programar_reposicion y _proxima_fecha_disponible."""
+        from app.services.aseo import _programar_reposicion, _proxima_fecha_disponible
+        fecha = date.today()
+
+        # 1. Aprendiz inactivo
+        inactivo = self.aprendices[0]
+        inactivo.activo = False
+        self.assertIsNone(_programar_reposicion(self.ficha.id, inactivo, fecha))
+        inactivo.activo = True
+
+        # 2. Aprendiz con turno pendiente futuro ya programado
+        turno_futuro = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha + timedelta(days=2),
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_futuro)
+        db.session.commit()
+        self.assertIsNone(_programar_reposicion(self.ficha.id, self.aprendices[0], fecha))
+        db.session.delete(turno_futuro)
+        db.session.commit()
+
+        # 3. Ficha con fecha_fin en el pasado: _proxima_fecha_disponible retorna None
+        fecha_fin_orig = self.ficha.fecha_fin
+        self.ficha.fecha_fin = fecha - timedelta(days=1)
+        db.session.commit()
+        self.assertIsNone(_proxima_fecha_disponible(self.ficha.id, fecha))
+        self.assertIsNone(_programar_reposicion(self.ficha.id, self.aprendices[0], fecha))
+        self.ficha.fecha_fin = fecha_fin_orig
+        db.session.commit()
+
+        # 4. Cuando no hay compañeros activos disponibles para emparejar
+        for a in self.aprendices[1:]:
+            a.activo = False
+        db.session.commit()
+        self.assertIsNone(_programar_reposicion(self.ficha.id, self.aprendices[0], fecha))
+        for a in self.aprendices[1:]:
+            a.activo = True
+        db.session.commit()
+
+    def test_verificar_ausencias_en_turnos_con_100_por_ciento_ausentes_retorna_lista_vacia(self):
+        """Si todos los aprendices faltan, verificar_ausencias_en_turnos retorna lista vacía sin marcar falsos reemplazos."""
+        from app.services.aseo import verificar_ausencias_en_turnos
+        fecha = fechas_futuras(1)[0]
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        self._crear_sesion(fecha, ausentes=tuple(a.id for a in self.aprendices))
+        resultado = verificar_ausencias_en_turnos(self.ficha.id, fecha, fecha)
+        self.assertEqual(resultado, [])
+        db.session.refresh(turno)
+        self.assertEqual(turno.aprendiz_1_id, self.aprendices[0].id)
+        self.assertEqual(turno.aprendiz_2_id, self.aprendices[1].id)
+
+    def test_reemplazar_ausentes_con_aprendiz_inexistente_es_seguro(self):
+        """_reemplazar_ausentes_del_dia es inmune a IDs de aprendices huérfanos sin causar AttributeError."""
+        from types import SimpleNamespace
+        from app.services.aseo import _reemplazar_ausentes_del_dia
+        fecha = date.today()
+        turno_mock = SimpleNamespace(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=999999,  # ID que no existe en DB
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            observacion=None,
+            auditoria_1=None,
+            auditoria_2=None,
+            generado_por='sistema',
+        )
+        presentes = {self.aprendices[2].id, self.aprendices[3].id}
+        resultado = _reemplazar_ausentes_del_dia(turno_mock, presentes)
+        # El slot 1 con aprendiz inexistente se omite con seguridad; el slot 2 (aprendices[1] ausente) se sustituye
+        self.assertEqual(len(resultado), 1)
+        self.assertEqual(resultado[0].id, self.aprendices[1].id)
+        self.assertEqual(turno_mock.aprendiz_1_id, 999999)
+        self.assertIn(turno_mock.aprendiz_2_id, presentes)
+
+    def test_verificar_ausencias_en_turnos_rango_con_multiples_turnos_distingue_sustituidos(self):
+        """En un rango con varios turnos, verificar_ausencias_en_turnos sólo devuelve los que efectivamente fueron sustituidos."""
+        from app.services.aseo import verificar_ausencias_en_turnos
+        fechas = fechas_futuras(3)
+        # Día 1: con ausencia y suplentes disponibles -> debe sustituirse
+        t1 = TurnoAseo(
+            ficha_id=self.ficha.id, fecha=fechas[0],
+            aprendiz_1_id=self.aprendices[0].id, aprendiz_2_id=self.aprendices[1].id,
+            estado='programado', generado_por='sistema',
+        )
+        # Día 2: todos presentes -> no se sustituye
+        t2 = TurnoAseo(
+            ficha_id=self.ficha.id, fecha=fechas[1],
+            aprendiz_1_id=self.aprendices[2].id, aprendiz_2_id=self.aprendices[3].id,
+            estado='programado', generado_por='sistema',
+        )
+        # Día 3: 100% ausentes -> no se puede sustituir
+        t3 = TurnoAseo(
+            ficha_id=self.ficha.id, fecha=fechas[2],
+            aprendiz_1_id=self.aprendices[4].id, aprendiz_2_id=self.aprendices[5].id,
+            estado='programado', generado_por='sistema',
+        )
+        db.session.add_all([t1, t2, t3])
+        db.session.commit()
+
+        self._crear_sesion(fechas[0], ausentes=(self.aprendices[0].id,))
+        self._crear_sesion(fechas[1], ausentes=())
+        self._crear_sesion(fechas[2], ausentes=tuple(a.id for a in self.aprendices))
+
+        resultado = verificar_ausencias_en_turnos(self.ficha.id, fechas[0], fechas[2])
+        self.assertEqual(len(resultado), 1)
+        self.assertEqual(resultado[0].id, t1.id)
+        db.session.refresh(t1)
+        self.assertNotEqual(t1.aprendiz_1_id, self.aprendices[0].id)
+        db.session.refresh(t2)
+        self.assertEqual(t2.aprendiz_1_id, self.aprendices[2].id)
+        db.session.refresh(t3)
+        self.assertEqual(t3.aprendiz_1_id, self.aprendices[4].id)
+
+    def test_desvincular_aprendiz_de_turnos_futuros_servicio_cobertura(self):
+        """desvincular_aprendiz_de_turnos_futuros cubre ramas con y sin turnos futuros y cuando no hay candidatos."""
+        from app.services.aseo import desvincular_aprendiz_de_turnos_futuros
+        hoy = date.today()
+
+        # Rama 1: Sin turnos futuros asignados
+        desvincular_aprendiz_de_turnos_futuros(self.ficha.id, self.aprendices[0].id)
+
+        # Rama 2: Con turno futuro donde hay compañeros activos para reemplazar
+        fecha_futura = fechas_futuras(1)[0]
+        turno_futuro = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha_futura,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno_futuro)
+        db.session.commit()
+
+        desvincular_aprendiz_de_turnos_futuros(self.ficha.id, self.aprendices[0].id)
+        db.session.commit()
+        db.session.refresh(turno_futuro)
+        self.assertNotEqual(turno_futuro.aprendiz_1_id, self.aprendices[0].id)
+        self.assertEqual(turno_futuro.aprendiz_2_id, self.aprendices[1].id)
+
+        # Rama 3: Cuando no quedan candidatos activos disponibles (elimina el turno)
+        for ap in self.aprendices:
+            if ap.id != self.aprendices[1].id:
+                ap.activo = False
+        db.session.commit()
+
+        desvincular_aprendiz_de_turnos_futuros(self.ficha.id, self.aprendices[1].id)
+        db.session.commit()
+        turno_eliminado = db.session.get(TurnoAseo, turno_futuro.id)
+        self.assertIsNone(turno_eliminado)
+
+        # Restaurar estado de aprendices
+        for ap in self.aprendices:
+            ap.activo = True
+        db.session.commit()
+
+    def test_ausente_sustituido_no_incrementa_veces_aseo_al_completar_turno(self):
+        """R3: Al completar un turno con sustitución, el ausente no suma veces_aseo y el suplente sí."""
+        from app.services.asistencia import guardar_asistencia
+        from app.services.aseo import completar_turno
+        fecha = fechas_futuras(1)[0]
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        # Ana (0) falta, Bruno (1) y los demás asisten
+        registros = {a.id: ('FALTA' if a.id == self.aprendices[0].id else 'ASISTE', None)
+                     for a in self.aprendices}
+        guardar_asistencia(self.ficha.id, fecha, registros)
+        db.session.refresh(turno)
+
+        suplente_id = turno.aprendiz_1_id
+        self.assertNotEqual(suplente_id, self.aprendices[0].id)
+
+        # Marcar turno como cumplido
+        completar_turno(turno)
+        db.session.commit()
+
+        # Ana (ausente original) no debe tener turnos cumplidos
+        cnt_ana = ContadorAseo.query.filter_by(aprendiz_id=self.aprendices[0].id).first()
+        self.assertEqual(cnt_ana.veces_aseo, 0)
+
+        # El suplente debe tener 1 turno cumplido
+        cnt_suplente = ContadorAseo.query.filter_by(aprendiz_id=suplente_id).first()
+        self.assertEqual(cnt_suplente.veces_aseo, 1)
+
+        # Bruno (asistió) debe tener 1 turno cumplido
+        cnt_bruno = ContadorAseo.query.filter_by(aprendiz_id=self.aprendices[1].id).first()
+        self.assertEqual(cnt_bruno.veces_aseo, 1)
+
+    def test_sustitucion_de_ambos_cupos_por_ausencia_doble_asigna_suplentes_distintos(self):
+        """Si ambos asignados faltan, se sustituyen ambos cupos por suplentes presentes distintos."""
+        from app.services.asistencia import guardar_asistencia
+        fecha = fechas_futuras(1)[0]
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        # Ana (0) y Bruno (1) faltan; los demás asisten
+        registros = {
+            a.id: ('FALTA' if a.id in (self.aprendices[0].id, self.aprendices[1].id) else 'ASISTE', None)
+            for a in self.aprendices
+        }
+        guardar_asistencia(self.ficha.id, fecha, registros)
+        db.session.refresh(turno)
+
+        # Ambos cupos cambiaron
+        self.assertNotIn(turno.aprendiz_1_id, (self.aprendices[0].id, self.aprendices[1].id))
+        self.assertNotIn(turno.aprendiz_2_id, (self.aprendices[0].id, self.aprendices[1].id))
+        # Y no son el mismo suplente
+        self.assertNotEqual(turno.aprendiz_1_id, turno.aprendiz_2_id)
+        # Auditoría debe reflejar ambas suplencias
+        self.assertIn('Suplencia por inasistencia', turno.auditoria_1 or '')
+        self.assertIn('Suplencia por inasistencia', turno.auditoria_2 or '')
+
+    def test_datos_transparencia_sincroniza_ausencias_proactivamente(self):
+        """datos_transparencia detecta ausencias en el mes y devuelve el turno actualizado con el suplente."""
+        from app.services.aseo import datos_transparencia
+        fecha = fechas_futuras(1)[0]
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+            generado_por='sistema',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        # Creamos sesión con Ana ausente
+        self._crear_sesion(fecha, ausentes=(self.aprendices[0].id,))
+
+        datos = datos_transparencia(self.ficha.id, mes=fecha.replace(day=1))
+        turno_en_datos = datos['turnos_por_fecha'].get(fecha)
+        self.assertIsNotNone(turno_en_datos)
+        self.assertNotEqual(turno_en_datos.aprendiz_1_id, self.aprendices[0].id)
+        self.assertEqual(turno_en_datos.aprendiz_2_id, self.aprendices[1].id)
+
 
 if __name__ == '__main__':
     unittest.main()
+

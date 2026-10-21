@@ -98,13 +98,14 @@
                 });
                 var datos = await respuesta.json();
                 if (!respuesta.ok) throw new Error(datos.error || datos.mensaje || 'No se pudo cargar la conversación.');
-                var mensajes = Array.isArray(datos.messages) ? datos.messages.slice() : [];
+                if (!Array.isArray(datos.messages)) throw new Error('No se pudo confirmar la conversación. Revisa tu conexión y vuelve a intentarlo.');
+                var mensajes = datos.messages.slice();
                 mensajes.sort(function (a, b) { return Number(a.id) - Number(b.id); });
                 mensajes.forEach(agregarMensaje);
                 if (!messagesBox.querySelector('.learner-group-chat-message')) mostrarVacio();
                 if (status) status.textContent = '';
             } catch (error) {
-                if (status) status.textContent = error.message || 'No se pudo actualizar el chat. Revisa tu conexión e inténtalo de nuevo.';
+                if (status) status.textContent = !['SyntaxError', 'TypeError'].includes(error.name) && error.message || 'No se pudo actualizar el chat. Revisa tu conexión e inténtalo de nuevo.';
             } finally {
                 polling = false;
             }
@@ -121,7 +122,11 @@
                 input.focus();
                 return;
             }
-            if (contenido.length > 1200 || sending) return;
+            if (contenido.length > 1200) {
+                if (status) status.textContent = 'El mensaje supera los 1200 caracteres. Reduce su extensión y vuelve a enviarlo.';
+                return;
+            }
+            if (sending) return;
 
             sending = true;
             submit.disabled = true;
@@ -139,12 +144,15 @@
                 });
                 var datos = await respuesta.json();
                 if (!respuesta.ok) throw new Error(datos.error || datos.mensaje || 'No se pudo enviar el mensaje. Inténtalo de nuevo.');
-                if (datos.message) agregarMensaje(datos.message);
+                if (!datos.message || !Number.isInteger(Number(datos.message.id)) || Number(datos.message.id) <= 0 || typeof datos.message.contenido !== 'string') {
+                    throw new Error('No se pudo confirmar el mensaje. Conservamos tu texto; revisa la conversación antes de volver a enviarlo.');
+                }
+                agregarMensaje(datos.message);
                 input.value = '';
                 actualizarContador();
                 if (status) status.textContent = 'Mensaje enviado.';
             } catch (error) {
-                if (status) status.textContent = error.message || 'No se pudo enviar el mensaje. Revisa tu conexión e inténtalo de nuevo.';
+                if (status) status.textContent = !['SyntaxError', 'TypeError'].includes(error.name) && error.message || 'No se pudo enviar el mensaje. Revisa tu conexión e inténtalo de nuevo.';
             } finally {
                 sending = false;
                 submit.disabled = false;

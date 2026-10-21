@@ -142,8 +142,15 @@ def _conectar_redis():
 
 
 def _procesar(job_id):
+    try:
+        job_id = int(job_id)
+        if job_id <= 0:
+            raise ValueError
+    except (TypeError, ValueError, OverflowError):
+        log.warning('Se descartó un identificador de trabajo inválido de la cola.')
+        return
     with app.app_context():
-        job = db.session.get(ImportacionJob, int(job_id))
+        job = db.session.get(ImportacionJob, job_id)
         if not job or job.estado != 'encolado':
             return
         if job.tipo_trabajo == 'resumen_ficha':
@@ -171,11 +178,23 @@ def _procesar(job_id):
             # Este commit confirma los datos académicos antes de recalcular
             # módulos secundarios. Si estos fallan, la importación permanece.
             db.session.commit()
-            actualizar_alertas_ficha(ficha.id)
-            actualizar_participacion_ficha(ficha.id)
+            advertencias = []
+            for nombre, actualizar in (
+                ('alertas', actualizar_alertas_ficha),
+                ('ranking', actualizar_participacion_ficha),
+            ):
+                try:
+                    actualizar(ficha.id)
+                except Exception:
+                    db.session.rollback()
+                    advertencias.append(f'Los datos quedaron guardados, pero no se pudo actualizar {nombre}.')
+                    log.exception('La importación %s quedó guardada, pero falló la actualización de %s.', job_id, nombre)
 
             job.estado = 'completado'
-            job.resultado = json.dumps(_resultado_resumido(resultado), ensure_ascii=False)
+            resumen = _resultado_resumido(resultado)
+            if advertencias:
+                resumen['advertencias'] = advertencias
+            job.resultado = json.dumps(resumen, ensure_ascii=False)
             if job.archivo_version_id:
                 version = db.session.get(ArchivoFichaVersion, job.archivo_version_id)
                 if version:

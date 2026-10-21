@@ -23,6 +23,7 @@ from app.services.aseo import (
     obtener_configuracion,
     recalcular_contadores,
     reemplazar_aprendices,
+    verificar_ausencias_en_turnos,
 )
 from app.services.festivos import (
     es_festivo_colombia,
@@ -124,6 +125,11 @@ def turnos(ficha_id):
     mes = _mes_consulta(request.args.get('mes'))
     ultimo_dia = calendar.monthrange(mes.year, mes.month)[1]
     fin_mes = mes.replace(day=ultimo_dia)
+    config = obtener_configuracion(ficha_id)
+    verificar_ausencias_en_turnos(ficha_id, mes, fin_mes)
+    recalcular_contadores(ficha_id)
+    db.session.commit()
+
     semanas = calendar.Calendar(firstweekday=0).monthdatescalendar(
         mes.year, mes.month
     )
@@ -139,10 +145,6 @@ def turnos(ficha_id):
             SesionAsistencia.fecha.between(mes, fin_mes),
         ).all()
     }
-
-    config = obtener_configuracion(ficha_id)
-    recalcular_contadores(ficha_id)
-    db.session.commit()
     contadores = {
         contador.aprendiz_id: contador
         for contador in ContadorAseo.query.filter_by(ficha_id=ficha_id).all()
@@ -415,6 +417,11 @@ def gestionar(ficha_id):
     mes = _mes_consulta(request.args.get('mes'))
     ultimo_dia = calendar.monthrange(mes.year, mes.month)[1]
     fin_mes = mes.replace(day=ultimo_dia)
+    config = obtener_configuracion(ficha_id)
+    verificar_ausencias_en_turnos(ficha_id, mes, fin_mes)
+    recalcular_contadores(ficha_id)
+    db.session.commit()
+
     semanas = calendar.Calendar(firstweekday=0).monthdatescalendar(
         mes.year, mes.month
     )
@@ -430,10 +437,6 @@ def gestionar(ficha_id):
             SesionAsistencia.fecha.between(mes, fin_mes),
         ).all()
     }
-
-    config = obtener_configuracion(ficha_id)
-    recalcular_contadores(ficha_id)
-    db.session.commit()
     contadores = {
         contador.aprendiz_id: contador
         for contador in ContadorAseo.query.filter_by(ficha_id=ficha_id).all()
@@ -782,13 +785,7 @@ def excluir_como_aprendiz(ficha_id, aprendiz_id):
 )
 @limiter.limit('10 per minute')
 def proponer_intercambio(ficha_id, turno_id):
-    documento = (
-        request.form.get('documento')
-        or session.get('aprendiz_documento', '')
-    ).strip()
-    aprendiz = Aprendiz.query.filter_by(
-        ficha_id=ficha_id, documento=documento
-    ).first()
+    aprendiz = _aprendiz_autorizado(ficha_id)
     turno = db.session.get(TurnoAseo, turno_id)
     receptor = db.session.get(
         Aprendiz, request.form.get('aprendiz_recibe_id', type=int)
@@ -850,13 +847,7 @@ def proponer_intercambio(ficha_id, turno_id):
 )
 @limiter.limit('10 per minute')
 def responder_intercambio(ficha_id, intercambio_id):
-    documento = (
-        request.form.get('documento')
-        or session.get('aprendiz_documento', '')
-    ).strip()
-    aprendiz = Aprendiz.query.filter_by(
-        ficha_id=ficha_id, documento=documento
-    ).first()
+    aprendiz = _aprendiz_autorizado(ficha_id)
     intercambio = db.session.get(IntercambioAseo, intercambio_id)
     if (
         not aprendiz
@@ -913,6 +904,7 @@ def transparencia(ficha_id):
     mes_siguiente = _mover_mes(mes, 1).strftime('%Y-%m')
 
     datos = datos_transparencia(ficha_id, mes)
+    db.session.commit()
 
     orden = request.args.get('orden', 'veces')
     if orden == 'nombre':

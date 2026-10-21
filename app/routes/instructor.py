@@ -1,3 +1,5 @@
+from pathlib import Path
+from app.routes.auth import _destino_interno
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func, select, case
@@ -673,6 +675,25 @@ def _resumen_importacion(resultado):
     return " · ".join(partes) + "."
 
 
+def _actualizar_indicadores_carga(ficha_id, corte_id=None):
+    """Actualiza derivados sin invalidar una carga ya confirmada."""
+    fallo = False
+    try:
+        actualizar_alertas_ficha(ficha_id)
+    except Exception:
+        db.session.rollback()
+        fallo = True
+        current_app.logger.exception('La carga quedó guardada, pero falló la actualización de alertas.')
+    try:
+        actualizar_participacion_ficha(ficha_id, corte_id=corte_id)
+    except Exception:
+        db.session.rollback()
+        fallo = True
+        current_app.logger.exception('La carga quedó guardada, pero falló la actualización del ranking.')
+    if fallo:
+        flash('La carga quedó guardada, pero no fue posible actualizar todos los indicadores. Recargue la página más tarde.', 'warning')
+
+
 @instructor_bp.route('/fichas/importar-reporte', methods=['POST'])
 @login_required
 def importar_reporte_ficha():
@@ -690,6 +711,7 @@ def importar_reporte_ficha():
         )
         ficha = resultado['ficha']
         db.session.commit()
+        archivos_respaldo = []
         try:
             archivo.stream.seek(0)
             version = crear_version(
@@ -699,6 +721,7 @@ def importar_reporte_ficha():
                 TIPO_REPORTE_JUICIOS,
                 metadata=resultado.get('metadata'),
                 permitir_existente=True,
+                archivos_creados=archivos_respaldo,
             )
             actualizar_estado(version, 'procesado', detalle=_resumen_importacion(resultado))
             db.session.commit()
@@ -707,9 +730,15 @@ def importar_reporte_ficha():
             flash(str(exc), 'warning')
         except Exception:
             db.session.rollback()
+            for ruta_nueva in archivos_respaldo:
+                ArchivoService.eliminar(ruta_nueva)
             current_app.logger.exception('La ficha se importó, pero no se pudo guardar la versión del reporte.')
-        actualizar_alertas_ficha(ficha.id)
-        actualizar_participacion_ficha(ficha.id)
+            flash(
+                'Los datos de la ficha se importaron, pero no fue posible guardar el reporte original. '
+                'Vuelva a cargar el reporte para conservar su respaldo descargable.',
+                'warning',
+            )
+        _actualizar_indicadores_carga(ficha.id)
 
         accion = 'creada' if resultado['ficha_creada'] else 'vinculada'
         mensaje = (
@@ -979,8 +1008,8 @@ def alternar_estado_activo_aprendiz(ficha_id, aprendiz_id):
         current_app.logger.exception('Error al cambiar estado activo del aprendiz')
         flash('Ocurrió un error al actualizar el estado del aprendiz.', 'error')
 
-    siguiente = request.form.get('next') or request.referrer
-    if siguiente and siguiente.startswith('/'):
+    siguiente = _destino_interno(request.form.get('next') or request.referrer)
+    if siguiente:
         return redirect(siguiente)
     return redirect(url_for('instructor.aprendices', ficha_id=ficha_id))
 
@@ -1353,6 +1382,8 @@ def guardar_portafolio_instructor(ficha_id, aprendiz_id):
         or 'application/json' in request.headers.get('Accept', '')
     )
     datos = request.get_json(silent=True) if request.is_json else request.form
+    if request.is_json and not isinstance(datos, dict):
+        return jsonify(ok=False, error='Envíe los enlaces del portafolio en un objeto JSON válido.'), 400
     github_raw = datos.get('enlace_github', '')
     notion_raw = datos.get('enlace_notion', '')
 
@@ -1405,7 +1436,8 @@ def cargar_excel(ficha_id):
 
     importacion_job_id = None
     version = None
-    version_path = None
+    archivos_creados = []
+    ruta_temporal = None
     volver_planeacion = request.form.get('retorno') == 'planeacion'
     volver_juicios = request.form.get('retorno') == 'juicios'
     aprendiz_admin_id = request.form.get('aprendiz_administrativo_id', type=int)
@@ -1420,8 +1452,8 @@ def cargar_excel(ficha_id):
             TIPO_REPORTE_JUICIOS,
             metadata=metadata_reporte,
             permitir_existente=True,
+            archivos_creados=archivos_creados,
         )
-        version_path = version.ruta_archivo
         if current_app.config.get('IMPORTACIONES_ASINCRONAS'):
             archivo.stream.seek(0)
             nombre_archivo = secure_filename(archivo.filename) or 'reporte.xls'
@@ -1432,6 +1464,7 @@ def cargar_excel(ficha_id):
                 carpeta='importaciones',
                 nombre_archivo=f'{uuid4().hex}_{nombre_archivo}',
             )
+            ruta_temporal = Path(ruta).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix()
 
             job = ImportacionJob(
                 ficha_id=ficha.id,
@@ -1444,6 +1477,8 @@ def cargar_excel(ficha_id):
             )
             db.session.add(job)
             db.session.commit()
+            archivos_creados.clear()
+            ruta_temporal = None
             importacion_job_id = job.id
             try:
                 encolar_importacion(job.id, current_app.config['IMPORT_QUEUE_NAME'])
@@ -1464,7 +1499,6 @@ def cargar_excel(ficha_id):
                     db.session.commit()
                 importacion_job_id = None
                 # Conserva la versión permanente para descarga y diagnóstico.
-                version_path = None
                 raise RuntimeError(
                     'No fue posible poner la importación en cola. '
                     'Revisa REDIS_URL y que el worker esté activo.'
@@ -1486,8 +1520,8 @@ def cargar_excel(ficha_id):
                     flash(f'No se pudo asignar el rol administrativo: {err}', 'warning')
             actualizar_estado(version, 'procesado', detalle=_resumen_importacion(resultado))
             db.session.commit()
-            actualizar_alertas_ficha(ficha.id)
-            actualizar_participacion_ficha(ficha.id)
+            archivos_creados.clear()
+            _actualizar_indicadores_carga(ficha.id)
 
             msg = _resumen_importacion(resultado)
             if resultado['errores']:
@@ -1499,13 +1533,17 @@ def cargar_excel(ficha_id):
 
     except (ErrorArchivo, ErrorImportacion, RuntimeError) as exc:
         db.session.rollback()
-        if version_path:
-            ArchivoService.eliminar(version_path)
+        for ruta_nueva in archivos_creados:
+            ArchivoService.eliminar(ruta_nueva)
+        if ruta_temporal:
+            ArchivoService.eliminar(ruta_temporal)
         flash(str(exc), 'error')
     except Exception:
         db.session.rollback()
-        if version_path:
-            ArchivoService.eliminar(version_path)
+        for ruta_nueva in archivos_creados:
+            ArchivoService.eliminar(ruta_nueva)
+        if ruta_temporal:
+            ArchivoService.eliminar(ruta_temporal)
         current_app.logger.exception('Error inesperado al importar aprendices')
         flash('No fue posible procesar el archivo. Verifica el Excel e inténtalo de nuevo.', 'error')
 
@@ -1931,9 +1969,16 @@ def tareas(ficha_id):
             **datos,
         )
         db.session.add(tarea)
-        db.session.commit()
-        actualizar_alertas_ficha(ficha_id)
-        actualizar_participacion_ficha(ficha_id, corte_id=corte_id)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            if material_url:
+                ArchivoService.eliminar(material_url)
+            current_app.logger.exception('No se pudo registrar la tarea con su material.')
+            flash('No fue posible registrar la tarea. Vuelva a intentarlo; el material no quedó guardado.', 'error')
+            return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
+        _actualizar_indicadores_carga(ficha_id, corte_id=corte_id)
         flash(f'Tarea "{datos["titulo"]}" creada correctamente.', 'success')
         return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
@@ -2102,15 +2147,22 @@ def editar_tarea(ficha_id, tarea_id):
     elif quitar_material:
         tarea.material_apoyo_url = None
     tarea.actualizada_en = datetime.utcnow()
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        if material_nuevo:
+            ArchivoService.eliminar(material_nuevo)
+        current_app.logger.exception('No se pudo actualizar la tarea con su material.')
+        flash('No fue posible actualizar la tarea. El material anterior se conserva; vuelva a intentarlo.', 'error')
+        return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
     # El archivo viejo se borra después del commit: si la transacción fallara,
     # el registro seguiría apuntando a un archivo que ya no existe en disco.
     if material_anterior and (material_nuevo or quitar_material):
         ArchivoService.eliminar(material_anterior)
 
-    actualizar_alertas_ficha(ficha_id)
-    actualizar_participacion_ficha(ficha_id)
+    _actualizar_indicadores_carga(ficha_id)
     flash(f'Tarea "{tarea.titulo}" actualizada.', 'success')
     return redirect(url_for('instructor.tareas', ficha_id=ficha_id))
 
@@ -2765,6 +2817,9 @@ def guardar_config_alertas(ficha_id):
     if min(umbral_amarillo, umbral_rojo, max_fallas) < 1:
         flash('Los umbrales deben ser mayores que cero.', 'error')
         return redirect(url_for('instructor.alertas', ficha_id=ficha_id))
+    if max(umbral_amarillo, umbral_rojo, max_fallas) > 2_147_483_647:
+        flash('Los umbrales superan el máximo permitido. Ingrese valores menores.', 'error')
+        return redirect(url_for('instructor.alertas', ficha_id=ficha_id))
     if umbral_rojo <= umbral_amarillo:
         flash('La alerta roja debe activarse después de la alerta amarilla.', 'error')
         return redirect(url_for('instructor.alertas', ficha_id=ficha_id))
@@ -2977,7 +3032,14 @@ def materiales(ficha_id):
             descripcion=descripcion,
         )
         db.session.add(material)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            ArchivoService.eliminar(resultado.url)
+            current_app.logger.exception('No se pudo registrar el material de la ficha.')
+            flash('No fue posible registrar el material. Vuelva a seleccionar el archivo e inténtelo de nuevo.', 'error')
+            return redirect(url_for('instructor.materiales', ficha_id=ficha_id))
         flash('Material subido exitosamente.', 'success')
         return redirect(url_for('instructor.materiales', ficha_id=ficha_id))
 
@@ -3004,9 +3066,16 @@ def eliminar_material(ficha_id, material_id):
         flash('No tienes permiso para eliminar este material.', 'error')
         return redirect(url_for('instructor.materiales', ficha_id=ficha_id))
 
-    ArchivoService.eliminar(material.url_archivo)
-    db.session.delete(material)
-    db.session.commit()
+    archivo_anterior = material.url_archivo
+    try:
+        db.session.delete(material)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('No fue posible eliminar el material %s.', material_id)
+        flash('No fue posible eliminar el material. El archivo se conserva; vuelva a intentarlo.', 'error')
+        return redirect(url_for('instructor.materiales', ficha_id=ficha_id))
+    ArchivoService.eliminar(archivo_anterior)
     flash('Material eliminado.', 'success')
     return redirect(url_for('instructor.materiales', ficha_id=ficha_id))
 
@@ -3426,8 +3495,10 @@ def toggle_competencia_seleccionada(ficha_id):
     if not puede_gestionar_ficha(ficha):
         return jsonify({'success': False, 'error': 'No tienes permisos en esta ficha.'}), 403
 
-    data = request.get_json() or {}
-    competencia_nombre = (data.get('competencia') or '').strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('competencia', ''), str):
+        return jsonify(success=False, error='Envíe la competencia como texto dentro de un objeto JSON.'), 400
+    competencia_nombre = data.get('competencia', '').strip()
     if not competencia_nombre:
         return jsonify({'success': False, 'error': 'Nombre de competencia requerido.'}), 400
 
@@ -3495,12 +3566,16 @@ def programar_competencia(ficha_id):
     if not puede_gestionar_ficha(ficha):
         return jsonify({'success': False, 'error': 'No tienes permisos en esta ficha.'}), 403
 
-    data = request.get_json() or {}
-    competencia_nombre = (data.get('competencia') or '').strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('competencia', ''), str):
+        return jsonify(success=False, error='Envíe la competencia como texto dentro de un objeto JSON.'), 400
+    competencia_nombre = data.get('competencia', '').strip()
     if not competencia_nombre:
         return jsonify({'success': False, 'error': 'Nombre de competencia requerido.'}), 400
 
-    limpiar = bool(data.get('limpiar'))
+    limpiar = data.get('limpiar', False)
+    if type(limpiar) is not bool:
+        return jsonify(success=False, error='La opción de restablecer la programación debe ser verdadera o falsa.'), 400
     from app.services.programacion_competencias import (
         guardar_programacion_competencia,
         limpiar_programacion_competencia,
@@ -3515,6 +3590,9 @@ def programar_competencia(ficha_id):
         f_fin_str = data.get('fecha_fin')
         f_ini = _parsear_fecha(f_ini_str)
         f_fin = _parsear_fecha(f_fin_str)
+        if ((f_ini_str not in (None, '') and not f_ini)
+                or (f_fin_str not in (None, '') and not f_fin)):
+            return jsonify(success=False, error='Ingrese fechas válidas para programar la competencia.'), 400
         if f_ini and f_fin and f_fin < f_ini:
             return jsonify({'success': False, 'error': 'La fecha de finalización no puede ser anterior a la de inicio.'}), 400
 

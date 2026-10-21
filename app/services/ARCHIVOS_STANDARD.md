@@ -111,11 +111,19 @@ return ArchivoService.enviar(
 
 ### 1. Extensión (siempre activa)
 Contra `ALLOWED_EXTENSIONS` en `config.py`. Actualmente:
-`pdf, png, jpg, jpeg, zip, rar, xlsx, xls, doc, docx, pptx`
+`pdf, png, jpg, jpeg, zip, rar, 7z, xlsx, xls, doc, docx, ppt, pptx`.
+Los selectores de evidencias, planes, soportes y materiales toman sus formatos
+de esta configuración. Para enviar carpetas, se comprimen en ZIP y se adjunta
+el archivo generado; cada entrega conserva un archivo.
 
 ### 2. MIME header (activado por defecto)
 `check_mime=True` verifica `archivo.content_type` contra `MIME_POR_EXTENSION`.
 El cliente puede falsear este header, por eso es informativo + preventivo.
+Se admiten los tipos binarios genéricos que algunos navegadores asignan a
+documentos y comprimidos. La validación de contenido permanece activa. Para
+ZIP también se admiten los alias de compresores y se verifica el directorio
+central con `zipfile.is_zipfile`; un ZIP truncado se rechaza con instrucciones
+para volver a comprimir la carpeta.
 
 ### 3. Magic bytes `check_magic=True` (activado por defecto)
 Lee 1 KB del archivo y lo compara con firmas conocidas. Se lee 1 KB y no 32 B
@@ -124,7 +132,9 @@ porque hay PDF válidos con bytes previos a `%PDF`. Cubre PDF, PNG, JPEG, ZIP
 
 ### 4. Tamaño
 - Límite por archivo: `MAX_UPLOAD_BYTES` en `config.py` (se configura con `MAX_CONTENT_LENGTH`, por compatibilidad con el entorno). Flask suma 1 MiB para los campos y separadores multipart; el error 413 muestra el límite y devuelve al panel del aprendiz cuando falla una evidencia.
-- Por archivo, tras escribirlo: 0 bytes → `ErrorArchivoVacio`; por encima del límite → `ErrorTamano`. En ambos casos el `.part` se borra y nada llega a la BD.
+- Antes de escribir, se comprueba que el archivo se pueda leer, tenga contenido
+  y respete el límite. La comprobación aplica también a importaciones crudas.
+  El guardado conserva la escritura atómica y limpia los archivos parciales.
 
 ## Frontend
 
@@ -134,8 +144,16 @@ formulario `multipart/form-data`:
 - valida tamaño y extensión **antes** de enviar (evita esperar 50 MB para un 413);
 - muestra porcentaje real de subida y bloquea el doble envío;
 - traduce 413 / 429 / error de red a un mensaje en español;
-- al terminar navega a `xhr.responseURL`, así los mensajes flash del patrón
-  POST-Redirect-GET se ven igual que sin JavaScript.
+- El adaptador `cargas_http.py` devuelve errores JSON con `ok` y `message`;
+  las sesiones expiradas incluyen `reload` para ofrecer recargar el formulario.
+  En los éxitos devuelve `redirect` sin consumir los mensajes flash antes de
+  navegar. Las respuestas HTML heredadas también conservan sus errores.
+- La selección se conserva tras un error y los botones recuperan su estado
+  anterior. El envío de planeación usa el mismo controlador compartido.
+- Un fallo de persistencia elimina únicamente los archivos nuevos. Los
+  archivos de versiones reutilizadas y las cargas confirmadas se conservan;
+  las fallas posteriores de indicadores o notificaciones se informan como
+  advertencias sobre una carga guardada.
 
 Para excluir un formulario concreto: `data-sin-progreso`. Si el navegador no
 soporta `FormData`/progreso, no se intercepta nada.

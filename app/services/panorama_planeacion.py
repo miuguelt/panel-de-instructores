@@ -111,7 +111,9 @@ def _calcular_desempeno_ficha(analisis, linea, proyeccion, contraste, catalogo_p
             evaluadores_distintos.add(ev.get('nombre'))
 
     evm = (proyeccion or {}).get('evm') or {}
-    spi = evm.get('spi') or 1.0
+    spi = evm.get('spi')
+    if spi is None:
+        spi = 1.0
 
     return {
         'total_saberes': total_saberes,

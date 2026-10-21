@@ -8,7 +8,7 @@ SVG para su visualización interactiva y accesible en el panel del aprendiz.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from app.models.ranking import PuntajeHistorico
@@ -111,23 +111,6 @@ def obtener_curva_rendimiento_aprendiz(
             'svg': construir_curva_svg_aprendiz([]),
         }
 
-    # Si hay un solo corte, sintetizamos un hito base anterior para trazar la línea
-    if len(puntos_raw) == 1:
-        p_unico = puntos_raw[0]
-        f_base = p_unico['fecha'] - timedelta(days=7)
-        puntaje_base = max(round(p_unico['puntaje'] * 0.9, 1), 0.0)
-        puntos_raw.insert(0, {
-            'fecha': f_base,
-            'fecha_clave': f_base.strftime('%Y-%m-%d'),
-            'fecha_str': f_base.strftime('%d/%m/%Y'),
-            'puntaje': puntaje_base,
-            'asistencia': p_unico['asistencia'],
-            'evidencias': max(round(p_unico['evidencias'] * 0.85, 1), 0.0),
-            'juicios': p_unico['juicios'],
-            'posicion': p_unico['posicion'],
-            'es_base_sintetica': True,
-        })
-
     # Cálculo de métricas y tendencia
     svg_data = construir_curva_svg_aprendiz(puntos_raw, meta_pct=70.0)
     ultimo_pt = puntos_raw[-1]
@@ -175,6 +158,8 @@ def obtener_curva_rendimiento_aprendiz(
         mejor_pt=mejor_pt,
         tendencia=tendencia,
     )
+    if len(puntos_raw) == 1:
+        diagnostico = 'Este es tu primer registro. La tendencia se podrá calcular cuando tengas al menos dos registros.'
     ruta_recuperacion = obtener_ruta_recuperacion_formativa()
 
     pilares = {

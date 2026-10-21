@@ -183,11 +183,11 @@
     {% endif %}
     <div style="padding:10px 18px 14px;border-top:1px solid var(--border-divider);display:flex;gap:6px;flex-wrap:wrap;">
       {% if es_imagen %}
-      <button onclick="vistaPrevia('{{ url_for('aprendiz.descargar_archivo', filename=m.url_archivo, inline=1) }}','{{ m.nombre_archivo }}')" class="btn btn-sm btn-outline">Vista Previa</button>
+      <button data-file-url="{{ url_for('aprendiz.descargar_archivo', filename=m.url_archivo, inline=1) }}" data-file-name="{{ m.nombre_archivo }}" onclick="vistaPrevia(this.dataset.fileUrl, this.dataset.fileName)" class="btn btn-sm btn-outline">Vista Previa</button>
       {% endif %}
       <a href="{{ url_for('aprendiz.descargar_archivo', filename=m.url_archivo) }}" class="btn btn-sm btn-primary" style="text-decoration:none;">Descargar</a>
       {% if m.instructor_id == current_user.id or current_user.es_admin or ficha.instructor_id == current_user.id %}
-      <button onclick="confirmarEliminar({{ m.id }},'{{ m.nombre_archivo|e }}')" class="btn btn-sm btn-outline" style="color:var(--sena-red);border-color:var(--sena-red);margin-left:auto;">Eliminar</button>
+      <button data-file-id="{{ m.id }}" data-file-name="{{ m.nombre_archivo }}" onclick="confirmarEliminar(this.dataset.fileId, this.dataset.fileName)" class="btn btn-sm btn-outline" style="color:var(--sena-red);border-color:var(--sena-red);margin-left:auto;">Eliminar</button>
       {% endif %}
     </div>
   </article>
@@ -215,7 +215,7 @@
       </header>
       <div class="app-modal-body app-modal-body--spacious">
         <div class="drop-zone" id="dropZone">
-          <input type="file" name="archivo" id="archivoInput" required onchange="onFileSelect(this)">
+          <input type="file" name="archivo" id="archivoInput" accept="{{ extensiones_carga }}" required onchange="onFileSelect(this)">
           <div class="drop-zone-prompt">
             <div class="drop-zone-icon">&#128228;</div>
             <div class="drop-zone-text">Arrastra un archivo aqu&iacute; o <strong>selecciona uno</strong></div>
@@ -227,6 +227,7 @@
             <button type="button" onclick="limpiarArchivo()" style="background:none;border:none;color:var(--sena-red);cursor:pointer;font-size:16px;padding:2px 4px;" title="Quitar archivo">&times;</button>
           </div>
         </div>
+        <p id="materialCargaError" role="alert" tabindex="-1" hidden style="color:var(--danger-text,#c0392b);margin:0;"></p>
         <div>
           <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;color:var(--text-muted);">Descripci&oacute;n <span style="font-weight:400;">(opcional)</span></label>
           <textarea name="descripcion" rows="3" placeholder="Breve descripci&oacute;n del contenido..." style="width:100%;padding:10px 14px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--input-bg);color:var(--text-main);font:inherit;font-size:14px;resize:vertical;transition:border-color .2s;outline:none;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-subtle)'"></textarea>
@@ -287,40 +288,29 @@
 <script>
 var materialAEliminar = null;
 
-var formSubir = document.getElementById('formSubir');
-if (formSubir) {
-  formSubir.addEventListener('submit', function() {
-    var btn = document.getElementById('btnSubirArchivo');
-    var btnCancelar = document.getElementById('btnCancelarSubir');
-    var modal = document.getElementById('modalSubir');
-    if (modal) modal.classList.add('is-loading');
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<span style="display:inline-block; margin-right:8px; animation: spin 1s linear infinite;">&#8982;</span> Subiendo, por favor espera...';
-      btn.style.opacity = '0.8';
-      btn.style.cursor = 'not-allowed';
-    }
-    if (btnCancelar) {
-      btnCancelar.style.pointerEvents = 'none';
-      btnCancelar.style.opacity = '0.5';
-    }
-  });
+function avisarCargaMaterial(mensaje) {
+  var aviso = document.getElementById('materialCargaError');
+  aviso.textContent = mensaje;
+  aviso.hidden = !mensaje;
+  if (mensaje) aviso.focus();
 }
 
 function onFileSelect(input) {
   var zone = document.getElementById('dropZone');
   var nameEl = document.getElementById('dropZoneFileName');
+  avisarCargaMaterial('');
   if (input.files && input.files[0]) {
     nameEl.textContent = input.files[0].name;
     zone.classList.add('has-file');
   } else {
+    nameEl.textContent = '';
     zone.classList.remove('has-file');
   }
 }
 function limpiarArchivo() {
   var input = document.getElementById('archivoInput');
   input.value = '';
-  document.getElementById('dropZone').classList.remove('has-file');
+  onFileSelect(input);
 }
 
 var dropZone = document.getElementById('dropZone');
@@ -332,11 +322,27 @@ if (dropZone) {
     dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drag-over'); });
   });
   dropZone.addEventListener('drop', function(e) {
-    var files = e.dataTransfer.files;
-    if (files.length) {
-      document.getElementById('archivoInput').files = files;
-      onFileSelect(document.getElementById('archivoInput'));
+    var datos = e.dataTransfer;
+    if (!datos) return;
+    var items = datos.items || [];
+    for (var i = 0; i < items.length; i += 1) {
+      var entrada = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+      if (entrada && entrada.isDirectory) {
+        avisarCargaMaterial('Para cargar una carpeta, comprime su contenido en un archivo ZIP y selecciona el ZIP generado.');
+        return;
+      }
     }
+    var files = datos.files;
+    if (!files || !files.length) {
+      avisarCargaMaterial('No se encontró un archivo para cargar. Si es una carpeta, comprime su contenido en un ZIP y selecciona el archivo generado.');
+      return;
+    }
+    if (files.length > 1) {
+      avisarCargaMaterial('Selecciona un solo archivo por carga. Para compartir varios archivos juntos, comprímelos en un ZIP.');
+      return;
+    }
+    document.getElementById('archivoInput').files = files;
+    onFileSelect(document.getElementById('archivoInput'));
   });
 }
 

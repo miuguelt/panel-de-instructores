@@ -442,12 +442,19 @@ def _presentes_en_fecha(ficha_id, fecha):
 
 
 def _proxima_fecha_disponible(ficha_id, despues_de):
+    turnos_existentes = {
+        t.fecha
+        for t in TurnoAseo.query.filter(
+            TurnoAseo.ficha_id == ficha_id,
+            TurnoAseo.fecha > despues_de,
+        ).all()
+    }
     sesiones = SesionAsistencia.query.filter(
         SesionAsistencia.ficha_id == ficha_id,
         SesionAsistencia.fecha > despues_de,
     ).order_by(SesionAsistencia.fecha).all()
     for s in sesiones:
-        if es_dia_habil(s.fecha):
+        if es_dia_habil(s.fecha) and s.fecha not in turnos_existentes:
             return s.fecha
 
     ficha = db.session.get(Ficha, ficha_id)
@@ -458,7 +465,7 @@ def _proxima_fecha_disponible(ficha_id, despues_de):
     )
     candidata = despues_de + timedelta(days=1)
     while candidata <= limite:
-        if es_dia_habil(candidata):
+        if es_dia_habil(candidata) and candidata not in turnos_existentes:
             if not SesionAsistencia.query.filter_by(
                 ficha_id=ficha_id, fecha=candidata
             ).first():
@@ -474,7 +481,7 @@ def _proxima_fecha_disponible(ficha_id, despues_de):
 
 
 def _programar_reposicion(ficha_id, aprendiz, desde_fecha):
-    """Guarda el próximo turno del ausente para equilibrar la cola justa."""
+    """Guarda el próximo turno del ausente en cupo disponible sin desalojar asignados."""
     if not aprendiz or not aprendiz.activo or aprendiz.estado not in ESTADOS_ACTIVOS:
         return None
     if TurnoAseo.query.filter(
@@ -502,28 +509,8 @@ def _programar_reposicion(ficha_id, aprendiz, desde_fecha):
         'para mantener la misma cantidad de turnos en el grupo.'
     )
     turno = TurnoAseo.query.filter_by(ficha_id=ficha_id, fecha=fecha).first()
-    if turno and turno.estado in ESTADOS_PENDIENTES:
-        if turno.incluye(aprendiz.id):
-            return turno
-        sale = max(
-            (turno.aprendiz_1, turno.aprendiz_2),
-            key=lambda item: (
-                contadores[item.id].veces_aseo + cargas_prog[item.id],
-                contadores[item.id].veces_aseo,
-                _ultima_fecha(contadores[item.id].ultima_vez_aseo, ultima_prog.get(item.id)) or date.min,
-                item.id,
-            ),
-        )
-        _reemplazar_en_turno(turno, sale.id, aprendiz.id, auditoria)
-        nota = (
-            f'Reposición de {aprendiz.nombre_completo} por ausencia el '
-            f'{desde_fecha.strftime("%d/%m/%Y")}.'
-        )
-        turno.observacion = (
-            f'{turno.observacion} {nota}'.strip() if turno.observacion else nota
-        )
-        db.session.flush()
-        return turno
+    if turno:
+        return turno if (turno.estado in ESTADOS_PENDIENTES and turno.incluye(aprendiz.id)) else None
 
     activos = [
         item for item in aprendices_activos(ficha_id) if item.id != aprendiz.id
@@ -578,7 +565,7 @@ def _reemplazar_ausentes_del_dia(turno, presentes):
     for slot in (1, 2):
         actual_id = turno.aprendiz_1_id if slot == 1 else turno.aprendiz_2_id
         otro_id = turno.aprendiz_2_id if slot == 1 else turno.aprendiz_1_id
-        if actual_id in presentes:
+        if not actual_id or actual_id in presentes:
             continue
 
         ocupados = {turno.aprendiz_1_id, turno.aprendiz_2_id}
@@ -606,6 +593,8 @@ def _reemplazar_ausentes_del_dia(turno, presentes):
             historial_parejas=historial_parejas,
         )
         ausente = db.session.get(Aprendiz, actual_id)
+        if not ausente:
+            continue
         auditoria = (
             f'Suplencia por inasistencia: {ausente.nombre_completo} no asistió el '
             f'{turno.fecha.strftime("%d/%m/%Y")}. Entró {suplente.nombre_completo} '
@@ -670,6 +659,34 @@ def ajustar_turno_por_asistencia(ficha_id, fecha_sesion):
             recalcular_contadores(ficha_id)
 
     return turno
+
+
+def verificar_ausencias_en_turnos(ficha_id, fecha_inicio, fecha_fin):
+    """Revisa si turnos pendientes en el rango tienen ausencias confirmadas y sustituye ausentes."""
+    config = obtener_configuracion(ficha_id)
+    if not config.excluir_ausentes:
+        return []
+
+    turnos = TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.fecha.between(fecha_inicio, fecha_fin),
+        TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
+    ).order_by(TurnoAseo.fecha).all()
+
+    sustituidos = []
+    for turno in turnos:
+        presentes = _presentes_en_fecha(ficha_id, turno.fecha)
+        if presentes is not None:
+            if (turno.aprendiz_1_id and turno.aprendiz_1_id not in presentes) or (
+                turno.aprendiz_2_id and turno.aprendiz_2_id not in presentes
+            ):
+                repuestos = _reemplazar_ausentes_del_dia(turno, presentes)
+                if repuestos:
+                    sustituidos.append(turno)
+
+    if sustituidos:
+        db.session.flush()
+    return sustituidos
 
 
 def recalcular_contadores(ficha_id):
@@ -1059,6 +1076,8 @@ def datos_transparencia(ficha_id, mes=None):
     import calendar as cal
     ultimo_dia = cal.monthrange(mes.year, mes.month)[1]
     fin_mes = mes.replace(day=ultimo_dia)
+
+    verificar_ausencias_en_turnos(ficha_id, mes, fin_mes)
 
     turnos_mes = TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,

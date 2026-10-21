@@ -1,8 +1,8 @@
 """Carga unificada de los tres documentos que alimentan una ficha.
 
-La planeación pedagógica, el Programa de Formación y el Reporte de Juicios
-Evaluativos se procesan en una sola transacción: si uno falla, no queda
-ninguna versión a medias ni archivos huérfanos en disco.
+La validación de los documentos precede la confirmación de sus registros.
+La cola y los indicadores se actualizan después del guardado; sus fallas
+se informan sin eliminar versiones confirmadas ni archivos históricos.
 """
 
 from __future__ import annotations
@@ -51,8 +51,8 @@ def metadata_ficha(ficha):
 def procesar_carga_unificada(ficha, instructor_id, archivos):
     """Carga y procesa uno, dos o los tres documentos de una ficha.
 
-    Devuelve ``(ok, mensaje, status)``. Si algo falla, ninguna versión queda
-    registrada: se revierte la transacción y se borran los archivos escritos.
+    Devuelve ``(ok, mensaje, status)``. Antes de confirmar se revierte la
+    transacción y se limpian únicamente los archivos de esta solicitud.
     """
     archivo_planeacion = archivos.get('archivo_planeacion')
     archivo_juicios = (archivos.get('archivo_juicios') or archivos.get('archivo_reporte')
@@ -67,7 +67,10 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
         return False, 'Selecciona al menos uno de los tres documentos para procesar.', 422
 
     mensajes_exito = []
-    versiones_creadas = []
+    archivos_creados = []
+    ruta_cruda = None
+    guardado_confirmado = False
+    procesamiento_pendiente = False
     reporte_en_worker = False
 
     try:
@@ -75,9 +78,7 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
         if tiene_planeacion:
             if not archivo_planeacion.filename.lower().endswith('.xlsx'):
                 raise ValueError('La planeación pedagógica debe estar en formato .xlsx.')
-            ver_plan = crear_version(archivo_planeacion, ficha.id, instructor_id, TIPO_PLANEACION, permitir_existente=True)
-            if ver_plan not in versiones_creadas:
-                versiones_creadas.append(ver_plan)
+            ver_plan = crear_version(archivo_planeacion, ficha.id, instructor_id, TIPO_PLANEACION, permitir_existente=True, archivos_creados=archivos_creados)
             ruta_plan = Path(current_app.config['UPLOAD_FOLDER']) / ver_plan.ruta_archivo
             contenido_plan = parsear_planeacion(ruta_plan)
             alineacion_plan = comparar_fuentes(contenido_plan['metadata'], metadata_ficha(ficha))
@@ -96,9 +97,7 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
         if tiene_programa:
             if not archivo_programa.filename.lower().endswith('.pdf'):
                 raise ValueError('El Programa de Formación debe estar en formato .pdf.')
-            ver_prog = crear_version(archivo_programa, ficha.id, instructor_id, TIPO_PROGRAMA, permitir_existente=True)
-            if ver_prog not in versiones_creadas:
-                versiones_creadas.append(ver_prog)
+            ver_prog = crear_version(archivo_programa, ficha.id, instructor_id, TIPO_PROGRAMA, permitir_existente=True, archivos_creados=archivos_creados)
             ruta_prog = Path(current_app.config['UPLOAD_FOLDER']) / ver_prog.ruta_archivo
             programa_data = parsear_programa(ruta_prog)
             alineacion_prog = comparar_fuentes(programa_data['metadata'], metadata_ficha(ficha))
@@ -115,9 +114,7 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
             meta_rep = leer_metadata_archivo(archivo_juicios)
             if es_reporte_oficial(meta_rep):
                 validar_reporte_ficha(ficha, meta_rep)
-            ver_rep = crear_version(archivo_juicios, ficha.id, instructor_id, TIPO_REPORTE_JUICIOS, metadata=meta_rep, permitir_existente=True)
-            if ver_rep not in versiones_creadas:
-                versiones_creadas.append(ver_rep)
+            ver_rep = crear_version(archivo_juicios, ficha.id, instructor_id, TIPO_REPORTE_JUICIOS, metadata=meta_rep, permitir_existente=True, archivos_creados=archivos_creados)
 
             if current_app.config.get('IMPORTACIONES_ASINCRONAS'):
                 archivo_juicios.stream.seek(0)
@@ -137,8 +134,12 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                 )
                 db.session.add(job)
                 db.session.commit()
+                archivos_creados.clear()
+                guardado_confirmado = True
+                procesamiento_pendiente = True
                 try:
                     encolar_importacion(job.id, current_app.config['IMPORT_QUEUE_NAME'])
+                    procesamiento_pendiente = False
                     reporte_en_worker = True
                     mensajes_exito.append(f'Reporte de juicios v{ver_rep.version} encolado (trabajo #{job.id})')
                 except ColaImportacionesNoDisponible:
@@ -146,35 +147,57 @@ def procesar_carga_unificada(ficha, instructor_id, archivos):
                     job.error = 'No fue posible conectar con la cola de procesamiento.'
                     actualizar_estado(ver_rep, 'error', detalle=job.error)
                     db.session.commit()
-                    mensajes_exito.append(f'Reporte v{ver_rep.version} guardado (cola no disponible)')
+                    if ruta_cruda:
+                        ArchivoService.eliminar(Path(ruta_cruda).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix())
+                        ruta_cruda = None
+                    return False, ('Los documentos quedaron guardados, pero el procesamiento del reporte no pudo iniciarse. '
+                                   'Vuelva a cargar el reporte más tarde o informe al administrador.'), 503
             else:
                 res_imp = importar_archivo(archivo_juicios, ficha, instructor_id)
                 actualizar_estado(ver_rep, 'procesado', detalle=f"{res_imp.get('nuevos', 0)} aprendices, {res_imp.get('juicios_nuevos', 0)} juicios")
-                actualizar_alertas_ficha(ficha.id)
-                actualizar_participacion_ficha(ficha.id)
                 mensajes_exito.append(f'Reporte de juicios v{ver_rep.version} procesado ({res_imp.get("nuevos", 0)} aprendices)')
 
         db.session.commit()
+        archivos_creados.clear()
+        guardado_confirmado = True
+        if tiene_juicios and not reporte_en_worker:
+            actualizar_alertas_ficha(ficha.id)
+            actualizar_participacion_ficha(ficha.id)
         if not reporte_en_worker:
-            encolar_recalculo_resumen(ficha.id, instructor_id)
+            trabajo_resumen = encolar_recalculo_resumen(ficha.id, instructor_id)
+            if trabajo_resumen is not None and trabajo_resumen.estado == 'error':
+                return True, ('Los documentos quedaron guardados, pero los indicadores están pendientes porque no se pudo iniciar su actualización. '
+                              'Recargue la página más tarde o informe al administrador. ' + ' · '.join(mensajes_exito)), 200
         return True, 'Análisis actualizado con éxito. ' + ' · '.join(mensajes_exito), 200
 
     except (ErrorArchivo, ErrorImportacion, ValueError, OSError) as exc:
         db.session.rollback()
-        for v in versiones_creadas:
+        for ruta_nueva in archivos_creados:
             try:
-                ArchivoService.eliminar(v.ruta_archivo)
+                ArchivoService.eliminar(ruta_nueva)
             except Exception:
                 pass
+        if ruta_cruda and not guardado_confirmado:
+            ArchivoService.eliminar(Path(ruta_cruda).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix())
+        if guardado_confirmado:
+            if procesamiento_pendiente:
+                return False, 'El reporte quedó guardado, pero no se confirmó el inicio de su procesamiento. Consulte el estado de la importación antes de reintentarlo.', 503
+            return True, 'Los documentos quedaron guardados, pero no fue posible actualizar todos los indicadores. Recargue la página más tarde.', 200
         return False, f'No fue posible completar la carga: {exc}', 422
     except Exception:
         db.session.rollback()
-        for v in versiones_creadas:
+        for ruta_nueva in archivos_creados:
             try:
-                ArchivoService.eliminar(v.ruta_archivo)
+                ArchivoService.eliminar(ruta_nueva)
             except Exception:
                 pass
+        if ruta_cruda and not guardado_confirmado:
+            ArchivoService.eliminar(Path(ruta_cruda).relative_to(Path(current_app.config['UPLOAD_FOLDER'])).as_posix())
         current_app.logger.exception('Error inesperado al cargar documentos')
+        if guardado_confirmado:
+            if procesamiento_pendiente:
+                return False, 'El reporte quedó guardado, pero no se confirmó el inicio de su procesamiento. Consulte el estado de la importación antes de reintentarlo.', 503
+            return True, 'Los documentos quedaron guardados, pero no fue posible actualizar todos los indicadores. Recargue la página más tarde.', 200
         return False, 'Ocurrió un error inesperado al procesar los documentos.', 500
 
 

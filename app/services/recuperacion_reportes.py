@@ -23,7 +23,7 @@ from app.models.aprendiz import Aprendiz
 from app.models.archivo_ficha import ArchivoFichaVersion, TIPO_REPORTE_JUICIOS
 from app.models.ficha import Ficha
 from app.models.juicio import JuicioEvaluativo
-from app.services.archivos import nombre_original_desde_ruta
+from app.services.archivos import ArchivoService, nombre_original_desde_ruta
 from app.services.importacion_ficha import leer_metadata_archivo
 
 
@@ -145,6 +145,7 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
     directorio_destino.mkdir(parents=True, exist_ok=True)
 
     match_original = buscar_archivo_reporte_original(ficha)
+    archivo_creado = None
 
     if match_original:
         archivo_origen = match_original['path']
@@ -163,6 +164,7 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
             nombre_disco = f'v{num_ver}_{uuid4().hex}_{nombre_original}'
             ruta_absoluta = directorio_destino / nombre_disco
             shutil.copy2(archivo_origen, ruta_absoluta)
+            archivo_creado = f'{carpeta_relativa}/{nombre_disco}'
 
         with open(ruta_absoluta, 'rb') as fp:
             digest = hashlib.sha256(fp.read()).hexdigest()
@@ -178,7 +180,7 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
         ws = wb.active
         ws.title = 'Juicios Evaluativos'
         encabezados = [
-            'Tipo Documento', 'Número Documento', 'Nombre', 'Apellidos',
+            'Tipo de Documento', 'Número de Documento', 'Nombre', 'Apellidos',
             'Estado Aprendiz', 'Competencia', 'Resultado de Aprendizaje',
             'Juicio de Evaluación', 'Fecha del Juicio', 'Funcionario que Calificó',
         ]
@@ -196,11 +198,12 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
                 j.competencia or '',
                 j.resultado_aprendizaje or '',
                 j.juicio or '',
-                j.importado_en.strftime('%d/%m/%Y %H:%M:%S') if j.importado_en else '',
+                j.fecha_juicio.strftime('%d/%m/%Y %H:%M:%S') if j.fecha_juicio else (j.fecha_fuente_texto or ''),
                 getattr(j, 'funcionario_registro', getattr(j, 'instructor_nombre', '')) or '',
             ])
 
         wb.save(ruta_absoluta)
+        archivo_creado = f'{carpeta_relativa}/{nombre_disco}'
         tamano = ruta_absoluta.stat().st_size
         with open(ruta_absoluta, 'rb') as fp:
             digest = hashlib.sha256(fp.read()).hexdigest()
@@ -229,6 +232,11 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
             db.session.commit()
         except Exception:
             db.session.rollback()
+            if archivo_creado:
+                ArchivoService.eliminar(archivo_creado)
+            current_app.logger.exception('No fue posible actualizar el respaldo del reporte de la ficha %s.', ficha.id)
+            if not (Path(current_app.config['UPLOAD_FOLDER']) / existente.ruta_archivo).is_file():
+                return None
         return existente
 
     inst_id = instructor_id or ficha.instructor_id
@@ -257,6 +265,8 @@ def asegurar_version_reporte(ficha_o_id, instructor_id=None):
         db.session.commit()
     except Exception:
         db.session.rollback()
+        if archivo_creado:
+            ArchivoService.eliminar(archivo_creado)
         existente = ArchivoFichaVersion.query.filter_by(
             ficha_id=ficha.id,
             tipo=TIPO_REPORTE_JUICIOS,

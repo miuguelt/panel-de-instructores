@@ -899,19 +899,29 @@ function mostrarDetalleRap(td) {
     document.getElementById('modal-raps-subtitulo').textContent = `${trim} • ${hDir}h directas (${intDir} h/semana) • ${hTot}h totales`;
 
     const cuerpo = document.getElementById('modal-raps-cuerpo');
-    cuerpo.innerHTML = '';
+    cuerpo.replaceChildren();
 
     raps.forEach((r) => {
         const item = document.createElement('div');
         item.className = 'pl-rap-item';
-        item.innerHTML = `
-            <div class="pl-rap-item-head">
-                <strong>${r.competencia}</strong>
-                <span class="pl-chip pl-tone-primary">${r.horas_directas}h directas</span>
-            </div>
-            <div class="pl-rap-item-body">${r.rap}</div>
-            ${r.fase ? `<div class="pl-rap-item-fase">Fase: ${r.fase}</div>` : ''}
-        `;
+        const cabecera = document.createElement('div');
+        cabecera.className = 'pl-rap-item-head';
+        const competencia = document.createElement('strong');
+        competencia.textContent = r.competencia;
+        const horas = document.createElement('span');
+        horas.className = 'pl-chip pl-tone-primary';
+        horas.textContent = `${r.horas_directas}h directas`;
+        cabecera.append(competencia, horas);
+        const resultado = document.createElement('div');
+        resultado.className = 'pl-rap-item-body';
+        resultado.textContent = r.rap;
+        item.append(cabecera, resultado);
+        if (r.fase) {
+            const fase = document.createElement('div');
+            fase.className = 'pl-rap-item-fase';
+            fase.textContent = `Fase: ${r.fase}`;
+            item.appendChild(fase);
+        }
         cuerpo.appendChild(item);
     });
 

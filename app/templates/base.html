@@ -174,7 +174,7 @@
     <script src="{{ url_for('static', filename='js/filter-view.js') }}" defer></script>
     {% block scripts %}{% endblock %}
     <script src="{{ url_for('static', filename='js/table-filters.js') }}" defer></script>
-    <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_upload_bytes | int }};</script>
+    <script>window.ADSO_MAX_UPLOAD_BYTES = {{ max_upload_bytes | int }}; window.ADSO_MAX_REQUEST_BYTES = {{ max_request_bytes | int }};</script>
     <script src="{{ url_for('static', filename='js/uploads.js') }}" defer></script>
     <script>
         // 1. Inicialización de componentes comunes (funciona en carga inicial y navegación HTMX)
@@ -265,19 +265,20 @@
     <script>
         function setTheme(themeName) {
             document.documentElement.setAttribute('data-theme', themeName);
-            localStorage.setItem('app-theme', themeName);
+            try { localStorage.setItem('app-theme', themeName); } catch (_) { /* El tema sigue activo aunque el navegador no permita guardarlo. */ }
             document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
                 el.classList.toggle('is-active', el.dataset.themeBtn === themeName);
             });
         }
         function toggleTheme() {
             var themes = ['sena', 'elegant', 'ocean'];
-            var current = localStorage.getItem('app-theme') || 'sena';
+            var current = document.documentElement.getAttribute('data-theme') || 'sena';
             var nextIdx = (themes.indexOf(current) + 1) % themes.length;
             setTheme(themes[nextIdx]);
         }
         (function() {
-            var t = localStorage.getItem('app-theme') || 'sena';
+            var t = document.documentElement.getAttribute('data-theme') || 'sena';
+            try { t = localStorage.getItem('app-theme') || t; } catch (_) { /* El navegador puede bloquear el almacenamiento local. */ }
             if (document.documentElement.getAttribute('data-theme') !== t) {
                 document.documentElement.setAttribute('data-theme', t);
             }
@@ -288,6 +289,7 @@
         
     </script>
     <script src="{{ url_for('static', filename='js/modal-system.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/portapapeles.js') }}" defer></script>
 
     <dialog id="modal-confirmacion" class="app-modal-overlay app-confirm-modal" aria-modal="true" aria-labelledby="modal-confirmacion-titulo" aria-describedby="modal-confirmacion-mensaje" data-confirm-dialog>
         <section class="app-modal-content app-modal-content--compact app-confirm-shell">

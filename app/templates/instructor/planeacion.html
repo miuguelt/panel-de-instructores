@@ -193,8 +193,6 @@
     const dropzones = document.querySelectorAll('.pl-dropzone');
     const btnAnalizar = document.getElementById('btn-ejecutar-analisis');
     const feedbackMsg = document.getElementById('pl-carga-feedback');
-    const progressWrap = document.getElementById('pl-carga-progress-wrap');
-    const progressBar = document.getElementById('pl-carga-progress-bar');
 
     dropzones.forEach(function (dz) {
         const inputId = dz.getAttribute('data-input-target');
@@ -233,7 +231,7 @@
                 dz.classList.add('has-file');
                 if (preview) {
                     preview.style.display = 'block';
-                    preview.innerHTML = `<strong>✓ Seleccionado:</strong> ${file.name} <small>(${Math.round(file.size / 1024)} KB)</small>`;
+                    preview.textContent = `✓ Seleccionado: ${file.name} (${Math.round(file.size / 1024)} KB)`;
                 }
                 if (textSpan) textSpan.style.display = 'none';
                 refrescarEstadoArchivos();
@@ -248,6 +246,12 @@
             if (this.files && this.files[0]) {
                 actualizarNombre(this.files[0]);
             } else {
+                dz.classList.remove('has-file');
+                if (preview) {
+                    preview.textContent = '';
+                    preview.style.display = 'none';
+                }
+                if (textSpan) textSpan.style.display = '';
                 refrescarEstadoArchivos();
             }
         });
@@ -269,6 +273,21 @@
         });
 
         dz.addEventListener('drop', function (e) {
+            const items = e.dataTransfer ? Array.from(e.dataTransfer.items || []) : [];
+            const contieneCarpeta = items.some(function (item) {
+                const entrada = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+                return entrada && entrada.isDirectory;
+            });
+            if (contieneCarpeta || !e.dataTransfer || !e.dataTransfer.files.length || e.dataTransfer.files.length > 1) {
+                if (feedbackMsg) {
+                    feedbackMsg.style.display = 'inline-block';
+                    feedbackMsg.className = 'pl-carga-msg pl-tone-warning';
+                    feedbackMsg.textContent = contieneCarpeta
+                        ? 'Seleccione el documento Excel o PDF correspondiente. Para entregar una carpeta como evidencia, comprímala en un ZIP desde el panel del aprendiz.'
+                        : 'Arrastre un solo archivo en cada espacio de carga.';
+                }
+                return;
+            }
             if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
                 input.files = e.dataTransfer.files;
                 actualizarNombre(input.files[0]);
@@ -298,79 +317,7 @@
                 return;
             }
 
-            // AJAX submit con progreso
-            e.preventDefault();
-            const formData = new FormData(formCarga);
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', formCarga.action, true);
-            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
-            if (btnAnalizar) {
-                btnAnalizar.disabled = true;
-                btnAnalizar.innerHTML = '<span class="pl-spinner"></span> Procesando análisis...';
-            }
-            if (progressWrap) progressWrap.style.display = 'block';
-            if (progressBar) progressBar.style.width = '20%';
-            if (feedbackMsg) {
-                feedbackMsg.style.display = 'inline-block';
-                feedbackMsg.className = 'pl-carga-msg pl-tone-info';
-                feedbackMsg.textContent = 'Subiendo y analizando documentos...';
-            }
-
-            xhr.upload.onprogress = function (ev) {
-                if (ev.lengthComputable && progressBar) {
-                    const percent = Math.min(Math.round((ev.loaded / ev.total) * 70), 70);
-                    progressBar.style.width = percent + '%';
-                }
-            };
-
-            xhr.onload = function () {
-                if (progressBar) progressBar.style.width = '100%';
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const resp = JSON.parse(xhr.responseText);
-                        if (resp.ok) {
-                            if (feedbackMsg) {
-                                feedbackMsg.className = 'pl-carga-msg pl-tone-success';
-                                feedbackMsg.textContent = resp.message || 'Análisis completado. Actualizando...';
-                            }
-                            window.setTimeout(function () {
-                                if (resp.redirect) window.location.href = resp.redirect;
-                                else window.location.reload();
-                            }, 600);
-                            return;
-                        }
-                    } catch (err) {}
-                    window.location.reload();
-                } else {
-                    let errMsg = 'Error al procesar la solicitud.';
-                    try {
-                        const errResp = JSON.parse(xhr.responseText);
-                        if (errResp.message) errMsg = errResp.message;
-                    } catch (err) {}
-                    if (feedbackMsg) {
-                        feedbackMsg.className = 'pl-carga-msg pl-tone-danger';
-                        feedbackMsg.textContent = errMsg;
-                    }
-                    if (btnAnalizar) {
-                        btnAnalizar.disabled = false;
-                        btnAnalizar.innerHTML = '<span class="pl-btn-icon">⚡</span> Reintentar Análisis';
-                    }
-                }
-            };
-
-            xhr.onerror = function () {
-                if (feedbackMsg) {
-                    feedbackMsg.className = 'pl-carga-msg pl-tone-danger';
-                    feedbackMsg.textContent = 'Error de conexión con el servidor.';
-                }
-                if (btnAnalizar) {
-                    btnAnalizar.disabled = false;
-                    btnAnalizar.innerHTML = '<span class="pl-btn-icon">⚡</span> Reintentar Análisis';
-                }
-            };
-
-            xhr.send(formData);
         });
     }
 
@@ -903,7 +850,7 @@
             rapsAprobados = dato.resultados_planeados.filter(r => (r.porcentaje_avance || 0) >= 80).length;
         }
 
-        const pctCobHoras = horasOficiales > 0 ? Math.round((horasPlan / horasOficiales) * 100) : 100;
+        const pctCobHoras = horasOficiales > 0 ? Math.round((horasPlan / horasOficiales) * 100) : null;
         const pctRapsOk = totalRaps > 0 ? Math.round((rapsAprobados / totalRaps) * 100) : 0;
 
         const nCrit = (dato.criterios_evaluacion || []).length;
@@ -913,10 +860,10 @@
         if (metricsBar) {
             metricsBar.innerHTML = `
                 <div class="pl-metric-box">
-                    <span class="pl-metric-val">${horasPlan} / ${horasOficiales} h</span>
-                    <span class="pl-metric-lbl">Cobertura Horas (${pctCobHoras}%)</span>
-                    <div class="pl-progress-mini-wrap" title="Cobertura de horas: ${pctCobHoras}%">
-                        <div class="pl-progress-mini-bar pl-tone-${pctCobHoras >= 100 ? 'success' : 'warning'}" style="width:${Math.min(pctCobHoras, 100)}%;"></div>
+                    <span class="pl-metric-val">${pctCobHoras === null ? 'Sin referencia de horas' : `${horasPlan} / ${horasOficiales} h`}</span>
+                    <span class="pl-metric-lbl">${pctCobHoras === null ? 'Cobertura de horas no disponible' : `Cobertura de horas (${pctCobHoras}%)`}</span>
+                    <div class="pl-progress-mini-wrap" title="${pctCobHoras === null ? 'No hay horas registradas para calcular la cobertura.' : `Cobertura de horas: ${pctCobHoras}%`}">
+                        <div class="pl-progress-mini-bar pl-tone-${pctCobHoras === null ? 'neutral' : pctCobHoras >= 100 ? 'success' : 'warning'}" style="width:${pctCobHoras === null ? 0 : Math.min(pctCobHoras, 100)}%;"></div>
                     </div>
                 </div>
                 <div class="pl-metric-box">

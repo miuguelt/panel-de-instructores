@@ -1,5 +1,6 @@
 from app import db
 import re
+from urllib.parse import urlsplit
 import unicodedata
 
 
@@ -110,9 +111,13 @@ def normalizar_url_portafolio(url, tipo=None):
     if not patron_url.match(url_texto):
         raise ValueError('La dirección web ingresada no tiene una estructura válida.')
 
-    if tipo == 'github' and 'github.com' not in url_texto.lower():
+    dominio = (urlsplit(url_texto).hostname or '').lower().rstrip('.')
+    if tipo == 'github' and not (dominio == 'github.com' or dominio.endswith('.github.com')):
         raise ValueError('El enlace de GitHub debe pertenecer al dominio github.com.')
-    if tipo == 'notion' and 'notion.' not in url_texto.lower():
+    if tipo == 'notion' and not any(
+        dominio == permitido or dominio.endswith('.' + permitido)
+        for permitido in ('notion.so', 'notion.site')
+    ):
         raise ValueError('El enlace de Notion debe pertenecer al dominio notion.so o notion.site.')
 
     return url_texto

@@ -244,7 +244,8 @@ def _calidad_entrega(entrega, limite_efectivo, ahora, umbral_alta):
 def _racha_perfecta(registros, sesiones_map, semanas, ahora):
     if semanas <= 0:
         return False
-    inicio = ahora.date() - timedelta(days=(semanas * 7) - 1)
+    dias_ventana = min((semanas * 7) - 1, ahora.date().toordinal() - 1)
+    inicio = ahora.date() - timedelta(days=dias_ventana)
     semanas_con_sesion = set()
     for registro in registros:
         sesion = sesiones_map.get(registro.sesion_id)
@@ -490,10 +491,19 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
                 calificaciones_altas += 1
 
             fecha_entrega = entrega.fecha_entrega or ahora
+            fecha_anticipacion = None
+            if limite_efectivo:
+                horas_anticipacion = max(config.horas_entrega_anticipada, 0)
+                minimo = datetime.min.replace(tzinfo=limite_efectivo.tzinfo)
+                horas_disponibles = (limite_efectivo - minimo) // timedelta(hours=1)
+                fecha_anticipacion = (
+                    minimo if horas_anticipacion > horas_disponibles
+                    else limite_efectivo - timedelta(hours=horas_anticipacion)
+                )
             if (
-                limite_efectivo
+                fecha_anticipacion is not None
                 and not entrega.registrada_por_instructor
-                and fecha_entrega <= limite_efectivo - timedelta(hours=max(config.horas_entrega_anticipada, 0))
+                and fecha_entrega <= fecha_anticipacion
             ):
                 entregas_anticipadas += 1
 

@@ -5,7 +5,7 @@ from app.models.aprendiz import Aprendiz
 from app.models.ficha import Ficha
 
 
-def crear_grupos_aleatorios(ficha_id, aprendiz_ids, tamano_grupo, prefijo_nombre="Grupo"):
+def crear_grupos_aleatorios(ficha_id, aprendiz_ids, tamano_grupo, prefijo_nombre="Grupo", *, confirmar=True):
     """
     Toma una lista de IDs de aprendices, los mezcla y arma grupos del tamaño especificado.
     Si sobran aprendices, se distribuyen equitativamente (uno a uno) entre los grupos ya formados.
@@ -66,7 +66,10 @@ def crear_grupos_aleatorios(ficha_id, aprendiz_ids, tamano_grupo, prefijo_nombre
         
         grupos_creados.append(nuevo_grupo)
 
-    db.session.commit()
+    if confirmar:
+        db.session.commit()
+    else:
+        db.session.flush()
     return grupos_creados
 
 
@@ -81,13 +84,14 @@ def archivar_grupo(grupo_id):
         return True
     return False
 
-def archivar_grupos_de_ficha(ficha_id):
+def archivar_grupos_de_ficha(ficha_id, *, confirmar=True):
     """
     Marca todos los grupos de una ficha como inactivos.
     Útil para "reiniciar" dinámicas de grupos.
     """
     Grupo.query.filter_by(ficha_id=ficha_id, activo=True).update({'activo': False})
-    db.session.commit()
+    if confirmar:
+        db.session.commit()
 
 
 def desvincular_aprendiz_de_grupos(ficha_id, aprendiz_id):

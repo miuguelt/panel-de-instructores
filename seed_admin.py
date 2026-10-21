@@ -6,9 +6,13 @@ from app.models.instructor import Instructor
 
 
 def seed_admin():
-    correo = os.getenv('ADSO_ADMIN_EMAIL', 'admin@sena.edu.co').strip().lower()
+    correo = (os.getenv('ADSO_ADMIN_EMAIL') or '').strip().lower()
     password = os.getenv('ADSO_ADMIN_PASSWORD', '')
     nombre = os.getenv('ADSO_ADMIN_NOMBRE', 'Administrador')
+
+    if password and (correo.count('@') != 1 or not all(correo.split('@')) or any(letra.isspace() for letra in correo)):
+        print('ADSO_ADMIN_EMAIL debe contener un correo válido antes de crear el administrador.', file=sys.stderr)
+        return 1
 
     admin = Instructor.query.filter_by(correo=correo).first()
     if admin:

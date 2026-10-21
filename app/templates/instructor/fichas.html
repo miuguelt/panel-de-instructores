@@ -123,27 +123,3 @@
 </div>
 {% endif %}
 {% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const importForm = document.getElementById('import-report-form');
-    if (importForm) {
-        importForm.addEventListener('submit', function() {
-            const btn = this.querySelector('button[type="submit"]');
-            if (btn) {
-                btn.innerHTML = '<span style="display:inline-block; margin-right:8px; animation: spin 1s linear infinite;">⌛</span> Importando y creando ficha...';
-                btn.style.opacity = '0.8';
-                btn.style.pointerEvents = 'none';
-                setTimeout(() => { btn.disabled = true; }, 10);
-            }
-        });
-    }
-});
-</script>
-<style>
-@keyframes spin {
-    100% { transform: rotate(360deg); }
-}
-</style>
-{% endblock %}

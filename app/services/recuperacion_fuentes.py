@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from flask import current_app
+
 from app import db
 from app.models.archivo_ficha import (
     ArchivoFichaVersion,
@@ -38,7 +40,7 @@ def recuperar_fuentes_ficha(
         return {'ok': False, 'mensaje': 'Ficha no encontrada.', 'nuevas': [], 'total_nuevas': 0}
 
     # Estado previo antes de intentar recuperar
-    tenia_reporte = bool(ultima_version(ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True))
+    tenia_reporte = bool(ultima_version(ficha.id, TIPO_REPORTE_JUICIOS, solo_procesadas=True, recuperar_reporte=False))
     tenia_planeacion = bool(ultima_version(ficha.id, TIPO_PLANEACION, solo_procesadas=True))
     tenia_programa = bool(ultima_version(ficha.id, TIPO_PROGRAMA, solo_procesadas=True))
 
@@ -54,11 +56,16 @@ def recuperar_fuentes_ficha(
     if not tenia_programa and version_programa:
         nuevas.append('Programa de Formación')
 
+    advertencias = []
     if nuevas:
         try:
-            encolar_recalculo_resumen(ficha.id, instructor_id or ficha.instructor_id)
+            trabajo = encolar_recalculo_resumen(ficha.id, instructor_id or ficha.instructor_id)
+            if trabajo is not None and trabajo.estado == 'error':
+                advertencias.append('Las fuentes quedaron recuperadas, pero no fue posible iniciar la actualización de indicadores. Vuelva a intentarlo más tarde o informe al administrador.')
         except Exception:
-            pass
+            db.session.rollback()
+            current_app.logger.exception('Las fuentes de la ficha %s se recuperaron, pero falló la actualización de indicadores.', ficha.id)
+            advertencias.append('Las fuentes quedaron recuperadas, pero no se confirmó la actualización de indicadores. Recargue la página más tarde.')
 
     return {
         'ok': True,
@@ -68,4 +75,6 @@ def recuperar_fuentes_ficha(
         'programa': version_programa,
         'nuevas': nuevas,
         'total_nuevas': len(nuevas),
+        'advertencias': advertencias,
+        'recalculo_pendiente': bool(advertencias),
     }

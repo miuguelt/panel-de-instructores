@@ -1189,7 +1189,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (btnCards) btnCards.setAttribute('aria-pressed', 'false');
             if (compactView) compactView.classList.add('is-visible');
             if (gridView) gridView.classList.add('is-hidden');
-            localStorage.setItem('dashboard-view-mode', 'compact');
+            try { localStorage.setItem('dashboard-view-mode', 'compact'); } catch (_) { /* La vista funciona sin almacenamiento local. */ }
         } else {
             if (btnCards) btnCards.classList.add('is-active');
             if (btnCompact) btnCompact.classList.remove('is-active');
@@ -1197,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (btnCompact) btnCompact.setAttribute('aria-pressed', 'false');
             if (compactView) compactView.classList.remove('is-visible');
             if (gridView) gridView.classList.remove('is-hidden');
-            localStorage.setItem('dashboard-view-mode', 'cards');
+            try { localStorage.setItem('dashboard-view-mode', 'cards'); } catch (_) { /* La vista funciona sin almacenamiento local. */ }
         }
     }
 
@@ -1205,7 +1205,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnCompact) btnCompact.addEventListener('click', function() { setViewMode('compact'); });
 
     // Restore saved view mode
-    var savedMode = localStorage.getItem('dashboard-view-mode');
+    var savedMode = null;
+    try { savedMode = localStorage.getItem('dashboard-view-mode'); } catch (_) { /* Se conserva la vista inicial si no se puede leer la preferencia. */ }
     if (savedMode === 'compact') {
         setViewMode('compact');
     }

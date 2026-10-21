@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 import io
+from math import isfinite
 
 import openpyxl
 from flask import Blueprint, flash, make_response, redirect, render_template, request, send_file, url_for
@@ -135,9 +136,26 @@ def configurar_ranking(ficha_id):
 
     config = obtener_configuracion(ficha_id, crear=True)
     try:
-        peso_asistencia = float(request.form.get('peso_asistencia', 30))
-        peso_evidencias = float(request.form.get('peso_evidencias', 40))
-        peso_juicios = float(request.form.get('peso_juicios', 30))
+        campos_decimales = {
+            'peso_asistencia': 30, 'peso_evidencias': 40, 'peso_juicios': 30,
+            'bonus_entrega_anticipada': 1, 'bonus_racha_asistencia': 3,
+            'bonus_calificacion_alta': 1, 'umbral_calificacion_alta': 4,
+            'penalizacion_falla_injustificada': 1,
+        }
+        try:
+            decimales = {campo: float(request.form.get(campo, valor))
+                         for campo, valor in campos_decimales.items()}
+            horas = max(0, int(request.form.get('horas_entrega_anticipada', 24)))
+            semanas = max(1, int(request.form.get('semanas_racha', 4)))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError('Ingrese números válidos para configurar el ranking.') from exc
+        if not all(isfinite(valor) for valor in decimales.values()):
+            raise ValueError('Los valores del ranking deben ser números finitos.')
+        if max(horas, semanas) > 2_147_483_647:
+            raise ValueError('Los valores de horas y semanas superan el máximo permitido.')
+        peso_asistencia = decimales['peso_asistencia']
+        peso_evidencias = decimales['peso_evidencias']
+        peso_juicios = decimales['peso_juicios']
         pesos = [peso_asistencia, peso_evidencias, peso_juicios]
         if abs(sum(pesos) - 100) > 0.01:
             raise ValueError('Los pesos deben sumar 100%.')
@@ -158,25 +176,13 @@ def configurar_ranking(ficha_id):
             if request.form.get('periodo_corte') in ('mensual', 'trimestral', 'semestral')
             else 'trimestral'
         )
-        config.bonus_entrega_anticipada = max(
-            0, float(request.form.get('bonus_entrega_anticipada', 1))
-        )
-        config.horas_entrega_anticipada = max(
-            0, int(request.form.get('horas_entrega_anticipada', 24))
-        )
-        config.bonus_racha_asistencia = max(
-            0, float(request.form.get('bonus_racha_asistencia', 3))
-        )
-        config.semanas_racha = max(1, int(request.form.get('semanas_racha', 4)))
-        config.bonus_calificacion_alta = max(
-            0, float(request.form.get('bonus_calificacion_alta', 1))
-        )
-        config.umbral_calificacion_alta = max(
-            0, float(request.form.get('umbral_calificacion_alta', 4))
-        )
-        config.penalizacion_falla_injustificada = max(
-            0, float(request.form.get('penalizacion_falla_injustificada', 1))
-        )
+        config.bonus_entrega_anticipada = max(0, decimales['bonus_entrega_anticipada'])
+        config.horas_entrega_anticipada = horas
+        config.bonus_racha_asistencia = max(0, decimales['bonus_racha_asistencia'])
+        config.semanas_racha = semanas
+        config.bonus_calificacion_alta = max(0, decimales['bonus_calificacion_alta'])
+        config.umbral_calificacion_alta = max(0, decimales['umbral_calificacion_alta'])
+        config.penalizacion_falla_injustificada = max(0, decimales['penalizacion_falla_injustificada'])
     except ValueError as error:
         db.session.rollback()
         flash(str(error) or 'Revisa los valores de configuración.', 'error')

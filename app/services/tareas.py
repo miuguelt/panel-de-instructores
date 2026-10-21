@@ -254,7 +254,7 @@ def agrupar_tareas_por_instructor(
         es_mio = 0 if (current_user_id and t.instructor_id == current_user_id) else 1
         nombre_inst = (t.creador.nombre or '').lower() if t.creador else 'zzzz'
         limite_ts = t.fecha_limite.timestamp() if t.fecha_limite else float('inf')
-        return (es_mio, nombre_inst, limite_ts, -(t.creada_en.timestamp() if t.creada_en else 0.0))
+        return (es_mio, nombre_inst, t.instructor_id, limite_ts, -(t.creada_en.timestamp() if t.creada_en else 0.0))
 
     tareas_ordenadas = sorted(lista_tareas, key=_clave_orden)
 
@@ -329,6 +329,7 @@ def agrupar_tareas_por_corte_e_instructor(
         key=lambda t: (
             orden_cortes.get(t.corte_id, len(orden_cortes)),
             (t.creador.nombre or '').lower() if t.creador else '',
+            t.instructor_id,
             -(t.creada_en.timestamp() if t.creada_en else 0.0),
         ),
     )

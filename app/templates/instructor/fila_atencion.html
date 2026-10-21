@@ -63,6 +63,7 @@
                                     </td>
                                     <td class="text-end">
                                         <form action="{{ url_for('atencion.cambiar_estado', ficha_id=ficha.id, turno_id=turno.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             {% if turno.estado == 'esperando' %}
                                             <button type="submit" name="estado" value="en_atencion" class="btn btn-sm btn-primary">Llamar</button>
                                             {% endif %}

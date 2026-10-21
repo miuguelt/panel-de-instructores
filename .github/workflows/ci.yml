@@ -55,6 +55,15 @@ jobs:
       - name: Run JavaScript chat tests and function coverage
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/grupo_chat.js --test tests_js/grupo_chat.test.cjs
 
+      - name: Ejecutar todas las pruebas JavaScript
+        run: npm test
+
+      - name: Verificar portapapeles y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/portapapeles.js --test tests_js/test_auditoria_frontend.test.cjs
+
+      - name: Verificar seguimiento de importaciones y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/importaciones.js --test tests_js/test_auditoria_frontend.test.cjs
+
       - name: Verificar navegación de planeación y cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/planeacion_navegacion.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-planeacion.lcov --test tests_js/planeacion_navegacion.test.cjs
 
@@ -69,6 +78,9 @@ jobs:
 
       - name: Verificar el testigo de carga y su cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/loading-indicator.js --test tests_js/loading_indicator.test.cjs
+
+      - name: Verificar carga de archivos y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/uploads.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-cargas.lcov --test tests_js/uploads.test.cjs
 
       - name: Verificar selector aleatorio del instructor y cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/selector_aprendiz.js --test-reporter=spec --test tests_js/selector_aprendiz.test.cjs
@@ -118,6 +130,7 @@ jobs:
             coverage-gantt.lcov
             coverage-personalizacion.lcov
             coverage-experiencia.lcov
+            coverage-cargas.lcov
           if-no-files-found: ignore
           retention-days: 14
 
@@ -127,10 +140,10 @@ jobs:
           DATABASE_URL: "sqlite:///:memory:"
         run: |
           echo "Ejecutando suite de pruebas en Panel de Instructores..."
-          python -m pytest tests/ -v --tb=short --cov=app --cov-branch --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=75
+          python -m pytest tests/ -v --tb=short --cov=app --cov=config --cov=worker --cov=wsgi --cov=seed_admin --cov-branch --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=75 --function-calls-json=test-results/function-calls.json
 
       - name: Verificar que la suite ejecute todas las funciones
-        run: python scripts/check_function_coverage.py --source app --coverage-xml coverage.xml
+        run: python scripts/check_function_coverage.py --source app --coverage-xml coverage.xml --calls-json test-results/function-calls.json --runtime-files config.py worker.py wsgi.py seed_admin.py
 
       - name: Agregar reporte de cobertura al resumen
         if: always() && hashFiles('coverage.xml') != ''
@@ -141,7 +154,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cobertura-python
-          path: coverage.xml
+          path: |
+            coverage.xml
+            test-results/function-calls.json
           if-no-files-found: ignore
           retention-days: 14
 

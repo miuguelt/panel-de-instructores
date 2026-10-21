@@ -1077,10 +1077,7 @@ def _generar_pdf_reporte_aprendiz(ficha, aprendiz, total_sesiones, total_faltas,
 @aprendiz_bp.route('/<int:ficha_id>/justificar/<int:registro_id>', methods=['POST'])
 @limiter.limit("10 per minute")
 def adjuntar_soporte_inasistencia(ficha_id, registro_id):
-    documento = (
-        request.form.get('documento')
-        or session.get('aprendiz_documento', '')
-    ).strip()
+    documento = _documento_aprendiz_para_ficha(ficha_id)
     aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
     registro = db.session.get(RegistroAsistencia, registro_id)
     if not aprendiz or not registro or registro.aprendiz_id != aprendiz.id or registro.sesion.ficha_id != ficha_id:
@@ -1093,6 +1090,8 @@ def adjuntar_soporte_inasistencia(ficha_id, registro_id):
         flash('Adjunta un soporte o escribe una nota para que tu instructor pueda revisarla.', 'error')
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
+    archivo_anterior = registro.soporte_url
+    archivo_nuevo = None
     if archivo and archivo.filename:
         try:
             resultado = ArchivoService.guardar(
@@ -1101,13 +1100,30 @@ def adjuntar_soporte_inasistencia(ficha_id, registro_id):
                 prefijo_extra=f'{aprendiz.documento}_inasistencia_{registro.id}',
             )
             registro.soporte_url = resultado.url
+            archivo_nuevo = resultado.url
         except ErrorArchivo as exc:
             flash(str(exc), 'error')
             return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
     if nota:
         registro.nota = nota
-    db.session.commit()
-    actualizar_alertas_ficha(ficha_id)
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        if archivo_nuevo:
+            ArchivoService.eliminar(archivo_nuevo)
+        current_app.logger.exception('No se pudo guardar el soporte de inasistencia %s.', registro_id)
+        flash('No fue posible guardar el soporte. Tu archivo anterior se conserva; inténtalo de nuevo.', 'error')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+    if archivo_nuevo and archivo_anterior and archivo_anterior != archivo_nuevo:
+        ArchivoService.eliminar(archivo_anterior)
+    try:
+        actualizar_alertas_ficha(ficha_id)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('El soporte quedó guardado, pero fallaron las alertas de la ficha %s.', ficha_id)
+        flash('El soporte quedó guardado. No fue posible actualizar las alertas; tu instructor puede revisarlo.', 'warning')
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
     flash('Soporte enviado. Tu instructor revisará la justificación.', 'success')
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
@@ -1382,13 +1398,19 @@ def subir_evidencia_plan(ficha_id, plan_id):
         ArchivoService.eliminar(archivo_anterior)
 
     if plan.creado_por:
-        registrar_notificacion(
-            'instructor', plan.creado_por,
-            f'{aprendiz.nombre_completo} envió evidencia para su plan de mejoramiento.',
-            'plan_evidencia', f'plan-evidencia:{plan.id}:{plan.evidencia_enviada_en}',
-            ficha_id, f'/instructor/fichas/{ficha_id}/casos-seguimiento',
-        )
-        db.session.commit()
+        try:
+            registrar_notificacion(
+                'instructor', plan.creado_por,
+                f'{aprendiz.nombre_completo} envió evidencia para su plan de mejoramiento.',
+                'plan_evidencia', f'plan-evidencia:{plan.id}:{plan.evidencia_enviada_en}',
+                ficha_id, f'/instructor/fichas/{ficha_id}/casos-seguimiento',
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('La evidencia del plan %s quedó guardada, pero falló la notificación.', plan_id)
+            flash('La evidencia quedó guardada, pero no fue posible enviar la notificación. Tu instructor puede consultar el plan.', 'warning')
+            return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
     flash('Evidencia del plan enviada. Tu instructor la revisará antes de cerrar el plan.', 'success')
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
@@ -1658,6 +1680,8 @@ def guardar_portafolio(ficha_id):
         return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
 
     datos = request.get_json(silent=True) if request.is_json else request.form
+    if request.is_json and not isinstance(datos, dict):
+        return jsonify(ok=False, error='Envía los enlaces del portafolio en un objeto JSON válido.'), 400
     github_raw = datos.get('enlace_github', '')
     notion_raw = datos.get('enlace_notion', '')
 

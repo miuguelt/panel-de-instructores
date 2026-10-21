@@ -153,7 +153,9 @@ class AppInitEndpointsTestCase(unittest.TestCase):
             self.assertEqual(respuesta.status_code, 200)
             datos = respuesta.get_json()
             self.assertEqual(datos['status'], 'degraded')
-            self.assertIn('Fallo de red', datos['database'])
+            self.assertEqual(datos['database'], 'unavailable')
+            self.assertEqual(datos['database_error'], 'Exception')
+            self.assertNotIn('Fallo de red', respuesta.get_data(as_text=True))
 
     def test_health_endpoint_con_inventario_uploads(self):
         respuesta = self.cliente.get('/health?uploads=1')

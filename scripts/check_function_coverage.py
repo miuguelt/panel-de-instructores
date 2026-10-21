@@ -2,6 +2,7 @@
 
 import argparse
 import ast
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -12,10 +13,17 @@ def iterar_funciones(raiz_fuente):
     raiz_proyecto = raiz_fuente.parent
     funciones = []
 
-    for ruta in sorted(raiz_fuente.rglob('*.py')):
+    rutas = [raiz_fuente] if raiz_fuente.is_file() else sorted(raiz_fuente.rglob('*.py'))
+    for ruta in rutas:
         arbol = ast.parse(ruta.read_text(encoding='utf-8'), filename=str(ruta))
         ruta_relativa = ruta.relative_to(raiz_proyecto).as_posix()
         for nodo in ast.walk(arbol):
+            if isinstance(nodo, ast.Lambda):
+                funciones.append({'archivo': ruta_relativa, 'nombre': '<lambda>',
+                    'linea': nodo.lineno, 'linea_cuerpo': nodo.body.lineno,
+                    'linea_inicio': nodo.lineno, 'lambda': True,
+                    'cuerpo': (nodo.body.lineno, nodo.body.end_lineno, nodo.body.col_offset, nodo.body.end_col_offset)})
+                continue
             if not isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
 
@@ -37,6 +45,8 @@ def iterar_funciones(raiz_fuente):
                 'nombre': nodo.name,
                 'linea': nodo.lineno,
                 'linea_cuerpo': cuerpo[0].lineno,
+                'linea_inicio': min([nodo.lineno] + [decorador.lineno for decorador in nodo.decorator_list]),
+                'lambda': False,
             })
 
     return sorted(funciones, key=lambda funcion: (funcion['archivo'], funcion['linea']))
@@ -68,13 +78,30 @@ def lineas_cubiertas(ruta_xml, raiz_fuente=None):
     return resultado
 
 
-def revisar_cobertura_funciones(raiz_fuente, ruta_xml):
+def revisar_cobertura_funciones(raiz_fuente, ruta_xml, llamadas_json=None):
     """Retorna el total y las funciones cuyo cuerpo no ejecutó la suite."""
     funciones = iterar_funciones(raiz_fuente)
+    if llamadas_json is not None:
+        llamadas = json.loads(Path(llamadas_json).read_text(encoding='utf-8'))['funciones']
+        pendientes = []
+        for funcion in funciones:
+            candidatas = [llamada for llamada in llamadas if llamada.get('pruebas')
+                and llamada['archivo'] == funcion['archivo'] and llamada['nombre'] == funcion['nombre']
+                and llamada['linea_inicio'] == funcion['linea_inicio']]
+            if funcion['lambda']:
+                inicio, fin, columna, columna_fin = funcion['cuerpo']
+                candidatas = [llamada for llamada in candidatas if any(
+                    inicio <= pos[0] <= pos[1] <= fin
+                    and (pos[0] != inicio or pos[2] >= columna)
+                    and (pos[1] != fin or pos[3] <= columna_fin)
+                    for pos in llamada['posiciones'])]
+            if not candidatas:
+                pendientes.append(funcion)
+        return len(funciones), pendientes
     cubiertas = lineas_cubiertas(ruta_xml, raiz_fuente)
     pendientes = [
         funcion for funcion in funciones
-        if funcion['linea_cuerpo'] not in cubiertas.get(funcion['archivo'], set())
+        if funcion['lambda'] or funcion['linea_cuerpo'] not in cubiertas.get(funcion['archivo'], set())
     ]
     return len(funciones), pendientes
 
@@ -84,14 +111,20 @@ def main(argumentos=None):
         description='Rechaza funciones de la aplicación sin ejecución en la suite.'
     )
     parser.add_argument('--source', default='app', help='Carpeta de código de producción.')
+    parser.add_argument('--calls-json', help='Invocaciones reales registradas por pytest; incluye callbacks lambda.')
+    parser.add_argument('--runtime-files', nargs='*', default=[], help='Módulos ejecutables adicionales a la aplicación.')
     parser.add_argument(
         '--coverage-xml', default='coverage.xml', help='Reporte XML generado por pytest-cov.'
     )
     opciones = parser.parse_args(argumentos)
 
     total, pendientes = revisar_cobertura_funciones(
-        opciones.source, opciones.coverage_xml
+        opciones.source, opciones.coverage_xml, llamadas_json=opciones.calls_json
     )
+    for ruta_runtime in opciones.runtime_files:
+        total_runtime, pendientes_runtime = revisar_cobertura_funciones(ruta_runtime, opciones.coverage_xml, llamadas_json=opciones.calls_json)
+        total += total_runtime
+        pendientes.extend(pendientes_runtime)
     cubiertas = total - len(pendientes)
     porcentaje = cubiertas / total * 100 if total else 0
     porcentaje_texto = '100%' if total and cubiertas == total else f'{porcentaje:.1f}%'

@@ -39,9 +39,12 @@ def _numero(valor):
     if valor is None or _texto(valor) == '':
         return 0.0
     try:
-        return float(str(valor).replace(',', '.'))
+        numero = float(str(valor).replace(',', '.'))
     except (TypeError, ValueError):
         return 0.0
+    if not math.isfinite(numero):
+        raise ValueError('La duración debe ser un número finito. Revise las horas del archivo de planeación.')
+    return numero
 
 
 def _fecha(valor):

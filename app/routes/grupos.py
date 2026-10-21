@@ -1,6 +1,7 @@
-from flask import Blueprint, abort, render_template, request, redirect, url_for, flash
+from flask import Blueprint, abort, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from app import db
 from app.models.ficha import Ficha
 from app.models.grupo import Grupo
@@ -97,13 +98,19 @@ def generar_grupos(ficha_id):
             return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
 
         # Archivar los grupos anteriores solo después de validar la selección.
-        archivar_grupos_de_ficha(ficha_id)
+        archivar_grupos_de_ficha(ficha_id, confirmar=False)
 
-        crear_grupos_aleatorios(ficha_id, ids_seleccionados, tamano_grupo)
+        crear_grupos_aleatorios(ficha_id, ids_seleccionados, tamano_grupo, confirmar=False)
+        db.session.commit()
         
         flash('Grupos generados exitosamente.', 'success')
     except ValueError as e:
+        db.session.rollback()
         flash(str(e), 'error')
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('No fue posible regenerar los grupos de la ficha %s.', ficha_id)
+        flash('No fue posible generar los grupos. Los equipos anteriores se conservan; vuelva a intentarlo.', 'error')
 
     return redirect(url_for('grupos.listar_grupos', ficha_id=ficha_id))
 

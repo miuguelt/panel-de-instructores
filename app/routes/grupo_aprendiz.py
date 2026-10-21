@@ -15,7 +15,7 @@ MAX_MENSAJES_POR_SOLICITUD = 100
 def _obtener_grupo_y_aprendiz(ficha_id):
     """Devuelve la identidad de sesión y un grupo activo al que pertenece."""
     aprendiz = aprendiz_de_sesion(ficha_id)
-    if not aprendiz:
+    if not aprendiz or not aprendiz.activo:
         return None, None
 
     grupo = (
@@ -58,7 +58,7 @@ def mensajes(ficha_id):
             despues_id = int(request.args.get('despues_id', '0'))
         except (TypeError, ValueError):
             return jsonify({'error': 'El identificador del último mensaje no es válido.'}), 400
-        if despues_id < 0:
+        if not 0 <= despues_id <= 2_147_483_647:
             return jsonify({'error': 'El identificador del último mensaje no es válido.'}), 400
 
         consulta = GrupoMensaje.query.filter_by(grupo_id=grupo.id)

@@ -497,7 +497,7 @@
                                 <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
                             </svg>
                         </a>
-                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" onclick="navigator.clipboard.writeText('{{ aprendiz.enlace_github }}')" title="Copiar enlace al portapapeles">
+                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" data-copy-value="{{ aprendiz.enlace_github }}" onclick="copiarTexto(this.dataset.copyValue)" title="Copiar enlace al portapapeles">
                             📋 Copiar
                         </button>
                     </div>
@@ -550,7 +550,7 @@
                                 <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
                             </svg>
                         </a>
-                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" onclick="navigator.clipboard.writeText('{{ aprendiz.enlace_notion }}')" title="Copiar enlace al portapapeles">
+                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" data-copy-value="{{ aprendiz.enlace_notion }}" onclick="copiarTexto(this.dataset.copyValue)" title="Copiar enlace al portapapeles">
                             📋 Copiar
                         </button>
                     </div>
@@ -677,12 +677,13 @@
                                 {% if tarea.requiere_archivo %}
                                 <div class="form-group">
                                     <label for="evidencia-grupo-{{ tarea.id }}">Archivo de evidencia{% if entrega and entrega.archivo_url %} (opcional para reemplazar el archivo){% else %} (obligatorio){% endif %}</label>
-                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" {% if not (entrega and entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept="{{ extensiones_carga }}" {% if not (entrega and entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                                    <small class="learner-form-help">Para enviar varios archivos, comprime la carpeta en ZIP. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
                                 </div>
                                 {% else %}
                                 <div class="form-group">
                                     <label for="evidencia-grupo-{{ tarea.id }}">Archivo de evidencia (opcional)</label>
-                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" class="form-file-input">
+                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept="{{ extensiones_carga }}" class="form-file-input">
                                 </div>
                                 {% endif %}
                                 <div class="form-group">
@@ -1406,8 +1407,8 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="form-group">
                             <label for="plan-evidencia-{{ plan.id }}">Archivo de evidencia (obligatorio)</label>
-                            <input type="file" id="plan-evidencia-{{ plan.id }}" name="archivo_evidencia_plan" accept=".pdf,.png,.jpg,.jpeg,.zip,.rar,.doc,.docx" aria-describedby="plan-evidencia-ayuda-{{ plan.id }}" required class="form-file-input">
-                            <small class="learner-form-help" id="plan-evidencia-ayuda-{{ plan.id }}">Formatos admitidos: PDF, PNG, JPG/JPEG, ZIP, RAR, DOC y DOCX.</small>
+                            <input type="file" id="plan-evidencia-{{ plan.id }}" name="archivo_evidencia_plan" accept="{{ extensiones_carga }}" aria-describedby="plan-evidencia-ayuda-{{ plan.id }}" required class="form-file-input">
+                            <small class="learner-form-help" id="plan-evidencia-ayuda-{{ plan.id }}">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Para enviar una carpeta, comprímela en ZIP.</small>
                         </div>
                         <div class="form-group">
                             <label for="plan-nota-{{ plan.id }}">Nota para tu instructor (opcional)</label>
@@ -1442,8 +1443,8 @@
             <p class="learner-support-guidance" id="guia-inasistencia-{{ registro.id }}" role="note">Adjunta un soporte o escribe una nota; completa al menos una opción para que tu instructor pueda revisar la inasistencia.</p>
             <div class="support-form-field">
                 <label for="soporte-inasistencia-{{ registro.id }}">Soporte de inasistencia (opcional)</label>
-                <input type="file" id="soporte-inasistencia-{{ registro.id }}" name="soporte" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" aria-describedby="guia-inasistencia-{{ registro.id }} formatos-inasistencia-{{ registro.id }}">
-                <small class="learner-form-help" id="formatos-inasistencia-{{ registro.id }}">Formatos admitidos: PDF, PNG, JPG/JPEG, DOC y DOCX.</small>
+                <input type="file" id="soporte-inasistencia-{{ registro.id }}" name="soporte" accept="{{ extensiones_carga }}" aria-describedby="guia-inasistencia-{{ registro.id }} formatos-inasistencia-{{ registro.id }}">
+                <small class="learner-form-help" id="formatos-inasistencia-{{ registro.id }}">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Para enviar una carpeta, comprímela en ZIP.</small>
             </div>
             <div class="support-form-field">
                 <label for="nota-inasistencia-{{ registro.id }}">Nota para tu instructor (opcional)</label>
@@ -1714,12 +1715,16 @@
             </div>
             <div class="learner-curve-badges">
                 <span class="badge {{ curva_rendimiento.badge_class }}">{{ curva_rendimiento.nivel_desempeno }}</span>
+                {% if curva_rendimiento.puntos|length > 1 %}
                 <span class="badge badge-secondary trend-chip {{ curva_rendimiento.tendencia_clase }}">
                     {{ curva_rendimiento.tendencia_icono }} {{ curva_rendimiento.tendencia|capitalize }}
                     {% if curva_rendimiento.diferencia_ultimo != 0 %}
                     ({{ '+' if curva_rendimiento.diferencia_ultimo > 0 else '' }}{{ curva_rendimiento.diferencia_ultimo }} pts)
                     {% endif %}
                 </span>
+                {% else %}
+                <span class="badge badge-secondary trend-chip">Primer registro</span>
+                {% endif %}
             </div>
         </div>
 
@@ -2346,7 +2351,7 @@
                             Archivo de evidencia {% if item.entrega and item.entrega.archivo_url %}(opcional para reemplazar archivo existente){% else %}(obligatorio){% endif %}
                         </label>
                         <input type="file" id="evidencia-{{ item.tarea.id }}" name="archivo_evidencia"
-                               accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                               accept="{{ extensiones_carga }}" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
                         {% if item.entrega and item.entrega.archivo_url %}
                         <small class="uploaded-note">Tiene un archivo subido previamente.</small>
                         {% endif %}
@@ -2355,11 +2360,11 @@
                     <div class="form-group">
                         <label for="evidencia-{{ item.tarea.id }}">Archivo de evidencia (opcional)</label>
                         <input type="file" id="evidencia-{{ item.tarea.id }}" name="archivo_evidencia"
-                               accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" class="form-file-input">
+                               accept="{{ extensiones_carga }}" class="form-file-input">
                     </div>
                     {% endif %}
 
-                    <small class="text-muted">Formatos admitidos: PDF, JPG, PNG, ZIP y RAR. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
+                    <small class="text-muted">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Si necesitas enviar varios archivos, comprime la carpeta en ZIP y adjunta el archivo generado. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
                     <div class="form-group">
                         <label for="repositorio-{{ item.tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
                         <input type="url" id="repositorio-{{ item.tarea.id }}" name="enlace_repositorio"
@@ -2511,7 +2516,7 @@
                                 Archivo de evidencia {% if item.entrega and item.entrega.archivo_url %}(opcional para reemplazar archivo existente){% else %}(obligatorio){% endif %}
                             </label>
                             <input type="file" id="evidencia-entregada-{{ item.tarea.id }}" name="archivo_evidencia"
-                                   accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                                   accept="{{ extensiones_carga }}" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
                             {% if item.entrega and item.entrega.archivo_url %}
                             <small class="uploaded-note">Tiene un archivo subido previamente.</small>
                             {% endif %}
@@ -2520,11 +2525,11 @@
                         <div class="form-group">
                             <label for="evidencia-entregada-{{ item.tarea.id }}">Archivo de evidencia (opcional)</label>
                             <input type="file" id="evidencia-entregada-{{ item.tarea.id }}" name="archivo_evidencia"
-                                   accept=".pdf,.png,.jpg,.jpeg,.zip,.rar" class="form-file-input">
+                                   accept="{{ extensiones_carga }}" class="form-file-input">
                         </div>
                         {% endif %}
 
-                        <small class="text-muted">Formatos admitidos: PDF, JPG, PNG, ZIP y RAR. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
+                        <small class="text-muted">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Si necesitas enviar varios archivos, comprime la carpeta en ZIP y adjunta el archivo generado. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
                         <div class="form-group">
                             <label for="repositorio-entregada-{{ item.tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
                             <input type="url" id="repositorio-entregada-{{ item.tarea.id }}" name="enlace_repositorio"
@@ -2773,7 +2778,9 @@
             return;
         }
         const causal = record.causal ? ` · ${record.causal}` : '';
-        detail.innerHTML = `<strong>${formatDate(iso)}</strong> · ${record.etiqueta || record.estado}${causal}`;
+        const fecha = document.createElement('strong');
+        fecha.textContent = formatDate(iso);
+        detail.replaceChildren(fecha, document.createTextNode(` · ${record.etiqueta || record.estado}${causal}`));
     }
 
     function render() {
@@ -2813,7 +2820,16 @@
             }
             button.setAttribute('role', 'gridcell');
             button.setAttribute('aria-label', record ? `${formatDate(iso)}: ${record.etiqueta || record.estado}` : `${formatDate(iso)}: sin marcación`);
-            button.innerHTML = `<span class="learner-calendar-day-number">${day}</span>${record ? `<span class="learner-calendar-day-state">${record.etiqueta || record.estado}</span>` : ''}`;
+            const numero = document.createElement('span');
+            numero.className = 'learner-calendar-day-number';
+            numero.textContent = String(day);
+            button.appendChild(numero);
+            if (record) {
+                const estado = document.createElement('span');
+                estado.className = 'learner-calendar-day-state';
+                estado.textContent = record.etiqueta || record.estado;
+                button.appendChild(estado);
+            }
             button.addEventListener('click', () => showDetail(iso, record));
             grid.appendChild(button);
         }

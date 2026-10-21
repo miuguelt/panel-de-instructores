@@ -225,12 +225,12 @@ class ArchivosTestCase(unittest.TestCase):
             )
         self.assertEqual(self._listar_uploads(), [])
 
-    def test_mime_generico_no_se_acepta_para_otras_extensiones(self):
+    def test_mime_generico_no_permite_suplantar_otras_extensiones(self):
         from werkzeug.datastructures import FileStorage
-        with self.assertRaises(ErrorMimeType):
+        with self.assertRaises(ErrorArchivo):
             ArchivoService.guardar(
                 archivo=FileStorage(
-                    stream=BytesIO(PDF),
+                    stream=BytesIO(b'contenido que no corresponde a un PDF'),
                     filename='evidencia.pdf',
                     content_type='application/octet-stream',
                 ),

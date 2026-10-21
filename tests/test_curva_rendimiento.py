@@ -89,8 +89,8 @@ class CurvaRendimientoTestCase(unittest.TestCase):
         self.assertEqual(curva['puntaje_actual'], 0.0)
         self.assertEqual(curva['nivel_desempeno'], 'Sin datos')
 
-    def test_curva_con_solo_fila_propia_sintetiza_base(self):
-        """Si solo hay cálculo actual en vivo, crea hito base y traza curva inicial."""
+    def test_curva_con_solo_fila_propia_conserva_un_punto_real(self):
+        """Una medición actual no permite inventar historia ni tendencia."""
         fila_propia = {
             'puntaje_total': 82.5,
             'puntaje_asistencia': 80.0,
@@ -105,7 +105,8 @@ class CurvaRendimientoTestCase(unittest.TestCase):
             hoy=date(2026, 4, 1),
         )
         self.assertTrue(curva['tiene_datos'])
-        self.assertEqual(len(curva['puntos']), 2)
+        self.assertEqual(len(curva['puntos']), 1)
+        self.assertEqual(curva['diferencia_ultimo'], 0)
         self.assertEqual(curva['puntaje_actual'], 82.5)
         self.assertEqual(curva['posicion_actual'], 3)
         self.assertEqual(curva['nivel_desempeno'], 'Bueno')
