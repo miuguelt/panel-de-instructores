@@ -252,3 +252,6 @@ PROJECT_GENOME.md
 conversations/
 memory-bank/
 # --- end DevBrain rastros de agentes IA ---
+
+# Artefactos temporales de ejecuciones locales de pruebas
+/tmp_pytest*/

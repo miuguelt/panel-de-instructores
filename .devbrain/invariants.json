@@ -1,29 +1,31 @@
 {
   "schema_version": "1.0",
   "ratchet": {
-    "min_test_count": 144,
+    "min_test_count": 159,
     "min_function_coverage": 100,
     "forbid_skip_xfail": true
   },
   "modules": {
     "turnos-aseo": {
       "status": "LOCKED",
-      "description": "Algoritmo de turnos de aseo con equidad acumulada, sustitución automática y motor puro token-bucket",
+      "description": "Algoritmo de turnos de aseo con equidad sobre la carga total (cumplidos + programados), sustitución automática y motor puro token-bucket",
       "protected_globs": [
         "app/services/aseo*.py",
         "app/routes/aseo.py"
       ],
-      "min_test_count": 144,
+      "min_test_count": 159,
       "forbid_skip_xfail": true,
       "invariants": [
-        "Equidad estricta por carga acumulada (delta <= 1 en ventanas completas)",
+        "Equidad por carga total: cumplidos + turnos ya programados de todo el horizonte (delta <= 1 en ventanas completas)",
+        "Nunca se asigna primero a quien más turnos suma: el cupo va al de menor carga total cuando existe alternativa",
         "Cero asignaciones consecutivas cuando existan aprendices disponibles",
-        "Sustitución inmediata por inasistencia preservando cola natural",
+        "Sustitución inmediata por inasistencia usando la menor carga total y reposición solo si queda en deuda",
         "Desacoplamiento total del motor puro frente a ORM y base de datos"
       ],
       "test_targets": [
         "tests/test_aseo.py",
         "tests/test_aseo_equidad.py",
+        "tests/test_aseo_equidad_total.py",
         "tests/test_aseo_fechas_controladas.py",
         "tests/test_aseo_invariantes_dorados.py",
         "tests/test_aseo_no_cumplido_y_reabrir.py",
@@ -31,11 +33,13 @@
         "tests/test_aseo_termino_general_cortes.py"
       ],
       "golden_hashes": {
-        "tests/golden/aseo_23_aprendices_60d.json": "sha256:bbf98bfc3a97f679bec3baca8a74adb9f16427609b2ff0d29a2dff8e37c49a81"
+        "tests/golden/aseo_23_aprendices_60d.json": "sha256:a8808439705a71679f26428edba4275c5c6970723a1651a4eca0d4a773e1184b"
       },
       "golden_snapshots": {
-        "tests/golden/aseo_23_aprendices_60d.json": "sha256:bbf98bfc3a97f679bec3baca8a74adb9f16427609b2ff0d29a2dff8e37c49a81"
+        "tests/golden/aseo_23_aprendices_60d.json": "sha256:a8808439705a71679f26428edba4275c5c6970723a1651a4eca0d4a773e1184b"
       }
     }
   }
 }
+
+

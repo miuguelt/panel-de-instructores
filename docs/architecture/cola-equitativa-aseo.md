@@ -11,9 +11,11 @@ Las pruebas de regresión reproducen esta diferencia con registros persistidos.
 
 Los dos cupos del turno usan los mismos criterios, en este orden:
 
-1. Menor carga total: aseos cumplidos y turnos pendientes considerados en el cálculo.
-2. Entre quienes tienen esa carga, descanso de los asignados en la sesión anterior,
-   si hay otra persona disponible con la misma carga.
+1. Menor carga total: aseos cumplidos más turnos ya programados de **todo el
+   horizonte** (no solo del rango que se está calculando).
+2. Descanso obligatorio: no se repite a quien fue asignado en la sesión anterior
+   mientras exista otra persona elegible. Antes se relajaba el descanso y se podía
+   repetir a la misma persona dos días seguidos aunque hubiera reemplazo.
 3. Menor cantidad de aseos cumplidos.
 4. Rotación de compañeros y, en el calendario, reducción de parejas repetidas
    entre quienes quedan disponibles. Estos criterios solo resuelven empates
@@ -25,8 +27,10 @@ Los dos cupos del turno usan los mismos criterios, en este orden:
 
 Cada asignación aumenta inmediatamente la carga proyectada. Esto evita que
 un calendario completo repita a los mismos aprendices porque sus turnos nuevos
-todavía no se han cumplido. Evitar sesiones consecutivas nunca permite elegir
-a alguien con mayor carga total. Si solo hay dos personas elegibles, pueden repetir.
+todavía no se han cumplido. La regla nunca entrega el cupo a quien tiene más
+carga total si existe una alternativa con menos: es el defecto que reportaba
+"el sistema asigna primero a quienes más veces han hecho aseo". Si solo hay dos
+personas elegibles, pueden repetir.
 
 ## Responsabilidades y contratos
 
@@ -45,13 +49,18 @@ a alguien con mayor carga total. Si solo hay dos personas elegibles, pueden repe
   aprendiz y pasa la selección al mismo servicio de generación.
 - `tests/test_aseo_equidad.py` verifica el desempate en ambos cupos, el reparto de
   un calendario, los límites de la selección y los mensajes de auditoría.
+- `tests/test_aseo_equidad_total.py` fija la equidad sobre la carga total: los
+  pendientes de otros rangos consumen cupo, el cálculo nunca elige a quien más
+  tiene, la inasistencia se compensa con la menor carga y el botón "Calcular
+  turnos" informa el delta resultante.
 - La suite existente verifica permisos, festivos, exclusiones, cumplimiento
   individual y conservación de turnos cumplidos, manuales y pasados.
 
 No se modifica el esquema ni se recalculan datos reales durante las pruebas.
-La generación mantiene el alcance temporal existente: los pendientes anteriores
-al rango y los protegidos dentro de este aportan carga; los futuros fuera del
-rango no adelantan la carga del periodo actual.
+La generación cuenta como carga los pendientes **anteriores y posteriores** al
+rango; solo quedan fuera los pendientes que el propio rango va a redistribuir,
+porque esos se asignan de nuevo dentro del cálculo. Así un mes calculado de forma
+independiente no vuelve a premiar a quien ya tiene aseos programados en otro mes.
 
 El selector semanal se incluye en los formularios del instructor y del aprendiz.
 De lunes a viernes quedan marcados por defecto; las selecciones de sábado y
@@ -109,18 +118,39 @@ y forman parte de la suite que CI ejecuta con la compuerta de funciones al 100 %
    contador `ContadorAseo.veces_aseo` se mantiene en término general sin reiniciarse
    al abrir, cerrar o cambiar de corte.
 
-2. **Doble métrica en transparencia y gestión:**
+2. **Métricas de transparencia y gestión:**
    Para brindar claridad tanto del periodo en curso como del balance general, las
-   interfaces del instructor y del aprendiz presentan dos columnas diferenciadas:
+   interfaces del instructor y del aprendiz presentan tres columnas diferenciadas:
    - **En periodo (`veces_periodo`):** Muestra los turnos efectivamente cumplidos
      por el aprendiz dentro del mes o rango de fechas visualizado (calculado con
      `contar_cumplidos_en_periodo`).
-   - **Total (`veces_total`):** Muestra la totalidad histórica de turnos cumplidos
-     por el aprendiz en la formación (`ContadorAseo.veces_aseo`).
+   - **Cumplidos (`veces_total`):** Muestra la totalidad histórica de turnos
+     cumplidos por el aprendiz en la formación (`ContadorAseo.veces_aseo`).
+   - **Programados (`veces_pendientes`) y Total (`veces_comprometidas`):** muestran
+     los turnos pendientes y la suma que realmente usa el algoritmo para decidir.
+     La columna Total es la que debe mirar el instructor para comprobar la equidad.
 
 3. **Criterio rector de asignación:**
-   El cálculo de cola justa (`app/services/aseo_cola.py`) prioriza la carga acumulada
-   general y la fecha de referencia más antigua (quien lleva más tiempo sin realizar
-   aseo o nunca lo ha hecho), garantizando que todos los aprendices alcancen el mismo
-   número de turnos a lo largo del proceso formativo.
+   El cálculo de cola justa (`app/services/aseo_cola.py` y
+   `app/services/aseo_motor_puro.py`) prioriza la carga total (cumplidos +
+   programados de todo el horizonte) y la fecha de referencia más antigua (quien
+   lleva más tiempo sin realizar aseo o nunca lo ha hecho), garantizando que todos
+   los aprendices alcancen el mismo número de turnos a lo largo del proceso formativo.
+
+## Inasistencia y equidad
+
+Cuando alguien no asiste, el turno del día se resuelve en dos pasos:
+
+1. Se busca un suplente entre los presentes con la **menor carga total**, nunca
+   entre los que ya acumulan más turnos. El ausente no suma el turno a su contador.
+2. Se le programa una reposición solo si su carga total quedó por debajo de la de
+   sus compañeros. Si otra persona ya cubrió el turno y el ausente conserva sus
+   pendientes, no se le agrega otro turno: así no se sobrecompensa ni se duplica
+   la reposición. La reposición se empareja con quien menos carga total tiene.
+
+Ninguna inasistencia desaloja turnos futuros ya publicados de otros aprendices.
+Para reequilibrar todo el horizonte existe `rebalancear_turnos_pendientes`, que
+solo cambia parejas de turnos pendientes existentes (no crea ni borra), respeta
+manuales e intercambios aceptados y se ejecuta desde el botón "Calcular turnos"
+con la opción **Equilibrar todo el calendario**.
 

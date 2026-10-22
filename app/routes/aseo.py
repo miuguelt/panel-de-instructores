@@ -16,15 +16,18 @@ from app.services.aseo import (
     aprendices_activos,
     asegurar_contadores,
     asignar_o_actualizar_turno,
+    cargas_pendientes,
     completar_turno,
     marcar_no_cumplido,
     reabrir_turno,
+    rebalancear_turnos_pendientes,
     contar_cumplidos_en_periodo,
     datos_transparencia,
     generar_turnos,
     obtener_configuracion,
     recalcular_contadores,
     reemplazar_aprendices,
+    resumen_equidad,
     verificar_ausencias_en_turnos,
 )
 from app.services.festivos import (
@@ -153,6 +156,7 @@ def turnos(ficha_id):
     }
     aprendices = aprendices_activos(ficha_id)
     cumplidos_periodo = contar_cumplidos_en_periodo(ficha_id, mes, fin_mes)
+    pendientes_totales = cargas_pendientes(ficha_id)
     proximos = {}
     for turno in TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
@@ -168,6 +172,9 @@ def turnos(ficha_id):
             'contador': contadores[aprendiz.id],
             'veces_periodo': cumplidos_periodo.get(aprendiz.id, 0),
             'veces_total': contadores[aprendiz.id].veces_aseo,
+            'veces_pendientes': pendientes_totales.get(aprendiz.id, 0),
+            'veces_comprometidas': contadores[aprendiz.id].veces_aseo
+            + pendientes_totales.get(aprendiz.id, 0),
             'proxima': proximos.get(aprendiz.id),
         }
         for aprendiz in aprendices
@@ -205,12 +212,18 @@ def turnos(ficha_id):
     festivos_dict = obtener_festivos_colombia(mes.year)
     festivos_mes = {f: nom for f, nom in festivos_dict.items() if mes <= f <= fin_mes}
 
+    totales_equidad = [fila['veces_comprometidas'] for fila in equidad]
+
     return render_template(
         'turnos_aseo.html',
         ficha=ficha,
         config=config,
         aprendices=aprendices,
         equidad=equidad,
+        equidad_delta=(max(totales_equidad) - min(totales_equidad)) if totales_equidad else 0,
+        equidad_minimo=min(totales_equidad) if totales_equidad else 0,
+        equidad_maximo=max(totales_equidad) if totales_equidad else 0,
+        equidad_promedio=(sum(totales_equidad) / len(totales_equidad)) if totales_equidad else 0,
         orden=orden,
         mes=mes,
         nombre_mes=f'{MESES[mes.month]} {mes.year}',
@@ -250,6 +263,7 @@ def generar(ficha_id):
         )
         recalcular = request.form.get('recalcular', 'on') in ('on', 'true', '1')
         respetar_manuales = request.form.get('respetar_manuales', 'on') in ('on', 'true', '1')
+        equilibrar = request.form.get('equilibrar_calendario', 'on') in ('on', 'true', '1')
         resultado = generar_turnos(
             ficha_id,
             inicio,
@@ -258,6 +272,18 @@ def generar(ficha_id):
             respetar_manuales=respetar_manuales,
             dias_semana=dias_semana,
         )
+        # Equilibra también los turnos ya programados fuera del rango visible, para
+        # que el reparto sea justo sobre el total de turnos y no solo sobre un mes.
+        equilibrados = (
+            rebalancear_turnos_pendientes(
+                ficha_id,
+                fecha_inicio=inicio,
+                respetar_manuales=respetar_manuales,
+            )
+            if equilibrar
+            else []
+        )
+        resumen = resumen_equidad(ficha_id)
         db.session.commit()
     except ValueError as exc:
         db.session.rollback()
@@ -274,6 +300,8 @@ def generar(ficha_id):
         partes.append(f'{creados} nuevo(s)')
     if recalculados:
         partes.append(f'{recalculados} pendiente(s) recalculado(s)')
+    if equilibrados:
+        partes.append(f'{len(equilibrados)} equilibrado(s) fuera del rango')
     if cumplidos:
         partes.append(f'{cumplidos} cumplido(s) conservado(s)')
     if manuales:
@@ -283,6 +311,11 @@ def generar(ficha_id):
         mensaje = f'Cálculo de turnos completado ({", ".join(partes)}) para {resultado["sesiones"]} sesión(es).'
     else:
         mensaje = f'No se requirieron cambios en las {resultado["sesiones"]} sesiones evaluadas.'
+
+    mensaje += (
+        f' Equidad resultante: cada aprendiz tiene entre {resumen["minimo"]} y '
+        f'{resumen["maximo"]} turnos en total (diferencia de {resumen["delta"]}).'
+    )
 
     if resultado['sin_candidatos']:
         mensaje += (
@@ -490,6 +523,7 @@ def gestionar(ficha_id):
     }
     aprendices = aprendices_activos(ficha_id)
     cumplidos_periodo = contar_cumplidos_en_periodo(ficha_id, mes, fin_mes)
+    pendientes_totales = cargas_pendientes(ficha_id)
     proximos = {}
     for turno in TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
@@ -505,6 +539,10 @@ def gestionar(ficha_id):
             'contador': contadores.get(aprendiz.id),
             'veces_periodo': cumplidos_periodo.get(aprendiz.id, 0),
             'veces_total': contadores[aprendiz.id].veces_aseo if contadores.get(aprendiz.id) else 0,
+            'veces_pendientes': pendientes_totales.get(aprendiz.id, 0),
+            'veces_comprometidas': (
+                contadores[aprendiz.id].veces_aseo if contadores.get(aprendiz.id) else 0
+            ) + pendientes_totales.get(aprendiz.id, 0),
             'proxima': proximos.get(aprendiz.id),
         }
         for aprendiz in aprendices
@@ -547,6 +585,7 @@ def gestionar(ficha_id):
     total_programados = sum(
         1 for turno in turnos_mes if turno.estado in ESTADOS_PENDIENTES
     )
+    totales_equidad = [fila['veces_comprometidas'] for fila in equidad]
 
     return render_template(
         'aprendiz/gestion_aseo.html',
@@ -556,6 +595,10 @@ def gestionar(ficha_id):
         aprendices=aprendices,
         contadores=contadores,
         equidad=equidad,
+        equidad_delta=(max(totales_equidad) - min(totales_equidad)) if totales_equidad else 0,
+        equidad_minimo=min(totales_equidad) if totales_equidad else 0,
+        equidad_maximo=max(totales_equidad) if totales_equidad else 0,
+        equidad_promedio=(sum(totales_equidad) / len(totales_equidad)) if totales_equidad else 0,
         orden=orden,
         turnos=turnos_mes,
         turnos_por_fecha=turnos_por_fecha,
@@ -590,6 +633,7 @@ def generar_como_aprendiz(ficha_id):
         fin = _fecha_formulario(request.form.get('fecha_fin'), 'fecha final')
         recalcular = request.form.get('recalcular', 'on') in ('on', 'true', '1')
         respetar_manuales = request.form.get('respetar_manuales', 'on') in ('on', 'true', '1')
+        equilibrar = request.form.get('equilibrar_calendario', 'on') in ('on', 'true', '1')
         dias_semana = (
             request.form.getlist('dias_semana')
             if 'dias_semana_present' in request.form
@@ -605,6 +649,17 @@ def generar_como_aprendiz(ficha_id):
             respetar_manuales=respetar_manuales,
             dias_semana=dias_semana,
         )
+        equilibrados = (
+            rebalancear_turnos_pendientes(
+                ficha_id,
+                fecha_inicio=inicio,
+                respetar_manuales=respetar_manuales,
+                generado_por=origen_generacion,
+            )
+            if equilibrar
+            else []
+        )
+        resumen = resumen_equidad(ficha_id)
         db.session.commit()
     except ValueError as exc:
         db.session.rollback()
@@ -621,6 +676,8 @@ def generar_como_aprendiz(ficha_id):
         partes.append(f'{creados} nuevo(s)')
     if recalculados:
         partes.append(f'{recalculados} pendiente(s) recalculado(s)')
+    if equilibrados:
+        partes.append(f'{len(equilibrados)} equilibrado(s) fuera del rango')
     if cumplidos:
         partes.append(f'{cumplidos} cumplido(s) conservado(s)')
     if manuales:
@@ -630,6 +687,11 @@ def generar_como_aprendiz(ficha_id):
         mensaje = f'Cálculo de turnos completado ({", ".join(partes)}) para {resultado["sesiones"]} sesión(es).'
     else:
         mensaje = f'No se requirieron cambios en las {resultado["sesiones"]} sesiones evaluadas.'
+
+    mensaje += (
+        f' Equidad resultante: cada aprendiz tiene entre {resumen["minimo"]} y '
+        f'{resumen["maximo"]} turnos en total (diferencia de {resumen["delta"]}).'
+    )
 
     if resultado.get('sin_candidatos'):
         mensaje += (
@@ -1047,6 +1109,7 @@ def transparencia(ficha_id):
         aprendiz=aprendiz,
         documento=documento,
         equidad=datos['equidad'],
+        equidad_delta=datos.get('equidad_delta', 0),
         orden=orden,
         mes=mes,
         nombre_mes=nombre_mes,

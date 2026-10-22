@@ -113,8 +113,9 @@
             <h2>Tabla de equidad</h2>
         </div>
         <span class="badge badge-info">{{ equidad|length }} activos</span>
+        <span class="badge {{ 'badge-success' if equidad_delta <= 1 else 'badge-warning' }}">Diferencia máxima: {{ equidad_delta }} turno{{ '' if equidad_delta == 1 else 's' }}</span>
     </div>
-    <p class="text-muted">Los contadores en término general registran el total histórico acumulado de la ficha y no se reinician al crear cortes pedagógicos. El sistema asigna los turnos buscando que todos alcancen la misma cantidad en total, iniciando por quien menos veces lo ha hecho y quien lleva más tiempo sin turno.</p>
+    <p class="text-muted">Los contadores en término general registran el total histórico acumulado de la ficha y no se reinician al crear cortes pedagógicos. El sistema asigna los turnos buscando que todos alcancen la misma cantidad en total: los <strong>cumplidos</strong> y los ya <strong>programados</strong> pesan igual en la cola, y siempre se empieza por quien menos suma y quien lleva más tiempo sin turno.</p>
     <div class="table-container">
     <div class="table-responsive">
         <table class="table equity-table">
@@ -123,6 +124,8 @@
                 <tr>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='nombre') }}">Aprendiz</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='periodo') }}">En periodo</a></th>
+                    <th scope="col">Cumplidos</th>
+                    <th scope="col">Programados</th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Total</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='ultima') }}">Última vez</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='proxima') }}">Próxima</a></th>
@@ -133,7 +136,9 @@
                 <tr data-estado="{{ fila.aprendiz.estado }}"{% if aprendiz and fila.aprendiz.id == aprendiz.id %} class="is-me"{% endif %}>
                     <td data-label="Aprendiz"><strong>{{ fila.aprendiz.nombre_completo }}</strong></td>
                     <td data-label="En periodo"><span class="equity-count">{{ fila.veces_periodo }}</span></td>
-                    <td data-label="Total"><span class="equity-count equity-count-total">{{ fila.veces_total }}</span></td>
+                    <td data-label="Cumplidos"><span class="equity-count">{{ fila.veces_total }}</span></td>
+                    <td data-label="Programados"><span class="equity-count">{{ fila.veces_pendientes }}</span></td>
+                    <td data-label="Total"><span class="equity-count equity-count-total">{{ fila.veces_comprometidas }}</span></td>
                     <td data-label="Última vez">{{ fila.contador.ultima_vez_aseo.strftime('%d/%m/%Y') if fila.contador.ultima_vez_aseo else 'Nunca' }}</td>
                     <td data-label="Próxima">{{ fila.proxima.strftime('%d/%m/%Y') if fila.proxima else 'Sin programar' }}</td>
                 </tr>

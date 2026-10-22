@@ -56,7 +56,7 @@
                 <span>Cola Justa y Equidad</span>
             </div>
             <h2>Calcular turnos de aseo</h2>
-            <p class="cleaning-card-desc">Calcula y redistribuye los días faltantes equilibrando las cargas según los turnos cumplidos por cada aprendiz. Los turnos cumplidos se conservan intactos y se omiten los festivos de Colombia.</p>
+            <p class="cleaning-card-desc">Reparte los días faltantes empezando siempre por quien menos turnos suma en total (cumplidos + ya programados), nunca por quien más ha hecho aseo. Los turnos cumplidos se conservan intactos y se omiten los festivos de Colombia.</p>
         </div>
 
         <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}" class="cleaning-form">
@@ -98,10 +98,22 @@
                             <span class="cleaning-chip-sub">Mantiene asignaciones manuales en los días seleccionados</span>
                         </span>
                     </label>
+                    <label class="cleaning-option-chip">
+                        <input type="checkbox" name="equilibrar_calendario" checked class="cleaning-custom-checkbox">
+                        <span class="cleaning-chip-box">
+                            <span class="cleaning-chip-title">Equilibrar todo el calendario</span>
+                            <span class="cleaning-chip-sub">Reasigna también los turnos ya programados de otros meses</span>
+                        </span>
+                    </label>
                 </div>
+                <p class="cleaning-equity-hint">
+                    Equidad actual: cada aprendiz tiene entre
+                    <strong>{{ equidad_minimo }}</strong> y
+                    <strong>{{ equidad_maximo }}</strong>
+                    turnos en total (diferencia de <strong>{{ equidad_delta }}</strong>).
+                </p>
             </div>
 
-            <!-- Botón de Acción -->
             <div class="cleaning-form-actions">
                 <button type="submit" class="btn btn-primary btn-calc-turnos">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-right: 6px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -441,6 +453,8 @@
                 <tr>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='nombre') }}">Aprendiz</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='periodo') }}">En periodo</a></th>
+                    <th scope="col">Cumplidos</th>
+                    <th scope="col">Programados</th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Total</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='ultima') }}">Última vez</a></th>
                     <th scope="col"><a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='proxima') }}">Próxima estimada</a></th>
@@ -452,7 +466,9 @@
                 <tr data-estado="{{ fila.aprendiz.estado }}">
                     <td data-label="Aprendiz"><strong>{{ fila.aprendiz.nombre_completo }}</strong></td>
                     <td data-label="En periodo"><span class="equity-count">{{ fila.veces_periodo }}</span></td>
-                    <td data-label="Total"><span class="equity-count equity-count-total">{{ fila.veces_total }}</span></td>
+                    <td data-label="Cumplidos"><span class="equity-count">{{ fila.veces_total }}</span></td>
+                    <td data-label="Programados"><span class="equity-count">{{ fila.veces_pendientes }}</span></td>
+                    <td data-label="Total"><span class="equity-count equity-count-total">{{ fila.veces_comprometidas }}</span></td>
                     <td data-label="Última vez">{{ fila.contador.ultima_vez_aseo.strftime('%d/%m/%Y') if fila.contador.ultima_vez_aseo else 'Nunca' }}</td>
                     <td data-label="Próxima">{{ fila.proxima.strftime('%d/%m/%Y') if fila.proxima else 'Sin programar' }}</td>
                     <td data-label="Disponibilidad">

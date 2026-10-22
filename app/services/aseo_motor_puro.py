@@ -2,8 +2,10 @@
 
 Función pura desacoplada de SQLAlchemy y la base de datos para garantizar
 invariantes matemáticos verificables y prevenir regresiones:
-1. Ningún aprendiz recibe turno en Ronda k+1 hasta que el 100 % de los activos
-   hayan recibido o repuesto su turno en Ronda k (Invariante de Equidad Estricta).
+1. Equidad sobre la carga total (turnos cumplidos + turnos ya programados): el
+   cupo se entrega siempre a quien menos turnos suma en total; nunca a quien más
+   ha hecho aseo. La diferencia entre el que más y el que menos nunca se amplía
+   por una asignación que tenía una alternativa con menor carga.
 2. Distancia mínima de descanso (cero días consecutivos) entre turnos de una misma persona.
 3. Diversidad de parejas: no repetir compañeros mientras existan opciones con menor historial.
 4. Respeto absoluto de turnos cumplidos y asignaciones manuales sin duplicar cupos.
@@ -32,6 +34,8 @@ def calcular_turnos_token_bucket(
     ausentes_por_fecha=None,
     excluidos_hasta=None,
     veces_cumplidas_iniciales=None,
+    ultima_pareja_ids=None,
+    ultima_fecha_asignada=None,
     rng=None,
 ):
     """Calcula asignaciones de aseo sesión a sesión mediante bolsa de rondas estricta.
@@ -40,11 +44,16 @@ def calcular_turnos_token_bucket(
         aprendiz_ids: lista de IDs de aprendices activos elegibles.
         sesiones_fechas: lista ordenada de fechas (date) correspondientes a las sesiones.
         turnos_fijos: dict opcional {fecha: {'aprendiz_1_id': id, 'aprendiz_2_id': id, ...}}
-        cargas_iniciales: dict opcional {aprendiz_id: veces_cumplidas_previas}
+        cargas_iniciales: dict opcional {aprendiz_id: carga_total_previa}; debe incluir
+            los turnos cumplidos y los pendientes comprometidos de todo el horizonte.
         ultimas_fechas_iniciales: dict opcional {aprendiz_id: ultima_fecha_date}
         historial_parejas_inicial: dict opcional {(id1, id2): veces_compartidas}
         ausentes_por_fecha: dict opcional {fecha: set(aprendiz_ids_presentes)}
         excluidos_hasta: dict opcional {aprendiz_id: fecha_hasta}
+        veces_cumplidas_iniciales: dict opcional {aprendiz_id: veces_cumplidas_previas}
+        ultima_pareja_ids: pareja de la sesión anterior al tramo calculado, para no
+            repetir personas en días consecutivos al recalcular un tramo intermedio.
+        ultima_fecha_asignada: fecha de esa sesión anterior (antigüedad inicial).
         rng: instancia opcional de random.Random para determinismo en pruebas.
 
     Retorna:
@@ -69,6 +78,19 @@ def calcular_turnos_token_bucket(
     for a_id in aprendiz_ids:
         cargas.setdefault(a_id, 0)
         veces_cumplidas.setdefault(a_id, 0)
+
+    # Sembrar el descanso y la antigüedad con la sesión previa al tramo calculado
+    elegibles = set(aprendiz_ids)
+    if ultima_pareja_ids:
+        pareja_previa = {a_id for a_id in ultima_pareja_ids if a_id in elegibles}
+        if len(pareja_previa) == 2:
+            asignaciones_recientes.append(pareja_previa)
+            if ultima_fecha_asignada:
+                for a_id in pareja_previa:
+                    ultima_asignacion[a_id] = max(
+                        ultima_asignacion.get(a_id) or date.min,
+                        ultima_fecha_asignada,
+                    )
 
     # Ingerir turnos fijos (cumplidos, no_cumplidos o manuales respetados)
     for fecha in sorted(turnos_fijos.keys()):
@@ -122,15 +144,18 @@ def calcular_turnos_token_bucket(
         # Ventana de descanso reciente: la sesión inmediatamente anterior
         recientes_ids = set(asignaciones_recientes[-1]) if asignaciones_recientes else set()
 
-        # 1. Determinamos nivel mínimo de carga de los candidatos (Ronda actual)
-        min_carga = min(cargas[a] for a in candidatos_fecha)
-        bolsa_ronda = [a for a in candidatos_fecha if cargas[a] == min_carga]
+        # El descanso es obligatorio mientras exista una alternativa: solo se
+        # permite repetir en días consecutivos si no hay nadie más elegible.
+        base = [a for a in candidatos_fecha if a not in recientes_ids]
+        if not base:
+            base = list(candidatos_fecha)
 
-        # Candidato 1: filtrado por descanso inmediato
-        cands_1 = [a for a in bolsa_ronda if a not in recientes_ids]
-        if not cands_1:
-            # Si todos en la bolsa descansaron recientemente, relajar al grupo completo de la ronda
-            cands_1 = list(bolsa_ronda)
+        # 1. Determinamos nivel mínimo de carga total de los candidatos (Ronda actual)
+        min_carga = min(cargas[a] for a in base)
+        bolsa_ronda = [a for a in base if cargas[a] == min_carga]
+
+        # Candidato 1: la bolsa ya descarta a quienes trabajaron ayer si hay reemplazo
+        cands_1 = list(bolsa_ronda)
 
         # 1. Menos turnos cumplidos prevalecen sobre antigüedad
         min_cumpl_1 = min(veces_cumplidas[a] for a in cands_1)
@@ -145,8 +170,15 @@ def calcular_turnos_token_bucket(
         bolsa_restante = [a for a in bolsa_ronda if a != elegido_1]
         if not bolsa_restante:
             # La bolsa de la ronda actual se agotó (grupo impar o cierre de ciclo):
-            # Tomamos candidatos del siguiente nivel de carga
-            disponibles_siguiente = [a for a in candidatos_fecha if a != elegido_1]
+            # Tomamos candidatos del siguiente nivel de carga.
+            disponibles_siguiente = [
+                a for a in candidatos_fecha
+                if a != elegido_1 and a not in recientes_ids
+            ]
+            if not disponibles_siguiente:
+                disponibles_siguiente = [
+                    a for a in candidatos_fecha if a != elegido_1
+                ]
             min_siguiente = min(cargas[a] for a in disponibles_siguiente)
             bolsa_restante = [a for a in disponibles_siguiente if cargas[a] == min_siguiente]
 

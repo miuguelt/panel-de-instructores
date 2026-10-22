@@ -3,16 +3,27 @@
 Cumple con la Regla 5.0 de DevBrain: no se permite consolidar código de producción
 sin que cada función nueva esté acompañada de sus pruebas automatizadas y ejecutada
 con aserciones observables.
+
+El registro de invocaciones (``test-results/function-calls.json``) es una caché: una
+copia vieja decía "sin prueba" de funciones que sí estaban probadas. Por eso, cuando
+el registro no cubre las funciones del diff o es anterior al último cambio del módulo,
+la compuerta ejecuta las pruebas relacionadas, fusiona las invocaciones reales y solo
+después decide. La caché vieja ya no puede bloquear un commit por sí sola.
 """
 
 import argparse
-import ast
 import json
 import re
 import subprocess
 import sys
-import xml.etree.ElementTree as ET
+import time
 from pathlib import Path
+
+DIRECTORIOS_FUENTE = ('app', 'worker.py')
+RUTAS_EVIDENCIA = ('test-results/function-calls.json', 'test-results/calls.json')
+MAX_ARCHIVOS_PRUEBA = 24
+TIEMPO_LIMITE_SEGUNDOS = 900
+TOLERANCIA_MTIME = 1.0
 
 
 def obtener_diff_git(referencia=None, en_stage=False):
@@ -47,7 +58,7 @@ def obtener_diff_git(referencia=None, en_stage=False):
         return ''
 
 
-def extraer_funciones_nuevas_diff(diff_texto, directorios_fuente=('app', 'worker.py')):
+def extraer_funciones_nuevas_diff(diff_texto, directorios_fuente=DIRECTORIOS_FUENTE):
     """Identifica las funciones agregadas en el diff dentro de los directorios de producción."""
     funciones_nuevas = []
     archivo_actual = None
@@ -78,6 +89,228 @@ def extraer_funciones_nuevas_diff(diff_texto, directorios_fuente=('app', 'worker
                 })
 
     return funciones_nuevas
+
+
+def cargar_llamadas(ruta):
+    """Lee un registro de invocaciones tolerando archivos ausentes o corruptos."""
+    try:
+        datos = json.loads(Path(ruta).read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return {'funciones': []}
+    if not isinstance(datos, dict):
+        return {'funciones': []}
+    return dict(datos, funciones=list(datos.get('funciones') or []))
+
+
+def fusionar_llamadas(previas, nuevas):
+    """Une dos registros: las pruebas se acumulan y la línea más reciente prevalece."""
+    por_clave = {}
+    entradas = list(previas.get('funciones') or []) + list(nuevas.get('funciones') or [])
+    for entrada in entradas:
+        if not isinstance(entrada, dict) or not entrada.get('nombre') or not entrada.get('archivo'):
+            continue
+        clave = (entrada['archivo'], entrada['nombre'])
+        anterior = por_clave.get(clave)
+        pruebas = set(anterior.get('pruebas') or []) if anterior else set()
+        pruebas.update(entrada.get('pruebas') or [])
+        fusionada = dict(entrada)
+        fusionada['pruebas'] = sorted(pruebas)
+        por_clave[clave] = fusionada
+
+    return {
+        'pruebas_aprobadas': nuevas.get('pruebas_aprobadas', previas.get('pruebas_aprobadas', 0)),
+        'funciones': sorted(
+            por_clave.values(),
+            key=lambda f: (f.get('archivo', ''), f.get('linea_inicio', 0), f.get('nombre', '')),
+        ),
+    }
+
+
+def ruta_evidencia_por_defecto(raiz):
+    """Prefiere un registro existente y, si no hay ninguno, la ruta que escribe pytest."""
+    raiz = Path(raiz)
+    for relativa in RUTAS_EVIDENCIA:
+        candidata = raiz / relativa
+        if candidata.exists():
+            return candidata
+    return raiz / RUTAS_EVIDENCIA[0]
+
+
+def seleccionar_pruebas(funciones, raiz, ampliar=False, excluir=()):
+    """Elige los archivos de prueba que probablemente ejercitan las funciones del diff.
+
+    La primera pasada se limita a pruebas cuyo nombre corresponde al módulo o que
+    nombran la función. La pasada ampliada suma las que importan el módulo; se usa
+    solo cuando la primera no alcanzó a ejecutar alguna función, para no arrastrar
+    suites ajenas al cambio.
+    """
+    raiz = Path(raiz).resolve()
+    directorio = raiz / 'tests'
+    if not directorio.exists():
+        return []
+
+    archivos = sorted(p for p in directorio.rglob('test_*.py') if p.is_file())
+    if not archivos:
+        return []
+
+    excluidos = {Path(p).as_posix() for p in excluir}
+    textos = {}
+    for archivo in archivos:
+        if archivo.relative_to(raiz).as_posix() in excluidos:
+            continue
+        try:
+            textos[archivo] = archivo.read_text(encoding='utf-8', errors='replace').lower()
+        except OSError:
+            continue
+
+    elegidos = set()
+    for item in funciones:
+        ruta = item['archivo']
+        if not ruta.endswith('.py'):
+            continue
+        modulo = ruta[:-3].replace('/', '.')
+        modulo_clave = modulo.lower()
+        partes = modulo.split('.')
+        padre = '.'.join(partes[:-1]) or modulo
+        prefijo = partes[-1].split('_')[0]
+        patron_import = re.compile(rf'\bfrom\s+{re.escape(padre)}\s+import\b')
+        nombre = item['nombre'].lower()
+
+        for archivo, texto in textos.items():
+            tallo = archivo.stem.lower()
+            coincide = tallo.startswith(f'test_{prefijo}') or nombre in texto
+            if not coincide and ampliar:
+                coincide = modulo_clave in texto or bool(patron_import.search(texto))
+            if coincide:
+                elegidos.add(archivo)
+
+    return [
+        p.relative_to(raiz).as_posix()
+        for p in sorted(elegidos)[:MAX_ARCHIVOS_PRUEBA]
+    ]
+
+
+def funciones_sin_evidencia(funciones, ruta_evidencia):
+    """Funciones del diff que aún no tienen una prueba aprobada registrada."""
+    registradas = {
+        (entrada.get('archivo'), entrada.get('nombre'))
+        for entrada in cargar_llamadas(ruta_evidencia)['funciones']
+        if entrada.get('pruebas')
+    }
+    return [
+        item for item in funciones
+        if (item['archivo'], item['nombre']) not in registradas
+    ]
+
+
+def motivos_evidencia_desactualizada(funciones, ruta_evidencia, raiz):
+    """Explica por qué el registro no sirve como prueba para estas funciones."""
+    ruta_evidencia = Path(ruta_evidencia)
+    if not ruta_evidencia.exists():
+        return ['no hay registro de ejecución de pruebas']
+
+    registradas = {
+        (entrada.get('archivo'), entrada.get('nombre'))
+        for entrada in cargar_llamadas(ruta_evidencia)['funciones']
+        if entrada.get('pruebas')
+    }
+    modificado = ruta_evidencia.stat().st_mtime
+
+    motivos = []
+    for item in funciones:
+        if (item['archivo'], item['nombre']) not in registradas:
+            motivos.append(f"sin invocación registrada para {item['archivo']}:{item['nombre']}")
+            continue
+        try:
+            fuente = (Path(raiz) / item['archivo']).stat().st_mtime
+        except OSError:
+            continue
+        if modificado + TOLERANCIA_MTIME < fuente:
+            motivos.append(f'registro anterior al último cambio de {item["archivo"]}')
+            break
+
+    return motivos
+
+
+def ejecutar_pruebas_relacionadas(archivos, destino, raiz, tiempo_limite=TIEMPO_LIMITE_SEGUNDOS):
+    """Corre pytest sobre los archivos elegidos registrando las invocaciones reales."""
+    destino = Path(destino)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    comando = [
+        sys.executable, '-m', 'pytest', *archivos,
+        '-q', '-p', 'no:cacheprovider', '-o', 'addopts=',
+        f'--function-calls-json={destino}',
+    ]
+
+    inicio = time.monotonic()
+    try:
+        resultado = subprocess.run(
+            comando,
+            cwd=str(raiz),
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=tiempo_limite,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {'codigo': None, 'salida': '', 'segundos': round(time.monotonic() - inicio, 1),
+                'error': f'tiempo agotado tras {tiempo_limite}s'}
+    except OSError as exc:
+        return {'codigo': None, 'salida': '', 'segundos': round(time.monotonic() - inicio, 1),
+                'error': str(exc)}
+
+    salida = f'{resultado.stdout or ""}{resultado.stderr or ""}'
+    return {'codigo': resultado.returncode, 'salida': salida,
+            'segundos': round(time.monotonic() - inicio, 1), 'error': None}
+
+
+def refrescar_evidencia(funciones, raiz, ruta_evidencia, tiempo_limite=TIEMPO_LIMITE_SEGUNDOS,
+                        ampliar=False, excluir=()):
+    """Ejecuta las pruebas relacionadas y fusiona sus invocaciones en el registro."""
+    archivos = seleccionar_pruebas(funciones, raiz, ampliar=ampliar, excluir=excluir)
+    if not archivos:
+        return {'estado': 'sin_pruebas', 'archivos': [], 'salida': '', 'segundos': 0.0, 'error': None}
+
+    ruta_evidencia = Path(ruta_evidencia)
+    temporal = ruta_evidencia.parent / '.function-calls-fresco.json'
+    resultado = ejecutar_pruebas_relacionadas(archivos, temporal, raiz, tiempo_limite)
+    resultado['archivos'] = archivos
+
+    if resultado['codigo'] == 1:
+        respuesta = dict(resultado, estado='pruebas_fallidas')
+    elif resultado['codigo'] == 0 and temporal.exists():
+        ruta_evidencia.parent.mkdir(parents=True, exist_ok=True)
+        fusionado = fusionar_llamadas(cargar_llamadas(ruta_evidencia), cargar_llamadas(temporal))
+        ruta_evidencia.write_text(json.dumps(fusionado, ensure_ascii=False, indent=2), encoding='utf-8')
+        respuesta = dict(resultado, estado='actualizada')
+    elif resultado['codigo'] == 5:
+        respuesta = dict(resultado, estado='sin_pruebas')
+    else:
+        respuesta = dict(resultado, estado='no_ejecutable')
+
+    try:
+        temporal.unlink()
+    except OSError:
+        pass
+    return respuesta
+
+
+def refrescar_evidencia_completa(funciones, raiz, ruta_evidencia, tiempo_limite=TIEMPO_LIMITE_SEGUNDOS):
+    """Refresca la evidencia y, si aún falta alguna función, amplía la búsqueda una vez."""
+    pasos = [refrescar_evidencia(funciones, raiz, ruta_evidencia, tiempo_limite)]
+    if pasos[0]['estado'] != 'actualizada':
+        return pasos
+
+    pendientes = funciones_sin_evidencia(funciones, ruta_evidencia)
+    if pendientes:
+        segundo = refrescar_evidencia(
+            pendientes, raiz, ruta_evidencia, tiempo_limite,
+            ampliar=True, excluir=pasos[0]['archivos'],
+        )
+        pasos.append(segundo)
+    return pasos
 
 
 def verificar_cobertura_con_llamadas(funciones_nuevas, ruta_llamadas):
@@ -155,6 +388,12 @@ def verificar_pruebas_estaticas(funciones_nuevas, raiz_proyecto='.'):
     return resultado
 
 
+def _resumen_pytest(salida, maximo=12):
+    """Devuelve las últimas líneas útiles de pytest para el mensaje de bloqueo."""
+    lineas = [linea for linea in (salida or '').splitlines() if linea.strip()]
+    return '\n'.join(lineas[-maximo:])
+
+
 def main(argumentos=None):
     """Punto de entrada de línea de comandos."""
     parser = argparse.ArgumentParser(
@@ -178,8 +417,20 @@ def main(argumentos=None):
         default='.',
         help='Directorio raíz del proyecto.',
     )
+    parser.add_argument(
+        '--sin-auto',
+        action='store_true',
+        help='No refrescar el registro de ejecución; juzgar con lo que ya exista.',
+    )
+    parser.add_argument(
+        '--tiempo-limite',
+        type=int,
+        default=TIEMPO_LIMITE_SEGUNDOS,
+        help='Segundos máximos para la corrida focalizada de pytest.',
+    )
 
     args = parser.parse_args(argumentos)
+    raiz = Path(args.raiz).resolve()
 
     diff_texto = obtener_diff_git(referencia=args.commit, en_stage=args.cached)
     if not diff_texto:
@@ -191,23 +442,40 @@ def main(argumentos=None):
         print('✅ No se detectaron funciones nuevas en el código de producción.')
         return 0
 
-    # Si se especificó calls-json o existe en test-results/cargas-calls-total.json, usar verificación de ejecución
-    ruta_llamadas = args.calls_json
-    if not ruta_llamadas:
-        raiz_p = Path(args.raiz)
-        for candidata in (
-            raiz_p / 'test-results/calls.json',
-            raiz_p / 'test-results/function-calls.json',
-        ):
-            if candidata.exists():
-                ruta_llamadas = str(candidata)
-                break
+    ruta_llamadas = Path(args.calls_json) if args.calls_json else ruta_evidencia_por_defecto(raiz)
+    automatico = not args.sin_auto and not args.calls_json
 
-    if ruta_llamadas and Path(ruta_llamadas).exists():
+    if automatico:
+        motivos = motivos_evidencia_desactualizada(funciones, ruta_llamadas, raiz)
+        if motivos:
+            print(f'🔄 El registro de ejecución no cubre este cambio: {motivos[0]}')
+            pasos = refrescar_evidencia_completa(funciones, raiz, ruta_llamadas, args.tiempo_limite)
+            for indice, paso in enumerate(pasos):
+                if paso['estado'] == 'actualizada':
+                    detalle = ' (búsqueda ampliada)' if indice else ''
+                    print(
+                        f"   {len(paso['archivos'])} archivo(s) de prueba ejecutados en "
+                        f"{paso['segundos']}s{detalle}."
+                    )
+                    if indice == 0:
+                        print(f'   Registro actualizado en {ruta_llamadas.as_posix()}.')
+                elif paso['estado'] == 'pruebas_fallidas':
+                    print(_resumen_pytest(paso['salida']))
+                    print('\n❌ Las pruebas relacionadas fallaron; no se puede certificar la Regla 5.0.')
+                    print('👉 Corrige las pruebas antes de consolidar el cambio.')
+                    return 1
+                elif paso['estado'] == 'sin_pruebas':
+                    if indice == 0:
+                        print('   No hay archivos de prueba relacionados; se verifica por referencias estáticas.')
+                else:
+                    detalle = paso.get('error') or f"pytest terminó con código {paso['codigo']}"
+                    print(f'   No se pudo ejecutar pytest ({detalle}); se verifica por referencias estáticas.')
+
+    if ruta_llamadas.exists():
         verificacion = verificar_cobertura_con_llamadas(funciones, ruta_llamadas)
-        origen_info = f'llamadas reales de prueba en {ruta_llamadas}'
+        origen_info = f'llamadas reales de prueba en {ruta_llamadas.as_posix()}'
     else:
-        verificacion = verificar_pruebas_estaticas(funciones, raiz_proyecto=args.raiz)
+        verificacion = verificar_pruebas_estaticas(funciones, raiz_proyecto=str(raiz))
         origen_info = 'referencias en archivos de prueba'
 
     aprobadas = verificacion['aprobadas']

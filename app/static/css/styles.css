@@ -3578,6 +3578,21 @@ select optgroup {
     gap: 12px;
 }
 
+.cleaning-equity-hint {
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px dashed var(--border-divider);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.cleaning-equity-hint strong {
+    color: var(--text-strong);
+}
+
 .cleaning-weekday-fieldset {
     min-width: 0;
     margin: 0;

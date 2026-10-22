@@ -41,7 +41,7 @@
                 <span>Cola Justa y Equidad</span>
             </div>
             <h2>Calcular turnos de aseo</h2>
-            <p class="cleaning-card-desc">Calcula y redistribuye los días faltantes equilibrando las cargas según los turnos cumplidos por cada aprendiz. Los turnos cumplidos se conservan intactos.</p>
+            <p class="cleaning-card-desc">Reparte los días faltantes empezando siempre por quien menos turnos suma en total (cumplidos + ya programados), nunca por quien más ha hecho aseo. Los turnos cumplidos se conservan intactos.</p>
         </div>
 
         <form method="POST" action="{{ url_for('aseo.generar', ficha_id=ficha.id) }}" class="cleaning-form">
@@ -83,7 +83,20 @@
                             <span class="cleaning-chip-sub">Mantiene asignaciones manuales en los días seleccionados</span>
                         </span>
                     </label>
+                    <label class="cleaning-option-chip">
+                        <input type="checkbox" name="equilibrar_calendario" checked class="cleaning-custom-checkbox">
+                        <span class="cleaning-chip-box">
+                            <span class="cleaning-chip-title">Equilibrar todo el calendario</span>
+                            <span class="cleaning-chip-sub">Reasigna también los turnos ya programados de otros meses</span>
+                        </span>
+                    </label>
                 </div>
+                <p class="cleaning-equity-hint">
+                    Equidad actual: cada aprendiz tiene entre
+                    <strong>{{ equidad_minimo }}</strong> y
+                    <strong>{{ equidad_maximo }}</strong>
+                    turnos en total (diferencia de <strong>{{ equidad_delta }}</strong>).
+                </p>
             </div>
 
             <!-- Botón de Acción -->
@@ -293,8 +306,9 @@
             <h2>Tabla de equidad</h2>
         </div>
         <span class="badge badge-info">{{ equidad|length }} activos</span>
+        <span class="badge {{ 'badge-success' if equidad_delta <= 1 else 'badge-warning' }}">Diferencia máxima: {{ equidad_delta }} turno{{ '' if equidad_delta == 1 else 's' }}</span>
     </div>
-    <p class="text-muted">Los contadores en término general registran el total histórico acumulado de la ficha y no se reinician al crear cortes pedagógicos. El sistema asigna los turnos buscando que todas las personas alcancen la misma cantidad de turnos en total, iniciando siempre por quien menos veces lo ha hecho y quien lleva más tiempo sin turno.</p>
+    <p class="text-muted">Los contadores en término general registran el total histórico acumulado de la ficha y no se reinician al crear cortes pedagógicos. El sistema asigna los turnos buscando que todas las personas alcancen la misma cantidad de turnos en total: los <strong>cumplidos</strong> y los ya <strong>programados</strong> pesan igual en la cola, y siempre se empieza por quien menos suma y quien lleva más tiempo sin turno.</p>
     <div class="table-container">
     <div class="table-responsive" data-filter-region="aseo-equidad-tabla">
         <table class="table equity-table">
@@ -303,6 +317,8 @@
                 <tr>
                     <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='nombre') }}">Aprendiz</a></th>
                     <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='periodo') }}">En periodo</a></th>
+                    <th scope="col">Cumplidos</th>
+                    <th scope="col">Programados</th>
                     <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='veces') }}">Total</a></th>
                     <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='ultima') }}">Última vez</a></th>
                     <th scope="col"><a href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes.strftime('%Y-%m'), orden='proxima') }}">Próxima estimada</a></th>
@@ -314,7 +330,9 @@
                 <tr data-estado="{{ fila.aprendiz.estado }}">
                     <td data-label="Aprendiz"><strong><a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=fila.aprendiz.id) }}">{{ fila.aprendiz.nombre_completo }}</a></strong></td>
                     <td data-label="En periodo"><span class="equity-count">{{ fila.veces_periodo }}</span></td>
-                    <td data-label="Total"><span class="equity-count equity-count-total">{{ fila.veces_total }}</span></td>
+                    <td data-label="Cumplidos"><span class="equity-count">{{ fila.veces_total }}</span></td>
+                    <td data-label="Programados"><span class="equity-count">{{ fila.veces_pendientes }}</span></td>
+                    <td data-label="Total"><span class="equity-count equity-count-total">{{ fila.veces_comprometidas }}</span></td>
                     <td data-label="Última vez">{{ fila.contador.ultima_vez_aseo.strftime('%d/%m/%Y') if fila.contador.ultima_vez_aseo else 'Nunca' }}</td>
                     <td data-label="Próxima">{{ fila.proxima.strftime('%d/%m/%Y') if fila.proxima else 'Sin programar' }}</td>
                     <td data-label="Disponibilidad">

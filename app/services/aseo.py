@@ -87,6 +87,112 @@ def _obtener_historial_parejas(ficha_id):
     return parejas
 
 
+def _cargas_totales(
+    ficha_id,
+    activos,
+    contadores,
+    excluir_desde=None,
+    excluir_hasta=None,
+):
+    """Carga total por aprendiz: cumplidos + turnos pendientes de todo el horizonte.
+
+    Es la única medida de equidad del calendario. Incluye los pendientes anteriores
+    y posteriores a la ventana que se está calculando, porque un turno ya programado
+    consume el mismo cupo que uno cumplido: si solo se contaran los cumplidos, quien
+    ya tiene aseos asignados volvería a quedar primero en la cola.
+
+    Los pendientes dentro de la ventana ``[excluir_desde, excluir_hasta]`` se omiten
+    porque esa ventana se redistribuye (o se ingiere como turno fijo en el motor).
+    """
+    cargas = {
+        aprendiz.id: contadores[aprendiz.id].veces_aseo for aprendiz in activos
+    }
+    ultimas = {
+        aprendiz.id: contadores[aprendiz.id].ultima_vez_aseo for aprendiz in activos
+    }
+    for turno in TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
+    ).all():
+        if (
+            excluir_desde is not None
+            and turno.fecha >= excluir_desde
+            and (excluir_hasta is None or turno.fecha <= excluir_hasta)
+        ):
+            continue
+        for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
+            if aprendiz_id not in cargas:
+                continue
+            cargas[aprendiz_id] += 1
+            ultimas[aprendiz_id] = _ultima_fecha(
+                ultimas[aprendiz_id], turno.fecha
+            )
+    return cargas, ultimas
+
+
+def _es_turno_reposicion(turno):
+    """True si el turno nació como reposición de una inasistencia."""
+    return bool(turno.observacion and 'Reposición' in turno.observacion)
+
+
+def _sembrar_descanso_anterior(ficha_id, fecha_inicio):
+    """Pareja y fecha del turno inmediatamente anterior al tramo que se calcula.
+
+    Evita que un recálculo parcial repita en su primera sesión a quienes ya
+    hicieron aseo en la última sesión del tramo previo. Se ignora cuando el
+    turno anterior quedó a más de tres días (puente o fin de semana largo).
+    """
+    anterior = TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.fecha < fecha_inicio,
+    ).order_by(TurnoAseo.fecha.desc()).first()
+    if not anterior or (fecha_inicio - anterior.fecha) > timedelta(days=3):
+        return None, None
+    return {anterior.aprendiz_1_id, anterior.aprendiz_2_id}, anterior.fecha
+
+
+def cargas_pendientes(ficha_id):
+    """Turnos pendientes (programados o intercambiados) por aprendiz en todo el horizonte."""
+    pendientes = defaultdict(int)
+    for turno in TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
+    ).all():
+        for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
+            pendientes[aprendiz_id] += 1
+    return pendientes
+
+
+def resumen_equidad(ficha_id):
+    """Foto de la equidad del calendario usando la carga total (cumplidos + programados).
+
+    Retorna el detalle por aprendiz y la diferencia entre quien más y quien menos
+    turnos suma, que es el indicador que persigue el botón "Calcular turnos".
+    """
+    activos = aprendices_activos(ficha_id)
+    contadores = recalcular_contadores(ficha_id)
+    pendientes = cargas_pendientes(ficha_id)
+    filas = [
+        {
+            'aprendiz': aprendiz,
+            'cumplidos': contadores[aprendiz.id].veces_aseo,
+            'programados': pendientes.get(aprendiz.id, 0),
+            'total': contadores[aprendiz.id].veces_aseo
+            + pendientes.get(aprendiz.id, 0),
+        }
+        for aprendiz in activos
+    ]
+    totales = [fila['total'] for fila in filas]
+    return {
+        'filas': filas,
+        'delta': (max(totales) - min(totales)) if totales else 0,
+        'minimo': min(totales) if totales else 0,
+        'maximo': max(totales) if totales else 0,
+        'promedio': mean(totales) if totales else 0,
+        'pendientes': sum(pendientes.values()),
+    }
+
+
 def _registros_presentes(sesion):
     registros = sesion.registros.all()
     if not registros:
@@ -207,6 +313,9 @@ def generar_turnos(
     """Genera y recalcula turnos para sesiones del rango equilibrando cargas y evitando repeticiones.
 
     - Conserva siempre intactos los turnos cumplidos (históricos).
+    - Equilibra con la carga total: turnos cumplidos + turnos pendientes de todo el
+      horizonte. Un pendiente de otro mes consume cupo igual que uno del rango, así
+      que la cola nunca vuelve a elegir primero a quien ya tiene más aseos asignados.
     - Si recalcular_existentes=True, recalcula cronológicamente los turnos
       pendientes/programados para equilibrar las cargas y rotar parejas sin repeticiones consecutivas.
     - Si respetar_manuales=True, conserva asignaciones manuales en días permitidos.
@@ -235,8 +344,6 @@ def generar_turnos(
 
     eliminados = eliminar_turnos_fuera_del_calendario(existentes, dias_semana, ESTADOS_PENDIENTES)
     historial_parejas = _obtener_historial_parejas(ficha_id)
-    cargas_programadas = defaultdict(int)
-    ultimo_turno_asignado = {}
     hoy = date.today()
 
     turnos_fijos = {}
@@ -261,24 +368,13 @@ def generar_turnos(
                 'incrementar_carga': (turno.estado in ESTADOS_PENDIENTES),
             }
 
-    cargas_iniciales = {aprendiz.id: contadores[aprendiz.id].veces_aseo for aprendiz in activos}
-    ultimas_fechas_iniciales = {
-        aprendiz.id: contadores[aprendiz.id].ultima_vez_aseo for aprendiz in activos
-    }
-
-    # Sumar turnos pendientes anteriores al rango
-    turnos_pendientes_anteriores = TurnoAseo.query.filter(
-        TurnoAseo.ficha_id == ficha_id,
-        TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
-        TurnoAseo.fecha < fecha_inicio,
-    ).all()
-    for turno in turnos_pendientes_anteriores:
-        for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
-            if aprendiz_id in cargas_iniciales:
-                cargas_iniciales[aprendiz_id] += 1
-            ultimas_fechas_iniciales[aprendiz_id] = _ultima_fecha(
-                ultimas_fechas_iniciales.get(aprendiz_id), turno.fecha
-            )
+    cargas_iniciales, ultimas_fechas_iniciales = _cargas_totales(
+        ficha_id,
+        activos,
+        contadores,
+        excluir_desde=fecha_inicio,
+        excluir_hasta=fecha_fin,
+    )
 
     excluidos_hasta = {
         aprendiz.id: contadores[aprendiz.id].excluido_hasta
@@ -293,6 +389,8 @@ def generar_turnos(
             if presentes is not None:
                 ausentes_por_fecha[sesion.fecha] = presentes
 
+    vecino_pareja, vecino_fecha = _sembrar_descanso_anterior(ficha_id, fecha_inicio)
+
     resultado_motor = calcular_turnos_token_bucket(
         aprendiz_ids=[a.id for a in activos],
         sesiones_fechas=[s.fecha for s in sesiones],
@@ -303,6 +401,8 @@ def generar_turnos(
         ausentes_por_fecha=ausentes_por_fecha,
         excluidos_hasta=excluidos_hasta,
         veces_cumplidas_iniciales={a.id: contadores[a.id].veces_aseo for a in activos},
+        ultima_pareja_ids=vecino_pareja,
+        ultima_fecha_asignada=vecino_fecha,
         rng=rng,
     )
 
@@ -398,6 +498,155 @@ def generar_turnos(
     }
 
 
+def rebalancear_turnos_pendientes(
+    ficha_id,
+    fecha_inicio=None,
+    fecha_fin=None,
+    respetar_manuales=True,
+    generado_por='sistema',
+    rng=None,
+):
+    """Redistribuye las parejas de los turnos ya programados para restaurar la equidad.
+
+    No crea ni elimina turnos: solo decide quién hace cada aseo pendiente existente
+    usando la carga total (cumplidos + programados de todo el horizonte). Lo usa el
+    botón "Calcular turnos" con la opción de equilibrar todo el calendario, para que
+    el reparto sea justo sobre el total y no solo sobre el rango visible.
+
+    - Solo toca turnos pendientes desde hoy (o ``fecha_inicio``) en adelante.
+    - Respeta asignaciones manuales, reposiciones e intercambios aceptados.
+    - Nunca asigna a quien está excluido o marcado ausente para esa sesión.
+    """
+    hoy = date.today()
+    desde = fecha_inicio or hoy
+    if desde < hoy:
+        desde = hoy
+    consulta = TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
+        TurnoAseo.fecha >= desde,
+    )
+    if fecha_fin is not None:
+        consulta = consulta.filter(TurnoAseo.fecha <= fecha_fin)
+    turnos = consulta.order_by(TurnoAseo.fecha).all()
+    if not turnos:
+        return []
+
+    activos = aprendices_activos(ficha_id)
+    if len(activos) < 2:
+        return []
+
+    contadores = recalcular_contadores(ficha_id)
+    ultima_fecha = turnos[-1].fecha
+    cargas_iniciales, ultimas_fechas_iniciales = _cargas_totales(
+        ficha_id,
+        activos,
+        contadores,
+        excluir_desde=desde,
+        excluir_hasta=ultima_fecha,
+    )
+    historial_parejas = _obtener_historial_parejas(ficha_id)
+    excluidos_hasta = {
+        aprendiz.id: contadores[aprendiz.id].excluido_hasta
+        for aprendiz in activos
+        if contadores[aprendiz.id].excluido_hasta
+    }
+
+    config = obtener_configuracion(ficha_id)
+    ausentes_por_fecha = {}
+    if config.excluir_ausentes:
+        for turno in turnos:
+            presentes = _presentes_en_fecha(ficha_id, turno.fecha)
+            if presentes is not None:
+                ausentes_por_fecha[turno.fecha] = presentes
+
+    turnos_fijos = {}
+    for turno in turnos:
+        es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
+        es_intercambio = turno.estado == 'intercambiado'
+        es_reposicion = _es_turno_reposicion(turno)
+        if es_manual or es_intercambio or es_reposicion:
+            turnos_fijos[turno.fecha] = {
+                'id': turno.id,
+                'aprendiz_1_id': turno.aprendiz_1_id,
+                'aprendiz_2_id': turno.aprendiz_2_id,
+                'estado': turno.estado,
+                'es_manual': es_manual or es_reposicion,
+                'auditoria_1': turno.auditoria_1,
+                'auditoria_2': turno.auditoria_2,
+                'incrementar_carga': True,
+            }
+
+    vecino_pareja, vecino_fecha = _sembrar_descanso_anterior(ficha_id, desde)
+    resultado_motor = calcular_turnos_token_bucket(
+        aprendiz_ids=[a.id for a in activos],
+        sesiones_fechas=[t.fecha for t in turnos],
+        turnos_fijos=turnos_fijos,
+        cargas_iniciales=cargas_iniciales,
+        ultimas_fechas_iniciales=ultimas_fechas_iniciales,
+        historial_parejas_inicial=historial_parejas,
+        ausentes_por_fecha=ausentes_por_fecha,
+        excluidos_hasta=excluidos_hasta,
+        veces_cumplidas_iniciales={
+            a.id: contadores[a.id].veces_aseo for a in activos
+        },
+        ultima_pareja_ids=vecino_pareja,
+        ultima_fecha_asignada=vecino_fecha,
+        rng=rng,
+    )
+
+    aprendices_por_id = {a.id: a for a in activos}
+    turnos_por_fecha = {turno.fecha: turno for turno in turnos}
+    programados_locales = {
+        a.id: cargas_iniciales[a.id] - contadores[a.id].veces_aseo for a in activos
+    }
+    promedio = mean(contadores[a.id].veces_aseo for a in activos)
+    rebalanceados = []
+
+    for asig in resultado_motor['asignaciones']:
+        turno = turnos_por_fecha.get(asig['fecha'])
+        if turno is None or asig['es_fijo']:
+            continue
+        a1_id = asig['aprendiz_1_id']
+        a2_id = asig['aprendiz_2_id']
+        elegido_1 = aprendices_por_id.get(a1_id)
+        elegido_2 = aprendices_por_id.get(a2_id)
+        if not elegido_1 or not elegido_2:
+            continue
+
+        pareja_clave = tuple(sorted((a1_id, a2_id)))
+        veces_juntos = historial_parejas.get(pareja_clave, 0)
+        historial_parejas[pareja_clave] = veces_juntos + 1
+
+        if (turno.aprendiz_1_id, turno.aprendiz_2_id) != (a1_id, a2_id):
+            turno.aprendiz_1_id = a1_id
+            turno.aprendiz_2_id = a2_id
+            turno.generado_por = generado_por
+            turno.auditoria_1 = 'Recálculo por equidad total. ' + _razon_eleccion(
+                contadores[a1_id],
+                programados_locales[a1_id],
+                promedio,
+                asig['fecha'] in ausentes_por_fecha,
+                companero_nombre=elegido_2.nombre,
+                veces_juntos=veces_juntos,
+            )
+            turno.auditoria_2 = 'Recálculo por equidad total. ' + _razon_eleccion(
+                contadores[a2_id],
+                programados_locales[a2_id],
+                promedio,
+                asig['fecha'] in ausentes_por_fecha,
+                companero_nombre=elegido_1.nombre,
+                veces_juntos=veces_juntos,
+            )
+            rebalanceados.append(turno)
+
+        programados_locales[a1_id] += 1
+        programados_locales[a2_id] += 1
+
+    db.session.flush()
+    return rebalanceados
+
+
 def _cargas_programadas(ficha_id):
     cargas = defaultdict(int)
     ultima = {}
@@ -472,27 +721,55 @@ def _proxima_fecha_disponible(ficha_id, despues_de):
     return None
 
 
-def _programar_reposicion(ficha_id, aprendiz, desde_fecha):
-    """Guarda el próximo turno del ausente en cupo disponible sin desalojar asignados."""
+def _programar_reposicion(ficha_id, aprendiz, desde_fecha, forzar=False):
+    """Devuelve al ausente el cupo que no cumplió, sin desalojar turnos ajenos.
+
+    Por defecto solo repone cuando su carga total quedó por debajo de la de sus
+    compañeros: si otra persona ya cubrió el turno y él mantiene sus pendientes,
+    no se le agenda otro (evita sobrecompensar y duplicar reposiciones).
+    ``forzar=True`` se usa cuando el turno no lo cubrió nadie (no cumplido).
+    """
     if not aprendiz or not aprendiz.activo or aprendiz.estado not in ESTADOS_ACTIVOS:
         return None
-    if TurnoAseo.query.filter(
+
+    # Una sola reposición por inasistencia: guardar dos veces el mismo turno (o
+    # repetir el "no cumplió") no debe duplicar el cupo compensado de esa fecha.
+    fecha_ausencia = desde_fecha.strftime('%d/%m/%Y')
+    reposiciones_previas = TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
-        TurnoAseo.fecha > desde_fecha,
         TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
+        TurnoAseo.observacion.like('%Reposición%'),
         db.or_(
             TurnoAseo.aprendiz_1_id == aprendiz.id,
             TurnoAseo.aprendiz_2_id == aprendiz.id,
         ),
-    ).first():
+    ).all()
+    for reposicion in reposiciones_previas:
+        if fecha_ausencia in (reposicion.observacion or ''):
+            return reposicion
+
+    companeros = [
+        item for item in aprendices_activos(ficha_id) if item.id != aprendiz.id
+    ]
+    if not companeros:
+        return None
+
+    contadores = asegurar_contadores(ficha_id)
+    cargas_prog, ultima_prog = _cargas_programadas(ficha_id)
+    cargas_totales = {
+        item.id: contadores[item.id].veces_aseo + cargas_prog.get(item.id, 0)
+        for item in companeros
+    }
+    cargas_totales[aprendiz.id] = (
+        contadores[aprendiz.id].veces_aseo + cargas_prog.get(aprendiz.id, 0)
+    )
+    if not forzar and cargas_totales[aprendiz.id] >= max(cargas_totales.values()):
         return None
 
     fecha = _proxima_fecha_disponible(ficha_id, desde_fecha)
     if not fecha:
         return None
 
-    contadores = asegurar_contadores(ficha_id)
-    cargas_prog, ultima_prog = _cargas_programadas(ficha_id)
     historial_parejas = _obtener_historial_parejas(ficha_id)
     auditoria = (
         f'Reposición inmediata: no cumplió el turno del '
@@ -504,11 +781,7 @@ def _programar_reposicion(ficha_id, aprendiz, desde_fecha):
     if turno:
         return turno if (turno.estado in ESTADOS_PENDIENTES and turno.incluye(aprendiz.id)) else None
 
-    activos = [
-        item for item in aprendices_activos(ficha_id) if item.id != aprendiz.id
-    ]
-    if not activos:
-        return None
+    activos = companeros
     companero = _elegir_por_cola_justa(
         activos,
         contadores,
@@ -621,7 +894,13 @@ def _reemplazar_ausentes_del_dia(turno, presentes):
 
 
 def ajustar_turno_por_asistencia(ficha_id, fecha_sesion):
-    """Ajusta el turno del día: crea, repone ausentes y recalcula contadores."""
+    """Ajusta el turno del día: crea, repone ausentes y recalcula contadores.
+
+    Cuando alguien no asiste se sustituye por la persona presente con menor carga
+    total y se le reserva su reposición en el siguiente cupo libre. Así la ausencia
+    no altera el total de turnos de nadie ni desaloja los turnos ya publicados de
+    los demás; el botón "Calcular turnos" puede reequilibrar todo el calendario.
+    """
     config = obtener_configuracion(ficha_id)
     presentes = _presentes_en_fecha(ficha_id, fecha_sesion)
     turno = TurnoAseo.query.filter_by(
@@ -649,6 +928,14 @@ def ajustar_turno_por_asistencia(ficha_id, fecha_sesion):
             turno.completado_1 = completado_1_nuevo
             turno.completado_2 = completado_2_nuevo
             recalcular_contadores(ficha_id)
+            if not completado_1_nuevo and turno.aprendiz_1:
+                _programar_reposicion(
+                    ficha_id, turno.aprendiz_1, turno.fecha, forzar=True
+                )
+            if not completado_2_nuevo and turno.aprendiz_2:
+                _programar_reposicion(
+                    ficha_id, turno.aprendiz_2, turno.fecha, forzar=True
+                )
 
     return turno
 
@@ -741,9 +1028,13 @@ def completar_turno(turno, completado_1=None, completado_2=None):
     recalcular_contadores(turno.ficha_id)
 
     if turno.completado_1 is False and turno.aprendiz_1:
-        _programar_reposicion(turno.ficha_id, turno.aprendiz_1, turno.fecha)
+        _programar_reposicion(
+            turno.ficha_id, turno.aprendiz_1, turno.fecha, forzar=True
+        )
     if turno.completado_2 is False and turno.aprendiz_2:
-        _programar_reposicion(turno.ficha_id, turno.aprendiz_2, turno.fecha)
+        _programar_reposicion(
+            turno.ficha_id, turno.aprendiz_2, turno.fecha, forzar=True
+        )
 
     db.session.flush()
     return turno
@@ -767,9 +1058,13 @@ def marcar_no_cumplido(
     recalcular_contadores(turno.ficha_id)
 
     if aprendiz_1_no_cumplio and turno.aprendiz_1:
-        _programar_reposicion(turno.ficha_id, turno.aprendiz_1, turno.fecha)
+        _programar_reposicion(
+            turno.ficha_id, turno.aprendiz_1, turno.fecha, forzar=True
+        )
     if aprendiz_2_no_cumplio and turno.aprendiz_2:
-        _programar_reposicion(turno.ficha_id, turno.aprendiz_2, turno.fecha)
+        _programar_reposicion(
+            turno.ficha_id, turno.aprendiz_2, turno.fecha, forzar=True
+        )
 
     db.session.flush()
     return turno
@@ -1136,6 +1431,7 @@ def datos_transparencia(ficha_id, mes=None):
     contadores = recalcular_contadores(ficha_id)
     cumplidos_periodo = contar_cumplidos_en_periodo(ficha_id, mes, fin_mes)
     activos = aprendices_activos(ficha_id)
+    pendientes_totales = cargas_pendientes(ficha_id)
     proximos = {}
     for turno in TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
@@ -1151,6 +1447,9 @@ def datos_transparencia(ficha_id, mes=None):
             'contador': contadores[aprendiz.id],
             'veces_periodo': cumplidos_periodo.get(aprendiz.id, 0),
             'veces_total': contadores[aprendiz.id].veces_aseo,
+            'veces_pendientes': pendientes_totales.get(aprendiz.id, 0),
+            'veces_comprometidas': contadores[aprendiz.id].veces_aseo
+            + pendientes_totales.get(aprendiz.id, 0),
             'proxima': proximos.get(aprendiz.id),
         }
         for aprendiz in activos
@@ -1161,6 +1460,7 @@ def datos_transparencia(ficha_id, mes=None):
             fila['contador'].ultima_vez_aseo or date.min,
         )
     )
+    totales = [fila['veces_comprometidas'] for fila in equidad]
 
     semanas = cal.Calendar(firstweekday=0).monthdatescalendar(mes.year, mes.month)
     anios_mes = {mes.year, fin_mes.year}
@@ -1175,6 +1475,7 @@ def datos_transparencia(ficha_id, mes=None):
         'sesiones_mes': sesiones_mes,
         'festivos_mes': festivos_mes,
         'equidad': equidad,
+        'equidad_delta': (max(totales) - min(totales)) if totales else 0,
         'semanas': semanas,
         'mes': mes,
         'total_cumplidos': sum(1 for t in turnos_mes if t.estado == 'cumplido'),
