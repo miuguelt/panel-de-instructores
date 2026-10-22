@@ -3,7 +3,7 @@ from app.helpers import utc_now
 from app import db
 
 
-ESTADOS_TURNO_ASEO = ('programado', 'cumplido', 'intercambiado')
+ESTADOS_TURNO_ASEO = ('programado', 'cumplido', 'intercambiado', 'no_cumplido')
 ORIGENES_TURNO_ASEO = ('sistema', 'instructor', 'aprendiz_admin', 'aprendiz')
 ESTADOS_INTERCAMBIO_ASEO = ('pendiente', 'aceptado', 'rechazado')
 

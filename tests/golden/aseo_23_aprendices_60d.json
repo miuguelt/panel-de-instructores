@@ -1,0 +1,580 @@
+{
+  "schema_version": "1.0",
+  "metadata": {
+    "generator": "app.services.aseo_motor_puro.calcular_turnos_token_bucket",
+    "cohort_size": 23,
+    "horizon_days": 60,
+    "start_date": "2026-10-01",
+    "end_date": "2026-12-23",
+    "seed": 42,
+    "delta_max": 1,
+    "consecutive_conflicts": 0
+  },
+  "cargas_finales": {
+    "1": 6,
+    "2": 5,
+    "3": 5,
+    "4": 6,
+    "5": 5,
+    "6": 5,
+    "7": 6,
+    "8": 5,
+    "9": 5,
+    "10": 6,
+    "11": 6,
+    "12": 5,
+    "13": 5,
+    "14": 5,
+    "15": 5,
+    "16": 5,
+    "17": 5,
+    "18": 5,
+    "19": 5,
+    "20": 5,
+    "21": 5,
+    "22": 5,
+    "23": 5
+  },
+  "asignaciones": [
+    {
+      "fecha": "2026-10-01",
+      "aprendiz_1_id": 21,
+      "aprendiz_2_id": 4,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 4 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 21 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-02",
+      "aprendiz_1_id": 1,
+      "aprendiz_2_id": 11,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 11 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 1 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-05",
+      "aprendiz_1_id": 10,
+      "aprendiz_2_id": 12,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 12 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 10 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-06",
+      "aprendiz_1_id": 7,
+      "aprendiz_2_id": 6,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 6 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 7 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-07",
+      "aprendiz_1_id": 18,
+      "aprendiz_2_id": 20,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 20 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 18 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-08",
+      "aprendiz_1_id": 16,
+      "aprendiz_2_id": 3,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 3 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 16 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-09",
+      "aprendiz_1_id": 22,
+      "aprendiz_2_id": 15,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 15 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 22 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-12",
+      "aprendiz_1_id": 2,
+      "aprendiz_2_id": 5,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 5 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 2 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-13",
+      "aprendiz_1_id": 8,
+      "aprendiz_2_id": 13,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 13 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 8 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-14",
+      "aprendiz_1_id": 14,
+      "aprendiz_2_id": 9,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 9 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 14 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-15",
+      "aprendiz_1_id": 23,
+      "aprendiz_2_id": 17,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 17 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 23 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-16",
+      "aprendiz_1_id": 19,
+      "aprendiz_2_id": 4,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 1). Carga acumulada previa: 0. Compañero: ID 4 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 19 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-19",
+      "aprendiz_1_id": 21,
+      "aprendiz_2_id": 11,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 11 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 21 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-20",
+      "aprendiz_1_id": 1,
+      "aprendiz_2_id": 10,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 10 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 1 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-21",
+      "aprendiz_1_id": 12,
+      "aprendiz_2_id": 7,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 7 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 12 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-22",
+      "aprendiz_1_id": 6,
+      "aprendiz_2_id": 18,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 18 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 6 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-23",
+      "aprendiz_1_id": 20,
+      "aprendiz_2_id": 16,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 16 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 20 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-26",
+      "aprendiz_1_id": 3,
+      "aprendiz_2_id": 15,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 15 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 3 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-27",
+      "aprendiz_1_id": 22,
+      "aprendiz_2_id": 2,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 2 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 22 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-28",
+      "aprendiz_1_id": 5,
+      "aprendiz_2_id": 13,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 13 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 5 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-29",
+      "aprendiz_1_id": 8,
+      "aprendiz_2_id": 9,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 9 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 8 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-10-30",
+      "aprendiz_1_id": 14,
+      "aprendiz_2_id": 17,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 17 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 14 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-02",
+      "aprendiz_1_id": 23,
+      "aprendiz_2_id": 19,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 19 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 2). Carga acumulada previa: 1. Compañero: ID 23 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-03",
+      "aprendiz_1_id": 4,
+      "aprendiz_2_id": 11,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 11 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 4 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-04",
+      "aprendiz_1_id": 21,
+      "aprendiz_2_id": 1,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 1 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 21 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-05",
+      "aprendiz_1_id": 10,
+      "aprendiz_2_id": 7,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 7 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 10 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-06",
+      "aprendiz_1_id": 12,
+      "aprendiz_2_id": 6,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 6 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 12 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-09",
+      "aprendiz_1_id": 18,
+      "aprendiz_2_id": 16,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 16 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 18 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-10",
+      "aprendiz_1_id": 20,
+      "aprendiz_2_id": 15,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 15 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 20 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-11",
+      "aprendiz_1_id": 3,
+      "aprendiz_2_id": 22,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 22 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 3 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-12",
+      "aprendiz_1_id": 2,
+      "aprendiz_2_id": 13,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 13 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 2 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-13",
+      "aprendiz_1_id": 5,
+      "aprendiz_2_id": 9,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 9 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 5 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-16",
+      "aprendiz_1_id": 8,
+      "aprendiz_2_id": 17,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 17 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 8 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-17",
+      "aprendiz_1_id": 14,
+      "aprendiz_2_id": 19,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 19 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 14 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-18",
+      "aprendiz_1_id": 23,
+      "aprendiz_2_id": 11,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 3). Carga acumulada previa: 2. Compañero: ID 11 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 23 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-19",
+      "aprendiz_1_id": 4,
+      "aprendiz_2_id": 1,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 1 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 4 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-20",
+      "aprendiz_1_id": 21,
+      "aprendiz_2_id": 10,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 10 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 21 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-23",
+      "aprendiz_1_id": 7,
+      "aprendiz_2_id": 16,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 16 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 7 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-24",
+      "aprendiz_1_id": 6,
+      "aprendiz_2_id": 20,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 20 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 6 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-25",
+      "aprendiz_1_id": 12,
+      "aprendiz_2_id": 18,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 18 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 12 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-26",
+      "aprendiz_1_id": 15,
+      "aprendiz_2_id": 2,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 2 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 15 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-27",
+      "aprendiz_1_id": 22,
+      "aprendiz_2_id": 13,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 13 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 22 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-11-30",
+      "aprendiz_1_id": 3,
+      "aprendiz_2_id": 9,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 9 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 3 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-01",
+      "aprendiz_1_id": 5,
+      "aprendiz_2_id": 17,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 17 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 5 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-02",
+      "aprendiz_1_id": 8,
+      "aprendiz_2_id": 19,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 19 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 8 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-03",
+      "aprendiz_1_id": 14,
+      "aprendiz_2_id": 23,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 23 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 4). Carga acumulada previa: 3. Compañero: ID 14 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-04",
+      "aprendiz_1_id": 11,
+      "aprendiz_2_id": 10,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 10 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 11 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-07",
+      "aprendiz_1_id": 4,
+      "aprendiz_2_id": 7,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 7 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 4 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-08",
+      "aprendiz_1_id": 1,
+      "aprendiz_2_id": 16,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 16 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 1 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-09",
+      "aprendiz_1_id": 21,
+      "aprendiz_2_id": 6,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 6 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 21 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-10",
+      "aprendiz_1_id": 20,
+      "aprendiz_2_id": 12,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 12 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 20 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-11",
+      "aprendiz_1_id": 18,
+      "aprendiz_2_id": 15,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 15 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 18 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-14",
+      "aprendiz_1_id": 2,
+      "aprendiz_2_id": 9,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 9 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 2 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-15",
+      "aprendiz_1_id": 22,
+      "aprendiz_2_id": 17,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 17 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 22 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-16",
+      "aprendiz_1_id": 13,
+      "aprendiz_2_id": 19,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 19 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 13 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-17",
+      "aprendiz_1_id": 3,
+      "aprendiz_2_id": 23,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 23 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 3 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-18",
+      "aprendiz_1_id": 5,
+      "aprendiz_2_id": 8,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 8 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 5 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-21",
+      "aprendiz_1_id": 14,
+      "aprendiz_2_id": 11,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 5). Carga acumulada previa: 4. Compañero: ID 11 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 6). Carga acumulada previa: 5. Compañero: ID 14 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-22",
+      "aprendiz_1_id": 10,
+      "aprendiz_2_id": 4,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 6). Carga acumulada previa: 5. Compañero: ID 4 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 6). Carga acumulada previa: 5. Compañero: ID 10 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    },
+    {
+      "fecha": "2026-12-23",
+      "aprendiz_1_id": 7,
+      "aprendiz_2_id": 1,
+      "auditoria_1": "Asignado por bolsa de rondas (Ronda 6). Carga acumulada previa: 5. Compañero: ID 1 (0 aseo(s) previos juntos).",
+      "auditoria_2": "Asignado por bolsa de rondas (Ronda 6). Carga acumulada previa: 5. Compañero: ID 7 (0 aseo(s) previos juntos).",
+      "es_fijo": false,
+      "turno_id": null
+    }
+  ]
+}

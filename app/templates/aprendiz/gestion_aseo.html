@@ -282,12 +282,23 @@
                             <input type="text" name="observacion" placeholder="Motivo del cambio">
                             <button class="btn btn-sm btn-outline" type="submit">Cambiar pareja</button>
                         </form>
-                        {% if turno.estado != 'cumplido' %}
-                        <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-sm btn-primary btn-full" type="submit">✓ Marcar cumplido</button>
-                        </form>
-                        {% endif %}
+                        <div class="calendar-quick-actions" style="margin-top: 6px;">
+                            {% if turno.estado in ('programado', 'intercambiado') %}
+                            <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="display:inline; margin:0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-xs btn-success" type="submit" title="Marcar turno como cumplido">✓ Cumplir</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('aseo_aprendiz.no_cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="display:inline; margin:0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-xs btn-danger" type="submit" title="Marcar no cumplido y reprogramar">✗ No cumplió</button>
+                            </form>
+                            {% else %}
+                            <form method="POST" action="{{ url_for('aseo_aprendiz.reabrir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="display:inline; margin:0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-xs btn-outline" type="submit" title="Reabrir turno a estado programado">↺ Reabrir</button>
+                            </form>
+                            {% endif %}
+                        </div>
                         {% if turno.auditoria_1 or turno.auditoria_2 %}
                         <details class="audit-details">
                             <summary>¿Por qué los eligió?</summary>
@@ -380,13 +391,25 @@
                             <div class="text-muted small" style="margin-top: 3px;">{{ 'Automático' if turno.generado_por == 'sistema' else 'Manual' }}</div>
                         </td>
                         <td data-label="Acciones">
-                            {% if turno.estado != 'cumplido' %}
-                            <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como hecho">✓ Marcar hecho</button>
-                            </form>
+                            {% if turno.estado in ('programado', 'intercambiado') %}
+                            <div style="display: flex; gap: 4px;">
+                                <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-xs btn-success" aria-label="Marcar hecho">✓ Hecho</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('aseo_aprendiz.no_cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-xs btn-danger" aria-label="Marcar no cumplido">✗ No cumplió</button>
+                                </form>
+                            </div>
                             {% else %}
-                            <span class="text-muted" style="font-weight: 500;">✓ Cumplido</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="badge badge-{{ 'success' if turno.estado == 'cumplido' else 'danger' }}">{{ '✓ Cumplido' if turno.estado == 'cumplido' else '✗ No cumplido' }}</span>
+                                <form method="POST" action="{{ url_for('aseo_aprendiz.reabrir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-xs btn-outline" title="Reabrir turno">↺</button>
+                                </form>
+                            </div>
                             {% endif %}
                         </td>
                     </tr>

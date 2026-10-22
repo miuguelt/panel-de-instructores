@@ -17,6 +17,8 @@ from app.services.aseo import (
     asegurar_contadores,
     asignar_o_actualizar_turno,
     completar_turno,
+    marcar_no_cumplido,
+    reabrir_turno,
     contar_cumplidos_en_periodo,
     datos_transparencia,
     generar_turnos,
@@ -224,6 +226,7 @@ def turnos(ficha_id):
         opciones_dias_semana=OPCIONES_DIAS_SEMANA,
         dias_laborales=DIAS_LABORALES,
         total_cumplidos=sum(1 for turno in turnos_mes if turno.estado == 'cumplido'),
+        total_no_cumplidos=sum(1 for turno in turnos_mes if turno.estado == 'no_cumplido'),
         total_programados=sum(
             1 for turno in turnos_mes if turno.estado in ESTADOS_PENDIENTES
         ),
@@ -303,9 +306,53 @@ def cumplir(ficha_id, turno_id):
     if not ficha or not turno or turno.ficha_id != ficha_id:
         flash('Turno no encontrado.', 'error')
         return redirect(url_for('instructor.dashboard'))
-    completar_turno(turno)
+    completado_1 = None
+    completado_2 = None
+    if 'completado_1' in request.form or 'completado_2' in request.form:
+        completado_1 = request.form.get('completado_1') in ('on', 'true', '1')
+        completado_2 = request.form.get('completado_2') in ('on', 'true', '1')
+    completar_turno(turno, completado_1=completado_1, completado_2=completado_2)
     db.session.commit()
-    flash('Turno marcado como cumplido. Los contadores quedaron actualizados.', 'success')
+    flash('Turno guardado como cumplido. Los contadores quedaron actualizados.', 'success')
+    return redirect(
+        url_for('aseo.turnos', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m'))
+    )
+
+
+@aseo_bp.route(
+    '/fichas/<int:ficha_id>/turnos-aseo/<int:turno_id>/no-cumplir',
+    methods=['POST'],
+)
+@login_required
+def no_cumplir(ficha_id, turno_id):
+    ficha = _ficha_autorizada(ficha_id)
+    turno = db.session.get(TurnoAseo, turno_id)
+    if not ficha or not turno or turno.ficha_id != ficha_id:
+        flash('Turno no encontrado.', 'error')
+        return redirect(url_for('instructor.dashboard'))
+    observacion = request.form.get('observacion', '').strip() or None
+    marcar_no_cumplido(turno, observacion=observacion)
+    db.session.commit()
+    flash('Turno marcado como no cumplido. Se reprogramó la reposición correspondiente en la siguiente fecha disponible.', 'info')
+    return redirect(
+        url_for('aseo.turnos', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m'))
+    )
+
+
+@aseo_bp.route(
+    '/fichas/<int:ficha_id>/turnos-aseo/<int:turno_id>/reabrir',
+    methods=['POST'],
+)
+@login_required
+def reabrir(ficha_id, turno_id):
+    ficha = _ficha_autorizada(ficha_id)
+    turno = db.session.get(TurnoAseo, turno_id)
+    if not ficha or not turno or turno.ficha_id != ficha_id:
+        flash('Turno no encontrado.', 'error')
+        return redirect(url_for('instructor.dashboard'))
+    reabrir_turno(turno)
+    db.session.commit()
+    flash('Turno reabierto y restablecido a estado programado.', 'success')
     return redirect(
         url_for('aseo.turnos', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m'))
     )
@@ -619,6 +666,61 @@ def cumplir_como_aprendiz(ficha_id, turno_id):
     completar_turno(turno, completado_1=completado_1, completado_2=completado_2)
     db.session.commit()
     flash('Turno de aseo marcado como cumplido.', 'success')
+
+    origen = request.form.get('origen') or request.args.get('origen')
+    if origen == 'panel':
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+    if origen == 'transparencia':
+        return redirect(url_for(
+            'aseo_aprendiz.transparencia', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m')
+        ))
+    return redirect(url_for(
+        'aseo_aprendiz.gestionar', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m')
+    ))
+
+
+@aseo_aprendiz_bp.route(
+    '/<int:ficha_id>/turnos-aseo/<int:turno_id>/no-cumplir', methods=['POST']
+)
+@limiter.limit('30 per minute')
+def no_cumplir_como_aprendiz(ficha_id, turno_id):
+    actor = _aprendiz_autorizado(ficha_id)
+    turno = db.session.get(TurnoAseo, turno_id)
+    if not actor or not turno or turno.ficha_id != ficha_id:
+        flash('No tienes permiso para marcar ese turno.', 'error')
+        return _volver_al_panel_aprendiz(ficha_id)
+
+    observacion = request.form.get('observacion', '').strip() or None
+    marcar_no_cumplido(turno, observacion=observacion)
+    db.session.commit()
+    flash('Turno marcado como no cumplido. Se reprogramó la reposición.', 'info')
+
+    origen = request.form.get('origen') or request.args.get('origen')
+    if origen == 'panel':
+        return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+    if origen == 'transparencia':
+        return redirect(url_for(
+            'aseo_aprendiz.transparencia', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m')
+        ))
+    return redirect(url_for(
+        'aseo_aprendiz.gestionar', ficha_id=ficha_id, mes=turno.fecha.strftime('%Y-%m')
+    ))
+
+
+@aseo_aprendiz_bp.route(
+    '/<int:ficha_id>/turnos-aseo/<int:turno_id>/reabrir', methods=['POST']
+)
+@limiter.limit('30 per minute')
+def reabrir_como_aprendiz(ficha_id, turno_id):
+    actor = _aprendiz_autorizado(ficha_id)
+    turno = db.session.get(TurnoAseo, turno_id)
+    if not actor or not turno or turno.ficha_id != ficha_id:
+        flash('No tienes permiso para modificar ese turno.', 'error')
+        return _volver_al_panel_aprendiz(ficha_id)
+
+    reabrir_turno(turno)
+    db.session.commit()
+    flash('Turno reabierto y restablecido a estado programado.', 'success')
 
     origen = request.form.get('origen') or request.args.get('origen')
     if origen == 'panel':

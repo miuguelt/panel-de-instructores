@@ -17,6 +17,7 @@ from app.services.aseo_cola import (
     elegir_por_cola_justa as _elegir_por_cola_justa,
     razon_eleccion as _razon_eleccion,
 )
+from app.services.aseo_motor_puro import calcular_turnos_token_bucket
 from app.services.aseo_calendario import DIAS_LABORALES, normalizar_dias_semana
 from app.services.aseo_limpieza import eliminar_turnos_fuera_del_calendario
 from app.services.festivos import (
@@ -238,7 +239,34 @@ def generar_turnos(
     ultimo_turno_asignado = {}
     hoy = date.today()
 
-    # Si hay turnos pendientes anteriores al rango que se está calculando, sumamos sus cargas
+    turnos_fijos = {}
+    cumplidos_conservados = 0
+    omitidos_manuales = 0
+
+    for fecha, turno in existentes.items():
+        es_cumplido = turno.estado in ('cumplido', 'no_cumplido')
+        es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
+        es_pasado = proteger_pasados and fecha < hoy
+        no_recalc = not recalcular_existentes and turno.estado in ESTADOS_PENDIENTES
+
+        if es_cumplido or es_manual or es_pasado or no_recalc:
+            turnos_fijos[fecha] = {
+                'id': turno.id,
+                'aprendiz_1_id': turno.aprendiz_1_id,
+                'aprendiz_2_id': turno.aprendiz_2_id,
+                'estado': turno.estado,
+                'es_manual': es_manual,
+                'auditoria_1': turno.auditoria_1,
+                'auditoria_2': turno.auditoria_2,
+                'incrementar_carga': (turno.estado in ESTADOS_PENDIENTES),
+            }
+
+    cargas_iniciales = {aprendiz.id: contadores[aprendiz.id].veces_aseo for aprendiz in activos}
+    ultimas_fechas_iniciales = {
+        aprendiz.id: contadores[aprendiz.id].ultima_vez_aseo for aprendiz in activos
+    }
+
+    # Sumar turnos pendientes anteriores al rango
     turnos_pendientes_anteriores = TurnoAseo.query.filter(
         TurnoAseo.ficha_id == ficha_id,
         TurnoAseo.estado.in_(ESTADOS_PENDIENTES),
@@ -246,127 +274,91 @@ def generar_turnos(
     ).all()
     for turno in turnos_pendientes_anteriores:
         for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
-            cargas_programadas[aprendiz_id] += 1
-            ultimo_turno_asignado[aprendiz_id] = _ultima_fecha(
-                ultimo_turno_asignado.get(aprendiz_id), turno.fecha
+            if aprendiz_id in cargas_iniciales:
+                cargas_iniciales[aprendiz_id] += 1
+            ultimas_fechas_iniciales[aprendiz_id] = _ultima_fecha(
+                ultimas_fechas_iniciales.get(aprendiz_id), turno.fecha
             )
 
-    # Si se respetan asignaciones manuales o turnos no recalculables dentro del rango
-    for fecha, turno in existentes.items():
-        if turno.estado in ESTADOS_PENDIENTES:
-            es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
-            es_pasado = proteger_pasados and fecha < hoy
-            if es_manual or es_pasado or not recalcular_existentes:
-                for aprendiz_id in (turno.aprendiz_1_id, turno.aprendiz_2_id):
-                    cargas_programadas[aprendiz_id] += 1
+    excluidos_hasta = {
+        aprendiz.id: contadores[aprendiz.id].excluido_hasta
+        for aprendiz in activos
+        if contadores[aprendiz.id].excluido_hasta
+    }
 
-    aleatorio = rng
+    ausentes_por_fecha = {}
+    if config.excluir_ausentes:
+        for sesion in sesiones:
+            presentes = _registros_presentes(sesion)
+            if presentes is not None:
+                ausentes_por_fecha[sesion.fecha] = presentes
+
+    resultado_motor = calcular_turnos_token_bucket(
+        aprendiz_ids=[a.id for a in activos],
+        sesiones_fechas=[s.fecha for s in sesiones],
+        turnos_fijos=turnos_fijos,
+        cargas_iniciales=cargas_iniciales,
+        ultimas_fechas_iniciales=ultimas_fechas_iniciales,
+        historial_parejas_inicial=historial_parejas,
+        ausentes_por_fecha=ausentes_por_fecha,
+        excluidos_hasta=excluidos_hasta,
+        veces_cumplidas_iniciales={a.id: contadores[a.id].veces_aseo for a in activos},
+        rng=rng,
+    )
+
+    aprendices_por_id = {a.id: a for a in activos}
+    cargas_programadas_locales = defaultdict(int)
+    for a_id, val in cargas_iniciales.items():
+        cargas_programadas_locales[a_id] = val - contadores[a_id].veces_aseo
+
     creados = []
     recalculados = []
-    cumplidos_conservados = 0
-    omitidos_manuales = 0
-    sin_candidatos = []
-    asignados_sesion_anterior = set()
+    promedio = mean(contadores[a.id].veces_aseo for a in activos) if activos else 0
 
-    for sesion in sesiones:
-        turno_existente = existentes.get(sesion.fecha)
-        if turno_existente:
-            if turno_existente.estado == 'cumplido':
+    for asig in resultado_motor['asignaciones']:
+        sesion_fecha = asig['fecha']
+        turno_existente = existentes.get(sesion_fecha)
+        if asig['es_fijo']:
+            if turno_existente and turno_existente.estado == 'cumplido':
                 cumplidos_conservados += 1
-                for a_id in (turno_existente.aprendiz_1_id, turno_existente.aprendiz_2_id):
-                    ultimo_turno_asignado[a_id] = sesion.fecha
-                asignados_sesion_anterior = {
-                    turno_existente.aprendiz_1_id,
-                    turno_existente.aprendiz_2_id,
-                }
-                continue
-            if respetar_manuales and turno_existente.generado_por in ORIGENES_MANUALES:
+            else:
                 omitidos_manuales += 1
-                for a_id in (turno_existente.aprendiz_1_id, turno_existente.aprendiz_2_id):
-                    ultimo_turno_asignado[a_id] = sesion.fecha
-                asignados_sesion_anterior = {
-                    turno_existente.aprendiz_1_id,
-                    turno_existente.aprendiz_2_id,
-                }
-                continue
-            if proteger_pasados and sesion.fecha < hoy:
-                for a_id in (turno_existente.aprendiz_1_id, turno_existente.aprendiz_2_id):
-                    ultimo_turno_asignado[a_id] = sesion.fecha
-                asignados_sesion_anterior = {
-                    turno_existente.aprendiz_1_id,
-                    turno_existente.aprendiz_2_id,
-                }
-                continue
-            if not recalcular_existentes:
-                for a_id in (turno_existente.aprendiz_1_id, turno_existente.aprendiz_2_id):
-                    ultimo_turno_asignado[a_id] = sesion.fecha
-                asignados_sesion_anterior = {
-                    turno_existente.aprendiz_1_id,
-                    turno_existente.aprendiz_2_id,
-                }
-                continue
-
-        presentes = _registros_presentes(sesion) if config.excluir_ausentes else None
-        candidatos = []
-        for aprendiz in activos:
-            contador = contadores[aprendiz.id]
-            if contador.excluido_hasta and contador.excluido_hasta >= sesion.fecha:
-                continue
-            if presentes is not None and aprendiz.id not in presentes:
-                continue
-            candidatos.append(aprendiz)
-
-        if len(candidatos) < 2:
-            sin_candidatos.append(sesion.fecha)
-            asignados_sesion_anterior = set()
             continue
 
-        promedio = mean(
-            contadores[aprendiz.id].veces_aseo for aprendiz in candidatos
-        )
+        a1_id = asig['aprendiz_1_id']
+        a2_id = asig['aprendiz_2_id']
+        elegido_1 = aprendices_por_id.get(a1_id)
+        elegido_2 = aprendices_por_id.get(a2_id)
+        if not elegido_1 or not elegido_2:
+            continue
 
-        elegido_1 = _elegir_por_cola_justa(
-            candidatos, contadores, cargas_programadas, ultimo_turno_asignado,
-            rng=aleatorio, evitar_ids=asignados_sesion_anterior,
-        )
-        disponibles_2 = [a for a in candidatos if a.id != elegido_1.id]
-        elegido_2 = _elegir_por_cola_justa(
-            disponibles_2, contadores, cargas_programadas, ultimo_turno_asignado,
-            rng=aleatorio, companero_id=elegido_1.id,
-            historial_parejas=historial_parejas,
-            evitar_ids=asignados_sesion_anterior, anticipar_parejas=True,
-        )
-
-        pareja_clave = tuple(sorted((elegido_1.id, elegido_2.id)))
+        pareja_clave = tuple(sorted((a1_id, a2_id)))
         veces_juntos_previa = historial_parejas.get(pareja_clave, 0)
         historial_parejas[pareja_clave] = veces_juntos_previa + 1
 
         razon_1 = _razon_eleccion(
-            contadores[elegido_1.id],
-            cargas_programadas[elegido_1.id],
+            contadores[a1_id],
+            cargas_programadas_locales[a1_id],
             promedio,
-            presentes is not None,
+            sesion_fecha in ausentes_por_fecha,
             companero_nombre=elegido_2.nombre,
             veces_juntos=veces_juntos_previa,
         )
         razon_2 = _razon_eleccion(
-            contadores[elegido_2.id],
-            cargas_programadas[elegido_2.id],
+            contadores[a2_id],
+            cargas_programadas_locales[a2_id],
             promedio,
-            presentes is not None,
+            sesion_fecha in ausentes_por_fecha,
             companero_nombre=elegido_1.nombre,
             veces_juntos=veces_juntos_previa,
         )
 
-        cargas_programadas[elegido_1.id] += 1
-        cargas_programadas[elegido_2.id] += 1
-        ultimo_turno_asignado[elegido_1.id] = sesion.fecha
-        ultimo_turno_asignado[elegido_2.id] = sesion.fecha
-        asignados_sesion_anterior = {elegido_1.id, elegido_2.id}
+        cargas_programadas_locales[a1_id] += 1
+        cargas_programadas_locales[a2_id] += 1
 
         if turno_existente:
-            turno_existente.aprendiz_1_id = elegido_1.id
-            turno_existente.aprendiz_2_id = elegido_2.id
+            turno_existente.aprendiz_1_id = a1_id
+            turno_existente.aprendiz_2_id = a2_id
             turno_existente.estado = 'programado'
             turno_existente.generado_por = generado_por
             turno_existente.auditoria_1 = razon_1
@@ -382,9 +374,9 @@ def generar_turnos(
         else:
             turno = TurnoAseo(
                 ficha_id=ficha_id,
-                fecha=sesion.fecha,
-                aprendiz_1_id=elegido_1.id,
-                aprendiz_2_id=elegido_2.id,
+                fecha=sesion_fecha,
+                aprendiz_1_id=a1_id,
+                aprendiz_2_id=a2_id,
                 estado='programado',
                 generado_por=generado_por,
                 auditoria_1=razon_1,
@@ -402,7 +394,7 @@ def generar_turnos(
         'omitidos_existentes': cumplidos_conservados + omitidos_manuales,
         'cumplidos_conservados': cumplidos_conservados,
         'omitidos_manuales': omitidos_manuales,
-        'sin_candidatos': sin_candidatos,
+        'sin_candidatos': resultado_motor['sin_candidatos'],
     }
 
 
@@ -728,6 +720,9 @@ def completar_turno(turno, completado_1=None, completado_2=None):
     ):
         _reemplazar_ausentes_del_dia(turno, presentes)
 
+    if completado_1 is False and completado_2 is False:
+        return marcar_no_cumplido(turno, aprendiz_1_no_cumplio=True, aprendiz_2_no_cumplio=True)
+
     turno.estado = 'cumplido'
     turno.completado_en = datetime.utcnow()
 
@@ -744,6 +739,51 @@ def completar_turno(turno, completado_1=None, completado_2=None):
             turno.completado_2 = True
 
     recalcular_contadores(turno.ficha_id)
+
+    if turno.completado_1 is False and turno.aprendiz_1:
+        _programar_reposicion(turno.ficha_id, turno.aprendiz_1, turno.fecha)
+    if turno.completado_2 is False and turno.aprendiz_2:
+        _programar_reposicion(turno.ficha_id, turno.aprendiz_2, turno.fecha)
+
+    db.session.flush()
+    return turno
+
+
+def marcar_no_cumplido(
+    turno,
+    aprendiz_1_no_cumplio=True,
+    aprendiz_2_no_cumplio=True,
+    observacion=None,
+):
+    """Marca un turno de aseo como no cumplido y agenda reposición para quienes no cumplieron."""
+    turno.estado = 'no_cumplido'
+    turno.completado_1 = not bool(aprendiz_1_no_cumplio)
+    turno.completado_2 = not bool(aprendiz_2_no_cumplio)
+    turno.completado_en = datetime.utcnow()
+    if observacion:
+        nota = f'Marcado como no cumplido: {observacion.strip()}'
+        turno.observacion = f'{turno.observacion} {nota}'.strip() if turno.observacion else nota
+
+    recalcular_contadores(turno.ficha_id)
+
+    if aprendiz_1_no_cumplio and turno.aprendiz_1:
+        _programar_reposicion(turno.ficha_id, turno.aprendiz_1, turno.fecha)
+    if aprendiz_2_no_cumplio and turno.aprendiz_2:
+        _programar_reposicion(turno.ficha_id, turno.aprendiz_2, turno.fecha)
+
+    db.session.flush()
+    return turno
+
+
+def reabrir_turno(turno):
+    """Restablece un turno cumplido o no cumplido a su estado programado inicial."""
+    turno.estado = 'programado'
+    turno.completado_1 = None
+    turno.completado_2 = None
+    turno.completado_en = None
+    recalcular_contadores(turno.ficha_id)
+    db.session.flush()
+    return turno
 
 
 def asignar_o_actualizar_turno(

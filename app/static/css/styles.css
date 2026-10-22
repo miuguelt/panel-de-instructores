@@ -3857,6 +3857,60 @@ select optgroup {
     background: var(--sena-green-light);
     border-left-color: var(--accent-primary);
 }
+.calendar-assignment.state-no_cumplido {
+    background: #fdf2f2;
+    border-left-color: #e02424;
+}
+.calendar-quick-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 5px;
+    margin-bottom: 3px;
+    flex-wrap: wrap;
+}
+.calendar-quick-actions form {
+    margin: 0;
+    display: inline;
+}
+.btn-xs {
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+    line-height: 1.3;
+}
+.btn-danger {
+    background: #e02424;
+    color: #ffffff;
+    border: 1px solid #c81e1e;
+}
+.btn-danger:hover {
+    background: #c81e1e;
+    color: #ffffff;
+}
+.btn-success {
+    background: #057a55;
+    color: #ffffff;
+    border: 1px solid #046c4e;
+}
+.btn-success:hover {
+    background: #046c4e;
+    color: #ffffff;
+}
+.badge-danger {
+    background: #fde8e8;
+    color: #9b1c1c;
+    border: 1px solid #f8b4b4;
+}
+[data-theme="dark"] .calendar-assignment.state-no_cumplido {
+    background: rgba(224, 36, 36, 0.15);
+    border-left-color: #f05252;
+}
+[data-theme="dark"] .badge-danger {
+    background: rgba(224, 36, 36, 0.25);
+    color: #f98080;
+    border-color: rgba(224, 36, 36, 0.4);
+}
 .calendar-assignment strong {
     font-size: 11px;
     line-height: 1.25;
