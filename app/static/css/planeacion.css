@@ -230,8 +230,8 @@
 .pl-curve-fan { opacity: 0.9; stroke: none; }
 .pl-curve-productiva { fill: color-mix(in srgb, var(--text-muted) 10%, transparent); }
 .pl-curve-hoy { stroke: var(--danger); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: 0.85; }
-.pl-curve-hoy-pill { fill: var(--danger); filter: drop-shadow(0 2px 5px rgba(225, 29, 72, 0.28)); }
-.pl-curve-hoy-label { fill: #ffffff !important; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; pointer-events: none; }
+.pl-curve-hoy-pill { fill: var(--danger); filter: drop-shadow(0 2px 5px var(--status-danger-border)); }
+.pl-curve-hoy-label { fill: var(--button-on-accent) !important; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; pointer-events: none; }
 .pl-curve-label { fill: var(--text-muted); font-size: 13px; font-weight: 700; }
 .pl-curve-axis { fill: var(--text-muted); font-size: 12px; }
 
@@ -246,7 +246,7 @@
 }
 .pl-dot-real {
     fill: var(--accent-primary);
-    stroke: #fff;
+    stroke: var(--button-on-accent);
     stroke-width: 2px;
 }
 .pl-curve-dot:hover {
@@ -428,7 +428,7 @@
 }
 .pl-filter-btn.is-active {
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--button-on-accent);
     border-color: var(--accent-primary);
 }
 
@@ -821,7 +821,7 @@
 }
 .pl-btn-pedagogico:hover {
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--button-on-accent);
 }
 .pl-gantt .pl-btn-pedagogico:focus-visible,
 .pl-filter-btn:focus-visible {
@@ -921,7 +921,7 @@
     gap: 0.75rem;
     padding: 0.6rem 0.8rem;
     margin: 0.6rem 0;
-    background: color-mix(in srgb, var(--success) 12%, var(--bg-surface, #fff));
+    background: color-mix(in srgb, var(--success) 12%, var(--bg-surface));
     border: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
     border-left: 3px solid var(--success);
     border-radius: 10px;
@@ -1116,9 +1116,9 @@
     display: inline-block;
     width: 1rem;
     height: 1rem;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid var(--navbar-control-border);
     border-radius: 50%;
-    border-top-color: #fff;
+    border-top-color: var(--button-on-accent);
     animation: pl-spin 0.8s linear infinite;
 }
 @keyframes pl-spin {
@@ -1129,7 +1129,7 @@
 .pl-modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: var(--modal-backdrop);
     backdrop-filter: blur(4px);
     z-index: 1000;
     display: flex;
@@ -1561,10 +1561,10 @@ details.pl-collapsible-section > .pl-collapsible-body {
     border-top: 3px solid var(--accent-primary);
 }
 .pl-perfil-card.is-experiencia {
-    border-top: 3px solid #f59e0b;
+    border-top: 3px solid var(--sena-yellow);
 }
 .pl-perfil-card.is-competencias {
-    border-top: 3px solid #10b981;
+    border-top: 3px solid var(--success);
 }
 .pl-perfil-head {
     font-size: 0.82rem;
@@ -1683,7 +1683,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 
 .pl-highlight {
-    background-color: rgba(250, 204, 21, 0.35);
+    background-color: var(--status-warning-bg);
     color: inherit;
     padding: 0 2px;
     border-radius: 3px;
@@ -1975,18 +1975,18 @@ details.pl-collapsible-section > .pl-collapsible-body {
     stroke-linejoin: round;
     letter-spacing: -0.01em;
 }
-.pl-curve-proj-lbl.is-p10 { fill: #059669; }
-.pl-curve-proj-lbl.is-p50 { fill: #4f46e5; }
-.pl-curve-proj-lbl.is-p90 { fill: #d97706; }
+.pl-curve-proj-lbl.is-p10 { fill: var(--status-success-text); }
+.pl-curve-proj-lbl.is-p50 { fill: var(--accent-primary); }
+.pl-curve-proj-lbl.is-p90 { fill: var(--status-warning-text); }
 
 [data-theme="dark"] .pl-curve-proj-lbl.is-p10,
-[data-theme="ocean"] .pl-curve-proj-lbl.is-p10 { fill: #34d399; }
+[data-theme="ocean"] .pl-curve-proj-lbl.is-p10 { fill: var(--status-success-text); }
 
 [data-theme="dark"] .pl-curve-proj-lbl.is-p50,
-[data-theme="ocean"] .pl-curve-proj-lbl.is-p50 { fill: #818cf8; }
+[data-theme="ocean"] .pl-curve-proj-lbl.is-p50 { fill: var(--accent-primary); }
 
 [data-theme="dark"] .pl-curve-proj-lbl.is-p90,
-[data-theme="ocean"] .pl-curve-proj-lbl.is-p90 { fill: #fbbf24; }
+[data-theme="ocean"] .pl-curve-proj-lbl.is-p90 { fill: var(--status-warning-text); }
 
 .pl-proj-circle {
     cursor: pointer;
@@ -2105,14 +2105,14 @@ details.pl-collapsible-section > .pl-collapsible-body {
     font-weight: 700;
 }
 .pl-radar-poly-plan {
-    fill: rgba(99, 102, 241, 0.15);
-    stroke: #6366f1;
+    fill: var(--accent-glow);
+    stroke: var(--accent-primary);
     stroke-width: 2;
     stroke-dasharray: 3 3;
 }
 .pl-radar-poly-real {
-    fill: rgba(16, 185, 129, 0.3);
-    stroke: #10b981;
+    fill: color-mix(in srgb, var(--success) 30%, transparent);
+    stroke: var(--success);
     stroke-width: 2.5;
 }
 
@@ -2240,7 +2240,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 .pl-mode-btn.is-active {
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--button-on-accent);
     box-shadow: 0 2px 6px color-mix(in srgb, var(--accent-primary) 35%, transparent);
 }
 
@@ -2431,15 +2431,15 @@ details.pl-collapsible-section > .pl-collapsible-body {
     transform: translateY(-2px);
 }
 .pl-radar-dot {
-    fill: #10b981;
-    stroke: #fff;
+    fill: var(--success);
+    stroke: var(--button-on-accent);
     stroke-width: 1.5px;
     transition: r 0.15s ease, filter 0.15s ease;
     cursor: pointer;
 }
 .pl-radar-dot:hover {
     r: 6px;
-    filter: drop-shadow(0 0 5px #10b981);
+    filter: drop-shadow(0 0 5px var(--success));
 }
 
 /* --- Tooltip Flotante Inteligente --- */
@@ -2448,10 +2448,10 @@ details.pl-collapsible-section > .pl-collapsible-body {
     z-index: 1000;
     pointer-events: none;
     display: none;
-    background: rgba(17, 24, 39, 0.94);
-    color: #fff;
+    background: var(--color-ocean-950);
+    color: var(--button-on-accent);
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--navbar-control-border);
     border-radius: 10px;
     padding: 0.65rem 0.85rem;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
@@ -2464,9 +2464,9 @@ details.pl-collapsible-section > .pl-collapsible-body {
     font-size: 0.8rem;
     font-weight: 800;
     margin-bottom: 0.35rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid var(--navbar-control-border);
     padding-bottom: 0.3rem;
-    color: #fff;
+    color: var(--button-on-accent);
 }
 .pl-tooltip-body {
     display: flex;
@@ -2480,11 +2480,11 @@ details.pl-collapsible-section > .pl-collapsible-body {
     gap: 0.6rem;
 }
 .pl-tooltip-row span {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--navbar-text-muted);
     font-size: 0.72rem;
 }
 .pl-tooltip-row strong {
-    color: #fff;
+    color: var(--button-on-accent);
     font-weight: 700;
 }
 
@@ -2504,7 +2504,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
     }
     .pl-card {
         box-shadow: none;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-data);
         break-inside: avoid;
     }
     .pl-gantt-scale {
@@ -2555,7 +2555,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 .pl-subnav-link.is-active {
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--button-on-accent);
 }
 
 /* Las secciones no deben quedar tapadas por la barra sticky al saltar */
@@ -2646,8 +2646,8 @@ details.pl-collapsible-section > .pl-collapsible-body {
     margin: 1rem 0;
     padding: 0.85rem 1.25rem;
     border-radius: var(--radius-sm, 8px);
-    background: rgba(59, 130, 246, 0.12);
-    border: 1px solid rgba(59, 130, 246, 0.35);
+    background: var(--status-info-bg);
+    border: 1px solid var(--status-info-border);
     color: var(--text-color, var(--text-strong));
     font-size: 0.92rem;
     align-items: center;
@@ -2689,7 +2689,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 .pl-modal-raps {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--modal-backdrop);
     z-index: 200;
     justify-content: center;
     align-items: center;
@@ -2900,4 +2900,20 @@ details.pl-collapsible-section > .pl-collapsible-body {
     .pl-card.is-collapsed .pl-card-head p { display: block; }
     .pl-card-toggle,
     .pl-subnav-tools { display: none !important; }
+}
+
+/* ---- Utilidades de tooltip y leyenda (planeacion.html / panorama) ---- */
+.pl-tooltip-sub {
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    border-top: 1px dashed var(--border-glass);
+    font-size: 0.68rem;
+    opacity: 0.85;
+}
+.pl-legend-map {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    align-items: center;
+    margin-top: 0.9rem;
 }

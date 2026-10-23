@@ -4,6 +4,27 @@
 
   function crearMotor(win, doc) {
     var memoria = {};
+    var CLASES_PROGRESO = { panel: 'upload-progress', texto: 'upload-progress-text', relleno: 'upload-progress-fill' };
+
+    // El motor reutiliza el panel canónico de cargas creado por uploads.js. Si
+    // una integración aporta nodos sin clase se completan aquí: el progreso usa
+    // siempre las clases del sistema, nunca estilos inline con colores.
+    function asegurarClases(ui) {
+      if (!ui) return;
+      var pares = [['panel', CLASES_PROGRESO.panel], ['texto', CLASES_PROGRESO.texto], ['relleno', CLASES_PROGRESO.relleno]];
+      for (var i = 0; i < pares.length; i += 1) {
+        var nodo = ui[pares[i][0]];
+        if (nodo && nodo.classList && typeof nodo.classList.add === 'function') nodo.classList.add(pares[i][1]);
+      }
+    }
+
+    function pintarAvance(ui, porcentaje) {
+      if (!ui || !ui.relleno) return;
+      if (ui.relleno.classList && typeof ui.relleno.classList.add === 'function') {
+        ui.relleno.classList.add(CLASES_PROGRESO.relleno);
+      }
+      ui.relleno.style.width = porcentaje + '%';
+    }
 
     function mensaje(destino, instructor, aprendiz) {
       return destino.indexOf('/aprendiz/') === 0 ? aprendiz : instructor;
@@ -44,6 +65,7 @@
     }
 
     async function iniciar(form, datos, seleccion, ui, callbacks, config) {
+      asegurarClases(ui);
       var destino = new win.URL(form.action, win.location.href).pathname;
       var clave = 'adso:cargas:v1:' + destino;
       var entrada = leer(clave);
@@ -74,7 +96,7 @@
         var velocidad = nuevos / Math.max((Date.now() - inicio) / 1000, 0.001);
         var restante = Math.ceil((total - recibidos) / Math.max(velocidad, 1));
         var porcentaje = Math.floor(recibidos / total * 100);
-        ui.relleno.style.width = porcentaje + '%';
+        pintarAvance(ui, porcentaje);
         ui.texto.textContent = 'Subiendo… ' + porcentaje + '% · ' + (recibidos / 1048576).toFixed(1) +
           ' de ' + (total / 1048576).toFixed(1) + ' MiB confirmados · ' + (velocidad / 1048576).toFixed(1) +
           ' MiB/s · aproximadamente ' + restante + ' s restantes.';

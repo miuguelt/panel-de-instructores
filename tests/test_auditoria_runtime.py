@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import create_app, db
-from app.models import Aprendiz, ArchivoFichaVersion, ImportacionJob, JuicioEvaluativo
+from app.models import Aprendiz, ArchivoFichaVersion, ImportacionJob, JuicioEvaluativo, Notificacion
 from tests import test_importacion_ficha as apoyo
 
 
@@ -58,6 +58,11 @@ def contexto_runtime():
 def test_worker_conserva_importacion_confirmada_si_falla_ranking(contexto_runtime):
     import worker
     caso = contexto_runtime
+    inicial = apoyo.importar_archivo(
+        caso._archivo_con_estado('POR EVALUAR'), caso.ficha, caso.a.id,
+    )
+    assert inicial['carga_inicial_juicios']
+    db.session.commit()
     contenido = caso._archivo().read()
     ruta = Path(caso.uploads.name, 'reporte.xlsx')
     ruta.write_bytes(contenido)
@@ -79,6 +84,9 @@ def test_worker_conserva_importacion_confirmada_si_falla_ranking(contexto_runtim
     assert db.session.get(ArchivoFichaVersion, version_id).estado == 'procesado'
     assert Aprendiz.query.filter_by(ficha_id=caso.ficha.id, documento='1001').count() == 1
     assert JuicioEvaluativo.query.filter_by(ficha_id=caso.ficha.id).count() == 1
+    assert Notificacion.query.filter_by(
+        destinatario_tipo='aprendiz', ficha_id=caso.ficha.id, tipo='juicio_evaluativo'
+    ).count() == 1
     assert json.loads(confirmado.resultado)['advertencias']
     assert not ruta.exists()
 

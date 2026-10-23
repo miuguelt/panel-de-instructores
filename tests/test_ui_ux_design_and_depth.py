@@ -70,6 +70,74 @@ class DesignSystemAndDepthTestCase(unittest.TestCase):
         self.assertIn('@media (prefers-reduced-motion: reduce)', self.css_content)
         self.assertIn('transform: none !important', self.css_content)
 
+    def test_css_surface_tokens_are_defined_for_every_theme(self):
+        """Verifica las capas de superficie, borde y control del sistema visual."""
+        for token in (
+            '--surface-glass:',
+            '--surface-glass-strong:',
+            '--surface-data:',
+            '--surface-control:',
+            '--border-glass:',
+            '--border-control:',
+            '--radius-md:',
+            '--radius-control:',
+            '--control-h-sm:',
+            '--bg-base:',
+        ):
+            self.assertIn(token, self.css_content, f'Falta el token {token} en styles.css')
+
+        # Los tres temas calibran su propia superficie translúcida.
+        self.assertGreaterEqual(
+            self.css_content.count('--surface-glass:'),
+            3,
+            'Los temas elegant, sena y ocean deben declarar --surface-glass',
+        )
+        self.assertGreaterEqual(self.css_content.count('--surface-glass-strong:'), 3)
+        self.assertGreaterEqual(self.css_content.count('--surface-data:'), 3)
+
+    def test_css_glass_fallbacks_and_accessibility_media_queries(self):
+        """Verifica los fallbacks y preferencias de accesibilidad del vidrio."""
+        self.assertIn('@supports not', self.css_content)
+        self.assertIn('@media (prefers-reduced-transparency: reduce)', self.css_content)
+        self.assertIn('@media (prefers-contrast: more)', self.css_content)
+        self.assertIn('@media (forced-colors: active)', self.css_content)
+        # En colores forzados los controles recuperan borde y foco del sistema.
+        self.assertIn('outline: 3px solid Highlight', self.css_content)
+
+    def test_css_canonical_button_states_and_outline_variants(self):
+        """Verifica los estados y variantes de botón del sistema de componentes."""
+        for selector in (
+            '.btn:disabled',
+            '.btn[aria-disabled="true"]',
+            '.btn[aria-busy="true"]',
+            '.btn-icon',
+            '.btn-ghost',
+            '.btn-outline-danger',
+            '.btn-outline-success',
+        ):
+            self.assertIn(selector, self.css_content, f'Falta el selector {selector}')
+
+        # La pista del spinner en botones rellenos usa el token de contraste.
+        self.assertIn('--button-on-accent', self.css_content)
+
+    def test_css_canonical_table_filter_and_upload_components(self):
+        """Verifica los componentes canónicos que consumen table-filters.js y uploads.js."""
+        for selector in (
+            '.table-toolbar',
+            '.table-filters-container',
+            '.table-filter-search',
+            '.table-filter-select',
+            '.table-filter-result',
+            '.table-filter-empty',
+            '.table-filter-toggle.is-active',
+            '.upload-progress',
+            '.upload-progress-text',
+            '.upload-progress-bar',
+            '.upload-progress-fill',
+            '.upload-error',
+        ):
+            self.assertIn(selector, self.css_content, f'Falta el componente {selector}')
+
     def test_base_template_includes_lucide_and_scripts(self):
         """Verifica que base.html incluya lucide.min.js e inicialice los iconos."""
         base_path = os.path.join(self.app.root_path, 'templates', 'base.html')

@@ -83,12 +83,6 @@ def _aprendiz_admin_autorizado(ficha_id):
 def _aprendiz_autorizado(ficha_id):
     """Devuelve el aprendiz de sesión si pertenece y está activo en la ficha."""
     aprendiz = aprendiz_de_sesion(ficha_id)
-    if not aprendiz:
-        doc = (request.form.get('documento') or request.args.get('documento') or '').strip()
-        if doc:
-            aprendiz = Aprendiz.query.filter_by(
-                ficha_id=ficha_id, documento=doc
-            ).first()
     if not aprendiz or aprendiz.estado not in ESTADOS_ACTIVOS or not aprendiz.activo:
         return None
     return aprendiz
@@ -431,15 +425,16 @@ def configurar(ficha_id):
     if not ficha:
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
-    config = obtener_configuracion(ficha_id)
-    config.excluir_ausentes = request.form.get('excluir_ausentes') == 'on'
     try:
-        config.aviso_horas = max(
+        aviso_horas = max(
             0, min(720, int(request.form.get('aviso_horas', 24)))
         )
     except (TypeError, ValueError):
         flash('Las horas de aviso deben ser un número entero.', 'error')
         return redirect(url_for('aseo.turnos', ficha_id=ficha_id))
+    config = obtener_configuracion(ficha_id)
+    config.excluir_ausentes = request.form.get('excluir_ausentes') == 'on'
+    config.aviso_horas = aviso_horas
     db.session.commit()
     flash('Configuración de turnos actualizada.', 'success')
     return redirect(url_for('aseo.turnos', ficha_id=ficha_id))
@@ -591,6 +586,7 @@ def gestionar(ficha_id):
         'aprendiz/gestion_aseo.html',
         ficha=ficha,
         actor=actor,
+        puede_gestionar_aseo=_aprendiz_admin_autorizado(ficha_id) is not None,
         config=config,
         aprendices=aprendices,
         contadores=contadores,
@@ -623,7 +619,7 @@ def gestionar(ficha_id):
 @aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo/generar', methods=['POST'])
 @limiter.limit('20 per minute')
 def generar_como_aprendiz(ficha_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha or not actor:
         flash('No tienes permiso para generar turnos de aseo en esta ficha.', 'error')
@@ -713,7 +709,7 @@ def generar_como_aprendiz(ficha_id):
 )
 @limiter.limit('30 per minute')
 def cumplir_como_aprendiz(ficha_id, turno_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     turno = db.session.get(TurnoAseo, turno_id)
     if not actor or not turno or turno.ficha_id != ficha_id:
         flash('No tienes permiso para marcar ese turno.', 'error')
@@ -746,7 +742,7 @@ def cumplir_como_aprendiz(ficha_id, turno_id):
 )
 @limiter.limit('30 per minute')
 def no_cumplir_como_aprendiz(ficha_id, turno_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     turno = db.session.get(TurnoAseo, turno_id)
     if not actor or not turno or turno.ficha_id != ficha_id:
         flash('No tienes permiso para marcar ese turno.', 'error')
@@ -774,7 +770,7 @@ def no_cumplir_como_aprendiz(ficha_id, turno_id):
 )
 @limiter.limit('30 per minute')
 def reabrir_como_aprendiz(ficha_id, turno_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     turno = db.session.get(TurnoAseo, turno_id)
     if not actor or not turno or turno.ficha_id != ficha_id:
         flash('No tienes permiso para modificar ese turno.', 'error')
@@ -801,7 +797,7 @@ def reabrir_como_aprendiz(ficha_id, turno_id):
 )
 @limiter.limit('30 per minute')
 def editar_como_aprendiz(ficha_id, turno_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     turno = db.session.get(TurnoAseo, turno_id)
     aprendiz_1 = Aprendiz.query.filter_by(
         id=request.form.get('aprendiz_1_id', type=int), ficha_id=ficha_id
@@ -843,7 +839,7 @@ def editar_como_aprendiz(ficha_id, turno_id):
 @aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo/asignar', methods=['POST'])
 @limiter.limit('30 per minute')
 def asignar_como_aprendiz(ficha_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha or not actor:
         flash('No tienes permiso para asignar turnos de aseo.', 'error')
@@ -882,20 +878,21 @@ def asignar_como_aprendiz(ficha_id):
 @aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo/config', methods=['POST'])
 @limiter.limit('30 per minute')
 def configurar_como_aprendiz(ficha_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha or not actor:
         flash('Debes pertenecer a esta ficha para configurar los turnos de aseo.', 'error')
         return _volver_al_panel_aprendiz(ficha_id)
-    config = obtener_configuracion(ficha_id)
-    config.excluir_ausentes = request.form.get('excluir_ausentes') in ('on', 'true', '1')
     try:
-        config.aviso_horas = max(
+        aviso_horas = max(
             0, min(720, int(request.form.get('aviso_horas', 24)))
         )
     except (TypeError, ValueError):
         flash('Las horas de aviso deben ser un número entero.', 'error')
         return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
+    config = obtener_configuracion(ficha_id)
+    config.excluir_ausentes = request.form.get('excluir_ausentes') in ('on', 'true', '1')
+    config.aviso_horas = aviso_horas
     db.session.commit()
     flash('Configuración de turnos de aseo actualizada.', 'success')
     return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
@@ -907,10 +904,17 @@ def configurar_como_aprendiz(ficha_id):
 )
 @limiter.limit('30 per minute')
 def excluir_como_aprendiz(ficha_id, aprendiz_id):
-    actor = _aprendiz_autorizado(ficha_id)
+    actor = _aprendiz_admin_autorizado(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
     aprendiz = db.session.get(Aprendiz, aprendiz_id)
-    if not ficha or not actor or not aprendiz or aprendiz.ficha_id != ficha_id:
+    if (
+        not ficha
+        or not actor
+        or not aprendiz
+        or aprendiz.ficha_id != ficha_id
+        or aprendiz.estado not in ESTADOS_ACTIVOS
+        or not aprendiz.activo
+    ):
         flash('Aprendiz no encontrado o no tienes permiso para esta ficha.', 'error')
         return _volver_al_panel_aprendiz(ficha_id)
     contador = ContadorAseo.query.filter_by(
@@ -921,6 +925,9 @@ def excluir_como_aprendiz(ficha_id, aprendiz_id):
         contador = ContadorAseo.query.filter_by(
             ficha_id=ficha_id, aprendiz_id=aprendiz_id
         ).first()
+    if not contador:
+        flash('No se pudo cargar la disponibilidad de este aprendiz.', 'error')
+        return redirect(url_for('aseo_aprendiz.gestionar', ficha_id=ficha_id))
 
     hasta = request.form.get('excluido_hasta', '').strip()
     if hasta:
@@ -1122,4 +1129,5 @@ def transparencia(ficha_id):
         hoy=date.today(),
         total_cumplidos=datos['total_cumplidos'],
         total_programados=datos['total_programados'],
+        puede_gestionar_aseo=_aprendiz_admin_autorizado(ficha_id) is not None,
     )

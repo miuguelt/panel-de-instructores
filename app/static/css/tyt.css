@@ -265,8 +265,8 @@
 }
 
 .tyt-meter--tiempo .tyt-fill {
-    background: linear-gradient(90deg, #2563eb, #60a5fa);
-    box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
+    background: linear-gradient(90deg, var(--status-info-solid), var(--info));
+    box-shadow: 0 0 8px var(--status-info-border);
 }
 
 .tyt-meter--aprobados .tyt-fill {
@@ -732,7 +732,7 @@
 .tyt-action:hover { 
     border-color: var(--accent-primary); 
     background: var(--accent-primary); 
-    color: #ffffff;
+    color: var(--button-on-accent);
     transform: translateY(-1px);
     box-shadow: 0 4px 14px var(--accent-glow);
 }

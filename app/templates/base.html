@@ -19,6 +19,7 @@
     {% block head %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modal-system.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/loading-indicator.css') }}">
+    {% block page_css %}{% endblock %}
     <script>
         (function() {
             try {
@@ -81,13 +82,13 @@
                        class="nav-icon-button"
                        aria-label="Notificaciones{% if notificaciones_no_leidas %}: {{ notificaciones_no_leidas }} sin leer{% endif %}"
                        title="Notificaciones">
-                        <i data-lucide="bell" style="width:18px;height:18px;" aria-hidden="true"></i>
+                        <i data-lucide="bell" class="icon-md" aria-hidden="true"></i>
                         {% if notificaciones_no_leidas %}<span class="notification-count">{{ notificaciones_no_leidas }}</span>{% endif %}
                     </a>
                     <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form" hx-boost="false">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-outline nav-logout">
-                            <i data-lucide="log-out" style="width:14px;height:14px;" aria-hidden="true"></i>
+                            <i data-lucide="log-out" class="icon-sm" aria-hidden="true"></i>
                             <span>Salir</span>
                         </button>
                     </form>
@@ -195,9 +196,10 @@
     {% endblock %}
 
     <div class="theme-float">
-        <button type="button" onclick="toggleTheme()" class="theme-float-single-btn" title="Cambiar tema de interfaz" aria-label="Cambiar tema de interfaz">
+        <button type="button" onclick="toggleTheme()" class="theme-float-single-btn" title="Cambiar tema de interfaz. Tema actual: SENA" aria-label="Cambiar tema de interfaz">
             <svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         </button>
+        <span id="theme-float-status" class="sr-only" aria-live="polite"></span>
     </div>
 
     <main id="contenido-principal" class="container" tabindex="-1">
@@ -311,12 +313,24 @@
 
     </script>
     <script>
+        var ADSO_THEME_NAMES = { sena: 'SENA', elegant: 'Elegante', ocean: 'Océano' };
+        function actualizarEtiquetaTema(themeName) {
+            var nombre = ADSO_THEME_NAMES[themeName] || 'SENA';
+            var boton = document.querySelector('.theme-float-single-btn');
+            if (boton) {
+                boton.setAttribute('title', 'Cambiar tema de interfaz. Tema actual: ' + nombre);
+                boton.setAttribute('aria-label', 'Cambiar tema de interfaz');
+            }
+            var estado = document.getElementById('theme-float-status');
+            if (estado) estado.textContent = 'Tema ' + nombre + ' activo.';
+        }
         function setTheme(themeName) {
             document.documentElement.setAttribute('data-theme', themeName);
             try { localStorage.setItem('app-theme', themeName); } catch (_) { /* El tema sigue activo aunque el navegador no permita guardarlo. */ }
             document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
                 el.classList.toggle('is-active', el.dataset.themeBtn === themeName);
             });
+            actualizarEtiquetaTema(themeName);
         }
         function toggleTheme() {
             var themes = ['sena', 'elegant', 'ocean'];
@@ -333,6 +347,7 @@
             document.querySelectorAll('.theme-float-dot, .theme-dot').forEach(function(el) {
                 if (el.dataset.themeBtn === t) el.classList.add('is-active');
             });
+            actualizarEtiquetaTema(t);
         })();
         
     </script>

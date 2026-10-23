@@ -552,6 +552,24 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertEqual(registro.revisada_por_id, self.instructor.id)
         self.assertIsNone(registro.archivo_url)
         self.assertTrue(registro.entregada_a_tiempo)
+        self.assertEqual(Notificacion.query.filter_by(
+            destinatario_tipo='aprendiz', destinatario_id=self.aprendiz.id,
+            tipo='calificacion',
+        ).count(), 1)
+
+        repetida = self.cliente.post(
+            f'/instructor/tareas/{actividad.id}/actividad-clase',
+            data={
+                'aprobados': [str(self.aprendiz.id)],
+                'calificacion_general': '4.8',
+                'observacion_general': 'Sustentó en clase',
+            },
+        )
+        self.assertEqual(repetida.status_code, 302)
+        self.assertEqual(Notificacion.query.filter_by(
+            destinatario_tipo='aprendiz', destinatario_id=self.aprendiz.id,
+            tipo='calificacion',
+        ).count(), 1)
 
         # Desmarcar retira la aprobación previamente registrada.
         retiro = self.cliente.post(
@@ -1335,6 +1353,11 @@ class FlujosWebTestCase(unittest.TestCase):
         db.session.refresh(self.entrega)
         self.assertTrue(self.entrega.calificada)
         self.assertEqual(self.entrega.revisada_por_id, self.instructor.id)
+        aviso = Notificacion.query.filter_by(
+            destinatario_tipo='aprendiz', destinatario_id=self.aprendiz.id,
+            tipo='calificacion',
+        ).one()
+        self.assertNotIn('documento=', aviso.url or '')
 
     def test_resolver_alerta_general_es_atomico_y_responde(self):
         respuesta = self.cliente.post(

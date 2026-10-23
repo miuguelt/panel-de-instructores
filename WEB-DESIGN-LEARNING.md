@@ -1,5 +1,21 @@
 # Aprendizajes de diseño web
 
+## 23 de octubre de 2026 — sistema visual de superficies translúcidas, botones y bordes
+
+- Alcance observado: la interfaz acumulaba superficies de vidrio con alfas distintas, botones con radios y alturas propios en cada módulo, iconos dimensionados con `style` en línea y colores literales repetidos en plantillas. El resultado era un sistema que se veía coherente de lejos y se rompía de cerca: contraste irregular, objetivos táctiles menores de 42 px y CSS incrustado imposible de auditar.
+- Patrón aplicado: capas de superficie con nombre y propósito (`--surface-glass-subtle` → `--surface-glass` → `--surface-glass-strong` → `--surface-data`), una sola escala de radios y alturas, y `.btn` como único punto de entrada de acciones. El dato tabular se aparta del vidrio con `--surface-data`; el vidrio queda para jerarquía y decoración.
+- Decisión de legibilidad: el contraste se calcula sobre el color compuesto (`--surface-glass` con alfa sobre `--bg-base`), no sobre el color ideal del token. Esa diferencia explica por qué un gris que parecía correcto sobre blanco dejaba de cumplir AA sobre el fondo tintado del tema.
+- Patrón candidato: los fallbacks de accesibilidad (`@supports not`, `prefers-reduced-transparency`, `prefers-contrast: more`, `forced-colors: active`) como parte del contrato y no como parche. Estado: `candidate` hasta revisarlo en una segunda familia de pantallas (aprendiz y grupos).
+- Riesgo evitado: fijar los nuevos tokens como colores planos habría vuelto a acoplar los tres temas; se mantuvieron como capas por tema con alias de compatibilidad para no romper CSS de página ya existente.
+- Evidencia obtenida (estática, cierre del 23 de octubre de 2026):
+  - `node tests_js/estilos_estandarizados.test.cjs`: 7/7. Atributos `style=` en plantillas: 706 (partían de 952); 0 bloques `<style>` fuera del `noscript` de `base.html`; 0 colores literales fuera de tokens; 0 iconos `<i>`/`<svg>` con ancho y alto en línea; ratchet en 720.
+  - `node tests_js/tokens_accesibilidad_m1.test.cjs`: 9/9, incluido el contraste compuesto por alfa de `--surface-glass` sobre `--bg-base` en los tres temas y los cuatro fallbacks de accesibilidad.
+  - `node tests_js/responsive_bento_m2.test.cjs`: 4/4, con `--surface-glass` del tema Sena (alfa 0.82) y `--text-main` >= 4.5 sobre el compuesto.
+  - `node tests_js/grupos_layout.test.cjs`: 3/3, con `.bento-sidebar` leído desde `app/static/css/grupos.css`.
+  - `node tests_js/test_auditoria_frontend.test.cjs` 8/8, `node tests_js/uploads.test.cjs` 13/13 y `node tests_js/uploads_reanudables.test.cjs` 24/24 tras migrar sus paneles a clases del sistema.
+  - `python -m pytest tests/test_ui_ux_design_and_depth.py -q`: 11 passed.
+- Evidencia pendiente por limitación del entorno: `tests_browser/diseno_visual.test.cjs` (Playwright) comprueba estilos calculados y desbordamiento en 320, 390, 768, 1440, 1920 y 2560 px, pero no puede ejecutarse en el sandbox de trabajo: Chromium falla al lanzarse con `spawn EPERM`. La prueba ya lanza un mensaje explícito y requiere una sesión con `danger-full-access`; al ejecutarla, anotar aquí las capturas y cualquier ajuste de alfa o altura táctil que surja.
+
 ## 12 de septiembre de 2026 — herramientas del directorio de aprendices
 
 - Alcance observado: la versión anterior agrupaba correctamente las herramientas, pero al desplegarse perdía jerarquía, dejaba demasiado espacio alrededor del QR y mezclaba controles nativos con botones tematizados.

@@ -2,23 +2,24 @@
   "schema_version": "1.0",
   "project": "panel de instructores",
   "jurisdiction": "CO",
-  "last_reviewed": "2026-10-07",
+  "last_reviewed": "2026-10-23",
   "verdict": {
     "technical_implementation": "verificada localmente con datos de pruebas",
     "production_with_real_personal_data": "BLOCKED",
-    "scope": "Incorporación de fotos reales en la nueva funcionalidad; no modifica el estado declarado de la operación heredada."
+    "scope": "Incorporación de fotos reales y avisos voluntarios de evaluación; no modifica el estado declarado de la operación heredada."
   },
   "pending_blockers": [
     { "id": "responsable", "owner": "institución por confirmar", "action": "Confirmar el responsable del tratamiento y la autorización aplicable a la foto opcional.", "evidence": null },
-    { "id": "población-y-retención", "owner": "institución por confirmar", "action": "Confirmar si hay menores y documentar retención, eliminación y acceso institucional a las fotos.", "evidence": null }
+    { "id": "población-y-retención", "owner": "institución por confirmar", "action": "Confirmar si hay menores y documentar retención, eliminación y acceso institucional a las fotos.", "evidence": null },
+    { "id": "web-push-educativo", "owner": "responsable institucional por confirmar", "action": "Mantener WEB_PUSH_ENABLED=false hasta documentar la base aplicable, el aviso al aprendiz, la población menor de edad, el proveedor de navegador, las transferencias y la retención de endpoints y claves de suscripción.", "evidence": "docs/architecture/avisos-calificacion-aprendiz.md" }
   ],
   "audit_trail": {
-    "last_legal_change_reviewed_on": "2026-10-07",
-    "review_scope": "Inventario técnico de campos, rutas, aislamiento y nueva carga de imágenes; aprobación institucional pendiente.",
-    "evidence": ["docs/architecture/personalizacion-aprendiz.md", "tests/test_personalizacion_aprendiz.py", "tests_browser/aprendiz_personalizacion.test.cjs"]
+    "last_legal_change_reviewed_on": "2026-10-23",
+    "review_scope": "Clasificación técnica del cambio de avisos de evaluación y suscripción Web Push. La aprobación institucional, la población menor de edad, las transferencias y la retención siguen pendientes.",
+    "evidence": ["docs/architecture/personalizacion-aprendiz.md", "tests/test_personalizacion_aprendiz.py", "tests_browser/aprendiz_personalizacion.test.cjs", "docs/architecture/avisos-calificacion-aprendiz.md", "tests/test_notificaciones_calificacion.py", "tests_browser/notificaciones_aprendiz.test.cjs"]
   },
   "ai_resume_contract": {
-    "preserve": ["No marcar aprobaciones institucionales sin evidencia humana.", "No cargar fotos reales para las pruebas.", "Mantener la identidad de sesión y el aislamiento por aprendiz."],
-    "verification": ["python -m pytest tests/test_personalizacion_aprendiz.py tests/test_personalizacion_migration.py", "node --test tests_browser/aprendiz_personalizacion.test.cjs"]
+    "preserve": ["No marcar aprobaciones institucionales sin evidencia humana.", "No cargar fotos reales para las pruebas.", "Mantener la identidad de sesión y el aislamiento por aprendiz.", "Mantener WEB_PUSH_ENABLED=false hasta completar la revisión institucional de datos educativos y proveedores."],
+    "verification": ["python -m pytest tests/test_personalizacion_aprendiz.py tests/test_personalizacion_migration.py tests/test_notificaciones_calificacion.py", "node --test tests_browser/aprendiz_personalizacion.test.cjs tests_browser/notificaciones_aprendiz.test.cjs"]
   }
 }

@@ -72,7 +72,7 @@
 .pl-gantt-fechas dd { margin: 0; font-size: .83rem; color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .pl-gantt-evento .pl-gantt-acciones { margin: 1rem 0; }
 .pl-gantt-evento .pl-gantt-acciones button { flex: 1 1 10rem; }
-.pl-gantt-evento .pl-btn-evaluacion { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+.pl-gantt-evento .pl-btn-evaluacion { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--button-on-accent); }
 .pl-gantt-evento .pl-gantt-rap { overflow-wrap: normal; }
 .pl-gantt-evento .pl-eval-head > div { flex: 1; }
 .pl-gantt-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem; padding: .6rem 0; margin-bottom: .8rem; border-bottom: 1px solid var(--border-divider); }
@@ -94,7 +94,7 @@
 .pl-gantt-progress-head { display: flex; justify-content: space-between; align-items: baseline; font-size: .78rem; color: var(--text-muted); }
 .pl-gantt-progress-head strong { color: var(--text-strong); font-size: .84rem; font-variant-numeric: tabular-nums; }
 .pl-gantt-bar-split { display: flex; height: 18px; border-radius: 999px; overflow: hidden; border: 1px solid var(--border-divider); background: var(--bg-surface); margin: .4rem 0 .6rem; }
-.pl-split-seg { display: flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 700; color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 .45rem; }
+.pl-split-seg { display: flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 700; color: var(--button-on-accent); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 .45rem; }
 .pl-split-directas { background: var(--accent-primary); }
 .pl-split-indep { background: color-mix(in srgb, var(--accent-primary) 35%, var(--text-muted)); }
 
@@ -133,7 +133,7 @@
 .pl-pedagogia-filtros { display: flex; flex-wrap: wrap; gap: .35rem; }
 .pl-pedagogia-filter-btn { min-height: 34px; padding: .35rem .7rem; font-size: .78rem; font-weight: 600; border-radius: 8px; border: 1px solid var(--border-divider); background: var(--bg-card); color: var(--text-muted); cursor: pointer; transition: all .2s; }
 .pl-pedagogia-filter-btn:hover { color: var(--text-strong); border-color: var(--accent-primary); }
-.pl-pedagogia-filter-btn.is-active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+.pl-pedagogia-filter-btn.is-active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--button-on-accent); }
 
 .pl-gantt-pedagogia { display: grid; gap: .9rem; grid-template-columns: minmax(0, 1fr); }
 .pl-gantt-pedagogia article { padding: 1rem; border: 1px solid var(--border-divider); border-radius: 10px; background: var(--bg-surface); display: flex; flex-direction: column; }

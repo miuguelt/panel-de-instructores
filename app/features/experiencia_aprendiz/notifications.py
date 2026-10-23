@@ -9,6 +9,7 @@ CATEGORIAS = {
     'critica': ('Seguimiento', 'convivencia'),
     'tarea': ('Evidencias', 'evidencias'),
     'calificacion': ('Retroalimentación', 'evidencias'),
+    'juicio_evaluativo': ('Juicios evaluativos', 'juicios'),
     'feedback': ('Retroalimentación', 'evidencias'),
     'justificacion': ('Asistencia', 'resumen'),
     'observador': ('Convivencia', 'convivencia'),

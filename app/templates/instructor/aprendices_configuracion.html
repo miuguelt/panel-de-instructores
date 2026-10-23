@@ -92,7 +92,7 @@
                             <input type="hidden" name="next" value="{{ url_for('instructor.configuracion_aprendices', ficha_id=ficha.id) }}">
                             {% if ap.activo %}
                             <input type="hidden" name="accion" value="deshabilitar">
-                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger, #dc2626);"
+                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--danger);"
                                 data-confirm="¿Desea deshabilitar a este aprendiz del ranking, turnos de aseo, llamado a lista y asignación de grupos?"
                                 data-confirm-title="Deshabilitar aprendiz"
                                 data-confirm-label="Deshabilitar"
@@ -101,7 +101,7 @@
                             </button>
                             {% else %}
                             <input type="hidden" name="accion" value="habilitar">
-                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--success, #16a34a);">
+                            <button type="submit" class="btn btn-sm btn-outline" style="color: var(--success);">
                                 Habilitar
                             </button>
                             {% endif %}

@@ -1282,6 +1282,8 @@ def aceptar_intercambio(intercambio):
     turno = intercambio.turno
     if turno.estado not in ESTADOS_PENDIENTES:
         raise ValueError('El turno ya no admite intercambios.')
+    if turno.fecha < date.today():
+        raise ValueError('El turno ya pasó y no admite intercambios.')
 
     if not intercambio.aprendiz_solicita or not intercambio.aprendiz_solicita.activo or not intercambio.aprendiz_recibe or not intercambio.aprendiz_recibe.activo:
         raise ValueError('Uno de los aprendices se encuentra deshabilitado.')

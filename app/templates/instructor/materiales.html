@@ -1,129 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Materiales de Apoyo - {{ ficha.codigo }}{% endblock %}
 
-{% block head %}
-<style>
-  :root { --modal-z: 200; }
-  .material-card {
-    display: flex;
-    flex-direction: column;
-    transition: transform .2s, box-shadow .2s;
-    position: relative;
-    overflow: hidden;
-  }
-  .material-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
-
-  .file-icon {
-    width: 44px; height: 44px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 11px; letter-spacing: .02em;
-    flex-shrink: 0;
-  }
-  .file-icon-pdf { background: #fef2f2; color: #dc2626; }
-  .file-icon-word { background: #eff6ff; color: #2563eb; }
-  .file-icon-excel { background: #f0fdf4; color: #16a34a; }
-  .file-icon-ppt { background: #fff7ed; color: #ea580c; }
-  .file-icon-zip { background: #fefce8; color: #ca8a04; }
-  .file-icon-image { background: #faf5ff; color: #9333ea; }
-  .file-icon-other { background: var(--border-divider); color: var(--text-muted); }
-
-  .drop-zone {
-    border: 2px dashed var(--border-subtle);
-    border-radius: var(--radius-sm);
-    padding: 32px 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .2s, background .2s;
-    position: relative;
-  }
-  .drop-zone:hover,
-  .drop-zone.drag-over {
-    border-color: var(--accent-primary);
-    background: var(--accent-glow);
-  }
-  .drop-zone.has-file {
-    border-color: var(--accent-primary);
-    border-style: solid;
-    background: var(--accent-glow);
-  }
-  .drop-zone-icon {
-    font-size: 36px;
-    margin-bottom: 8px;
-    color: var(--text-muted);
-    transition: color .2s;
-  }
-  .drop-zone:hover .drop-zone-icon,
-  .drop-zone.drag-over .drop-zone-icon {
-    color: var(--accent-primary);
-  }
-  .drop-zone-text { font-size: 14px; color: var(--text-muted); }
-  .drop-zone-text strong { color: var(--accent-primary); }
-  .drop-zone input[type="file"] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer;
-  }
-  .drop-zone-file {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    margin-top: 12px;
-    padding: 10px 14px;
-    background: var(--bg-surface);
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-strong);
-  }
-  .drop-zone.has-file .drop-zone-file { display: flex; }
-  .drop-zone.has-file .drop-zone-prompt { display: none; }
-
-  .search-box {
-    width: 100%;
-    max-width: 380px;
-    padding: 10px 16px 10px 40px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    background: var(--input-bg);
-    color: var(--text-main);
-    font-size: 14px;
-    transition: border-color .2s, box-shadow .2s;
-  }
-  .search-box:focus {
-    border-color: var(--accent-primary);
-    box-shadow: var(--focus-ring);
-    outline: none;
-  }
-  .search-wrap { position: relative; display: inline-block; }
-  .search-wrap::before {
-    content: '\1F50D';
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 15px;
-    color: var(--text-muted);
-    pointer-events: none;
-  }
-
-  .preview-img {
-    max-width: 100%;
-    max-height: 70vh;
-    border-radius: 8px;
-    display: block;
-    margin: 0 auto;
-  }
-
-  .material-meta {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-  .material-meta .divider { color: var(--border-divider); }
-
-  @keyframes spin { 100% { transform: rotate(360deg); } }
-</style>
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
 {% endblock %}
+
 
 {% block navbar %}{{ super() }}{% endblock %}
 
@@ -227,7 +108,7 @@
             <button type="button" onclick="limpiarArchivo()" style="background:none;border:none;color:var(--sena-red);cursor:pointer;font-size:16px;padding:2px 4px;" title="Quitar archivo">&times;</button>
           </div>
         </div>
-        <p id="materialCargaError" role="alert" tabindex="-1" hidden style="color:var(--danger-text,#c0392b);margin:0;"></p>
+        <p id="materialCargaError" role="alert" tabindex="-1" hidden style="color:var(--danger-text);margin:0;"></p>
         <div>
           <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;color:var(--text-muted);">Descripci&oacute;n <span style="font-weight:400;">(opcional)</span></label>
           <textarea name="descripcion" rows="3" placeholder="Breve descripci&oacute;n del contenido..." style="width:100%;padding:10px 14px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--input-bg);color:var(--text-main);font:inherit;font-size:14px;resize:vertical;transition:border-color .2s;outline:none;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-subtle)'"></textarea>

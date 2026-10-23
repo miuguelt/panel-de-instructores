@@ -1,0 +1,321 @@
+/* =========================================
+   ENTREGAS — revision de entregas de una tarea
+   Extraído de app/templates/instructor/entregas.html.
+   Consume los tokens y componentes de styles.css.
+========================================= */
+
+
+    .entregas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+        margin-top: 24px;
+    }
+    .entrega-card {
+        display: flex;
+        flex-direction: column;
+        background: var(--surface-glass);
+        border-radius: var(--radius);
+        padding: 24px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border-divider);
+        border-top: 4px solid var(--gray-300);
+        transition: all 0.35s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .entrega-card:hover {
+        transform: translateY(-6px);
+        box-shadow: var(--shadow-lg);
+    }
+    .entrega-card.status-entregado {
+        border-top-color: var(--sena-green);
+    }
+    .entrega-card.status-retraso {
+        border-top-color: var(--sena-orange);
+    }
+    .entrega-card.status-prorroga {
+        border-top-color: var(--status-info-border);
+    }
+    
+    .entrega-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        gap: 12px;
+    }
+    .entrega-info h3 {
+        margin: 0 0 4px 0;
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--gray-900);
+        line-height: 1.2;
+    }
+    .entrega-info small {
+        color: var(--gray-500);
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .entrega-evidencia {
+        background: var(--bg-surface);
+        padding: 16px;
+        border-radius: var(--radius-sm);
+        margin-bottom: 24px;
+        text-align: center;
+        border: 1px dashed var(--gray-300);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 70px;
+    }
+    
+    .entrega-calificacion {
+        border-top: 1px solid var(--border-divider);
+        padding-top: 20px;
+        margin-top: auto;
+    }
+    
+    .calificacion-status {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        font-size: 14px;
+        color: var(--gray-700);
+    }
+    .calificacion-valor {
+        font-weight: 800;
+        font-size: 18px;
+        color: var(--sena-green);
+        background: var(--sena-green-light);
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+    .calificacion-pendiente {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--gray-500);
+        background: var(--gray-100);
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+    
+    .form-evaluar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .form-evaluar-row {
+        display: grid;
+        grid-template-columns: 85px 1fr;
+        gap: 10px;
+    }
+    .form-evaluar input, .form-evaluar select, .form-evaluar textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--gray-300);
+        border-radius: 8px;
+        font-size: 13px;
+        font-family: inherit;
+        background: var(--bg-surface);
+        transition: all 0.2s ease;
+    }
+    .form-evaluar input:focus, .form-evaluar select:focus, .form-evaluar textarea:focus {
+        outline: none;
+        border-color: var(--sena-green);
+        box-shadow: var(--focus-ring);
+        background: var(--surface-data);
+    }
+    .btn-full {
+        width: 100%;
+        justify-content: center;
+        margin-top: 8px;
+    }
+    
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+        margin-bottom: 8px;
+    }
+    .stat-card {
+        background: var(--surface-glass);
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+    .stat-title {
+        font-size: 13px;
+        color: var(--gray-500);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+    .stat-value {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--gray-900);
+        line-height: 1;
+    }
+    .stat-success { color: var(--sena-green); }
+    .stat-warning { color: var(--sena-orange); }
+    .stat-danger { color: var(--sena-red); }
+
+    .evaluacion-masiva {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-divider);
+        border-radius: var(--radius-sm);
+        padding: 20px;
+        margin: 24px 0;
+    }
+    .evaluacion-masiva-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    .evaluacion-masiva-title { margin: 0; color: var(--gray-900); font-size: 17px; }
+    .evaluacion-masiva-grid {
+        display: grid;
+        grid-template-columns: minmax(120px, 160px) minmax(160px, 220px) 1fr;
+        gap: 12px;
+        align-items: start;
+    }
+    .evaluacion-masiva-grid input,
+    .evaluacion-masiva-grid select,
+    .evaluacion-masiva-grid textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border: 1px solid var(--gray-300);
+        border-radius: 8px;
+        font: inherit;
+        background: var(--surface-data);
+    }
+    .evaluacion-masiva-grid textarea { min-height: 42px; resize: vertical; }
+    .seleccion-entrega {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        color: var(--gray-700);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .seleccion-entrega input { width: 18px; height: 18px; accent-color: var(--sena-green); }
+    .entrega-card.is-seleccionada { box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-lg); }
+
+/* ---- Clases extraídas de estilos en línea (entregas.html) ---- */
+.entrega-card--selectable { cursor: pointer; padding: 16px; }
+.entrega-header--compact { margin-bottom: 8px; }
+.entrega-nombre { font-size: 15px; }
+
+.checkbox-entrega { width: 20px; height: 20px; }
+.checkbox-masiva { width: 18px; height: 18px; accent-color: var(--accent-primary); }
+.label-masiva {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.form-evaluacion { margin-top: 24px; padding: 24px; }
+.evaluacion-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.alerta-info-card { margin-top: 24px; padding: 18px; }
+
+.resumen-progreso-card {
+    padding: 24px;
+    margin-bottom: 24px;
+    background: var(--surface-glass);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+}
+.resumen-progreso-title {
+    margin: 0 0 20px;
+    color: var(--text-strong);
+    font-size: 17px;
+    font-weight: 700;
+}
+.resumen-bloque { margin-bottom: 20px; }
+.progreso-entregas {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+.progreso-entregas-label { color: var(--text-muted); font-weight: 600; }
+.progreso-entregas-valor { font-weight: 800; }
+.progreso-track {
+    width: 100%;
+    height: 12px;
+    overflow: hidden;
+    background-color: var(--border-divider);
+    border-radius: 8px;
+    box-shadow: inset 0 1px 2px var(--border-divider);
+}
+.progreso-fill { height: 100%; border-radius: inherit; }
+.progreso-nota {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.justificacion-retraso {
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    text-align: left;
+    background: var(--status-warning-bg);
+    border: 1px solid var(--status-warning-border);
+    border-radius: 6px;
+}
+.justificacion-retraso strong { color: var(--status-warning-text); }
+.justificacion-retraso p {
+    margin: 3px 0 0;
+    color: var(--status-warning-text);
+    font-style: italic;
+}
+
+.svg-inline { margin-right: 6px; vertical-align: text-bottom; }
+.detalle-box {
+    padding: 8px 10px;
+    font-size: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-divider);
+    border-radius: 6px;
+}
+.detalle-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.detalle-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+.detalle-input {
+    padding: 6px;
+    font-size: 12px;
+    background: var(--surface-data);
+    border: 1px solid var(--border-control);
+    border-radius: 4px;
+}
+.detalle-acciones { display: flex; gap: 6px; margin-top: 4px; }
+.btn-outline-danger-solid { color: var(--status-danger-text); border-color: var(--status-danger-text); }

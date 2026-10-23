@@ -9,6 +9,8 @@ from app.models.alertas import (
     ConfiguracionAlertas,
     ConfiguracionAlertasComite,
     Notificacion,
+    PushDispatch,
+    PushSubscription,
     PlanMejoramiento,
 )
 from app.models.ranking import ConfiguracionRanking, PuntajeHistorico
@@ -47,7 +49,7 @@ __all__ = [
     'Instructor', 'Ficha', 'Corte', 'Aprendiz',
     'SesionAsistencia', 'RegistroAsistencia',
     'Tarea', 'Entrega', 'ProrrogaTarea', 'ConfiguracionAlertas', 'ConfiguracionAlertasComite',
-    'Alerta', 'Notificacion', 'PlanMejoramiento',
+    'Alerta', 'Notificacion', 'PushDispatch', 'PushSubscription', 'PlanMejoramiento',
     'ConfiguracionRanking', 'PuntajeHistorico',
     'Insignia', 'InsigniaOtorgada',
     'Grupo', 'GrupoAprendiz', 'GrupoMensaje', 'TurnoAtencion',

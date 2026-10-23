@@ -2,19 +2,20 @@
   "schema_version": "1.0",
   "project": "panel de instructores",
   "jurisdiction": "CO",
-  "profile": "personalización de un panel educativo con foto opcional",
+  "profile": "panel educativo con foto opcional y avisos voluntarios de evaluación",
   "status": "review_required",
   "controller": { "status": "pendiente de confirmación institucional", "name": null },
-  "last_reviewed": "2026-10-07",
-  "scope": "Preferencias visuales y foto opcional del aprendiz; no acredita controles de toda la aplicación heredada.",
+  "last_reviewed": "2026-10-23",
+  "scope": "Preferencias visuales, foto opcional y avisos de evaluación del aprendiz. La clasificación técnica no acredita controles de toda la aplicación heredada ni constituye aprobación institucional.",
   "required_profiles": ["personal_data", "education", "public_entity", "file_uploads"],
   "population": { "minors": "por confirmar", "evidence": null },
   "controls": [
     { "id": "aislamiento", "status": "implemented", "evidence": "app/features/personalizacion_aprendiz/routes.py", "verification": "tests/test_personalizacion_aprendiz.py" },
     { "id": "imagen-y-metadatos", "status": "implemented", "evidence": "app/features/personalizacion_aprendiz/service.py", "verification": "tests/test_personalizacion_aprendiz.py" },
     { "id": "borrado-opcional", "status": "implemented", "evidence": "app/features/personalizacion_aprendiz/service.py", "verification": "tests_browser/aprendiz_personalizacion.test.cjs" },
-    { "id": "autorización-y-retención", "status": "pending", "owner": "responsable institucional por confirmar", "evidence": null }
+    { "id": "autorización-y-retención", "status": "pending", "owner": "responsable institucional por confirmar", "evidence": null },
+    { "id": "avisos-educativos-web-push", "status": "implemented_review_required", "evidence": "docs/architecture/avisos-calificacion-aprendiz.md", "verification": "tests/test_notificaciones_calificacion.py; tests_browser/notificaciones_aprendiz.test.cjs", "conditions": ["WEB_PUSH_ENABLED permanece false hasta la revisión institucional", "el proveedor depende del navegador y puede tratar el endpoint y la entrega fuera del panel", "el texto del sistema no contiene la calificación ni el documento", "confirmar población menor de edad, responsable, base aplicable, información al aprendiz, transferencia y retención"] }
   ],
-  "release_rule": "La incorporación de fotos reales requiere confirmar la autorización vigente, la población, la retención y el responsable institucional. La implementación técnica no constituye una aprobación.",
+  "release_rule": "La incorporación de fotos reales requiere confirmar la autorización vigente, la población, la retención y el responsable institucional. Web Push para aprendices reales permanece apagado hasta revisar el tratamiento de datos educativos, la información al aprendiz, los proveedores de navegador y las transferencias aplicables. La implementación técnica no constituye una aprobación.",
   "evidence_directory": "test-results"
 }

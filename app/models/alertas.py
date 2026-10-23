@@ -1,3 +1,9 @@
+import base64
+import hashlib
+
+from cryptography.fernet import Fernet
+from flask import current_app
+
 from app.helpers import utc_now
 
 from app import db
@@ -100,6 +106,111 @@ class Notificacion(db.Model):
         db.Index(
             'ix_notificaciones_destinatario_leida',
             'destinatario_tipo', 'destinatario_id', 'leida',
+        ),
+    )
+
+
+class PushSubscription(db.Model):
+    """Suscripción voluntaria de Web Push vinculada a una sesión de aprendiz."""
+
+    __tablename__ = 'aprendiz_push_subscriptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    aprendiz_id = db.Column(
+        db.Integer, db.ForeignKey('aprendices.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    ficha_id = db.Column(
+        db.Integer, db.ForeignKey('fichas.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    endpoint_hash = db.Column(db.String(64), nullable=False, unique=True)
+    endpoint_cifrado = db.Column(db.Text, nullable=False)
+    p256dh_cifrado = db.Column(db.Text, nullable=False)
+    auth_cifrado = db.Column(db.Text, nullable=False)
+    creada_en = db.Column(db.DateTime, nullable=False, default=utc_now)
+    actualizada_en = db.Column(db.DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    aprendiz = db.relationship('Aprendiz', backref=db.backref(
+        'suscripciones_push', lazy='dynamic', cascade='all, delete-orphan'
+    ))
+
+    def _cifrador(self):
+        secreto = current_app.config.get('SECRET_KEY')
+        if not secreto:
+            raise RuntimeError('Falta SECRET_KEY para proteger las suscripciones Web Push.')
+        derivada = hashlib.sha256(
+            ('panel-aprendiz-web-push:' + str(secreto)).encode('utf-8')
+        ).digest()
+        return Fernet(base64.urlsafe_b64encode(derivada))
+
+    def _cifrar(self, valor):
+        return self._cifrador().encrypt(str(valor).encode('utf-8')).decode('ascii')
+
+    def _descifrar(self, valor):
+        return self._cifrador().decrypt(valor.encode('ascii')).decode('utf-8')
+
+    @property
+    def endpoint(self):
+        return self._descifrar(self.endpoint_cifrado)
+
+    @endpoint.setter
+    def endpoint(self, valor):
+        self.endpoint_hash = hashlib.sha256(str(valor).encode('utf-8')).hexdigest()
+        self.endpoint_cifrado = self._cifrar(valor)
+
+    @property
+    def p256dh(self):
+        return self._descifrar(self.p256dh_cifrado)
+
+    @p256dh.setter
+    def p256dh(self, valor):
+        self.p256dh_cifrado = self._cifrar(valor)
+
+    @property
+    def auth(self):
+        return self._descifrar(self.auth_cifrado)
+
+    @auth.setter
+    def auth(self, valor):
+        self.auth_cifrado = self._cifrar(valor)
+
+
+class PushDispatch(db.Model):
+    """Buzón transaccional para enviar avisos sin bloquear la calificación."""
+
+    __tablename__ = 'aprendiz_push_dispatches'
+
+    id = db.Column(db.Integer, primary_key=True)
+    notificacion_id = db.Column(
+        db.Integer, db.ForeignKey('notificaciones.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    aprendiz_id = db.Column(
+        db.Integer, db.ForeignKey('aprendices.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    ficha_id = db.Column(
+        db.Integer, db.ForeignKey('fichas.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    suscripcion_id = db.Column(
+        db.Integer,
+        db.ForeignKey('aprendiz_push_subscriptions.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+    estado = db.Column(db.String(20), nullable=False, default='pendiente', index=True)
+    intentos = db.Column(db.Integer, nullable=False, default=0)
+    disponible_en = db.Column(db.DateTime, nullable=False, default=utc_now, index=True)
+    creado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
+    enviado_en = db.Column(db.DateTime, nullable=True)
+    ultimo_error = db.Column(db.String(80), nullable=True)
+
+    notificacion = db.relationship('Notificacion')
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'notificacion_id', 'suscripcion_id', name='uq_push_dispatch_notificacion_suscripcion'
         ),
     )
 

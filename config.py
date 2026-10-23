@@ -92,6 +92,7 @@ def _env_int(name, default, minimum=None, maximum=None):
 
 class Config:
     SECRET_KEY = _secret_key
+    SECRET_KEY_IS_EPHEMERAL = SECRET_KEY_IS_EPHEMERAL
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     HTTP_SLOW_REQUEST_MS = _env_int('HTTP_SLOW_REQUEST_MS', 1000, minimum=0)
@@ -157,3 +158,9 @@ class Config:
         .strip().lower() in ('1', 'true', 'yes', 'on')
     )
     IMPORT_QUEUE_NAME = os.getenv('IMPORT_QUEUE_NAME') or 'adso:importaciones'
+    # Las claves privadas solo llegan desde el gestor de secretos del entorno.
+    # Push queda apagado hasta que la institución revise el tratamiento de datos.
+    WEB_PUSH_ENABLED = (os.getenv('WEB_PUSH_ENABLED') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+    VAPID_PUBLIC_KEY = (os.getenv('VAPID_PUBLIC_KEY') or '').strip()
+    VAPID_PRIVATE_KEY = (os.getenv('VAPID_PRIVATE_KEY') or '').strip()
+    VAPID_SUBJECT = (os.getenv('VAPID_SUBJECT') or '').strip()

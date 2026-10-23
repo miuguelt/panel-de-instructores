@@ -188,22 +188,22 @@ dialog.app-modal-overlay:not([open]) {
     height: 2.65rem;
     place-items: center;
     color: var(--accent-hover);
-    background: color-mix(in srgb, var(--accent-primary) 13%, var(--bg-card));
-    border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, var(--border-subtle));
-    border-radius: .85rem;
+    background: color-mix(in srgb, var(--accent-primary) 13%, var(--surface-control, var(--bg-card)));
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, var(--border-glass));
+    border-radius: var(--radius-control, .85rem);
     font-size: 1.15rem;
 }
 
 .app-confirm-modal.is-warning .app-confirm-icon {
     color: var(--warning);
-    background: color-mix(in srgb, var(--warning) 12%, var(--bg-card));
-    border-color: color-mix(in srgb, var(--warning) 30%, var(--border-subtle));
+    background: color-mix(in srgb, var(--warning) 12%, var(--surface-control, var(--bg-card)));
+    border-color: color-mix(in srgb, var(--warning) 30%, var(--border-glass));
 }
 
 .app-confirm-modal.is-danger .app-confirm-icon {
     color: var(--danger);
-    background: color-mix(in srgb, var(--danger) 10%, var(--bg-card));
-    border-color: color-mix(in srgb, var(--danger) 30%, var(--border-subtle));
+    background: color-mix(in srgb, var(--danger) 10%, var(--surface-control, var(--bg-card)));
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--border-glass));
 }
 
 .app-confirm-copy {
@@ -229,8 +229,8 @@ dialog.app-modal-overlay:not([open]) {
 
 .app-confirm-modal .app-confirm-accept {
     color: var(--button-on-accent, #fff);
-    background: var(--accent-hover);
-    border-color: var(--accent-hover);
+    background: linear-gradient(135deg, var(--accent-hover), var(--accent-primary));
+    border-color: color-mix(in srgb, var(--button-on-accent, #fff) 22%, transparent);
 }
 
 .app-notice-region {
@@ -252,11 +252,13 @@ dialog.app-modal-overlay:not([open]) {
     min-width: 0;
     padding: .9rem 1rem;
     color: var(--text-main);
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
+    background: var(--surface-glass-strong, var(--bg-card));
+    border: 1px solid var(--border-glass);
     border-left: 4px solid var(--accent-primary);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-control, var(--radius-sm));
     box-shadow: var(--shadow-lg);
+    backdrop-filter: var(--blur-glass-sm);
+    -webkit-backdrop-filter: var(--blur-glass-sm);
     pointer-events: auto;
     animation: modalSlideUp .18s ease-out;
 }
@@ -292,7 +294,7 @@ dialog.app-modal-overlay:not([open]) {
     color: var(--text-muted);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: .65rem;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     font: inherit;
     font-size: 1.35rem;
@@ -301,20 +303,20 @@ dialog.app-modal-overlay:not([open]) {
 .app-notice-close:hover,
 .app-notice-close:focus-visible {
     color: var(--text-strong);
-    background: var(--bg-surface);
-    border-color: var(--border-divider);
+    background: var(--surface-hover, var(--bg-surface));
+    border-color: var(--border-glass);
 }
 
 .app-confirm-modal.is-warning .app-confirm-accept {
-    color: var(--text-strong);
-    background: var(--warning);
-    border-color: var(--warning);
+    color: var(--status-warning-solid-on, var(--text-strong));
+    background: var(--status-warning-solid, var(--warning));
+    border-color: color-mix(in srgb, #0f172a 18%, transparent);
 }
 
 .app-confirm-modal.is-danger .app-confirm-accept {
-    color: #fff;
-    background: var(--danger);
-    border-color: var(--danger);
+    color: var(--status-danger-solid-on, #fff);
+    background: var(--status-danger-solid, var(--danger));
+    border-color: color-mix(in srgb, #000 18%, transparent);
 }
 
 .pl-modal-close:focus-visible,

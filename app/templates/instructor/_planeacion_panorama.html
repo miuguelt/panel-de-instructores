@@ -680,8 +680,8 @@
         </div>
 
         <div class="pl-legend">
-            <span><i style="background:rgba(99, 102, 241, 0.4); border:1px solid #6366f1"></i> Cobertura Planificada (100%)</span>
-            <span><i style="background:rgba(16, 185, 129, 0.5); border:1px solid #10b981"></i> Avance Real Aprobado</span>
+            <span><i class="pl-tone-info"></i> Cobertura Planificada (100%)</span>
+            <span><i class="pl-tone-success"></i> Avance Real Aprobado</span>
         </div>
     </section>
     {% endif %}
@@ -731,7 +731,7 @@
                     <th scope="col" style="min-width: 15rem;">Docente / Instructor</th>
                     <th scope="col" style="width: 7rem; text-align: center;">Total Horas</th>
                     {% for t_lbl in heatmap_docente.trimestres %}
-                    <th scope="col" style="text-align: center;">{{ t_lbl }}</th>
+                    <th scope="col" class="text-center">{{ t_lbl }}</th>
                     {% endfor %}
                 </tr>
             </thead>
@@ -745,7 +745,7 @@
                             <span class="pl-chip pl-tone-{{ fila.componente.tono }}" style="font-size:0.65rem; padding:0.1rem 0.4rem;">{{ fila.componente.badge }}</span>
                         </div>
                     </td>
-                    <td style="text-align: center;">
+                    <td class="text-center">
                         <span class="pl-chip">
                             <strong class="heat-total-val" data-dir="{{ fila.total_horas_directas }}" data-tot="{{ fila.total_horas_totales }}">
                                 {{ fila.total_horas_directas }} h
@@ -782,7 +782,7 @@
                         <strong>📊 Carga Formativa Total de la Ficha</strong>
                         <div style="font-size:0.68rem; color:var(--text-muted); font-weight:normal;">Suma de horas que cursa el grupo de aprendices</div>
                     </td>
-                    <td style="text-align: center;">
+                    <td class="text-center">
                         <span class="pl-chip pl-tone-primary">
                             <strong class="heat-total-val" data-dir="{{ heatmap_docente.resumen.total_horas_directas }}" data-tot="{{ heatmap_docente.resumen.total_horas_totales }}">
                                 {{ heatmap_docente.resumen.total_horas_directas }} h
@@ -805,12 +805,12 @@
         </table>
     </div>
 
-    <div class="pl-legend" style="margin-top: 0.9rem; display:flex; flex-wrap:wrap; gap:0.8rem; align-items:center;">
+    <div class="pl-legend pl-legend-map">
         <span style="font-size:0.75rem; font-weight:700; color:var(--text-muted);">Normativa SENA (Res. 642/2004):</span>
-        <span class="pl-tone-danger"><i style="background:rgba(239, 68, 68, 0.35); border:1px solid var(--danger);"></i> Sobrecarga (&gt;32 h/sem)</span>
-        <span class="pl-tone-warning"><i style="background:rgba(245, 158, 11, 0.35); border:1px solid var(--warning);"></i> Jornada Plena (28–32 h/sem)</span>
-        <span class="pl-tone-primary"><i style="background:rgba(59, 130, 246, 0.25); border:1px solid var(--accent-primary);"></i> Carga Regular (10–28 h/sem)</span>
-        <span class="pl-tone-neutral"><i style="background:rgba(148, 163, 184, 0.15); border:1px solid var(--border-divider);"></i> Carga Ligera (&lt;10 h/sem)</span>
+        <span class="pl-tone-danger"><i class="pl-tone-danger"></i> Sobrecarga (&gt;32 h/sem)</span>
+        <span class="pl-tone-warning"><i class="pl-tone-warning"></i> Jornada Plena (28–32 h/sem)</span>
+        <span class="pl-tone-primary"><i class="pl-tone-info"></i> Carga Regular (10–28 h/sem)</span>
+        <span class="pl-tone-neutral"><i class="pl-tone-neutral"></i> Carga Ligera (&lt;10 h/sem)</span>
     </div>
 </section>
 

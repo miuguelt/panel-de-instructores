@@ -6,6 +6,7 @@ from app import create_app, db
 from app.models import (
     Aprendiz,
     ConfiguracionAlertas,
+    ConfiguracionAseo,
     ConfiguracionRanking,
     ContadorAseo,
     Ficha,
@@ -27,6 +28,7 @@ from app.services.festivos import (
     es_festivo_colombia,
     obtener_festivos_colombia,
 )
+from app.services.permisos import cambiar_estado_activo_aprendiz, configurar_rol_aprendiz
 from tests.test_aseo_equidad import fechas_futuras
 
 
@@ -244,6 +246,32 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertFalse(turno.incluye(self.aprendices[0].id))
         self.assertEqual(turno.estado, 'intercambiado')
 
+    def test_intercambio_vencido_no_se_puede_aceptar(self):
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=date.today() - timedelta(days=1),
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+        )
+        db.session.add(turno)
+        db.session.flush()
+        intercambio = IntercambioAseo(
+            turno_id=turno.id,
+            aprendiz_solicita_id=self.aprendices[0].id,
+            aprendiz_recibe_id=self.aprendices[2].id,
+            confirma_solicita=True,
+        )
+        db.session.add(intercambio)
+        db.session.flush()
+
+        with self.assertRaisesRegex(ValueError, 'turno ya pasó'):
+            aceptar_intercambio(intercambio)
+
+        self.assertEqual(intercambio.estado, 'pendiente')
+        self.assertTrue(turno.incluye(self.aprendices[0].id))
+        self.assertFalse(turno.incluye(self.aprendices[2].id))
+
     def test_calendario_panel_y_generacion_http_responden(self):
         fecha = fechas_futuras(1)[0]
         self._crear_sesion(fecha)
@@ -303,6 +331,8 @@ class TurnosAseoTestCase(unittest.TestCase):
             TurnoAseo.fecha.between(sabado, domingo),
         ).count(), 2)
 
+        self.aprendices[0].rol_administrativo = True
+        db.session.commit()
         cliente_aprendiz = self.app.test_client()
         with cliente_aprendiz.session_transaction() as datos_sesion:
             datos_sesion['aprendiz_documento'] = self.aprendices[0].documento
@@ -948,7 +978,22 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertTrue(turno_manual.incluye(self.aprendices[2].id))
         self.assertTrue(turno_manual.incluye(self.aprendices[3].id))
 
-        # 3. Aprendiz regular (sin rol administrativo) sí puede gestionar y marcar turnos cumplidos
+        resp_editar = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno_manual.id}/editar',
+            data={
+                'aprendiz_1_id': self.aprendices[4].id,
+                'aprendiz_2_id': self.aprendices[5].id,
+                'observacion': 'Cambio autorizado por el aprendiz administrador',
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(resp_editar.status_code, 302)
+        db.session.refresh(turno_manual)
+        self.assertEqual(turno_manual.aprendiz_1_id, self.aprendices[4].id)
+        self.assertEqual(turno_manual.aprendiz_2_id, self.aprendices[5].id)
+        self.assertEqual(turno_manual.generado_por, 'aprendiz_admin')
+
+        # 3. Un aprendiz regular conserva la consulta, pero no modifica el calendario.
         cliente_no_admin = self.app.test_client()
         with cliente_no_admin.session_transaction() as s:
             s['aprendiz_documento'] = no_admin.documento
@@ -959,17 +1004,41 @@ class TurnosAseoTestCase(unittest.TestCase):
             follow_redirects=True,
         )
         self.assertEqual(resp_permitido.status_code, 200)
-        self.assertIn('Gestionar turnos de aseo'.encode(), resp_permitido.data)
+        self.assertIn('Calendario de turnos de aseo'.encode(), resp_permitido.data)
+        self.assertIn('calendario-turnos'.encode(), resp_permitido.data)
+        self.assertNotIn('form-generar-turnos'.encode(), resp_permitido.data)
+        self.assertNotIn('form-asignar-turno'.encode(), resp_permitido.data)
+        contenido_consulta = resp_permitido.get_data(as_text=True)
+        for ruta_modificacion in (
+            'editar_como_aprendiz',
+            'cumplir_como_aprendiz',
+            'no_cumplir_como_aprendiz',
+            'reabrir_como_aprendiz',
+            'excluir_como_aprendiz',
+        ):
+            self.assertNotIn(ruta_modificacion, contenido_consulta)
 
-        # Puede marcar turno como cumplido
+        resp_transparencia_regular = cliente_no_admin.get(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo'
+        )
+        self.assertEqual(resp_transparencia_regular.status_code, 200)
+        self.assertIn('calendar-card'.encode(), resp_transparencia_regular.data)
+        self.assertNotIn('cumplir_como_aprendiz'.encode(), resp_transparencia_regular.data)
+
+        # No puede cambiar estados, aunque presente el documento del administrador.
         resp_cumplir_regular = cliente_no_admin.post(
             f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno_manual.id}/cumplir',
-            data={'origen': 'panel'},
+            data={'origen': 'panel', 'documento': admin.documento},
             follow_redirects=False,
         )
         self.assertEqual(resp_cumplir_regular.status_code, 302)
         turno_manual_bd = db.session.get(TurnoAseo, turno_manual.id)
-        self.assertEqual(turno_manual_bd.estado, 'cumplido')
+        self.assertEqual(turno_manual_bd.estado, 'programado')
+
+        resp_panel_regular = cliente_no_admin.get(f'/aprendiz/{self.ficha.id}/panel')
+        self.assertEqual(resp_panel_regular.status_code, 200)
+        self.assertNotIn('cumplir_como_aprendiz'.encode(), resp_panel_regular.data)
+        self.assertNotIn('generar_como_aprendiz'.encode(), resp_panel_regular.data)
 
         # 4. Usuario no autenticado o de otra ficha no puede gestionar
         cliente_ajeno = self.app.test_client()
@@ -983,8 +1052,274 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
         self.assertIn('Debes pertenecer a esta ficha para gestionar los turnos de aseo'.encode(), resp_ajeno.data)
 
+        # Un documento en la URL tampoco establece una sesión de aprendiz.
+        cliente_sin_sesion = self.app.test_client()
+        resp_documento_url = cliente_sin_sesion.get(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar?documento={admin.documento}',
+            follow_redirects=True,
+        )
+        self.assertIn('Debes pertenecer a esta ficha para gestionar los turnos de aseo'.encode(), resp_documento_url.data)
+
+        cliente_sin_sesion.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={'documento': admin.documento, 'aviso_horas': '1'},
+            follow_redirects=False,
+        )
+        db.session.expire_all()
+        config = ConfiguracionAseo.query.filter_by(ficha_id=self.ficha.id).first()
+        self.assertEqual(config.aviso_horas, 24)
+
+    def test_tabla_aprendiz_admin_muestra_estado_no_cumplido_correcto(self):
+        administrador = self.aprendices[0]
+        administrador.rol_administrativo = True
+        fecha = date.today() + timedelta(days=2)
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=self.aprendices[1].id,
+            aprendiz_2_id=self.aprendices[2].id,
+            estado='no_cumplido',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = administrador.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+        respuesta = cliente.get(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar?mes={fecha.strftime("%Y-%m")}'
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(b'<span class="badge badge-danger">No cumplido</span>', respuesta.data)
+
+    def test_aprendiz_no_admin_no_modifica_turnos_aunque_envie_documento_admin(self):
+        administrador, actor, aprendiz_1, aprendiz_2, otro_1, otro_2 = self.aprendices
+        administrador.rol_administrativo = True
+        fecha = fechas_futuras(2)[0]
+        self._crear_sesion(fecha)
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=aprendiz_1.id,
+            aprendiz_2_id=aprendiz_2.id,
+            estado='no_cumplido',
+            observacion='Estado original',
+        )
+        config = ConfiguracionAseo(
+            ficha_id=self.ficha.id,
+            aviso_horas=24,
+            excluir_ausentes=False,
+        )
+        db.session.add_all([turno, config])
+        db.session.commit()
+
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = actor.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+
+        intentos = (
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/generar',
+                {'fecha_inicio': fecha.isoformat(), 'fecha_fin': fecha.isoformat()},
+            ),
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno.id}/cumplir',
+                {},
+            ),
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno.id}/no-cumplir',
+                {'observacion': 'No autorizado'},
+            ),
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno.id}/reabrir',
+                {},
+            ),
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno.id}/editar',
+                {'aprendiz_1_id': otro_1.id, 'aprendiz_2_id': otro_2.id},
+            ),
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/asignar',
+                {
+                    'fecha': fecha.isoformat(),
+                    'aprendiz_1_id': otro_1.id,
+                    'aprendiz_2_id': otro_2.id,
+                },
+            ),
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+                {'aviso_horas': '72', 'excluir_ausentes': 'on'},
+            ),
+            (
+                f'/aprendiz/{self.ficha.id}/turnos-aseo/exclusion/{actor.id}',
+                {'excluido_hasta': fecha.isoformat(), 'motivo': 'No autorizado'},
+            ),
+        )
+        conteo_turnos = TurnoAseo.query.filter_by(ficha_id=self.ficha.id).count()
+
+        for ruta, datos in intentos:
+            with self.subTest(ruta=ruta):
+                respuesta = cliente.post(
+                    ruta,
+                    data={**datos, 'documento': administrador.documento},
+                    follow_redirects=False,
+                )
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertEqual(
+                    TurnoAseo.query.filter_by(ficha_id=self.ficha.id).count(),
+                    conteo_turnos,
+                )
+                db.session.refresh(turno)
+                self.assertEqual(turno.estado, 'no_cumplido')
+                self.assertEqual(turno.observacion, 'Estado original')
+                db.session.refresh(config)
+                self.assertEqual(config.aviso_horas, 24)
+                self.assertFalse(config.excluir_ausentes)
+                self.assertIsNone(
+                    ContadorAseo.query.filter_by(
+                        ficha_id=self.ficha.id, aprendiz_id=actor.id
+                    ).first()
+                )
+
+    def test_intercambio_de_aseo_sigue_limitado_a_solicitante_y_destinatario(self):
+        solicitante, coasignado, destinatario, suplantador = self.aprendices[:4]
+        fecha = fechas_futuras(2)[0]
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=solicitante.id,
+            aprendiz_2_id=coasignado.id,
+            estado='programado',
+        )
+        db.session.add(turno)
+        db.session.commit()
+
+        cliente_solicitante = self.app.test_client()
+        with cliente_solicitante.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = solicitante.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+        respuesta_solicitud = cliente_solicitante.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno.id}/intercambiar',
+            data={
+                'aprendiz_recibe_id': destinatario.id,
+                'documento': suplantador.documento,
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(respuesta_solicitud.status_code, 302)
+        intercambio = IntercambioAseo.query.filter_by(turno_id=turno.id).one()
+        self.assertEqual(intercambio.aprendiz_solicita_id, solicitante.id)
+        self.assertEqual(intercambio.aprendiz_recibe_id, destinatario.id)
+
+        cliente_suplantador = self.app.test_client()
+        with cliente_suplantador.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = suplantador.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+        cliente_suplantador.post(
+            f'/aprendiz/{self.ficha.id}/intercambios/{intercambio.id}/responder',
+            data={'accion': 'rechazar', 'documento': destinatario.documento},
+            follow_redirects=False,
+        )
+        db.session.refresh(intercambio)
+        self.assertEqual(intercambio.estado, 'pendiente')
+
+        cliente_destinatario = self.app.test_client()
+        with cliente_destinatario.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = destinatario.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+        respuesta_destinatario = cliente_destinatario.post(
+            f'/aprendiz/{self.ficha.id}/intercambios/{intercambio.id}/responder',
+            data={'accion': 'rechazar'},
+            follow_redirects=False,
+        )
+        self.assertEqual(respuesta_destinatario.status_code, 302)
+        db.session.refresh(intercambio)
+        self.assertEqual(intercambio.estado, 'rechazado')
+
+    def test_reasignar_rol_y_deshabilitar_aprendiz_actualiza_autorizacion(self):
+        anterior, nuevo = self.aprendices[:2]
+        configurar_rol_aprendiz(self.ficha.id, anterior.id)
+        db.session.commit()
+
+        cliente_anterior = self.app.test_client()
+        with cliente_anterior.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = anterior.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+        cliente_nuevo = self.app.test_client()
+        with cliente_nuevo.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = nuevo.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+
+        cliente_anterior.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={'aviso_horas': '48'},
+            follow_redirects=False,
+        )
+        config = ConfiguracionAseo.query.filter_by(ficha_id=self.ficha.id).first()
+        self.assertEqual(config.aviso_horas, 48)
+
+        configurar_rol_aprendiz(self.ficha.id, nuevo.id)
+        db.session.commit()
+        cliente_anterior.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={'aviso_horas': '72', 'documento': nuevo.documento},
+            follow_redirects=False,
+        )
+        db.session.refresh(config)
+        self.assertEqual(config.aviso_horas, 48)
+
+        cliente_nuevo.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={'aviso_horas': '36'},
+            follow_redirects=False,
+        )
+        db.session.refresh(config)
+        self.assertEqual(config.aviso_horas, 36)
+
+        cambiar_estado_activo_aprendiz(self.ficha.id, nuevo.id, activo=False)
+        db.session.commit()
+        cliente_nuevo.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/config',
+            data={'aviso_horas': '12'},
+            follow_redirects=False,
+        )
+        db.session.refresh(config)
+        self.assertEqual(config.aviso_horas, 36)
+
+    def test_exclusion_rechaza_aprendiz_deshabilitado_sin_contador(self):
+        administrador, deshabilitado = self.aprendices[:2]
+        administrador.rol_administrativo = True
+        deshabilitado.activo = False
+        db.session.commit()
+
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = administrador.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+
+        respuesta = cliente.post(
+            f'/aprendiz/{self.ficha.id}/turnos-aseo/exclusion/{deshabilitado.id}',
+            data={
+                'excluido_hasta': (date.today() + timedelta(days=5)).isoformat(),
+                'motivo': 'Incapacidad',
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIsNone(
+            ContadorAseo.query.filter_by(
+                ficha_id=self.ficha.id,
+                aprendiz_id=deshabilitado.id,
+            ).first()
+        )
+
     def test_aprendiz_configurar_reglas_aseo(self):
         aprendiz = self.aprendices[1]
+        aprendiz.rol_administrativo = True
+        db.session.commit()
         cliente = self.app.test_client()
         with cliente.session_transaction() as s:
             s['aprendiz_documento'] = aprendiz.documento
@@ -1018,6 +1353,9 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
         self.assertEqual(resp_invalido.status_code, 200)
         self.assertIn('Las horas de aviso deben ser un número entero'.encode(), resp_invalido.data)
+        db.session.refresh(config)
+        self.assertTrue(config.excluir_ausentes)
+        self.assertEqual(config.aviso_horas, 48)
 
         # 3. Usuario ajeno no puede configurar
         cliente_ajeno = self.app.test_client()
@@ -1032,9 +1370,31 @@ class TurnosAseoTestCase(unittest.TestCase):
         )
         self.assertIn('Debes pertenecer a esta ficha'.encode(), resp_bloqueado.data)
 
+    def test_configuracion_instructor_invalida_no_aplica_cambios_parciales(self):
+        config = ConfiguracionAseo(
+            ficha_id=self.ficha.id,
+            aviso_horas=24,
+            excluir_ausentes=False,
+        )
+        db.session.add(config)
+        db.session.commit()
+        cliente = self._cliente_instructor()
+
+        respuesta = cliente.post(
+            f'/instructor/fichas/{self.ficha.id}/turnos-aseo/config',
+            data={'aviso_horas': 'inválido', 'excluir_ausentes': 'on'},
+            follow_redirects=True,
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        db.session.refresh(config)
+        self.assertEqual(config.aviso_horas, 24)
+        self.assertFalse(config.excluir_ausentes)
+
     def test_aprendiz_excluir_y_reactivar_aprendiz(self):
         actor = self.aprendices[0]
         companero = self.aprendices[2]
+        actor.rol_administrativo = True
+        db.session.commit()
         cliente = self.app.test_client()
         with cliente.session_transaction() as s:
             s['aprendiz_documento'] = actor.documento
@@ -1086,6 +1446,8 @@ class TurnosAseoTestCase(unittest.TestCase):
 
     def test_aprendiz_generar_turnos_con_respetar_manuales(self):
         actor = self.aprendices[0]
+        actor.rol_administrativo = True
+        db.session.commit()
         cliente = self.app.test_client()
         with cliente.session_transaction() as s:
             s['aprendiz_documento'] = actor.documento
@@ -1140,7 +1502,7 @@ class TurnosAseoTestCase(unittest.TestCase):
         # Estado A: Sin turno propio asignado
         resp_sin_turno = cliente.get(f'/aprendiz/{self.ficha.id}/panel')
         self.assertEqual(resp_sin_turno.status_code, 200)
-        self.assertIn('Programar aseo'.encode(), resp_sin_turno.data)
+        self.assertIn('Ver turnos de aseo'.encode(), resp_sin_turno.data)
         self.assertIn(f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar'.encode(), resp_sin_turno.data)
 
         # Estado B: Con turno propio asignado
@@ -1161,9 +1523,9 @@ class TurnosAseoTestCase(unittest.TestCase):
 
         resp_con_turno = cliente.get(f'/aprendiz/{self.ficha.id}/panel')
         self.assertEqual(resp_con_turno.status_code, 200)
-        # Debe mostrar "Tu próximo turno" y el botón para "Programar aseo"
+        # Debe mostrar el turno propio y el enlace de consulta para cualquier aprendiz.
         self.assertIn('Tu próximo turno'.encode(), resp_con_turno.data)
-        self.assertIn('Programar aseo'.encode(), resp_con_turno.data)
+        self.assertIn('Ver turnos de aseo'.encode(), resp_con_turno.data)
         self.assertIn(f'/aprendiz/{self.ficha.id}/turnos-aseo/gestionar'.encode(), resp_con_turno.data)
 
     def test_algoritmo_equitativo_prioriza_menor_veces_aseo(self):

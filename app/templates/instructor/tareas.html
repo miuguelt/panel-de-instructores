@@ -2,376 +2,11 @@
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
 {% block title %}Tareas y Evidencias - {{ ficha.codigo }} - SENA Control{% endblock %}
 
-{% block head %}
+{% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">
-<style>
-    /* Bento KPIs Summary Grid */
-    .metricas-bento-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin: 16px 0 22px;
-    }
-    .metrica-kpi-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border-divider);
-        border-radius: var(--radius-sm);
-        padding: 14px 16px;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        box-shadow: var(--shadow);
-        transition: transform .2s ease, box-shadow .2s ease;
-    }
-    .metrica-kpi-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-    }
-    .kpi-icon-bubble {
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        background: var(--bg-surface);
-        flex-shrink: 0;
-    }
-    .kpi-data-wrap { display: flex; flex-direction: column; }
-    .kpi-numero { font-size: 22px; font-weight: 800; color: var(--text-strong); line-height: 1.1; }
-    .kpi-etiqueta { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; margin-top: 3px; }
-
-    /* Barra de porcentaje de tiempo en tarjeta de tarea */
-    .tarea-progreso-tiempo-box {
-        margin: 12px 0 10px;
-        padding: 12px 14px;
-        border-radius: var(--radius-sm);
-        background: var(--bg-surface);
-        border: 1px solid var(--border-divider);
-    }
-    .tarea-progreso-tiempo-box.estado-urgente {
-        border-color: rgba(239, 68, 68, 0.35);
-        background: color-mix(in srgb, var(--bg-surface) 94%, #ef4444 6%);
-    }
-    .tarea-progreso-tiempo-box.estado-atencion {
-        border-color: rgba(245, 158, 11, 0.35);
-        background: color-mix(in srgb, var(--bg-surface) 94%, #f59e0b 6%);
-    }
-    .tarea-progreso-tiempo-box.estado-vencida {
-        border-color: rgba(185, 28, 28, 0.35);
-        background: color-mix(in srgb, var(--bg-surface) 94%, #b91c1c 6%);
-    }
-    .progreso-tiempo-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 8px;
-    }
-    .tiempo-info-izq {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .tiempo-restante-txt {
-        font-size: 13.5px;
-        color: var(--text-strong);
-    }
-    .porcentaje-tiempo-pill {
-        font-size: 12px;
-        font-weight: 700;
-        padding: 3px 9px;
-        border-radius: 999px;
-        background: var(--bg-card);
-        border: 1px solid var(--border-divider);
-        color: var(--text-muted);
-    }
-    .porcentaje-tiempo-pill.pill-normal {
-        color: var(--success, #10b981);
-        border-color: rgba(16, 185, 129, 0.3);
-        background: rgba(16, 185, 129, 0.08);
-    }
-    .porcentaje-tiempo-pill.pill-atencion {
-        color: var(--warning, #f59e0b);
-        border-color: rgba(245, 158, 11, 0.3);
-        background: rgba(245, 158, 11, 0.08);
-    }
-    .porcentaje-tiempo-pill.pill-urgente {
-        color: var(--danger, #ef4444);
-        border-color: rgba(239, 68, 68, 0.3);
-        background: rgba(239, 68, 68, 0.08);
-    }
-    .porcentaje-tiempo-pill.pill-vencida {
-        color: #b91c1c;
-        border-color: rgba(185, 28, 28, 0.3);
-        background: rgba(185, 28, 28, 0.08);
-    }
-
-    /* Pista y relleno de la barra de progreso */
-    .barra-tiempo-track {
-        height: 10px;
-        border-radius: 999px;
-        background: color-mix(in srgb, var(--border-divider) 80%, var(--bg-card) 20%);
-        overflow: hidden;
-        position: relative;
-        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
-    }
-    .barra-tiempo-fill {
-        height: 100%;
-        border-radius: 999px;
-        transition: width .4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .barra-tiempo-fill.fill-normal {
-        background: linear-gradient(90deg, #10b981, #059669);
-    }
-    .barra-tiempo-fill.fill-atencion {
-        background: linear-gradient(90deg, #f59e0b, #d97706);
-    }
-    .barra-tiempo-fill.fill-urgente {
-        background: linear-gradient(90deg, #ef4444, #dc2626);
-    }
-    .barra-tiempo-fill.fill-vencida {
-        background: linear-gradient(90deg, #b91c1c, #991b1b);
-    }
-    .barra-tiempo-fill.fill-sin_limite {
-        background: var(--text-muted, #94a3b8);
-        opacity: 0.5;
-    }
-
-    .progreso-tiempo-bottom {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-        margin-top: 8px;
-        font-size: 11.5px;
-        color: var(--text-muted);
-    }
-    .fecha-lbl { font-weight: 600; margin-right: 3px; }
-
-    /* Agrupación por instructor */
-    .instructor-card-seccion {
-        border: 1px solid var(--border-divider);
-        border-radius: var(--radius);
-        background: var(--bg-card);
-        box-shadow: var(--shadow);
-        overflow: hidden;
-        margin-bottom: 20px;
-        transition: box-shadow .2s ease;
-    }
-    .instructor-card-seccion:hover {
-        box-shadow: var(--shadow-lg);
-    }
-    .instructor-seccion-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 14px;
-        padding: 14px 20px;
-        background: var(--bg-surface);
-        border-bottom: 1px solid var(--border-divider);
-    }
-    .instructor-head-main {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        flex-wrap: wrap;
-    }
-    .instructor-avatar-circulo {
-        width: 42px;
-        height: 42px;
-        border-radius: 50%;
-        background: var(--accent-primary);
-        color: #ffffff;
-        font-weight: 800;
-        font-size: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
-        flex-shrink: 0;
-    }
-    .instructor-nombre-h2 {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--text-strong);
-        margin: 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-    .instructor-chips-line {
-        margin: 4px 0 0;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex-wrap: wrap;
-    }
-    .instructor-cuerpo-tareas {
-        padding: 20px;
-    }
-
-    .modalidad-opciones {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 12px;
-    }
-    .modalidad-opcion {
-        display: flex;
-        gap: 12px;
-        align-items: flex-start;
-        border: 1.5px solid var(--border-divider);
-        border-radius: var(--radius-sm);
-        padding: 14px 16px;
-        cursor: pointer;
-        background: var(--bg-surface);
-        transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .modalidad-opcion:hover {
-        border-color: var(--accent-primary);
-        background: var(--bg-card);
-        transform: translateY(-1px);
-        box-shadow: var(--shadow);
-    }
-    .modalidad-opcion:has(input:checked) {
-        border-color: var(--accent-primary);
-        background: var(--accent-glow, rgba(99, 102, 241, 0.08));
-        box-shadow: 0 0 0 1px var(--accent-primary);
-    }
-    .modalidad-opcion input {
-        margin-top: 3px;
-        accent-color: var(--accent-primary);
-        width: 16px;
-        height: 16px;
-    }
-    .modalidad-opcion strong { display: block; font-size: 14px; color: var(--text-strong); }
-    .modalidad-opcion small { color: var(--text-muted); font-size: 12.5px; display: block; margin-top: 2px; }
-
-    .task-card-footer {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-        margin-top: 14px;
-        padding-top: 12px;
-        border-top: 1px solid var(--border-divider);
-    }
-    .task-edit-form {
-        margin-top: 14px;
-        border-radius: var(--radius-sm);
-        background: var(--bg-surface);
-        padding: 10px 14px;
-        border: 1px solid var(--border-divider);
-    }
-    .task-edit-form summary {
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 13.5px;
-        color: var(--accent-primary);
-    }
-    .task-edit-inner {
-        border-top: 1px solid var(--border-divider);
-        margin-top: 12px;
-        padding-top: 16px;
-    }
-    .material-actual {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-        font-size: 13px;
-        color: var(--text-muted);
-    }
-
-    /* Tablero agrupado por corte e instructor (modo_todos) */
-    .tablero-agrupado { display: flex; flex-direction: column; gap: 16px; }
-    .corte-grupo {
-        border: 1px solid var(--border-glass, var(--border-divider));
-        border-radius: var(--radius);
-        background: var(--bg-card);
-        box-shadow: var(--shadow);
-        overflow: hidden;
-        transition: box-shadow 0.2s ease;
-    }
-    .corte-grupo:hover {
-        box-shadow: var(--shadow-lg);
-    }
-    .corte-grupo > summary {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 12px;
-        padding: 14px 20px;
-        cursor: pointer;
-        font-weight: 700;
-        font-size: 15px;
-        list-style: none;
-        background: var(--bg-surface);
-        border-bottom: 1px solid transparent;
-        transition: background-color 0.2s ease, border-color 0.2s ease;
-    }
-    .corte-grupo[open] > summary {
-        border-bottom-color: var(--border-divider);
-        background: color-mix(in srgb, var(--bg-surface) 90%, var(--accent-primary) 10%);
-    }
-    .corte-grupo > summary::-webkit-details-marker { display: none; }
-    .corte-grupo > summary::before {
-        content: "▾";
-        display: inline-block;
-        margin-right: 8px;
-        font-size: 14px;
-        color: var(--accent-primary);
-        transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .corte-grupo:not([open]) > summary::before { transform: rotate(-90deg); }
-    .corte-grupo-titulo { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .corte-grupo-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 22px; }
-    .instructor-grupo-head {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-        font-size: 15px;
-        font-weight: 700;
-        margin: 0 0 14px;
-        padding-bottom: 10px;
-        border-bottom: 1.5px dashed var(--border-divider);
-        color: var(--text-strong);
-    }
-    .corte-grupo > summary:focus-visible,
-    .corte-grupo > summary:focus-visible::before { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
-
-    /* Barra de búsqueda interactiva */
-    .busqueda-panel-wrap {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-        width: 100%;
-        margin-top: 8px;
-    }
-    .busqueda-input {
-        flex-grow: 1;
-        min-width: 240px;
-        padding: 9px 14px;
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--border-divider);
-        background: var(--bg-card);
-        color: var(--text-strong);
-        font-size: 13.5px;
-    }
-    .busqueda-input:focus {
-        border-color: var(--accent-primary);
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tareas.css') }}">
 {% endblock %}
+
 
 {% block content %}
 <div class="page-header">
@@ -394,35 +29,35 @@
 {# Tarjetas Bento con Métricas de Resumen del Módulo #}
 <div class="metricas-bento-grid">
     <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble" style="background: rgba(99, 102, 241, 0.1); color: var(--accent-primary);">📚</div>
+        <div class="kpi-icon-bubble kpi-icon-bubble--accent">📚</div>
         <div class="kpi-data-wrap">
             <span class="kpi-numero">{{ metricas_resumen.total_tareas }}</span>
             <span class="kpi-etiqueta">Total Tareas</span>
         </div>
     </div>
     <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble" style="background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981);">🟢</div>
+        <div class="kpi-icon-bubble kpi-icon-bubble--success">🟢</div>
         <div class="kpi-data-wrap">
             <span class="kpi-numero">{{ metricas_resumen.tareas_activas }}</span>
             <span class="kpi-etiqueta">En Plazo</span>
         </div>
     </div>
     <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble" style="background: rgba(245, 158, 11, 0.1); color: var(--warning, #f59e0b);">⏳</div>
+        <div class="kpi-icon-bubble kpi-icon-bubble--warning">⏳</div>
         <div class="kpi-data-wrap">
             <span class="kpi-numero">{{ metricas_resumen.tareas_urgentes }}</span>
             <span class="kpi-etiqueta">Por Vencer (&lt; 24h)</span>
         </div>
     </div>
     <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble" style="background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444);">🛑</div>
+        <div class="kpi-icon-bubble kpi-icon-bubble--danger">🛑</div>
         <div class="kpi-data-wrap">
             <span class="kpi-numero">{{ metricas_resumen.tareas_vencidas }}</span>
             <span class="kpi-etiqueta">Vencidas</span>
         </div>
     </div>
     <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble" style="background: rgba(148, 163, 184, 0.1); color: var(--text-muted);">♾️</div>
+        <div class="kpi-icon-bubble kpi-icon-bubble--muted">♾️</div>
         <div class="kpi-data-wrap">
             <span class="kpi-numero">{{ metricas_resumen.tareas_sin_limite }}</span>
             <span class="kpi-etiqueta">Sin Fecha Límite</span>

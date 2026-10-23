@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Turnos de aseo - {{ ficha.codigo }} - SENA Control{% endblock %}
 
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header cleaning-page-header">
     <div class="page-title-cluster">
@@ -155,7 +159,7 @@
 <section class="card calendar-card">
     <div class="calendar-toolbar" data-filter-region="aseo-calendario-toolbar">
         <a class="calendar-arrow" href="{{ url_for('aseo.turnos', ficha_id=ficha.id, mes=mes_anterior) }}" aria-label="Mes anterior">&larr;</a>
-        <div style="text-align: center;">
+        <div class="text-center">
             <span class="eyebrow">Calendario mensual</span>
             <h2>{{ nombre_mes }}</h2>
             <div style="display: flex; gap: 8px; justify-content: center; margin-top: 4px; flex-wrap: wrap;">
@@ -221,7 +225,7 @@
                             {% endif %}
                         </small>
                         {% elif turno.estado == 'no_cumplido' %}
-                        <small style="color: #c81e1e; font-weight: 600;">No realizado</small>
+                        <small class="turno-no-realizado">No realizado</small>
                         {% else %}
                         <small>{{ 'Automático' if turno.generado_por == 'sistema' else 'Ajuste manual' }}</small>
                         {% endif %}
@@ -293,7 +297,7 @@
         <span><i class="session-dot"></i> Sesión registrada</span>
         <span><i class="legend-block programmed"></i> Programado</span>
         <span><i class="legend-block done"></i> Cumplido</span>
-        <span><i class="legend-block" style="background:#e02424; border-radius:3px; display:inline-block; width:12px; height:12px; vertical-align:middle;"></i> No cumplido</span>
+        <span><i class="legend-block no-cumplido"></i> No cumplido</span>
         <span><i class="legend-absent"></i> Ausente (no suma al contador)</span>
         <span><i class="legend-block holiday"></i> Festivo</span>
     </div>

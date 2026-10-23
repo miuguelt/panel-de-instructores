@@ -6,7 +6,7 @@
 .pl-eval-pendientes { font-weight: 600; }
 .pl-gantt-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
 .pl-page .pl-gantt-acciones button { flex: 1 1 8rem; min-height: 44px; border-radius: 10px; white-space: normal; padding: .6rem .8rem; font-size: .86rem; }
-.pl-btn-evaluacion { border: 1px solid var(--accent-primary); background: var(--accent-primary); color: #fff; font-weight: 700; cursor: pointer; }
+.pl-btn-evaluacion { border: 1px solid var(--accent-primary); background: var(--accent-primary); color: var(--button-on-accent); font-weight: 700; cursor: pointer; }
 .pl-gantt-resultados { grid-column: 1 / -1; border-top: 1px solid var(--border-divider); padding-top: .25rem; min-width: 0; }
 .pl-gantt-resultados summary { cursor: pointer; min-height: 44px; padding: .6rem 0; color: var(--text-strong); font-size: .88rem; font-weight: 600; }
 .pl-gantt-resultados summary span { margin-left: .5rem; color: var(--text-muted); font-weight: 400; }
@@ -15,7 +15,7 @@
 .pl-gantt-rap h4 { font-size: .9rem; line-height: 1.55; margin: .4rem 0; color: var(--text-strong); }
 .pl-gantt-rap small, .pl-gantt-rap p { color: var(--text-muted); font-size: .8rem; line-height: 1.6; margin: .3rem 0; }
 .pl-eval-dialog { box-sizing: border-box; width: min(64rem, calc(100% - 1rem)); max-width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); margin: auto; border: 1px solid var(--border-divider); border-radius: 18px; padding: 0; background: var(--bg-card); color: var(--text-main); box-shadow: var(--shadow); }
-.pl-eval-dialog::backdrop { background: rgb(0 0 0 / .55); }
+.pl-eval-dialog::backdrop { background: var(--modal-backdrop); }
 .pl-eval-dialog *, .pl-gantt-row * { box-sizing: border-box; min-width: 0; }
 .pl-eval-panel { padding: 1rem; }
 .pl-eval-head { display: flex; align-items: start; justify-content: space-between; gap: .7rem; }

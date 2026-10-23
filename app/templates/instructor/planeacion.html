@@ -1151,7 +1151,7 @@
             }
 
             html += `
-                    <div class="pl-tooltip-sub" style="margin-top:0.35rem; padding-top:0.35rem; border-top:1px dashed rgba(255,255,255,0.15); font-size:0.68rem; opacity:0.85;">
+                    <div class="pl-tooltip-sub">
                         En este bloque: <span>+${planInc}h planeadas</span> · <span>${realInc !== null && realInc !== '' ? '+' + realInc + 'h aprobadas' : '—'}</span>
                     </div>
                 </div>
@@ -1205,7 +1205,7 @@
                         <strong style="color:var(--accent-primary); font-size:0.85rem;">${fecha}</strong>
                     </div>
                     ${difTexto ? `<div class="pl-tooltip-row"><span>Margen vs fin lectivo:</span><strong>${difTexto}</strong></div>` : ''}
-                    <div class="pl-tooltip-sub" style="margin-top:0.35rem; padding-top:0.35rem; border-top:1px dashed rgba(255,255,255,0.15); font-size:0.68rem; opacity:0.85;">
+                    <div class="pl-tooltip-sub">
                         ${desc}
                     </div>
                 </div>
@@ -1252,7 +1252,7 @@
                         <span>⏳ En Formación Activa:</span>
                         <strong>${form} (${formPct}%)</strong>
                     </div>
-                    <div class="pl-tooltip-row" style="color:var(--text-muted)">
+                    <div class="pl-tooltip-row text-muted">
                         <span>⚪ No Iniciados:</span>
                         <strong>${noin} (${noinPct}%)</strong>
                     </div>

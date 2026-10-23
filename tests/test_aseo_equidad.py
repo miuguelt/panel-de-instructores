@@ -489,6 +489,8 @@ def test_limpieza_resuelve_intercambios_reciprocos_y_borra_los_propios(grupo, es
 @pytest.mark.parametrize('actor', ['instructor', 'aprendiz'])
 def test_generacion_http_confirma_la_limpieza_incluso_sin_dias_laborables(grupo, actor):
     ficha, aprendices = grupo
+    if actor == 'aprendiz':
+        aprendices[0].rol_administrativo = True
     sabado, domingo = proximo_fin_de_semana()
     for fecha in (sabado, domingo):
         registrar_turno(ficha, aprendices, fecha, (0, 1), 'programado')

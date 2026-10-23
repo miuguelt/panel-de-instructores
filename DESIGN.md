@@ -1,5 +1,55 @@
 # Diseño de SENA Control
 
+## Contrato de diseño — sistema visual de superficies translúcidas, botones y bordes (23 de octubre de 2026)
+
+- Dirección visual: un mismo sistema de capas para toda la aplicación. Las superficies de vidrio se calibran por tema para que el texto conserve contraste AA sobre el color compuesto, los datos tabulares viven en superficie sólida y los controles comparten una sola escala de radios, alturas y bordes. La identidad SENA (verde, naranja y neutros) se expresa con tokens, no con colores escritos en las plantillas.
+- Capas de superficie (de atrás hacia adelante):
+  - `--bg-base`: lienzo del tema. Es la referencia para calcular el contraste compuesto.
+  - `--surface-glass-subtle`, `--surface-glass` y `--surface-glass-strong`: vidrio de 0.55–0.58, 0.74–0.82 y 0.86–0.91 de alfa. A mayor elevación, más opaca: el contenido crítico nunca queda sobre el vidrio más transparente.
+  - `--surface-glass-overlay`: capa opaca del tema para overlays de modal y barras fijas.
+  - `--surface-data`: superficie sólida (blanco en temas claros, 0.96 en el tema oscuro) para tablas, filas y celdas donde el dato debe leerse sin ruido del fondo.
+  - `--surface-control`: fondo de botones e inputs; `--surface-hover` y `--surface-selected`: realce de interacción; `--surface-header`: cabecera de tabla.
+  - Bordes: `--border-divider` (separación interna), `--border-data` (filas), `--border-glass` (tinte del acento sobre vidrio) y `--border-control` (borde de controles, contraste >= 3:1 sobre la superficie compuesta).
+- Tokens del sistema (fuente única: `app/static/css/styles.css`):
+  - Radios: `--radius-xs` 6 px, `--radius-sm` 10 px, `--radius-md` 12 px, `--radius-lg` 16 px, `--radius-xl` 22 px, `--radius-pill` 999 px; alias `--radius`/`--radius-card` = lg y `--radius-control` = md.
+  - Controles: `--control-h-sm` 42 px, `--control-h-md` 44 px y `--control-h-lg` 48 px. Todo botón, input, select y cierre de modal respeta al menos 42 px (44 px en modales y acciones críticas).
+  - Foco: `--focus-width` 3 px, `--focus-offset` 2 px y `--focus-ring`; el foco visible es `outline: 3px solid var(--accent-primary)` y debe permanecer en cualquier estado del botón.
+  - Vidrio: `--glass-blur` 18 px, `--glass-blur-strong` 22 px, `--blur-glass-sm` 10 px y `--glass-saturate` 140 %; `--glass-highlight` aporta el brillo interior de 1 px.
+  - Movimiento: `--dur-fast` 120 ms, `--dur-base` 180 ms, `--dur-slow` 240 ms y `--ease-standard`.
+- Reglas de legibilidad:
+  - Para cada tema se compone `--surface-glass` sobre `--bg-base` y se exige `--text-strong`, `--text-main` y `--text-muted` >= 4.5:1, y `--border-control` >= 3:1. Los valores se verifican en `tests_js/tokens_accesibilidad_m1.test.cjs`.
+  - El cuerpo de las tablas usa `--surface-data`, no vidrio: la lectura de datos no depende del fondo decorativo.
+  - Un texto nunca se coloca sobre una capa de vidrio más transparente que la calibrada para su nivel de elevación.
+  - La transparencia es decorativa y opcional: cualquier navegador o preferencia de accesibilidad puede desactivarla sin perder legibilidad ni jerarquía.
+- Botones (componente `.btn`):
+  - Base: `inline-flex`, altura mínima 42 px, radio de control, borde de control, superficie de control, texto `--text-strong` y peso 600. Tamaños `.btn-sm`/`.btn-xs` (42 px mínimo de alto y ancho para objetivos táctiles), `.btn-lg` (48 px), `.btn-full` y `.btn-group`.
+  - Variantes: `.btn-primary` (degradado del acento y `--button-on-accent`), `.btn-secondary`, `.btn-outline`, `.btn-ghost`, `.btn-link`, `.btn-danger`, `.btn-success`, `.btn-warning` y `.btn-info` (usando los tokens `--status-*-solid` y `--status-*-solid-on`), más las familias `.btn-outline-*` y `.btn-icon` (42 x 42 px).
+  - Estados: `:hover` eleva 2 px y refuerza borde/sombra; `:active` comprime 1 px; `:focus-visible` dibuja el anillo de 3 px con offset de 2 px; `:disabled` y `[aria-disabled="true"]` bajan la opacidad a .55, desactivan el cursor y anulan la elevación; `[aria-busy="true"]` (o `.is-loading`) oculta el texto y muestra un spinner cuyo trazo usa `--button-on-accent` en las variantes rellenas.
+- Bordes y radios:
+  - Un borde normal mide 1 px (`--border-hairline`); el borde reforzado mide 2 px (`--border-strong`) y se reserva para foco de contraste reforzado y estados de error.
+  - Los radios salen siempre de la escala: control/inner 10–12 px, tarjeta/modal 16 px, píldora 999 px. No se admiten radios ad hoc fuera de la escala.
+  - Los iconos usan `.icon-sm` 16 px, `.icon-md` 20 px, `.icon-lg` 24 px o `.icon-inline` 1em; su tamaño no se fija con `style` en línea.
+- Estados semánticos: alertas con `--status-*-text`, `--status-*-bg` y `--status-*-border` y acento lateral de 4 px; insignias con fondo sólido y texto de contraste ya emparejado; formularios con borde `--border-control`, foco de 3 px y superficie `--input-bg`; tablas con cabecera `--surface-header` y filas `--surface-data`.
+- Fallbacks obligatorios:
+  - `@supports not (backdrop-filter: blur(1px))`: las superficies con vidrio pasan a `--surface-1` sólida y `backdrop-filter: none`.
+  - `@media (prefers-reduced-transparency: reduce)`: mismo paso a superficie sólida para tarjetas, alertas, modales y controles.
+  - `@media (prefers-contrast: more)`: superficie de datos, bordes de control de 2 px y `--text-muted` como color de borde.
+  - `@media (forced-colors: active)`: bordes `ButtonText`, foco `Highlight` de 3 px y sin decoraciones que dependan solo del color.
+  - `@media (prefers-reduced-motion: reduce)`: desplazamientos y animaciones neutralizados.
+- Criterios BDD:
+  - Dado un tema cualquiera, cuando se compone su superficie translúcida sobre el fondo base, entonces el texto principal, secundario y atenuado conserva al menos 4.5:1 y el borde de control al menos 3:1.
+  - Dado un navegador sin `backdrop-filter` o una preferencia de transparencia reducida, cuando se carga cualquier pantalla, entonces las tarjetas, alertas y modales se pintan con superficie sólida y el contenido sigue siendo legible.
+  - Dado un botón primario, outline, deshabilitado u ocupado, cuando se inspecciona su estilo calculado, entonces conserva radio de control, altura mínima de 42 px y el estado se comunica también con opacidad, cursor o spinner.
+  - Dado un icono en una plantilla, cuando se revisa el HTML, entonces su tamaño procede de `.icon-*` o de un token, nunca de `width/height` en píxeles dentro de `style`.
+  - Dado un ancho de 320, 390, 768, 1440, 1920 o 2560 px, cuando se recorre una página del sistema, entonces no aparece desbordamiento horizontal de página y las acciones siguen alcanzables.
+- Verificación:
+  - `node tests_js/estilos_estandarizados.test.cjs`: variables definidas o dinámicas, variantes `.btn-*` definidas, cero `<style>` en plantillas (salvo el `noscript` de `base.html`), cero colores literales fuera de tokens, cero iconos con ancho/alto en línea y ratchet de atributos `style=` (720 tras la migración; solo puede bajar).
+  - `node tests_js/tokens_accesibilidad_m1.test.cjs`: tokens de superficie en los tres temas, contraste compuesto por alfa, fallbacks y estados canónicos de botón.
+  - `node tests_js/responsive_bento_m2.test.cjs`: calibración de `--surface-glass` del tema Sena y contraste de `--text-main` sobre la superficie compuesta.
+  - `node tests_js/grupos_layout.test.cjs`: la regla `.bento-sidebar` vive en `app/static/css/grupos.css`.
+  - `python -m pytest tests/test_ui_ux_design_and_depth.py -q`: tokens y selectores canónicos presentes en `styles.css`.
+  - `node tests_browser/diseno_visual.test.cjs`: estilos calculados de botón, tarjeta, alerta, insignia, input, tabla y modal; foco visible; cambio de tema; cero desbordamiento en 320, 390, 768, 1440, 1920 y 2560 px. Requiere lanzar Chromium real (sesión con `danger-full-access`, porque el sandbox confinado falla con `spawn EPERM`).
+
 ## Contrato de diseño — cronograma compacto y eventos interactivos (1 de octubre de 2026)
 
 - Dirección visual: visualización de datos integrada al tablero Bento; superficies sólidas y colores del tema vigente.

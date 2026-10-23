@@ -2,6 +2,10 @@
 
 {% block title %}Fila de Atención - {{ ficha.codigo }}{% endblock %}
 
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid mb-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -25,7 +29,7 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span id="statusLive" class="badge bg-success-subtle text-success border border-success-subtle">
-                            <span class="spinner-grow spinner-grow-sm me-1" style="width: 8px; height: 8px;" role="status"></span> En vivo (<span id="cuentaAtras">8</span>s)
+                            <span class="spinner-grow spinner-grow-sm me-1 fila-atencion-dot" role="status"></span> En vivo (<span id="cuentaAtras">8</span>s)
                         </span>
                         <button type="button" id="btnToggleAuto" class="btn btn-sm btn-outline-secondary" onclick="toggleAutoRecarga()">Pausar</button>
                     </div>

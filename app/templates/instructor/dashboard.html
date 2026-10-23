@@ -2,6 +2,10 @@
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
 {% block title %}Inicio - SENA Control{% endblock %}
 
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="dashboard">
     <section class="dashboard-hero" aria-labelledby="dashboard-title">
@@ -11,7 +15,7 @@
             <p>Consulta el avance y entra directamente al módulo que necesitas.</p>
         </div>
         <a href="{{ url_for('instructor.fichas') }}" class="btn btn-primary btn-lg">
-            <i data-lucide="folder-plus" style="width:18px;height:18px;" aria-hidden="true"></i> Crear o importar ficha
+            <i data-lucide="folder-plus" class="icon-md" aria-hidden="true"></i> Crear o importar ficha
         </a>
     </section>
 
@@ -29,16 +33,16 @@
     <!-- Herramientas: una sola búsqueda global y una vista persistente -->
     <div class="dashboard-toolbar">
         <div class="dashboard-search-wrap" role="search">
-            <span class="dashboard-search-icon" aria-hidden="true"><i data-lucide="search" style="width:16px;height:16px;"></i></span>
+            <span class="dashboard-search-icon" aria-hidden="true"><i data-lucide="search" class="icon-sm"></i></span>
             <input type="search" id="dashboard-ficha-search" class="dashboard-search-input" placeholder="Buscar por código de ficha o nombre del programa..." aria-label="Buscar fichas">
             <button type="button" class="dashboard-search-clear" id="dashboard-search-clear" aria-label="Limpiar búsqueda" hidden>×</button>
         </div>
         <div class="view-switcher" role="group" aria-label="Modo de visualización">
             <button type="button" class="view-switch-btn is-active" id="view-mode-cards" title="Vista en cuadrícula de tarjetas" aria-pressed="true">
-                <i data-lucide="layout-grid" style="width:15px;height:15px;" aria-hidden="true"></i> <span>Tarjetas</span>
+                <i data-lucide="layout-grid" class="icon-sm" aria-hidden="true"></i> <span>Tarjetas</span>
             </button>
             <button type="button" class="view-switch-btn" id="view-mode-compact" title="Vista compacta en lista" aria-pressed="false">
-                <i data-lucide="list" style="width:15px;height:15px;" aria-hidden="true"></i> <span>Lista compacta</span>
+                <i data-lucide="list" class="icon-sm" aria-hidden="true"></i> <span>Lista compacta</span>
             </button>
         </div>
         <span class="dashboard-result-count" id="dashboard-result-count" aria-live="polite"></span>
@@ -108,7 +112,7 @@
                     <h2 class="card-title">{{ ficha.nombre_programa|trim('.') }}</h2>
                 </div>
                 <div class="ficha-header-actions">
-                    <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-ficha-planeacion btn-ficha-vision-general" style="background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600;" title="Abrir Centro de Control y Visión General de la ficha">
+                    <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-ficha-planeacion btn-ficha-vision-general ficha-vision-general-cta" title="Abrir Centro de Control y Visión General de la ficha">
                         <span>🌟 Visión General</span> <span aria-hidden="true">&rarr;</span>
                     </a>
                     <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn-ficha-planeacion" title="Ver análisis pedagógico detallado, horas y competencias">
@@ -586,7 +590,7 @@
                     </div>
                     <div class="ficha-operational-grid">
                         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="operational-item operational-item--tasks">
-                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="file-text" style="width:20px;height:20px;"></i></span>
+                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="file-text" class="icon-md"></i></span>
                             <span class="operational-item-copy">
                                 <span class="operational-item-label">Tareas publicadas</span>
                                 <strong>{{ extra.get('tareas_totales', 0) }}</strong>
@@ -595,7 +599,7 @@
                             <span class="operational-item-arrow" aria-hidden="true">→</span>
                         </a>
                         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="operational-item operational-item--evidence">
-                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="inbox" style="width:20px;height:20px;"></i></span>
+                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="inbox" class="icon-md"></i></span>
                             <span class="operational-item-copy">
                                 <span class="operational-item-label">Entregas recibidas</span>
                                 <strong>{{ pct_entregas }}%</strong>
@@ -605,7 +609,7 @@
                             <span class="operational-item-arrow" aria-hidden="true">→</span>
                         </a>
                         <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="operational-item operational-item--plans">
-                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="compass" style="width:20px;height:20px;"></i></span>
+                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="compass" class="icon-md"></i></span>
                             <span class="operational-item-copy">
                                 <span class="operational-item-label">Planes de mejoramiento</span>
                                 <strong>{{ extra.get('planes_pendientes', 0) }}</strong>
@@ -818,7 +822,7 @@
                                             {% if n_pos > 0 %}<div class="balance-segment is-positive" style="width: {{ pct_pos }}%;" title="{{ n_pos }} reconocimientos"></div>{% endif %}
                                             {% if n_neg > 0 %}<div class="balance-segment is-negative" style="width: {{ pct_neg }}%;" title="{{ n_neg }} llamados de atención"></div>{% endif %}
                                         {% else %}
-                                            <div class="balance-segment is-clean" style="width: 100%;" title="Sin llamados de atención registrados"></div>
+                                            <div class="balance-segment is-clean u-w-full" title="Sin llamados de atención registrados"></div>
                                         {% endif %}
                                     </div>
 

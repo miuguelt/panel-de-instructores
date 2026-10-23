@@ -76,16 +76,14 @@
     panel.className = 'upload-progress';
     panel.setAttribute('role', 'status');
     panel.setAttribute('aria-live', 'polite');
-    panel.style.cssText = 'margin:10px 0;font-size:13px;';
     var texto = document.createElement('div');
     texto.className = 'upload-progress-text';
-    texto.style.cssText = 'margin-bottom:6px;';
     var barra = document.createElement('div');
-    barra.style.cssText = 'height:8px;border-radius:999px;overflow:hidden;background:rgba(127,127,127,.25);';
+    barra.className = 'upload-progress-bar';
     var relleno = document.createElement('div');
-    relleno.style.cssText = 'height:100%;width:0%;background:var(--accent-primary,#39a900);transition:width .15s linear;';
+    relleno.className = 'upload-progress-fill';
     barra.appendChild(relleno); panel.appendChild(texto); panel.appendChild(barra); form.appendChild(panel);
-    return { panel: panel, texto: texto, relleno: relleno };
+    return { panel: panel, texto: texto, barra: barra, relleno: relleno };
   }
 
   function mostrarError(form, mensaje, recargar) {
@@ -95,14 +93,12 @@
     aviso.className = 'upload-error';
     aviso.setAttribute('role', 'alert');
     aviso.setAttribute('tabindex', '-1');
-    aviso.style.cssText = 'margin:8px 0;color:var(--danger-text,#c0392b);font-size:13px;';
     aviso.textContent = mensaje;
     if (recargar) {
       var boton = document.createElement('button');
       boton.type = 'button';
-      boton.className = 'btn btn-secondary';
+      boton.className = 'btn btn-secondary u-flex u-mt-2';
       boton.textContent = 'Recargar formulario';
-      boton.style.cssText = 'display:block;margin-top:8px;min-height:44px;';
       boton.addEventListener('click', function () { window.location.reload(); });
       aviso.appendChild(boton);
     }

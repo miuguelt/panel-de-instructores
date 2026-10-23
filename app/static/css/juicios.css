@@ -1,0 +1,236 @@
+/* =========================================
+   JUICIOS EVALUATIVOS — pagina y modal de carga SOFIA Plus
+   Extraído de app/templates/instructor/juicios.html.
+   Consume los tokens y componentes de styles.css.
+========================================= */
+
+
+    /* ── Layout ── */
+    .juicios-container { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    /* ── Stats cards ── */
+    .juicios-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 1rem;
+    }
+    .juicio-stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 14px;
+        padding: 1.25rem;
+        box-shadow: var(--shadow);
+    }
+    .juicio-stat-card h4 {
+        margin: 0 0 .4rem;
+        font-size: .82rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+    .juicio-stat-val { font-size: 1.8rem; font-weight: 800; color: var(--text-strong); line-height: 1; }
+
+    /* ── Badge helpers ── */
+    .badge-tech        { background: var(--badge-tech-bg)!important; color: var(--badge-tech-text)!important; font-weight:700!important; }
+    .badge-transversal { background: var(--badge-transversal-bg)!important; color: var(--badge-transversal-text)!important; font-weight:700!important; }
+    .badge-ingles      { background: var(--badge-ingles-bg)!important; color: var(--badge-ingles-text)!important; font-weight:700!important; }
+    .badge-solid-success { background: var(--status-success-solid)!important; color:var(--status-success-solid-on)!important; font-weight:700!important; }
+    .badge-solid-warning { background: var(--status-warning-solid)!important; color:var(--status-warning-solid-on)!important; font-weight:700!important; }
+
+    /* ── Competencia grid ── */
+    .comp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.1rem;
+    }
+    .comp-card {
+        background: var(--bg-card);
+        border: 1.5px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 1.3rem 1.4rem 1.1rem;
+        box-shadow: var(--shadow);
+        cursor: pointer;
+        transition: border-color .22s ease, box-shadow .22s ease, transform .18s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .comp-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        border-radius: 16px 16px 0 0;
+        background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, var(--success)));
+        opacity: 0;
+        transition: opacity .22s;
+    }
+    .comp-card:hover {
+        border-color: var(--accent-primary);
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-3px);
+    }
+    .comp-card:hover::before { opacity: 1; }
+    .comp-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: .8rem; margin-bottom: .9rem; }
+    .comp-card-title { font-size: .92rem; font-weight: 700; color: var(--text-strong); line-height: 1.4; flex: 1; }
+    .comp-card-meta { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-bottom: .85rem; }
+    .comp-prog-row { display: flex; justify-content: space-between; font-size: .78rem; font-weight: 700; color: var(--text-strong); margin-bottom: .3rem; }
+    .comp-prog-bar { height: 7px; background: var(--border-divider); border-radius: 4px; overflow: hidden; }
+    .comp-prog-fill { height: 100%; border-radius: 4px; transition: width .5s ease; }
+    .comp-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: .85rem; font-size: .82rem; color: var(--text-muted); }
+    .comp-open-hint { font-size: .78rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: .3rem; }
+
+    /* ── Competencias Seleccionadas Highlighting ── */
+    .comp-card.is-selected-own {
+        border: 2px solid var(--comp-selected-own-border) !important;
+        background: var(--comp-selected-own-bg) !important;
+        box-shadow: 0 0 20px var(--accent-glow) !important;
+    }
+    .comp-card.is-selected-own::before {
+        opacity: 1 !important;
+        background: linear-gradient(90deg, var(--comp-selected-own-border), var(--accent-hover)) !important;
+    }
+    .comp-card.is-selected-other {
+        border: 2px solid var(--comp-selected-other-border) !important;
+        background: var(--comp-selected-other-bg) !important;
+        box-shadow: 0 0 20px var(--accent-glow) !important;
+    }
+    .comp-card.is-selected-other::before {
+        opacity: 1 !important;
+        background: linear-gradient(90deg, var(--comp-selected-other-border), var(--accent-primary)) !important;
+    }
+    .comp-select-btn {
+        background: var(--surface-glass);
+        border: 1px solid var(--border-subtle);
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: .74rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all .2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        user-select: none;
+    }
+    .comp-select-btn:hover {
+        background: var(--accent-primary);
+        color: var(--button-on-accent);
+        border-color: var(--accent-primary);
+        transform: translateY(-1px);
+    }
+    .comp-select-btn.is-own {
+        background: var(--success);
+        color: var(--button-on-accent);
+        border-color: var(--status-success-border);
+        box-shadow: 0 0 10px var(--status-success-border);
+    }
+    .comp-select-btn.is-own:hover {
+        background: var(--success);
+        border-color: var(--status-success-border);
+    }
+    .comp-select-btn.is-other {
+        background: var(--accent-primary);
+        color: var(--button-on-accent);
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 10px var(--accent-glow);
+    }
+    .comp-select-btn.is-other:hover {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+    }
+
+    /* ── CONTENIDO DEL MODAL ── */
+    .modal-header-info { flex: 1; min-width: 0; }
+    .modal-comp-name { font-size: 1.05rem; font-weight: 800; color: var(--text-strong); line-height: 1.4; margin-bottom: .4rem; }
+    .modal-comp-meta { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+
+    /* Stat pills row */
+    .modal-kpi-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: .8rem;
+    }
+    .modal-kpi {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: .9rem 1rem;
+        text-align: center;
+    }
+    .modal-kpi-val { font-size: 1.7rem; font-weight: 800; line-height: 1; margin-bottom: .25rem; }
+    .modal-kpi-label { font-size: .75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+    /* Progress ring */
+    .ring-wrap { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+    .ring-svg { overflow: visible; }
+    .ring-track { fill: none; stroke: var(--border-divider); stroke-width: 8; }
+    .ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
+    .ring-label { font-size: .8rem; color: var(--text-muted); font-weight: 600; }
+
+    /* RAP section */
+    .rap-section-title { font-size: .9rem; font-weight: 700; color: var(--text-strong); margin-bottom: .7rem; padding-bottom: .4rem; border-bottom: 1px solid var(--border-divider); }
+    .rap-section-title.is-danger { color: var(--danger); }
+
+    /* RAP accordion inside modal */
+    .rap-item { margin-bottom: .6rem; }
+    .rap-item-header {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        padding: .7rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: .6rem;
+        cursor: pointer;
+        transition: background .15s;
+    }
+    .rap-item-header:hover { background: var(--bg-card); }
+    .rap-item-title { font-size: .82rem; font-weight: 600; color: var(--text-main); line-height: 1.4; flex: 1; }
+    .rap-item-stats { display: flex; gap: .5rem; align-items: center; flex-shrink: 0; }
+    .rap-item-body { display: none; border: 1px solid var(--border-subtle); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
+    .rap-item-body.open { display: block !important; }
+    .rap-aprendiz-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem 1rem; border-bottom: 1px solid var(--border-divider); font-size: .82rem; }
+    .rap-aprendiz-row:last-child { border-bottom: none; }
+    .rap-aprendiz-name { color: var(--text-strong); font-weight: 600; }
+    .rap-aprendiz-meta { color: var(--text-muted); font-size: .78rem; }
+    .rap-aprendiz-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+
+    /* Evaluadores table */
+    .eval-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem .75rem; border-radius: 8px; background: var(--bg-surface); gap: 1rem; font-size: .84rem; }
+    .eval-row + .eval-row { margin-top: .4rem; }
+    .eval-name { font-weight: 600; color: var(--text-strong); }
+    .eval-count { font-size: .8rem; color: var(--text-muted); }
+
+    /* Aprendices no aprobados warning */
+    .pendientes-list { display: flex; flex-direction: column; gap: .35rem; }
+    .pendiente-chip { background: var(--status-danger-bg); border: 1px solid var(--status-danger-border); border-radius: 8px; padding: .45rem .75rem; font-size: .82rem; color: var(--text-strong); display: flex; justify-content: space-between; align-items: center; }
+    .pendiente-rap { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
+
+/* ---- Clases extraídas de estilos en línea (juicios.html) ---- */
+.nav-context-btn-action--primary {
+    background: var(--accent-primary);
+    color: var(--button-on-accent);
+    border: none;
+    cursor: pointer;
+}
+
+.juicio-stat-val--success { color: var(--status-success-text); }
+.juicio-stat-val--warning { color: var(--status-warning-text); }
+.juicio-stat-val--danger { color: var(--status-danger-text); }
+.juicio-stat-val--accent { color: var(--accent-primary); }
+.juicio-stat-val--info { color: var(--status-info-text); }
+
+.juicio-pct--accent { font-weight: 700; color: var(--accent-primary); }
+.juicio-pct--success { font-weight: 700; color: var(--status-success-text); }
+.juicio-pct--info { font-weight: 700; color: var(--status-info-text); }
+
+.rap-badge {
+    --rap-color: var(--accent-primary);
+    color: var(--rap-color);
+    background: var(--surface-glass);
+    border: 1px solid var(--rap-color);
+    font-weight: 800;
+    font-size: 0.78rem;
+}

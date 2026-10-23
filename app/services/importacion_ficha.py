@@ -11,6 +11,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
+import uuid
 import unicodedata
 from itertools import chain, islice
 from pathlib import Path
@@ -58,6 +59,10 @@ _TRANSVERSAL_KEYWORDS = (
     'medio ambient', 'ambiental',
     'etapa practica'
 )
+
+_JUICIOS_PENDIENTES = {
+    '', 'POR EVALUAR', 'PENDIENTE', 'SIN EVALUAR', 'EN FORMACIÓN', 'EN FORMACION',
+}
 
 
 class ErrorImportacion(ValueError):
@@ -185,6 +190,11 @@ def _extraer_metadata(filas):
 def _estado_aprendiz(valor):
     estado = _clave(valor).upper().replace(' ', '_').replace('-', '_')
     return estado or 'EN_FORMACION'
+
+
+def _juicio_evaluado(juicio):
+    """Indica si un juicio contiene un resultado que se debe anunciar."""
+    return _texto(juicio).upper() not in _JUICIOS_PENDIENTES
 
 
 def _clave_juicio(ficha_id, aprendiz_id, competencia, resultado_aprendizaje):
@@ -587,11 +597,15 @@ def importar_archivo(archivo, ficha_actual, instructor_id, crear_ficha=False):
                                          'juicios_actualizados', 'juicios_repetidos', 'sesiones_creadas'):
                             resultado[contador] += parcial[contador]
                         resultado['errores'].extend(parcial['errores'])
+                        resultado['aprendices_juicios_modificados'].update(
+                            parcial['aprendices_juicios_modificados']
+                        )
                     ficha_actual = resultado['ficha']
                     if not lote:
                         break
         from app.services.resultados_persistidos import invalidar_resultados_ficha
         invalidar_resultados_ficha(resultado['ficha'].id)
+        resultado['importacion_id'] = uuid.uuid4().hex
         return resultado
     finally:
         registros.close()
@@ -602,6 +616,7 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
     ficha, ficha_creada = _resolver_ficha(
         ficha_actual, metadata, instructor_id, crear_ficha
     )
+    carga_inicial_juicios = not JuicioEvaluativo.query.filter_by(ficha_id=ficha.id).first()
 
     if metadata.get('codigo_ficha'):
         ficha.codigo = metadata['codigo_ficha']
@@ -620,6 +635,7 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
 
     nuevos = actualizados = 0
     juicios_nuevos = juicios_actualizados = juicios_repetidos = 0
+    aprendices_juicios_modificados = set()
     errores = []
 
     # Precarga en memoria para que cada fila se resuelva con O(1) lookups.
@@ -743,6 +759,7 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
     # Segunda pasada: preparar todos los juicios para una inserción masiva.
     # Los duplicados dentro del mismo archivo se resuelven en memoria.
     juicios_pendientes = {}
+    juicios_modificados = set()
     for registro, documento in registros_validos:
         if 'clave_juicio' not in registro:
             continue
@@ -789,8 +806,17 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
                     juicios_repetidos += 1
                 else:
                     juicios_actualizados += 1
+                    juicios_modificados.add(clave)
             else:
                 juicios_repetidos += 1
+
+    for clave in juicios_modificados:
+        juicio = juicios_db[clave]
+        if _juicio_evaluado(juicio.juicio):
+            aprendices_juicios_modificados.add(juicio.aprendiz_id)
+    for datos in juicios_pendientes.values():
+        if _juicio_evaluado(datos['juicio']):
+            aprendices_juicios_modificados.add(datos['aprendiz_id'])
 
     if juicios_pendientes:
         db.session.bulk_insert_mappings(
@@ -893,4 +919,6 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
         'juicios_actualizados': juicios_actualizados,
         'juicios_repetidos': juicios_repetidos, 'errores': errores,
         'sesiones_creadas': sesiones_creadas,
+        'carga_inicial_juicios': carga_inicial_juicios,
+        'aprendices_juicios_modificados': aprendices_juicios_modificados,
     }

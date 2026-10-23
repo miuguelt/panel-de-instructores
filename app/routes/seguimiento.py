@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from xml.sax.saxutils import escape
 import io
 
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for, make_response
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for, make_response
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
@@ -35,6 +35,7 @@ from app.services.alertas import (
 )
 from app.services.permisos import aprendiz_de_sesion, puede_gestionar_ficha
 from app.models.alertas import PlanMejoramiento
+from app.models.alertas import PushSubscription
 from app.routes.auth import _destino_interno
 
 
@@ -493,8 +494,104 @@ def notificaciones_aprendiz(ficha_id):
     respuesta = make_response(render_template(
         'notificaciones.html', notificaciones=notificaciones, aprendiz=aprendiz,
         ficha=ficha, centro_avisos=organizar_notificaciones(notificaciones, modo, ficha_id),
+        notification_cursor=max((item.id for item in notificaciones), default=0),
+        push_habilitado=_push_habilitado(),
+        vapid_public_key=current_app.config.get('VAPID_PUBLIC_KEY', ''),
     ))
     respuesta.headers['Cache-Control'] = 'private, no-store, max-age=0'
+    return respuesta
+
+
+def _push_habilitado():
+    """Expone la clave pública solo cuando el envío está activado con VAPID completo."""
+    from app.services.notificaciones_push import configuracion_push_disponible
+
+    return bool(configuracion_push_disponible())
+
+
+def _aprendiz_activo(ficha_id):
+    """Resuelve la identidad del aprendiz exclusivamente desde la sesión."""
+    aprendiz = aprendiz_de_sesion(ficha_id)
+    if not aprendiz or not aprendiz.activo:
+        return None
+    return aprendiz
+
+
+@aprendiz_seguimiento_bp.route('/<int:ficha_id>/notificaciones/nuevas')
+def notificaciones_nuevas_aprendiz(ficha_id):
+    """Entrega avisos posteriores al cursor sin aceptar una identidad del navegador."""
+    aprendiz = _aprendiz_activo(ficha_id)
+    if not aprendiz:
+        return jsonify({'notificaciones': []}), 401
+    try:
+        cursor = int(request.args.get('desde_id', '0'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'El cursor de notificaciones no es válido.'}), 400
+    if cursor < 0:
+        return jsonify({'error': 'El cursor de notificaciones no es válido.'}), 400
+    items = Notificacion.query.filter(
+        Notificacion.destinatario_tipo == 'aprendiz',
+        Notificacion.destinatario_id == aprendiz.id,
+        Notificacion.ficha_id == ficha_id,
+        Notificacion.id > cursor,
+    ).order_by(Notificacion.id).limit(100).all()
+    respuesta = jsonify({'notificaciones': [
+        {'id': item.id, 'tipo': item.tipo, 'mensaje': item.mensaje, 'url': item.url}
+        for item in items
+    ]})
+    respuesta.headers['Cache-Control'] = 'private, no-store, max-age=0'
+    return respuesta
+
+
+@aprendiz_seguimiento_bp.route('/<int:ficha_id>/notificaciones/suscripcion', methods=['POST', 'DELETE'])
+def gestionar_suscripcion_push_aprendiz(ficha_id):
+    """Registra o retira la suscripción del aprendiz autenticado por su sesión."""
+    aprendiz = _aprendiz_activo(ficha_id)
+    if not aprendiz:
+        return jsonify({'error': 'Inicia sesión en tu ficha para gestionar los avisos.'}), 401
+    if not _push_habilitado():
+        return jsonify({'error': 'Los avisos del navegador todavía no están habilitados.'}), 503
+    from app.services.notificaciones_push import (
+        registrar_suscripcion,
+        retirar_suscripcion,
+    )
+
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict):
+        datos = {}
+    try:
+        if request.method == 'POST':
+            registrar_suscripcion(aprendiz, ficha_id, datos)
+            return jsonify({'ok': True, 'mensaje': 'Los avisos del navegador quedaron activados.'})
+        endpoint = datos.get('endpoint')
+        if not retirar_suscripcion(aprendiz, ficha_id, endpoint):
+            return jsonify({'error': 'No se encontró una suscripción de esta sesión.'}), 404
+        return jsonify({'ok': True, 'mensaje': 'Los avisos del navegador quedaron desactivados.'})
+    except PermissionError as error:
+        db.session.rollback()
+        return jsonify({'error': str(error)}), 409
+    except ValueError as error:
+        db.session.rollback()
+        return jsonify({'error': str(error)}), 400
+    except RuntimeError as error:
+        db.session.rollback()
+        return jsonify({'error': str(error)}), 503
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({'error': 'No se pudo guardar la suscripción. Inténtalo de nuevo.'}), 500
+
+
+@aprendiz_seguimiento_bp.route('/service-worker.js')
+def service_worker_aprendiz():
+    """Sirve el worker con alcance limitado a las páginas de aprendices."""
+    from flask import send_from_directory
+
+    respuesta = make_response(send_from_directory(
+        current_app.static_folder, 'js/aprendiz-service-worker.js',
+        mimetype='application/javascript',
+    ))
+    respuesta.headers['Service-Worker-Allowed'] = '/aprendiz/'
+    respuesta.headers['Cache-Control'] = 'no-cache'
     return respuesta
 
 

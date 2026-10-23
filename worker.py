@@ -13,7 +13,7 @@ from redis.exceptions import RedisError
 from werkzeug.datastructures import FileStorage
 
 from app.models import ArchivoFichaVersion, ImportacionJob, Ficha
-from app.services.alertas import actualizar_alertas_ficha
+from app.services.alertas import actualizar_alertas_ficha, notificar_juicios_importados
 from app.services.importacion_ficha import importar_archivo
 from app.services.permisos import configurar_rol_aprendiz
 from app.services.ranking import actualizar_participacion_ficha
@@ -180,6 +180,7 @@ def _procesar(job_id):
                 configurar_rol_aprendiz(
                     ficha.id, job.aprendiz_administrativo_id, True
                 )
+            notificar_juicios_importados(resultado, commit=False)
 
             # Este commit confirma los datos académicos antes de recalcular
             # módulos secundarios. Si estos fallan, la importación permanece.
@@ -281,6 +282,16 @@ def main():
     ultima_revision_tyt = -300
     ultima_fecha_precarga = None
     while True:
+        with app.app_context():
+            try:
+                from app.services.notificaciones_push import procesar_push_pendientes
+
+                procesar_push_pendientes()
+            except Exception:
+                db.session.rollback()
+                log.exception('No se pudieron despachar todos los avisos Web Push pendientes.')
+            finally:
+                db.session.remove()
         if app.config.get('CARGAS_REANUDABLES_ENABLED'):
             from app.services.cargas_trabajos import procesar_pendientes
             from app.services.cargas_limpieza import limpiar_cargas

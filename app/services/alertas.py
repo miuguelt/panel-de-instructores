@@ -246,6 +246,20 @@ def registrar_notificacion(destinatario_tipo, destinatario_id, mensaje, tipo,
         url=url,
     )
     db.session.add(notificacion)
+    if destinatario_tipo == 'aprendiz' and ficha_id and tipo in ('calificacion', 'juicio_evaluativo'):
+        try:
+            db.session.flush()
+            with db.session.begin_nested():
+                from app.services.notificaciones_push import encolar_push
+
+                encolar_push(notificacion)
+        except Exception:
+            # El envío remoto se procesa después del commit. Si el buzón no
+            # puede programarse, la calificación y su aviso en el panel siguen.
+            current_app.logger.exception(
+                'No se pudo programar Web Push para la notificación %s.',
+                notificacion.id,
+            )
     _enviar_correo_opcional(destinatario_tipo, destinatario_id, mensaje, ficha_id, contexto)
     return notificacion
 
@@ -834,10 +848,34 @@ def notificar_calificacion(entrega, ficha_id, commit=True):
             'Tu instructor publicó una calificación o retroalimentación. Si no estás de acuerdo, '
             'puedes solicitar revisión dentro de los dos días hábiles siguientes a la publicación.',
             'calificacion', f'calificacion:{entrega.id}:{entrega.revisada_en}', ficha_id,
-            f'/aprendiz/{ficha_id}/panel?documento={aprendiz.documento}',
+            f'/aprendiz/{ficha_id}/notificaciones',
         )
     if commit:
         db.session.commit()
+
+
+def notificar_juicios_importados(resultado, commit=False):
+    """Agrupa cambios evaluativos importados en un aviso por aprendiz y reporte."""
+    if (not resultado or resultado.get('ficha_creada')
+            or resultado.get('carga_inicial_juicios')):
+        return 0
+    ficha = resultado.get('ficha')
+    importacion_id = resultado.get('importacion_id')
+    if not ficha or not importacion_id:
+        return 0
+    ids_aprendices = sorted(set(resultado.get('aprendices_juicios_modificados') or ()))
+    creadas = 0
+    for aprendiz_id in ids_aprendices:
+        aviso = registrar_notificacion(
+            'aprendiz', aprendiz_id,
+            'Tu reporte de resultados formativos fue actualizado. Entra al panel para consultar la información.',
+            'juicio_evaluativo', f'juicio-importacion:{importacion_id}:{aprendiz_id}',
+            ficha.id, f'/aprendiz/{ficha.id}/notificaciones',
+        )
+        creadas += aviso is not None
+    if commit:
+        db.session.commit()
+    return creadas
 
 
 def asegurar_resumen_semanal(ficha, ahora=None):

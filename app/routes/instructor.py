@@ -38,6 +38,7 @@ from app.services.alertas import (
     notificar_calificacion,
     obtener_config_comite,
     registrar_notificacion,
+    notificar_juicios_importados,
 )
 from app.services.aseo import ajustar_turno_por_asistencia
 from app.services.asistencia import (
@@ -1511,6 +1512,7 @@ def cargar_excel(ficha_id):
                 except ValueError as err:
                     flash(f'No se pudo asignar el rol administrativo: {err}', 'warning')
             actualizar_estado(version, 'procesado', detalle=_resumen_importacion(resultado))
+            notificar_juicios_importados(resultado, commit=False)
             db.session.commit()
             archivos_creados.clear()
             _actualizar_indicadores_carga(ficha.id)
@@ -2203,6 +2205,7 @@ def registrar_actividad_clase(tarea_id):
 
     aprendices = Aprendiz.query_en_formacion(ficha.id).all()
     ids_validos = {aprendiz.id for aprendiz in aprendices}
+    aprendices_por_id = {aprendiz.id: aprendiz for aprendiz in aprendices}
     aprobados = set()
     for valor in request.form.getlist('aprobados'):
         try:
@@ -2231,8 +2234,19 @@ def registrar_actividad_clase(tarea_id):
     for aprendiz_id in ids_validos:
         entrega = existentes.get(aprendiz_id)
         if aprendiz_id in aprobados:
+            anterior = None if not entrega else (
+                entrega.registrada_por_instructor,
+                entrega.calificada,
+                entrega.calificacion,
+                entrega.feedback,
+                entrega.estado_revision,
+            )
             if not entrega:
-                entrega = Entrega(tarea_id=tarea.id, aprendiz_id=aprendiz_id)
+                entrega = Entrega(
+                    tarea_id=tarea.id,
+                    aprendiz_id=aprendiz_id,
+                    aprendiz=aprendices_por_id[aprendiz_id],
+                )
                 db.session.add(entrega)
                 nuevas += 1
             entrega.registrada_por_instructor = True
@@ -2243,6 +2257,15 @@ def registrar_actividad_clase(tarea_id):
             entrega.feedback = observacion
             entrega.revisada_en = ahora
             entrega.revisada_por_id = current_user.id
+            actual = (
+                entrega.registrada_por_instructor,
+                entrega.calificada,
+                entrega.calificacion,
+                entrega.feedback,
+                entrega.estado_revision,
+            )
+            if anterior != actual:
+                notificar_calificacion(entrega, ficha.id, commit=False)
         elif entrega and entrega.registrada_por_instructor:
             db.session.delete(entrega)
             retiradas += 1
@@ -2620,9 +2643,9 @@ def calificar_entrega(entrega_id):
     entrega.calificada = True
     entrega.revisada_en = datetime.utcnow()
     entrega.revisada_por_id = current_user.id
+    notificar_calificacion(entrega, entrega.tarea.ficha_id, commit=False)
     db.session.commit()
     errores_resumen = _actualizar_resumenes_despues_de_evaluar(entrega.tarea.ficha_id)
-    notificar_calificacion(entrega, entrega.tarea.ficha_id)
 
     flash('Calificación guardada.', 'success')
     if errores_resumen:

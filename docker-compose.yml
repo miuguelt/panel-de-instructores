@@ -24,6 +24,10 @@ services:
       - SMTP_PASSWORD
       - SMTP_FROM
       - PUBLIC_BASE_URL
+      - WEB_PUSH_ENABLED=${WEB_PUSH_ENABLED:-false}
+      - VAPID_PUBLIC_KEY
+      - VAPID_PRIVATE_KEY
+      - VAPID_SUBJECT
       - WTF_CSRF_TIME_LIMIT
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DB_POOL_SIZE
@@ -86,6 +90,10 @@ services:
       - SMTP_USER
       - SMTP_PASSWORD
       - SMTP_FROM
+      - WEB_PUSH_ENABLED=${WEB_PUSH_ENABLED:-false}
+      - VAPID_PUBLIC_KEY
+      - VAPID_PRIVATE_KEY
+      - VAPID_SUBJECT
       - WTF_CSRF_TIME_LIMIT
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DB_POOL_SIZE

@@ -29,6 +29,23 @@ function initClickableRows() {
     });
 }
 
+// Los iconos del botón se regeneran cuando cambia su contenido. Si Lucide no
+// está disponible, el botón conserva su texto y sigue siendo accesible.
+function _refrescarIconos() {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        try { window.lucide.createIcons(); } catch (_error) { /* sin iconos, sin ruido */ }
+    }
+}
+
+// Contenido canónico del botón de filtros: icono Lucide + etiqueta y, cuando
+// hay filtros activos, el contador en un badge del sistema.
+function _etiquetaFiltrar(visibleCount) {
+    const icono = '<i data-lucide="search" class="icon-sm" aria-hidden="true"></i>';
+    const label = '<span>Filtrar lista</span>';
+    if (visibleCount === undefined) return icono + label;
+    return icono + label + '<span class="badge badge-success">' + visibleCount + '</span>';
+}
+
 // Búsqueda sin distinguir tildes ni mayúsculas; se exige que estén todos los términos.
 function _filtroTerminos(consulta) {
     if (window.FiltroVista) return window.FiltroVista.terminos(consulta);
@@ -69,27 +86,23 @@ function initTableFilters() {
         if (container.closest('.ranking-card-container')) {
             toolbar.classList.add(container.classList.contains('ranking-mobile') ? 'table-toolbar-mobile' : 'table-toolbar-desktop');
         }
-        toolbar.style.cssText = 'display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 12px;';
 
-        // Toggle button
+        // Toggle button: mantiene 42 px de alto y ancho mínimo desde .btn-sm
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
-        toggleBtn.className = 'btn btn-sm btn-outline';
-        toggleBtn.innerHTML = '🔍 Filtrar lista';
+        toggleBtn.className = 'btn btn-sm btn-outline table-filter-toggle';
+        toggleBtn.innerHTML = _etiquetaFiltrar();
         toggleBtn.setAttribute('aria-expanded', 'false');
-        toggleBtn.style.cssText = 'border-radius: 20px; font-size: 12px; padding: 4px 12px; background: var(--bg-glass); color: var(--text-main); border: 1px solid var(--border-glass); transition: all 0.2s;';
 
-        // Create filter UI (hidden by default)
+        // Create filter UI (hidden by default; .table-filters-container controla la visibilidad)
         const filterContainer = document.createElement('div');
         filterContainer.className = 'table-filters-container';
-        filterContainer.style.cssText = 'display: none; gap: 12px; flex-wrap: wrap; align-items: center; background: var(--bg-glass); backdrop-filter: var(--blur-glass); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); box-shadow: var(--shadow); margin-top: 8px; width: 100%; animation: slideDown 0.2s ease-out;';
 
         const searchInput = document.createElement('input');
         searchInput.type = 'search';
-        searchInput.className = 'form-control';
+        searchInput.className = 'form-control table-filter-search';
         searchInput.placeholder = 'Escribe para buscar...';
         searchInput.setAttribute('aria-label', 'Buscar en la lista');
-        searchInput.style.cssText = 'flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-divider); background: var(--input-bg); color: var(--text-strong);';
 
         filterContainer.appendChild(searchInput);
 
@@ -108,9 +121,8 @@ function initTableFilters() {
         let stateSelect = null;
         if (hasDataEstado) {
             stateSelect = document.createElement('select');
-            stateSelect.className = 'form-control';
+            stateSelect.className = 'form-control table-filter-select';
             stateSelect.setAttribute('aria-label', 'Filtrar por estado');
-            stateSelect.style.cssText = 'width: auto; min-width: 150px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-divider); background: var(--input-bg); color: var(--text-strong);';
 
             const allOption = document.createElement('option');
             allOption.value = '';
@@ -137,15 +149,14 @@ function initTableFilters() {
         clearBtn.type = 'button';
         clearBtn.className = 'btn btn-sm btn-outline';
         clearBtn.textContent = 'Limpiar';
-        clearBtn.style.cssText = 'padding: 6px 12px; border-radius: 6px; font-size: 12px;';
         clearBtn.hidden = true;
         filterContainer.appendChild(clearBtn);
 
         // Resumen accesible del resultado
         const resultLabel = document.createElement('span');
+        resultLabel.className = 'table-filter-result';
         resultLabel.setAttribute('role', 'status');
         resultLabel.setAttribute('aria-live', 'polite');
-        resultLabel.style.cssText = 'font-size: 12px; color: var(--text-muted);';
         filterContainer.appendChild(resultLabel);
 
         // Aviso cuando ningún elemento coincide
@@ -159,17 +170,17 @@ function initTableFilters() {
                 emptyNotice.className = 'filter-empty-row';
                 const celda = document.createElement('td');
                 celda.colSpan = columnas;
-                celda.style.cssText = 'text-align: center; padding: 18px; color: var(--text-muted);';
+                celda.className = 'table-filter-empty';
                 celda.textContent = 'Ningún registro coincide con el filtro.';
                 emptyNotice.appendChild(celda);
                 tbody.appendChild(emptyNotice);
             } else {
                 emptyNotice = document.createElement('p');
-                emptyNotice.className = 'filter-empty-row';
-                emptyNotice.style.cssText = 'text-align: center; padding: 18px; color: var(--text-muted);';
+                emptyNotice.className = 'filter-empty-row table-filter-empty';
                 emptyNotice.textContent = 'Ningún registro coincide con el filtro.';
                 container.appendChild(emptyNotice);
             }
+            emptyNotice.hidden = true;
             return emptyNotice;
         };
 
@@ -178,17 +189,8 @@ function initTableFilters() {
         const setFiltersVisible = (visible) => {
             filtersVisible = visible;
             toggleBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
-            if (visible) {
-                filterContainer.style.display = 'flex';
-                toggleBtn.style.background = 'var(--sena-green-light)';
-                toggleBtn.style.borderColor = 'var(--accent-primary)';
-                toggleBtn.style.color = 'var(--accent-hover)';
-            } else {
-                filterContainer.style.display = 'none';
-                toggleBtn.style.background = 'var(--bg-glass)';
-                toggleBtn.style.borderColor = 'var(--border-glass)';
-                toggleBtn.style.color = 'var(--text-main)';
-            }
+            filterContainer.classList.toggle('is-open', visible);
+            toggleBtn.classList.toggle('is-active', visible);
         };
 
         toggleBtn.addEventListener('click', () => {
@@ -211,29 +213,31 @@ function initTableFilters() {
                     const matchesState = stateTerm === '' || itemState === stateTerm;
 
                     if (matchesSearch && matchesState) {
-                        item.style.display = '';
+                        item.hidden = false;
                         visibleCount++;
                     } else {
-                        item.style.display = 'none';
+                        item.hidden = true;
                     }
                 });
 
                 // Highlight button if filters are active
                 if (activo) {
-                    toggleBtn.innerHTML = `🔍 Filtrar lista <span class="badge badge-success" style="margin-left:4px;">${visibleCount}</span>`;
+                    toggleBtn.innerHTML = _etiquetaFiltrar(visibleCount);
+                    _refrescarIconos();
                     resultLabel.textContent = visibleCount === 1
                         ? '1 registro visible de ' + items.length
                         : visibleCount + ' registros visibles de ' + items.length;
                 } else {
-                    toggleBtn.innerHTML = '🔍 Filtrar lista';
+                    toggleBtn.innerHTML = _etiquetaFiltrar();
+                    _refrescarIconos();
                     resultLabel.textContent = '';
                 }
                 clearBtn.hidden = !activo;
 
                 if (activo && visibleCount === 0) {
-                    buildEmptyNotice().style.display = '';
+                    buildEmptyNotice().hidden = false;
                 } else if (emptyNotice) {
-                    emptyNotice.style.display = 'none';
+                    emptyNotice.hidden = true;
                 }
             });
         };
@@ -267,16 +271,11 @@ function initTableFilters() {
         toolbar.appendChild(toggleBtn);
         toolbar.appendChild(filterContainer);
 
-        // Add CSS animation if not exists
-        if (!document.getElementById('filter-animations')) {
-            const style = document.createElement('style');
-            style.id = 'filter-animations';
-            style.innerHTML = `@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }`;
-            document.head.appendChild(style);
-        }
-
         // Insert before the container
         container.parentNode.insertBefore(toolbar, container);
+
+        // Los iconos del botón se crean después de insertarlo en el documento.
+        _refrescarIconos();
 
         // Initial apply if default is set (sin mover la vista en la carga inicial)
         runFilters();

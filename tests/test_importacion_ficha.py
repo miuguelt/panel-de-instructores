@@ -18,6 +18,7 @@ from app.models import (
     Instructor,
     JuicioEvaluativo,
     JuicioEvaluativoInstructor,
+    Notificacion,
 )
 from app.services.importacion_ficha import (
     ErrorImportacion,
@@ -26,6 +27,7 @@ from app.services.importacion_ficha import (
     validar_reporte_ficha,
     _leer_archivo,
 )
+from app.services.alertas import notificar_juicios_importados
 
 
 class ImportacionFichaTestCase(unittest.TestCase):
@@ -84,6 +86,9 @@ class ImportacionFichaTestCase(unittest.TestCase):
         return FileStorage(stream=salida, filename='reporte.xlsx')
 
     def _archivo_con_estado(self, juicio, fecha='14/03/2023', funcionario='Instructor anterior'):
+        return self._archivo_con_estados((juicio, fecha, funcionario))
+
+    def _archivo_con_estados(self, *estados):
         libro = openpyxl.Workbook()
         hoja = libro.active
         hoja.append(['Ficha de Caracterización:', '', 2672089])
@@ -96,10 +101,11 @@ class ImportacionFichaTestCase(unittest.TestCase):
             'Competencia', 'Resultado de Aprendizaje', 'Juicio de Evaluación',
             'Fecha y Hora del Juicio Evaluativo', 'Funcionario que registro el juicio evaluativo',
         ])
-        hoja.append([
-            'CC', '1001', 'Ana', 'Pérez', 'EN_FORMACION', 'Competencia 1', 'Resultado 1',
-            juicio, fecha, funcionario,
-        ])
+        for juicio, fecha, funcionario in estados:
+            hoja.append([
+                'CC', '1001', 'Ana', 'Pérez', 'EN_FORMACION', 'Competencia 1', 'Resultado 1',
+                juicio, fecha, funcionario,
+            ])
         salida = BytesIO()
         libro.save(salida)
         salida.seek(0)
@@ -157,8 +163,15 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.assertEqual(Aprendiz.query.count(), 1)
         self.assertEqual(JuicioEvaluativo.query.count(), 1)
         self.assertEqual(JuicioEvaluativoInstructor.query.count(), 1)
+        self.assertEqual(len(resultado['aprendices_juicios_modificados']), 1)
+        self.assertTrue(resultado['carga_inicial_juicios'])
+        self.assertEqual(notificar_juicios_importados(resultado), 0)
+        db.session.commit()
+        self.assertEqual(Notificacion.query.filter_by(tipo='juicio_evaluativo').count(), 0)
 
         resultado2 = importar_archivo(self._archivo(), self.ficha, self.b.id)
+        self.assertEqual(resultado2['aprendices_juicios_modificados'], set())
+        self.assertEqual(notificar_juicios_importados(resultado2), 0)
         db.session.commit()
         self.assertEqual(resultado2['juicios_nuevos'], 0)
         self.assertEqual(resultado2['juicios_repetidos'], 2)
@@ -166,12 +179,74 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.assertEqual(FichaInstructor.query.count(), 2)
         self.assertEqual(JuicioEvaluativoInstructor.query.count(), 2)
 
+    def test_primera_carga_en_ficha_existente_no_notifica_aprendices(self):
+        resultado = importar_archivo(self._archivo(), self.ficha, self.a.id)
+
+        self.assertTrue(resultado.get('carga_inicial_juicios'))
+        db.session.commit()
+        self.assertEqual(notificar_juicios_importados(resultado), 0)
+        db.session.commit()
+        self.assertEqual(Notificacion.query.filter_by(tipo='juicio_evaluativo').count(), 0)
+
+    def test_estado_final_evaluado_en_filas_repetidas_genera_un_aviso(self):
+        inicial = importar_archivo(
+            self._archivo_con_estado('POR EVALUAR'), self.ficha, self.a.id,
+        )
+        self.assertTrue(inicial['carga_inicial_juicios'])
+        self.assertEqual(notificar_juicios_importados(inicial), 0)
+        db.session.commit()
+
+        resultado = importar_archivo(
+            self._archivo_con_estados(
+                ('POR EVALUAR', '14/03/2023', 'Instructor anterior'),
+                ('APROBADO', '15/03/2023', 'Instructor actual'),
+            ),
+            self.ficha,
+            self.a.id,
+        )
+
+        db.session.commit()
+        juicio = JuicioEvaluativo.query.one()
+        self.assertEqual(juicio.juicio, 'APROBADO')
+        self.assertFalse(resultado['carga_inicial_juicios'])
+        self.assertEqual(resultado['aprendices_juicios_modificados'], {juicio.aprendiz_id})
+        self.assertEqual(notificar_juicios_importados(resultado), 1)
+        db.session.commit()
+        self.assertEqual(Notificacion.query.filter_by(tipo='juicio_evaluativo').count(), 1)
+
+    def test_estado_final_pendiente_no_genera_aviso_aunque_antes_fuera_evaluado(self):
+        inicial = importar_archivo(
+            self._archivo_con_estado('APROBADO'), self.ficha, self.a.id,
+        )
+        self.assertTrue(inicial['carga_inicial_juicios'])
+        self.assertEqual(notificar_juicios_importados(inicial), 0)
+        db.session.commit()
+
+        resultado = importar_archivo(
+            self._archivo_con_estados(
+                ('APROBADO', '14/03/2023', 'Instructor anterior'),
+                ('POR EVALUAR', '15/03/2023', 'Instructor actual'),
+            ),
+            self.ficha,
+            self.a.id,
+        )
+
+        db.session.commit()
+        juicio = JuicioEvaluativo.query.one()
+        self.assertEqual(juicio.juicio, 'POR EVALUAR')
+        self.assertFalse(resultado['carga_inicial_juicios'])
+        self.assertEqual(resultado['aprendices_juicios_modificados'], set())
+        self.assertEqual(notificar_juicios_importados(resultado), 0)
+        db.session.commit()
+        self.assertEqual(Notificacion.query.filter_by(tipo='juicio_evaluativo').count(), 0)
+
     def test_cambio_de_estado_actualiza_el_juicio_sin_crear_duplicado(self):
-        importar_archivo(
+        inicial = importar_archivo(
             self._archivo_con_estado('POR EVALUAR'),
             self.ficha,
             self.a.id,
         )
+        self.assertEqual(inicial['aprendices_juicios_modificados'], set())
         db.session.commit()
 
         resultado = importar_archivo(
@@ -191,6 +266,10 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.assertEqual(JuicioEvaluativo.query.count(), 1)
         self.assertEqual(juicio.juicio, 'APROBADO')
         self.assertEqual(juicio.funcionario_registro, 'Instructor actualizado')
+        self.assertEqual(resultado['aprendices_juicios_modificados'], {juicio.aprendiz_id})
+        self.assertEqual(notificar_juicios_importados(resultado), 1)
+        db.session.commit()
+        self.assertEqual(Notificacion.query.filter_by(tipo='juicio_evaluativo').count(), 1)
 
     def test_crea_ficha_completa_desde_reporte(self):
         resultado = importar_archivo(
@@ -219,6 +298,7 @@ class ImportacionFichaTestCase(unittest.TestCase):
         self.assertEqual(ConfiguracionRanking.query.filter_by(ficha_id=ficha.id).count(), 1)
         self.assertEqual(ConfiguracionAseo.query.filter_by(ficha_id=ficha.id).count(), 1)
         self.assertEqual(resultado['metadata']['fecha_reporte'], date(2026, 6, 24))
+        self.assertEqual(notificar_juicios_importados(resultado), 0)
 
     def test_ruta_crea_ficha_y_redirige_a_aprendices(self):
         cliente = self.app.test_client()

@@ -81,7 +81,7 @@
                         {% else %}
                         <small>{{ 'Automático' if turno.generado_por == 'sistema' else 'Ajuste manual' }}</small>
                         {% endif %}
-                        {% if turno.estado != 'cumplido' and dia <= hoy %}
+                        {% if puede_gestionar_aseo and turno.estado != 'cumplido' and dia <= hoy %}
                         <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin-top: 4px;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="origen" value="transparencia">

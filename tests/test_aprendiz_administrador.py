@@ -170,35 +170,48 @@ class AprendizAdministradorTestCase(unittest.TestCase):
             3,
         )
 
-    def test_aprendiz_sin_rol_puede_generar_y_cumplir_aseo_pero_no_asistencia(self):
+    def test_aprendiz_sin_rol_no_puede_generar_ni_cumplir_aseo(self):
         self._sesion_aprendiz(self.aprendices[1])
+        administrador = self.aprendices[0]
+        administrador.rol_administrativo = True
+        db.session.commit()
         from app.services.festivos import es_dia_habil
         fecha = date.today() + timedelta(days=1)
         while not es_dia_habil(fecha):
             fecha += timedelta(days=1)
 
-        # 1. Puede generar turnos de aseo
+        # 1. No puede generar turnos, aunque envíe el documento del administrador.
         respuesta = self.cliente.post(
             f'/aprendiz/{self.ficha.id}/turnos-aseo/generar',
             data={
                 'fecha_inicio': fecha.isoformat(),
                 'fecha_fin': fecha.isoformat(),
+                'documento': administrador.documento,
             },
             follow_redirects=True,
         )
         self.assertEqual(respuesta.status_code, 200)
         turno = TurnoAseo.query.filter_by(ficha_id=self.ficha.id, fecha=fecha).first()
-        self.assertIsNotNone(turno)
-        self.assertEqual(turno.estado, 'programado')
+        self.assertIsNone(turno)
 
-        # 2. Puede marcar el turno como cumplido
+        # 2. Tampoco puede cambiar el estado de un turno existente.
+        turno = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=fecha,
+            aprendiz_1_id=administrador.id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='programado',
+        )
+        db.session.add(turno)
+        db.session.commit()
         resp_cumplir = self.cliente.post(
             f'/aprendiz/{self.ficha.id}/turnos-aseo/{turno.id}/cumplir',
+            data={'documento': administrador.documento},
             follow_redirects=True,
         )
         self.assertEqual(resp_cumplir.status_code, 200)
         db.session.refresh(turno)
-        self.assertEqual(turno.estado, 'cumplido')
+        self.assertEqual(turno.estado, 'programado')
 
         # 3. Asistencia / llamado a lista sigue estrictamente protegido para el aprendiz administrador
         fecha_asistencia = date.today() + timedelta(days=2)

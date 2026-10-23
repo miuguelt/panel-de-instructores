@@ -337,6 +337,13 @@ def panel(ficha_id):
         destinatario_tipo='aprendiz', destinatario_id=aprendiz.id,
         ficha_id=ficha_id, leida=False,
     ).order_by(Notificacion.fecha_creada.desc()).all()
+    notificacion_mas_reciente = Notificacion.query.filter_by(
+        destinatario_tipo='aprendiz', destinatario_id=aprendiz.id,
+        ficha_id=ficha_id,
+    ).order_by(Notificacion.id.desc()).with_entities(Notificacion.id).first()
+    from app.services.notificaciones_push import configuracion_push_disponible
+
+    push_habilitado = configuracion_push_disponible()
     inasistencias_pendientes = RegistroAsistencia.query.join(SesionAsistencia).filter(
         SesionAsistencia.ficha_id == ficha_id,
         RegistroAsistencia.aprendiz_id == aprendiz.id,
@@ -666,6 +673,9 @@ def panel(ficha_id):
                            notas_observador=notas_observador,
                            planes_mejoramiento=planes_mejoramiento,
                            notificaciones=notificaciones_aprendiz,
+                           notification_cursor=notificacion_mas_reciente[0] if notificacion_mas_reciente else 0,
+                           push_habilitado=push_habilitado,
+                           vapid_public_key=current_app.config.get('VAPID_PUBLIC_KEY', ''),
                            inasistencias_pendientes=inasistencias_pendientes,
                            asistencia_calendario=asistencia_calendario,
                            cronograma=cronograma,

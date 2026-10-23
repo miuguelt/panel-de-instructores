@@ -1,0 +1,18 @@
+<section class="learner-notification-controls" aria-label="Avisos de calificaciones" data-aprendiz-notifications
+         data-notification-poll-url="{{ url_for('aprendiz_seguimiento.notificaciones_nuevas_aprendiz', ficha_id=ficha.id) }}"
+         data-subscription-url="{{ url_for('aprendiz_seguimiento.gestionar_suscripcion_push_aprendiz', ficha_id=ficha.id) }}"
+         data-service-worker-url="{{ url_for('aprendiz_seguimiento.service_worker_aprendiz') }}"
+         data-vapid-public-key="{{ vapid_public_key|default('') }}"
+         data-push-enabled="{{ push_habilitado|default(false)|string|lower }}"
+         data-notification-cursor="{{ notification_cursor|default(0) }}"
+         data-notification-mode="{{ centro_avisos.modo if centro_avisos is defined else 'all' }}"
+         data-csrf-token="{{ csrf_token() }}">
+    <div class="notification-actions">
+        <button type="button" class="btn btn-sm btn-outline" data-enable-notification-sound>Activar sonido de avisos</button>
+        {% if push_habilitado|default(false) %}
+        <button type="button" class="btn btn-sm btn-outline" data-toggle-push>Activar avisos del navegador</button>
+        {% endif %}
+    </div>
+    <p data-notification-status class="notification-muted" role="status" aria-live="polite" aria-atomic="true">Los avisos nuevos aparecerán aquí mientras tengas el panel abierto.</p>
+    <div data-notification-live class="learner-notification-live" role="status" aria-live="polite" aria-atomic="false"></div>
+</section>

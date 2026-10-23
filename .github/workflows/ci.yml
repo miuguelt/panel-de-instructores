@@ -94,6 +94,9 @@ jobs:
       - name: Verificar metas, recorrido y ajustes del aprendiz
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/aprendiz_experiencia.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-experiencia.lcov --test tests_js/aprendiz_experiencia.test.cjs
 
+      - name: Verificar avisos del aprendiz y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/notificaciones_aprendiz.js --test-coverage-include=app/static/js/aprendiz-service-worker.js --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage-notificaciones.lcov --test tests_js/notificaciones_aprendiz.test.cjs
+
       - name: Instalar el navegador de pruebas
         run: |
           npm ci
@@ -130,6 +133,7 @@ jobs:
             coverage-gantt.lcov
             coverage-personalizacion.lcov
             coverage-experiencia.lcov
+            coverage-notificaciones.lcov
             coverage-cargas.lcov
           if-no-files-found: ignore
           retention-days: 14

@@ -129,6 +129,16 @@ class PersistenciaDespliegueTestCase(unittest.TestCase):
                 f'El servicio {servicio} no define LOG_LEVEL por defecto.',
             )
 
+    def test_app_y_worker_reciben_vapid_desde_secretos_y_push_se_apaga_por_defecto(self):
+        for servicio in ('app', 'worker'):
+            bloque = self.servicios[servicio]
+            self.assertIn('- WEB_PUSH_ENABLED=${WEB_PUSH_ENABLED:-false}', bloque)
+            for variable in ('VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT'):
+                self.assertIn(f'- {variable}', bloque)
+        ejemplo = _leer(os.path.join(RAIZ, '.env.example'))
+        self.assertIn('WEB_PUSH_ENABLED=false', ejemplo)
+        self.assertIn('VAPID_PRIVATE_KEY=<CLAVE_PRIVADA_VAPID>', ejemplo)
+
     def test_servicio_web_publica_puerto_8009_y_configura_puerto_traefik(self):
         app_block = self.servicios['app']
         self.assertIn(
