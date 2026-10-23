@@ -615,7 +615,7 @@ class TurnosAseoTestCase(unittest.TestCase):
 
     def test_evita_repeticion_consecutiva(self):
         # 3 días seguidos con 6 aprendices
-        fechas = [date.today() + timedelta(days=i) for i in range(1, 4)]
+        fechas = fechas_futuras(3)
         for f in fechas:
             self._crear_sesion(f)
         db.session.commit()
@@ -1091,11 +1091,7 @@ class TurnosAseoTestCase(unittest.TestCase):
             s['aprendiz_documento'] = actor.documento
             s['aprendiz_ficha_id'] = self.ficha.id
 
-        fecha_1 = date.today() + timedelta(days=1)
-        fecha_2 = date.today() + timedelta(days=2)
-        while es_festivo_colombia(fecha_1) or es_festivo_colombia(fecha_2):
-            fecha_1 += timedelta(days=1)
-            fecha_2 = fecha_1 + timedelta(days=1)
+        fecha_1, fecha_2 = fechas_futuras(2)
 
         self._crear_sesion(fecha_1)
         self._crear_sesion(fecha_2)
