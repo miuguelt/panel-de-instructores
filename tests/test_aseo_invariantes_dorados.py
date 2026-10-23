@@ -154,7 +154,11 @@ class TestAseoInvariantesDoradosPuros(unittest.TestCase):
         self.assertTrue(manifest_path.is_file(), f"Falta el manifiesto en {manifest_path}")
 
         raw_bytes = golden_path.read_bytes()
-        actual_hash = "sha256:" + hashlib.sha256(raw_bytes).hexdigest().lower()
+        # Git guarda el snapshot con LF y el checkout lo convierte a CRLF en
+        # Windows: el hash se calcula sobre el contenido canónico para que la
+        # misma revisión coincida en Linux (CI) y en Windows (local).
+        canonical = raw_bytes.replace(b'\r\n', b'\n')
+        actual_hash = "sha256:" + hashlib.sha256(canonical).hexdigest().lower()
 
         with open(manifest_path, 'r', encoding='utf-8') as f:
             manifest = json.load(f)

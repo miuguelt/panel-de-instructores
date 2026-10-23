@@ -33,10 +33,10 @@
         "tests/test_aseo_termino_general_cortes.py"
       ],
       "golden_hashes": {
-        "tests/golden/aseo_23_aprendices_60d.json": "sha256:a8808439705a71679f26428edba4275c5c6970723a1651a4eca0d4a773e1184b"
+        "tests/golden/aseo_23_aprendices_60d.json": "sha256:2745463c4d6d4895a2388e2e44d4f513c53a4cb2dd7c2b7555c54c7fc4731ee0"
       },
       "golden_snapshots": {
-        "tests/golden/aseo_23_aprendices_60d.json": "sha256:a8808439705a71679f26428edba4275c5c6970723a1651a4eca0d4a773e1184b"
+        "tests/golden/aseo_23_aprendices_60d.json": "sha256:2745463c4d6d4895a2388e2e44d4f513c53a4cb2dd7c2b7555c54c7fc4731ee0"
       }
     }
   }

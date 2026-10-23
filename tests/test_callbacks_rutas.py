@@ -34,7 +34,8 @@ class TablaEquidad(HTMLParser):
         if tag == 'td':
             etiqueta = atributos.get('data-label')
             self.etiqueta = etiqueta if etiqueta in {
-                'Aprendiz', 'En periodo', 'Total', 'Última vez', 'Próxima',
+                'Aprendiz', 'En periodo', 'Cumplidos', 'Programados',
+                'Total', 'Última vez', 'Próxima',
             } else None
             self.textos = []
 
@@ -92,11 +93,17 @@ def tablero_equidad(grupo):
     ultimas = [primera, anterior, segunda, segunda, antigua, None]
     siguientes = [proximas[0], proximas[1], proximas[0], proximas[1], proximas[2], None]
     periodos = [1, 0, 2, 1, 0, 0]
-    totales = [3, 1, 2, 1, 1, 0]
+    # El "Total" de la tabla es la carga comprometida: turnos cumplidos más
+    # turnos pendientes de todo el horizonte, no solo los cumplidos.
+    cumplidos = [3, 1, 2, 1, 1, 0]
+    pendientes = [2, 1, 1, 1, 1, 0]
+    totales = [cumplido + pendiente for cumplido, pendiente in zip(cumplidos, pendientes)]
     filas = [
         {
             'Aprendiz': aprendiz.nombre_completo,
             'En periodo': str(periodos[indice]),
+            'Cumplidos': str(cumplidos[indice]),
+            'Programados': str(pendientes[indice]),
             'Total': str(totales[indice]),
             'Última vez': ultimas[indice].strftime('%d/%m/%Y') if ultimas[indice] else 'Nunca',
             'Próxima': siguientes[indice].strftime('%d/%m/%Y') if siguientes[indice] else 'Sin programar',
@@ -140,5 +147,7 @@ def test_equidad_ordena_filas_y_conserva_metricas_visibles(tablero_equidad, vist
     tabla.feed(respuesta.get_data(as_text=True))
     assert tabla.filas == [filas[indice] for indice in indices]
     assert len(tabla.filas) == len(aprendices)
+    for fila in tabla.filas:
+        assert int(fila['Total']) == int(fila['Cumplidos']) + int(fila['Programados'])
     assert filas[5]['Última vez'] == 'Nunca'
     assert filas[5]['Próxima'] == 'Sin programar'
