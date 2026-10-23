@@ -11,7 +11,7 @@
             <p>Consulta el avance y entra directamente al módulo que necesitas.</p>
         </div>
         <a href="{{ url_for('instructor.fichas') }}" class="btn btn-primary btn-lg">
-            <span aria-hidden="true">＋</span> Crear o importar ficha
+            <i data-lucide="folder-plus" style="width:18px;height:18px;" aria-hidden="true"></i> Crear o importar ficha
         </a>
     </section>
 
@@ -29,16 +29,16 @@
     <!-- Herramientas: una sola búsqueda global y una vista persistente -->
     <div class="dashboard-toolbar">
         <div class="dashboard-search-wrap" role="search">
-            <span class="dashboard-search-icon" aria-hidden="true">🔍</span>
+            <span class="dashboard-search-icon" aria-hidden="true"><i data-lucide="search" style="width:16px;height:16px;"></i></span>
             <input type="search" id="dashboard-ficha-search" class="dashboard-search-input" placeholder="Buscar por código de ficha o nombre del programa..." aria-label="Buscar fichas">
             <button type="button" class="dashboard-search-clear" id="dashboard-search-clear" aria-label="Limpiar búsqueda" hidden>×</button>
         </div>
         <div class="view-switcher" role="group" aria-label="Modo de visualización">
             <button type="button" class="view-switch-btn is-active" id="view-mode-cards" title="Vista en cuadrícula de tarjetas" aria-pressed="true">
-                <span>⊞</span> Tarjetas
+                <i data-lucide="layout-grid" style="width:15px;height:15px;" aria-hidden="true"></i> <span>Tarjetas</span>
             </button>
             <button type="button" class="view-switch-btn" id="view-mode-compact" title="Vista compacta en lista" aria-pressed="false">
-                <span>☰</span> Lista compacta
+                <i data-lucide="list" style="width:15px;height:15px;" aria-hidden="true"></i> <span>Lista compacta</span>
             </button>
         </div>
         <span class="dashboard-result-count" id="dashboard-result-count" aria-live="polite"></span>
@@ -586,7 +586,7 @@
                     </div>
                     <div class="ficha-operational-grid">
                         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="operational-item operational-item--tasks">
-                            <span class="operational-item-icon" aria-hidden="true">📝</span>
+                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="file-text" style="width:20px;height:20px;"></i></span>
                             <span class="operational-item-copy">
                                 <span class="operational-item-label">Tareas publicadas</span>
                                 <strong>{{ extra.get('tareas_totales', 0) }}</strong>
@@ -595,7 +595,7 @@
                             <span class="operational-item-arrow" aria-hidden="true">→</span>
                         </a>
                         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="operational-item operational-item--evidence">
-                            <span class="operational-item-icon" aria-hidden="true">📥</span>
+                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="inbox" style="width:20px;height:20px;"></i></span>
                             <span class="operational-item-copy">
                                 <span class="operational-item-label">Entregas recibidas</span>
                                 <strong>{{ pct_entregas }}%</strong>
@@ -605,7 +605,7 @@
                             <span class="operational-item-arrow" aria-hidden="true">→</span>
                         </a>
                         <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="operational-item operational-item--plans">
-                            <span class="operational-item-icon" aria-hidden="true">🧭</span>
+                            <span class="operational-item-icon" aria-hidden="true"><i data-lucide="compass" style="width:20px;height:20px;"></i></span>
                             <span class="operational-item-copy">
                                 <span class="operational-item-label">Planes de mejoramiento</span>
                                 <strong>{{ extra.get('planes_pendientes', 0) }}</strong>
@@ -619,23 +619,23 @@
                 <!-- 5. BARRA DE ACCIONES RÁPIDAS -->
                 <nav class="ficha-action-grid ficha-action-grid-primary" aria-label="Acciones principales de la ficha {{ ficha.codigo }}">
                     <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
-                        <span class="module-icon" aria-hidden="true">📋</span>
+                        <span class="module-icon" aria-hidden="true"><i data-lucide="clipboard-check"></i></span>
                         <span><strong>Llamado a lista</strong><small>Registrar asistencia</small></span>
                     </a>
                     <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">📝</span>
+                        <span class="module-icon" aria-hidden="true"><i data-lucide="file-check"></i></span>
                         <span><strong>Tareas</strong><small>Asignaciones y entregas</small></span>
                     </a>
                     <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">👥</span>
+                        <span class="module-icon" aria-hidden="true"><i data-lucide="users"></i></span>
                         <span><strong>Aprendices</strong><small>Directorio y notas</small></span>
                     </a>
                     <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="module-action">
-                        <span class="module-icon" aria-hidden="true">📊</span>
+                        <span class="module-icon" aria-hidden="true"><i data-lucide="compass"></i></span>
                         <span><strong>Planeación & Juicios</strong><small>Avance pedagógico</small></span>
                     </a>
                     <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
-                        <span class="module-icon" aria-hidden="true">⚠️</span>
+                        <span class="module-icon" aria-hidden="true"><i data-lucide="alert-triangle"></i></span>
                         <span><strong>Alertas</strong><small>{% set num_alertas = extra.get('alertas_activas', 0) if extra else 0 %}{% if num_alertas %}{{ num_alertas }} activa{{ 's' if num_alertas != 1 }}{% else %}Sin riesgos{% endif %}</small></span>
                     </a>
                 </nav>

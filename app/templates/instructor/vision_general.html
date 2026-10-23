@@ -49,16 +49,16 @@
             </form>
             {% endif %}
             <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-primary btn-sm">
-                📋 Llamado a lista
+                <i data-lucide="clipboard-check" style="width:14px;height:14px;" aria-hidden="true"></i> Llamado a lista
             </a>
             <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-secondary btn-sm">
-                📝 Nueva tarea
+                <i data-lucide="plus-circle" style="width:14px;height:14px;" aria-hidden="true"></i> Nueva tarea
             </a>
             <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-info btn-sm text-white">
-                👥 Grupos Aleatorios
+                <i data-lucide="users-2" style="width:14px;height:14px;" aria-hidden="true"></i> Grupos aleatorios
             </a>
             <a href="{{ url_for('atencion.fila_atencion', ficha_id=ficha.id) }}" class="btn btn-warning btn-sm text-dark">
-                🙋‍♂️ Fila de Atención
+                <i data-lucide="hand" style="width:14px;height:14px;" aria-hidden="true"></i> Fila de atención
             </a>
         </div>
     </header>

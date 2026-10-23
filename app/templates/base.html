@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tyt.css') }}">
     <script src="{{ url_for('static', filename='js/loading-indicator.js') }}" defer></script>
     <script src="{{ url_for('static', filename='vendor/htmx/htmx.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='vendor/lucide/lucide.min.js') }}" defer></script>
     {% block head %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modal-system.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/loading-indicator.css') }}">
@@ -80,12 +81,15 @@
                        class="nav-icon-button"
                        aria-label="Notificaciones{% if notificaciones_no_leidas %}: {{ notificaciones_no_leidas }} sin leer{% endif %}"
                        title="Notificaciones">
-                        <span aria-hidden="true">🔔</span>
+                        <i data-lucide="bell" style="width:18px;height:18px;" aria-hidden="true"></i>
                         {% if notificaciones_no_leidas %}<span class="notification-count">{{ notificaciones_no_leidas }}</span>{% endif %}
                     </a>
                     <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form" hx-boost="false">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-sm btn-outline nav-logout">Salir</button>
+                        <button type="submit" class="btn btn-sm btn-outline nav-logout">
+                            <i data-lucide="log-out" style="width:14px;height:14px;" aria-hidden="true"></i>
+                            <span>Salir</span>
+                        </button>
                     </form>
                 </div>
                 {% endif %}
@@ -98,49 +102,91 @@
                 <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
                     <!-- Visión General (Centro de mando) -->
                     <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint == 'instructor.vision_general' %}is-active{% endif %}" title="Visión general de la ficha (Centro de mando)"{% if request.endpoint == 'instructor.vision_general' %} aria-current="page"{% endif %}>🌟 Visión General</a>
+                       class="{% if request.endpoint == 'instructor.vision_general' %}is-active{% endif %}" title="Visión general de la ficha (Centro de mando)"{% if request.endpoint == 'instructor.vision_general' %} aria-current="page"{% endif %}>
+                        <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
+                        <span>Visión General</span>
+                    </a>
 
                     <span class="ficha-nav-divider" aria-hidden="true"></span>
 
                     <!-- Día a Día -->
                     <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}" title="Llamado a lista y asistencia"{% if request.endpoint == 'instructor.asistencia' %} aria-current="page"{% endif %}>📋 Asistencia</a>
+                       class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}" title="Llamado a lista y asistencia"{% if request.endpoint == 'instructor.asistencia' %} aria-current="page"{% endif %}>
+                        <i data-lucide="clipboard-check" class="nav-icon" aria-hidden="true"></i>
+                        <span>Asistencia</span>
+                    </a>
                     <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}" title="Tareas y evidencias"{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %} aria-current="page"{% endif %}>📝 Tareas</a>
+                       class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}" title="Tareas y evidencias"{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %} aria-current="page"{% endif %}>
+                        <i data-lucide="file-check" class="nav-icon" aria-hidden="true"></i>
+                        <span>Tareas</span>
+                    </a>
                     <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'aseo.turnos' %}is-active{% endif %}" title="Turnos de aseo del ambiente"{% if request.endpoint == 'aseo.turnos' %} aria-current="page"{% endif %}>🧹 Aseo</a>
+                       class="{% if request.endpoint == 'aseo.turnos' %}is-active{% endif %}" title="Turnos de aseo del ambiente"{% if request.endpoint == 'aseo.turnos' %} aria-current="page"{% endif %}>
+                        <i data-lucide="sparkles" class="nav-icon" aria-hidden="true"></i>
+                        <span>Aseo</span>
+                    </a>
 
                     <span class="ficha-nav-divider" aria-hidden="true"></span>
 
                     <!-- Académico -->
                     <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %}is-active{% endif %}" title="Directorio de aprendices"{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %} aria-current="page"{% endif %}>👥 Aprendices</a>
+                       class="{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %}is-active{% endif %}" title="Directorio de aprendices"{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %} aria-current="page"{% endif %}>
+                        <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
+                        <span>Aprendices</span>
+                    </a>
                     <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.juicios',) %}is-active{% endif %}" title="Juicios evaluativos y RAPs"{% if request.endpoint in ('instructor.juicios',) %} aria-current="page"{% endif %}>🎓 Juicios</a>
+                       class="{% if request.endpoint in ('instructor.juicios',) %}is-active{% endif %}" title="Juicios evaluativos y RAPs"{% if request.endpoint in ('instructor.juicios',) %} aria-current="page"{% endif %}>
+                        <i data-lucide="graduation-cap" class="nav-icon" aria-hidden="true"></i>
+                        <span>Juicios</span>
+                    </a>
                     <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'planeacion.analisis' %}is-active{% endif %}" title="Planeación pedagógica y línea de tiempo"{% if request.endpoint == 'planeacion.analisis' %} aria-current="page"{% endif %}>🧭 Planeación</a>
+                       class="{% if request.endpoint == 'planeacion.analisis' %}is-active{% endif %}" title="Planeación pedagógica y línea de tiempo"{% if request.endpoint == 'planeacion.analisis' %} aria-current="page"{% endif %}>
+                        <i data-lucide="compass" class="nav-icon" aria-hidden="true"></i>
+                        <span>Planeación</span>
+                    </a>
                     <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.estadisticas',) %}is-active{% endif %}" title="Estadísticas y reportes"{% if request.endpoint in ('instructor.estadisticas',) %} aria-current="page"{% endif %}>📊 Estadísticas</a>
+                       class="{% if request.endpoint in ('instructor.estadisticas',) %}is-active{% endif %}" title="Estadísticas y reportes"{% if request.endpoint in ('instructor.estadisticas',) %} aria-current="page"{% endif %}>
+                        <i data-lucide="bar-chart-3" class="nav-icon" aria-hidden="true"></i>
+                        <span>Estadísticas</span>
+                    </a>
 
                     <span class="ficha-nav-divider" aria-hidden="true"></span>
 
                     <!-- Seguimiento y Convivencia -->
                     <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}" title="Alertas tempranas de riesgo"{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %} aria-current="page"{% endif %}>⚠️ Alertas</a>
+                       class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}" title="Alertas tempranas de riesgo"{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %} aria-current="page"{% endif %}>
+                        <i data-lucide="alert-triangle" class="nav-icon" aria-hidden="true"></i>
+                        <span>Alertas</span>
+                    </a>
                     <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'instructor.observador' %}is-active{% endif %}" title="Observador del aprendiz"{% if request.endpoint == 'instructor.observador' %} aria-current="page"{% endif %}>📓 Observador</a>
+                       class="{% if request.endpoint == 'instructor.observador' %}is-active{% endif %}" title="Observador del aprendiz"{% if request.endpoint == 'instructor.observador' %} aria-current="page"{% endif %}>
+                        <i data-lucide="book-open" class="nav-icon" aria-hidden="true"></i>
+                        <span>Observador</span>
+                    </a>
                     <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}" title="Casos de seguimiento"{% if request.endpoint == 'seguimiento.casos_seguimiento' %} aria-current="page"{% endif %}>🔍 Seguimiento</a>
+                       class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}" title="Casos de seguimiento"{% if request.endpoint == 'seguimiento.casos_seguimiento' %} aria-current="page"{% endif %}>
+                        <i data-lucide="search-check" class="nav-icon" aria-hidden="true"></i>
+                        <span>Seguimiento</span>
+                    </a>
 
                     <span class="ficha-nav-divider" aria-hidden="true"></span>
 
                     <!-- Recursos y Gamificación -->
                     <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}" title="Materiales de apoyo"{% if request.endpoint == 'instructor.materiales' %} aria-current="page"{% endif %}>📂 Materiales</a>
+                       class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}" title="Materiales de apoyo"{% if request.endpoint == 'instructor.materiales' %} aria-current="page"{% endif %}>
+                        <i data-lucide="folder" class="nav-icon" aria-hidden="true"></i>
+                        <span>Materiales</span>
+                    </a>
                     <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}" title="Ranking de participación"{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %} aria-current="page"{% endif %}>🏆 Ranking</a>
+                       class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}" title="Ranking de participación"{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %} aria-current="page"{% endif %}>
+                        <i data-lucide="trophy" class="nav-icon" aria-hidden="true"></i>
+                        <span>Ranking</span>
+                    </a>
                     <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}"
-                       class="{% if request.blueprint == 'grupos' %}is-active{% endif %}" title="Gestión de grupos y equipos"{% if request.blueprint == 'grupos' %} aria-current="page"{% endif %}>👥 Grupos</a>
+                       class="{% if request.blueprint == 'grupos' %}is-active{% endif %}" title="Gestión de grupos y equipos"{% if request.blueprint == 'grupos' %} aria-current="page"{% endif %}>
+                        <i data-lucide="users-2" class="nav-icon" aria-hidden="true"></i>
+                        <span>Grupos</span>
+                    </a>
                 </nav>
             </div>
         </div>
@@ -310,5 +356,17 @@
             </footer>
         </section>
     </dialog>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        });
+        document.body.addEventListener('htmx:afterSwap', function() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        });
+    </script>
 </body>
 </html>
