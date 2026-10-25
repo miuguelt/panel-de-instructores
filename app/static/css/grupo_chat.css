@@ -76,7 +76,7 @@
 .group-delivery-card { min-width: 0; }
 .group-assignment-names { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; color: var(--text-muted); font-size: 13px; }
 .group-assignment-names strong { color: var(--text-strong); }
-.group-assignment-names span { overflow-wrap: anywhere; }
+.group-assignment-names span { overflow-wrap: break-word; }
 .group-delivery-members,
 .group-delivery-submitter,
 .group-delivery-feedback { color: var(--text-muted); font-size: 13px; line-height: 1.5; }
@@ -162,7 +162,7 @@
     font-size: 13px;
 }
 
-.learner-group-members li > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+.learner-group-members li > span:nth-child(2) { min-width: 0; overflow-wrap: break-word; }
 .learner-group-avatar {
     display: inline-grid;
     width: 34px;
@@ -201,7 +201,7 @@
     color: var(--text-strong);
     font-size: 15px;
     line-height: 1.35;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 .learner-group-task-header .badge { flex: 0 0 auto; white-space: normal; text-align: center; }
 .learner-group-task-card .task-desc { margin: 10px 0; }
@@ -257,7 +257,7 @@
     border: 1px solid var(--border-data);
     border-radius: var(--radius-control) var(--radius-control) var(--radius-control) 4px;
     background: var(--surface-data);
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 .learner-group-chat-message.is-own {
     align-self: flex-end;
@@ -281,7 +281,7 @@
     font-size: 13px;
     line-height: 1.5;
     white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 .learner-group-chat-status { min-height: 1.2em; margin: 0; color: var(--text-muted); font-size: 12px; }
 .learner-group-chat-form { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -317,3 +317,22 @@
     .learner-group-chat-compose-footer { align-items: stretch; flex-direction: column; }
     .learner-group-chat-compose-footer .btn { width: 100%; }
 }
+
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

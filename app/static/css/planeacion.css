@@ -140,7 +140,7 @@
     color: var(--text-muted);
     font-size: 0.78rem;
     line-height: 1.5;
-    max-width: 78ch;
+    max-width:100%;
 }
 
 .pl-note { color: var(--text-muted); font-size: 0.74rem; line-height: 1.55; }
@@ -684,7 +684,7 @@
     border-radius: 16px;
 }
 .pl-empty h2 { margin: 0.3rem 0; color: var(--text-strong); }
-.pl-empty p { max-width: 44ch; margin: 0.6rem auto; color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; }
+.pl-empty p { width: 100%; max-width:100%; margin: 0.6rem auto; color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; text-align:var(--text-align-reading, start); }
 
 /* --- Adaptación a pantallas estrechas ------------------------------------ */
 @media (max-width: 860px) {
@@ -939,11 +939,13 @@
 .pl-doc-meta-title {
     color: var(--text-strong);
     font-size: 0.8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
     display: block;
-    max-width: 15rem;
+    width: 100%;
+    max-width: 100%;
+    overflow-wrap: break-word;
 }
 .pl-doc-meta-sub {
     color: var(--text-muted);
@@ -2397,9 +2399,11 @@ details.pl-collapsible-section > .pl-collapsible-body {
 .pl-fase-node-title strong {
     font-size: 0.82rem;
     color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    max-width: 100%;
+    overflow-wrap: break-word;
 }
 .pl-fase-node-title small {
     font-size: 0.68rem;
@@ -2917,3 +2921,22 @@ details.pl-collapsible-section > .pl-collapsible-body {
     align-items: center;
     margin-top: 0.9rem;
 }
+
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

@@ -341,7 +341,7 @@
     .learner-notifications .notification-group { margin-block: 1.5rem; }
     .learner-notifications .notification-group h3 { margin-bottom: .75rem; font-size: 1rem; }
     .learner-notifications .notification-meta { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
-    .learner-notifications .notification-copy p { overflow-wrap: anywhere; }
+    .learner-notifications .notification-copy p { overflow-wrap: break-word; }
     .learner-notifications .notification-actions { min-width: 0; }
     .learner-notifications .notification-actions .btn { min-height: 44px; }
     .learner-notifications .btn-primary { background: var(--text-strong); color: var(--bg-card); border-color: var(--text-strong); }
@@ -692,3 +692,22 @@
 .turno-no-realizado { color: var(--status-danger-text); font-weight: 600; }
 .legend-block.no-cumplido { background: var(--sena-red); }
 .fila-atencion-dot { width: 8px; height: 8px; }
+
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

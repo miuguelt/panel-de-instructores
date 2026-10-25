@@ -5,7 +5,7 @@
 ========================================= */
 
 
-    .report-shell { display: flex; flex-direction: column; gap: 1.15rem; max-width: 1500px; margin: 0 auto; color: var(--text-main); }
+    .report-shell { display: flex; flex-direction: column; gap: 1.15rem; max-width:100%; margin: 0 auto; color: var(--text-main); }
     .report-toolbar, .report-toolbar__actions, .report-identity, .report-hero__side, .report-meta-list, .report-section-heading, .report-section-heading > div, .report-task-card__title, .report-followup-item__head, .report-instructor-card__footer { display: flex; align-items: center; }
     .report-toolbar { justify-content: space-between; gap: 1rem; }
     .report-toolbar__actions { gap: .8rem; }
@@ -57,7 +57,7 @@
     .report-section { min-width: 0; padding: 1.3rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: var(--shadow); }
     .report-section--intro { background: var(--bg-surface); }
     .report-section--intro h2 { margin: .25rem 0 .35rem; }
-    .report-section--intro p { margin: 0; color: var(--text-main); max-width: 74ch; }
+    .report-section--intro p { margin: 0; color: var(--text-main); max-width:100%; }
     .report-section h2, .report-section h3 { margin: .25rem 0 0; color: var(--text-strong); }
     .report-section h2 { font-size: 1.15rem; } .report-section h3 { font-size: 1rem; }
     .report-section-heading { justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
@@ -119,3 +119,22 @@
     @media (max-width: 760px) { .report-toolbar, .report-hero, .report-hero__side { align-items: flex-start; flex-direction: column; } .report-toolbar__actions, .report-hero__side { align-items: flex-start; } .report-two-columns { grid-template-columns: 1fr; } .report-kpi-grid, .report-stat-grid--four, .report-stat-grid--five { grid-template-columns: repeat(2, 1fr); } .report-task-card { grid-template-columns: 1fr; } .report-meta-list span + span { border-left: 0; padding-left: 0; } .report-timeline-row { grid-template-columns: 75px minmax(80px, 1fr) 42px; } .report-timeline-row small { display: none; } }
     @media (max-width: 480px) { .report-shell { gap: .8rem; } .report-hero, .report-section { padding: 1rem; } .report-context-grid, .report-kpi-grid, .report-stat-grid--four, .report-stat-grid--five { grid-template-columns: 1fr; } .report-avatar { width: 60px; height: 60px; border-radius: 15px; } .report-identity { gap: .8rem; } .report-hero h1 { font-size: 1.35rem; } .report-category-row { grid-template-columns: minmax(0, 1fr) 80px; } .report-month-row { grid-template-columns: 105px minmax(80px, 1fr) 42px; } }
     @media print { @page { margin: 12mm; } body { background: var(--color-white) !important; } .no-print, .report-tabs { display: none !important; } .report-shell { max-width: none; gap: .7rem; } .report-hero, .report-section, .report-kpi, .report-stat, .report-context-grid > div { box-shadow: none; } .report-panel { display: flex !important; page-break-before: always; } #report-summary { page-break-before: auto; } .report-table-wrap { overflow: visible; } .report-table { min-width: 0; font-size: .68rem; } .report-table th, .report-table td { padding: .45rem; } .report-competency-card, .report-task-card, .report-followup-item { break-inside: avoid; } }
+
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

@@ -28,6 +28,8 @@
             } catch (e) {}
         })();
     </script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/devbrain-prose.css') }}" data-devbrain-prose>
+<script defer src="{{ url_for('static', filename='css/devbrain-prose.js') }}" data-devbrain-prose-runtime></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
     <div id="app-loading-overlay" class="app-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true" hidden>

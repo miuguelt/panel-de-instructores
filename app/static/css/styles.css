@@ -489,6 +489,7 @@ dialog.app-modal-overlay::backdrop {
     background: transparent;
 }
 
+/* text-layout-exception: el contenido completo permanece disponible en .app-modal-body con desplazamiento vertical */
 .modal-content-base,
 .app-modal-content {
     display: flex;
@@ -496,7 +497,8 @@ dialog.app-modal-overlay::backdrop {
     width: min(100%, 32.5rem);
     max-height: min(90vh, 52rem);
     min-height: 0;
-    overflow: hidden;
+    overflow-x: clip;
+    overflow-y: auto;
     color: var(--text-main);
     background: var(--surface-glass-strong, var(--bg-card));
     border: 1px solid var(--border-glass);
@@ -556,10 +558,11 @@ dialog.app-modal-overlay::backdrop {
 }
 .ficha-context {
     display: flex;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
     align-items: center;
     gap: 8px;
-    max-width: 280px;
+    max-width:100%;
     margin-right: 12px;
     padding-right: 12px;
     border-right: 1px solid var(--border-divider);
@@ -579,20 +582,22 @@ dialog.app-modal-overlay::backdrop {
     text-transform: uppercase;
 }
 .ficha-context strong {
-    overflow: hidden;
+    overflow: visible;
     color: var(--accent-hover);
     font-size: 13px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
+    text-overflow: clip;
+    white-space: normal;
 }
 .ficha-context-prog {
     color: var(--text-muted);
     font-size: 11px;
     font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 200px;
+    overflow: visible;
+    overflow-wrap: break-word;
+    text-overflow: clip;
+    white-space: normal;
+    max-width:100%;
     margin-top: 1px;
 }
 .ficha-nav {
@@ -882,14 +887,14 @@ body {
 
 .container {
     width: 100%;
-    max-width: 1240px;
+    max-width:100%;
     margin: 0 auto;
     padding: clamp(16px, 2.5vw, 32px) clamp(16px, 3vw, 32px) 56px;
 }
 
 @media (min-width: 1200px) {
     .container {
-        max-width: 1600px;
+        max-width:100%;
     }
 }
 
@@ -923,7 +928,7 @@ body {
     display: flex;
     align-items: center;
     width: 100%;
-    max-width: 1600px;
+    max-width:100%;
     min-height: 72px;
     margin: 0 auto;
     padding: 10px clamp(16px, 3vw, 32px);
@@ -968,10 +973,9 @@ body {
     margin-top: 3px;
     font-size: 11px;
     opacity: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 280px;
+    white-space: normal;
+    max-width: 100%;
+    overflow-wrap: break-word;
     color: var(--navbar-text-muted);
 }
 .nav-primary {
@@ -1100,13 +1104,16 @@ body {
 
 .nav-context-title {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     font-size: 13.5px;
     font-weight: 700;
     color: #ffffff;
     letter-spacing: -0.01em;
-    white-space: nowrap;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: break-word;
     margin: 0;
     line-height: 1.2;
 }
@@ -2225,7 +2232,7 @@ input[type="radio"] {
 /* ---- Column helpers ---- */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
-.text-left { text-align: left; }
+.text-left { text-align:var(--text-align-reading, start); }
 
 .td-count {
     text-align: center;
@@ -2693,7 +2700,7 @@ input[type="radio"] {
 .empty-state-lead {
     color: var(--text-muted);
     font-size: 15px;
-    max-width: 560px;
+    max-width:100%;
     margin: 0 auto 28px;
     line-height: 1.6;
 }
@@ -5190,10 +5197,6 @@ input[type="radio"] {
 }
 
 .ficha-dashboard-active .timeline-explanation {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
     margin: 8px 0 13px;
 }
 
@@ -5732,7 +5735,7 @@ input[type="radio"] {
 .settings-card[open] > summary { margin: 0 -18px 12px; border-bottom: 1px solid var(--border-divider); }
 .status-text { margin-left: 6px; font-size: 11px; }
 .error-page {
-    max-width: 620px;
+    max-width:100%;
     margin: clamp(40px, 10vh, 100px) auto;
     padding: clamp(28px, 6vw, 52px);
     text-align: center;
@@ -5911,7 +5914,9 @@ input[type="radio"] {
     }
     .nav-title {
         font-size: 14px;
-        white-space: nowrap;
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: break-word;
     }
     .nav-program-badge {
         font-size: 9px;
@@ -5923,10 +5928,10 @@ input[type="radio"] {
         display: block;
         font-size: 9.5px;
         opacity: 0.8;
-        max-width: 130px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        max-width:100%;
+        white-space: normal;
+        
+        
         color: rgba(255, 255, 255, 0.78);
     }
     .nav-primary {
@@ -5983,7 +5988,7 @@ input[type="radio"] {
         gap: 6px;
     }
     .ficha-context {
-        max-width: 140px;
+        max-width:100%;
         margin-right: 4px;
         padding-right: 8px;
         gap: 4px;
@@ -6009,10 +6014,11 @@ input[type="radio"] {
         display: block;
         font-size: 9px;
         color: var(--text-muted);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100px;
+        overflow: visible;
+        overflow-wrap: break-word;
+        text-overflow: clip;
+        white-space: normal;
+        max-width:100%;
     }
     .ficha-nav {
         gap: 3px;
@@ -6170,7 +6176,7 @@ input[type="radio"] {
         display: none;
     }
     .ficha-context-prog {
-        max-width: 70px;
+        max-width:100%;
     }
     .module-action { min-height: 62px; }
     .timeline-marker b { font-size: 8px; }
@@ -8554,7 +8560,7 @@ input[type="radio"] {
     }
 
     .dashboard-hero p {
-        max-width: 30rem;
+        max-width:100%;
         font-size: 14px;
     }
 
@@ -8655,9 +8661,9 @@ input[type="radio"] {
     }
     .nav-title {
         font-size: 12.5px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: break-word;
     }
 }
 
@@ -10536,7 +10542,7 @@ input[type="radio"] {
     color: var(--text-muted);
     font-size: 10.5px;
     line-height: 1.25;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 
 .operational-item-arrow {
@@ -13137,8 +13143,8 @@ main#contenido-principal {
 }
 
 .tasks-section-wrapper .task-info { flex: 1 1 16rem; min-width: 0; }
-.tasks-section-wrapper .task-title { font-size: clamp(1.05rem, 2vw, 1.22rem); line-height: 1.35; letter-spacing: -.02em; overflow-wrap: anywhere; }
-.tasks-section-wrapper .task-desc { margin: .8rem 0 0; max-width: 78ch; font-size: .9rem; line-height: 1.65; }
+.tasks-section-wrapper .task-title { font-size: clamp(1.05rem, 2vw, 1.22rem); line-height: 1.35; letter-spacing: -.02em; overflow-wrap: break-word; }
+.tasks-section-wrapper .task-desc { margin: .8rem 0 0; max-width:100%; font-size: .9rem; line-height: 1.65; }
 .tasks-section-wrapper .task-deadline { display: flex; align-items: center; gap: .35rem; margin: .4rem 0 0; color: var(--text-muted); font-size: .79rem; line-height: 1.5; }
 .tasks-section-wrapper .task-status { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; margin: 0; }
 .tasks-section-wrapper .task-status .badge { border-radius: 999px; padding: .38rem .65rem; font-size: .68rem; line-height: 1.2; white-space: normal; }
@@ -13342,7 +13348,7 @@ main#contenido-principal {
 
 .portafolio-subtitle {
     margin: 0;
-    max-width: 720px;
+    max-width:100%;
     font-size: 0.88rem;
     line-height: 1.45;
 }
@@ -13607,7 +13613,7 @@ main#contenido-principal {
 }
 
 .portafolio-modal-shell {
-    max-width: 540px;
+    max-width:100%;
     width: 92vw;
     background: var(--card-bg, #ffffff);
     border-radius: var(--radius, 16px);
@@ -13833,3 +13839,21 @@ main#contenido-principal {
     }
 }
 
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

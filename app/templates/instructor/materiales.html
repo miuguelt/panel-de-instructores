@@ -49,7 +49,7 @@
     <div style="display:flex;gap:14px;align-items:flex-start;padding:16px 18px 12px;">
       <div class="file-icon {{ icon_class }}">{{ label }}</div>
       <div style="flex:1;min-width:0;">
-        <h3 style="font-size:15px;font-weight:700;color:var(--text-strong);margin:0 0 3px;line-height:1.3;word-break:break-word;" title="{{ m.nombre_archivo }}">{{ m.nombre_archivo }}</h3>
+        <h3 style="font-size:15px;font-weight:700;color:var(--text-strong);margin:0 0 3px;line-height:1.3;word-break:normal;overflow-wrap:break-word;" title="{{ m.nombre_archivo }}">{{ m.nombre_archivo }}</h3>
         <div class="material-meta">
           <span>{{ tamanos.get(m.id, 0)|format_size }}</span>
           <span class="divider">|</span>
@@ -59,7 +59,7 @@
     </div>
     {% if m.descripcion %}
     <div style="padding:0 18px 8px;">
-      <p style="font-size:13px;color:var(--text-muted);line-height:1.45;margin:0;word-break:break-word;">{{ m.descripcion }}</p>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.45;margin:0;word-break:normal;overflow-wrap:break-word;">{{ m.descripcion }}</p>
     </div>
     {% endif %}
     <div style="padding:10px 18px 14px;border-top:1px solid var(--border-divider);display:flex;gap:6px;flex-wrap:wrap;">

@@ -201,7 +201,7 @@
 .pl-vencidas-card { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-divider); }
 .pl-vencidas-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: .8rem 1.2rem; margin-bottom: 1rem; }
 .pl-vencidas-head h3 { margin: .2rem 0 .4rem; font-size: 1.15rem; color: var(--text-strong); }
-.pl-vencidas-head p { margin: 0; font-size: .83rem; color: var(--text-muted); max-width: 50rem; line-height: 1.5; }
+.pl-vencidas-head p { margin: 0; font-size: .83rem; color: var(--text-muted); max-width:100%; line-height: 1.5; }
 .pl-vencidas-chips { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .pl-vencidas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 1rem; }
 .pl-vencida-item { display: flex; flex-direction: column; padding: 1rem; border-radius: 12px; border: 1px solid var(--border-divider); background: var(--bg-surface); cursor: pointer; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; text-align: left; }
@@ -220,3 +220,21 @@
 .pl-btn-vencida-abrir { background: transparent; border: 0; color: var(--accent-primary); font-size: .78rem; font-weight: 700; cursor: pointer; padding: 0; }
 .pl-vencida-item:hover .pl-btn-vencida-abrir { text-decoration: underline; }
 
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

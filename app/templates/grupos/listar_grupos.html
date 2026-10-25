@@ -155,7 +155,7 @@
                     <!-- Header de la Card del Grupo -->
                     <div class="grupo-card-header">
                         <div style="min-width:0;flex-grow:1;margin-right:6px;">
-                            <h3 class="grupo-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ grupo.nombre }}">{{ grupo.nombre }}</h3>
+                            <h3 class="grupo-title" style="white-space:normal;overflow-wrap:break-word;" title="{{ grupo.nombre }}">{{ grupo.nombre }}</h3>
                             <div class="grupo-meta">
                                <i data-lucide="calendar" class="icon-sm"></i>
                                 {{ grupo.creado_en.strftime('%d/%m/%Y') }} &middot; {{ grupo.aprendices|length }} aprendices
@@ -212,7 +212,7 @@
                 <h3 style="font-size:1.15rem;font-weight:700;color:var(--text-strong,inherit);margin-bottom:0.5rem;">
                     No hay equipos activos en esta ficha
                 </h3>
-                <p style="max-width:440px;font-size:0.9rem;line-height:1.55;color:var(--text-muted);margin-bottom:1.5rem;">
+                <p style="max-width:100%;font-size:0.9rem;line-height:1.55;color:var(--text-muted);margin-bottom:1.5rem;">
                     Puedes distribuir automáticamente los aprendices con el generador de la izquierda o crear equipos y asignar aprendices de forma manual.
                 </p>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">

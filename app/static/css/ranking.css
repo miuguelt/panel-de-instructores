@@ -82,7 +82,7 @@
 }
 
 .ranking-page .ranking-cut-selector {
-    max-width: 30rem;
+    max-width:100%;
 }
 
 .ranking-page .control-selectors-cluster,
@@ -150,8 +150,8 @@
 }
 
 .ranking-page .ranking-detail-heading > span {
-    max-width: 15rem;
-    text-align: left;
+    max-width:100%;
+    text-align:var(--text-align-reading, start);
 }
 
 .ranking-page #ranking-lista {
@@ -169,7 +169,7 @@
 }
 
 .ranking-page .ranking-podium-heading > span {
-    text-align: left;
+    text-align:var(--text-align-reading, start);
 }
 
 .ranking-page .ranking-podium-grid {
@@ -727,3 +727,22 @@
         border-color: var(--danger);
         background: var(--sena-red-light);
     }
+
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

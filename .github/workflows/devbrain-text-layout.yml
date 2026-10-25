@@ -1,0 +1,41 @@
+# DevBrain: comprobación portable de la regla 7.4.
+name: Ancho y legibilidad del texto
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  text-layout:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Pruebas y cobertura de los auditores
+        run: |
+          $env:NODE_V8_COVERAGE = 'coverage/text-layout'
+          node --test --experimental-test-coverage --test-coverage-include="**/text-layout-audit.mjs" --test-coverage-include="**/text-layout-browser-audit.cjs" --test-coverage-include="**/text-layout-browser-discovery.cjs" --test-coverage-include="**/text-layout-browser-probes.cjs" --test-coverage-include="**/text-layout-browser-engine.cjs" --test-coverage-include="**/text-layout-browser-runner.cjs" --test-coverage-include="**/text-layout-migration.mjs" --test-coverage-include="**/text-layout-install.mjs" --test-coverage-include="**/templates/prose-layout.js" --test-coverage-functions=100 --test-coverage-lines=90 --test-coverage-branches=80 tools/text-layout/scripts/tests/text-layout-audit.test.mjs tools/text-layout/scripts/tests/text-layout-browser-engine.test.cjs tools/text-layout/scripts/tests/prose-layout.test.mjs tools/text-layout/scripts/tests/prose-runtime.test.cjs tools/text-layout/scripts/tests/text-layout-install.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Fallaron las pruebas o la cobertura de los auditores.' }
+      - name: Auditar los estilos del proyecto
+        run: |
+          node tools/text-layout/scripts/text-layout-audit.mjs --root . --project --fail-on-violations --json > text-layout-static.json
+          if ($LASTEXITCODE -ne 0) { throw 'Hay restricciones de texto pendientes de corregir.' }
+      - name: Auditar las páginas estáticas
+        run: |
+          node tools/text-layout/scripts/text-layout-browser-audit.cjs --root . --project --json > text-layout-browser.json
+          if ($LASTEXITCODE -ne 0) { throw 'Hay problemas visuales de texto pendientes de corregir.' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: text-layout-evidence
+          path: |
+            text-layout-*.json
+            coverage/text-layout

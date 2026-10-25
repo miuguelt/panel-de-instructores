@@ -44,7 +44,7 @@
 .experience-competency-list strong, .experience-milestone-list strong { color: var(--text-strong); font-size: .88rem; }
 .experience-competency-list li > span { font-size: .8rem; }
 .experience-milestone-list li { display: flex; gap: .6rem; align-items: flex-start; }
-.experience-milestone-list li > span { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; background: var(--surface-control); color: var(--text-strong); font-weight: 800; }
+.experience-milestone-list li > span { display: grid; place-items: center; width:100%; height: 28px; flex: 0 0 28px; border-radius: 50%; background: var(--surface-control); color: var(--text-strong); font-weight: 800; }
 .experience-milestone-list p { margin: .2rem 0 0; font-size: .84rem; }
 .experience-empty { font-size: .9rem; }
 .experience-empty > span { font-size: 1.5rem; display: block; margin-bottom: .4rem; }
@@ -65,7 +65,7 @@
 #panel-aprendiz-root .portafolio-tile-body .btn { white-space: normal; max-width: 100%; min-height: 44px; }
 #panel-aprendiz-root .learner-calendar-toolbar { flex-wrap: wrap; min-width: 0; gap: .5rem; }
 #panel-aprendiz-root .learner-calendar-toolbar > * { min-width: 0; }
-#panel-aprendiz-root .learner-calendar-toolbar h3 { flex: 1 1 8rem; text-align: center; overflow-wrap: anywhere; }
+#panel-aprendiz-root .learner-calendar-toolbar h3 { flex: 1 1 8rem; text-align: center; overflow-wrap: break-word; }
 #panel-aprendiz-root .learner-calendar-toolbar button { max-width: 100%; min-height: 44px; white-space: normal; }
 #panel-aprendiz-root.experience-reduced-motion *, #panel-aprendiz-root.experience-reduced-motion *::before, #panel-aprendiz-root.experience-reduced-motion *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 #aprendiz-experiencia[aria-busy="true"] .experience-feedback { animation: experience-waiting 1.4s ease-in-out infinite alternate; }
@@ -85,3 +85,22 @@
     #panel-aprendiz-root .learner-calendar-toolbar button { grid-row: 2; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { #aprendiz-experiencia *, #aprendiz-experiencia *::before, #aprendiz-experiencia *::after { animation: none !important; transition: none !important; } }
+
+/* devbrain-prose-contract:start */
+/* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
+:where(p, dd, blockquote) {
+    --text-align-reading: start;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: var(--text-align-reading);
+    text-align-last: start;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    -webkit-hyphens: none;
+}
+:where(dd, blockquote) { margin-inline: 0; }
+/* devbrain-prose-contract:end */

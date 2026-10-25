@@ -26,6 +26,8 @@ const { chromium } = require('playwright');
 const raiz = path.resolve(__dirname, '..');
 const cssSistema = fs.readFileSync(path.join(raiz, 'app', 'static', 'css', 'styles.css'), 'utf8');
 const cssModales = fs.readFileSync(path.join(raiz, 'app', 'static', 'css', 'modal-system.css'), 'utf8');
+const cssPlaneacion = fs.readFileSync(path.join(raiz, 'app', 'static', 'css', 'planeacion.css'), 'utf8');
+const cssPlaneacionWorkspace = fs.readFileSync(path.join(raiz, 'app', 'static', 'css', 'planeacion_workspace.css'), 'utf8');
 const directorioResultados = path.join(raiz, 'test-results');
 
 let browser;
@@ -103,6 +105,26 @@ body { background: var(--bg-base); color: var(--text-main); font-family: system-
 async function abrirPagina(viewport = { width: 1440, height: 900 }) {
   const page = await browser.newPage({ viewport });
   await page.setContent(htmlPrueba(), { waitUntil: 'load' });
+  return page;
+}
+
+async function abrirPaginaLectura(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.setContent(`<!doctype html>
+<html lang="es-CO"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>${cssSistema}${cssPlaneacion}${cssPlaneacionWorkspace}
+html, body { margin: 0; padding: 0; }
+body { padding: 16px; font-family: system-ui, sans-serif; }
+.pl-page { width: 100%; max-width: none; min-width: 0; }
+#contenido-lectura { display: grid; gap: 16px; width: 100%; min-width: 0; }
+</style></head><body><main class="pl-page" id="contenido-lectura">
+  <section class="pl-doc-meta-badge" id="documento">
+    <div class="pl-doc-meta-info"><strong class="pl-doc-meta-title" id="titulo-documento">📗 Programa de formación para gestión documental y servicio institucional con acompañamiento presencial.pdf</strong></div>
+  </section>
+  <section class="pl-fase-node">
+    <div class="pl-fase-node-head"><span class="pl-fase-node-icon" aria-hidden="true">📎</span><div class="pl-fase-node-title"><strong id="titulo-fase">Acompañamiento y verificación de evidencias del proceso formativo institucional</strong><small>Segundo trimestre · 480 horas</small></div></div>
+  </section>
+</main></body></html>`, { waitUntil: 'load' });
   return page;
 }
 
@@ -281,6 +303,44 @@ test('sin desbordamiento horizontal en 320/390/768/1440/1920/2560 px', async () 
     if (process.env.PANEL_TEST_SCREENSHOTS !== '0' && [390, 1440].includes(ancho)) {
       await page.screenshot({ path: path.join(directorioResultados, `diseno-visual-${ancho}.png`), fullPage: true });
     }
+    await page.close();
+  }
+});
+
+test('los nombres de archivo y títulos de fase se envuelven sin recortarse entre 320 y 2560 px', async () => {
+  for (const ancho of [320, 390, 768, 1440, 1920, 2560]) {
+    const page = await abrirPaginaLectura({ width: ancho, height: 900 });
+    const medidas = await page.evaluate(() => {
+      const documento = document.getElementById('titulo-documento');
+      const fase = document.getElementById('titulo-fase');
+      const resumen = elemento => {
+        const estilo = getComputedStyle(elemento);
+        const rect = elemento.getBoundingClientRect();
+        return {
+          ancho: rect.width,
+          alto: rect.height,
+          scrollWidth: elemento.scrollWidth,
+          clientWidth: elemento.clientWidth,
+          whiteSpace: estilo.whiteSpace,
+          textOverflow: estilo.textOverflow,
+          overflowWrap: estilo.overflowWrap,
+        };
+      };
+      return {
+        documento: resumen(documento),
+        fase: resumen(fase),
+        pagina: document.documentElement.scrollWidth,
+        ventana: window.innerWidth,
+      };
+    });
+
+    for (const [nombre, texto] of [['nombre de archivo', medidas.documento], ['título de fase', medidas.fase]]) {
+      assert.equal(texto.whiteSpace, 'normal', `${nombre}: debe permitir el ajuste natural a ${ancho}px`);
+      assert.notEqual(texto.textOverflow, 'ellipsis', `${nombre}: no debe truncarse a ${ancho}px`);
+      assert.ok(texto.scrollWidth <= texto.clientWidth + 1, `${nombre}: tiene ancho interno desbordado a ${ancho}px`);
+      assert.ok(texto.alto > 18, `${nombre}: debe crecer en altura al envolver texto a ${ancho}px`);
+    }
+    assert.ok(medidas.pagina <= medidas.ventana + 1, `La página se desborda horizontalmente a ${ancho}px`);
     await page.close();
   }
 });
