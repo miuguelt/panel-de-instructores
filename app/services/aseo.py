@@ -135,20 +135,40 @@ def _es_turno_reposicion(turno):
     return bool(turno.observacion and 'Reposición' in turno.observacion)
 
 
-def _sembrar_descanso_anterior(ficha_id, fecha_inicio):
-    """Pareja y fecha del turno inmediatamente anterior al tramo que se calcula.
+def _sembrar_descanso_anterior(ficha_id, fecha_inicio, k=None):
+    """Recupera el historial de las últimas K sesiones anteriores a fecha_inicio.
 
-    Evita que un recálculo parcial repita en su primera sesión a quienes ya
-    hicieron aseo en la última sesión del tramo previo. Se ignora cuando el
-    turno anterior quedó a más de tres días (puente o fin de semana largo).
+    Siembra la ventana de enfriamiento y la antigüedad de la sesión previa para que
+    el motor puro respete el descanso sin repetir aprendices recientemente asignados.
+    Si el turno más reciente quedó a más de 4 días (puente, receso o vacaciones),
+    no se bloquea por enfriamiento inmediato de sesiones previas.
     """
-    anterior = TurnoAseo.query.filter(
-        TurnoAseo.ficha_id == ficha_id,
-        TurnoAseo.fecha < fecha_inicio,
-    ).order_by(TurnoAseo.fecha.desc()).first()
-    if not anterior or (fecha_inicio - anterior.fecha) > timedelta(days=3):
-        return None, None
-    return {anterior.aprendiz_1_id, anterior.aprendiz_2_id}, anterior.fecha
+    if k is None:
+        n = Aprendiz.query_en_formacion(ficha_id).count()
+        ronda = (n + 1) // 2 if n > 0 else 1
+        k = max(1, int(0.70 * ronda))
+
+    anteriores = (
+        TurnoAseo.query.filter(
+            TurnoAseo.ficha_id == ficha_id,
+            TurnoAseo.fecha < fecha_inicio,
+        )
+        .order_by(TurnoAseo.fecha.desc())
+        .limit(k)
+        .all()
+    )
+    if not anteriores:
+        return [], None
+
+    if (fecha_inicio - anteriores[0].fecha) > timedelta(days=3):
+        return [], None
+
+    anteriores_cronologicos = list(reversed(anteriores))
+    sesiones_previas = [
+        (t.aprendiz_1_id, t.aprendiz_2_id) for t in anteriores_cronologicos
+    ]
+    ultima_fecha = anteriores[0].fecha
+    return sesiones_previas, ultima_fecha
 
 
 def cargas_pendientes(ficha_id):
@@ -389,7 +409,7 @@ def generar_turnos(
             if presentes is not None:
                 ausentes_por_fecha[sesion.fecha] = presentes
 
-    vecino_pareja, vecino_fecha = _sembrar_descanso_anterior(ficha_id, fecha_inicio)
+    sesiones_previas, vecino_fecha = _sembrar_descanso_anterior(ficha_id, fecha_inicio)
 
     resultado_motor = calcular_turnos_token_bucket(
         aprendiz_ids=[a.id for a in activos],
@@ -401,7 +421,8 @@ def generar_turnos(
         ausentes_por_fecha=ausentes_por_fecha,
         excluidos_hasta=excluidos_hasta,
         veces_cumplidas_iniciales={a.id: contadores[a.id].veces_aseo for a in activos},
-        ultima_pareja_ids=vecino_pareja,
+        sesiones_previas_ids=sesiones_previas,
+        ultima_pareja_ids=set(sesiones_previas[-1]) if sesiones_previas else None,
         ultima_fecha_asignada=vecino_fecha,
         rng=rng,
     )
@@ -577,7 +598,7 @@ def rebalancear_turnos_pendientes(
                 'incrementar_carga': True,
             }
 
-    vecino_pareja, vecino_fecha = _sembrar_descanso_anterior(ficha_id, desde)
+    sesiones_previas, vecino_fecha = _sembrar_descanso_anterior(ficha_id, desde)
     resultado_motor = calcular_turnos_token_bucket(
         aprendiz_ids=[a.id for a in activos],
         sesiones_fechas=[t.fecha for t in turnos],
@@ -590,7 +611,8 @@ def rebalancear_turnos_pendientes(
         veces_cumplidas_iniciales={
             a.id: contadores[a.id].veces_aseo for a in activos
         },
-        ultima_pareja_ids=vecino_pareja,
+        sesiones_previas_ids=sesiones_previas,
+        ultima_pareja_ids=set(sesiones_previas[-1]) if sesiones_previas else None,
         ultima_fecha_asignada=vecino_fecha,
         rng=rng,
     )
@@ -622,6 +644,10 @@ def rebalancear_turnos_pendientes(
             turno.aprendiz_1_id = a1_id
             turno.aprendiz_2_id = a2_id
             turno.generado_por = generado_por
+            for intercambio in turno.intercambios:
+                if intercambio.estado == 'pendiente':
+                    intercambio.estado = 'rechazado'
+                    intercambio.respondido_en = datetime.utcnow()
             turno.auditoria_1 = 'Recálculo por equidad total. ' + _razon_eleccion(
                 contadores[a1_id],
                 programados_locales[a1_id],
@@ -645,6 +671,21 @@ def rebalancear_turnos_pendientes(
 
     db.session.flush()
     return rebalanceados
+
+
+def rebalancear_en_cascada_tras_manual(ficha_id, fecha_modificada, respetar_manuales=True):
+    """Rebalancea automáticamente los turnos pendientes posteriores a fecha_modificada.
+
+    Al realizar un ajuste manual en fecha D, recalcula los turnos futuros > D
+    en todo el horizonte planificado (desde = max(date.today(), D + timedelta(days=1))),
+    preservando turnos cumplidos, pasados y manuales fijos.
+    """
+    desde = max(date.today(), fecha_modificada + timedelta(days=1))
+    return rebalancear_turnos_pendientes(
+        ficha_id,
+        fecha_inicio=desde,
+        respetar_manuales=respetar_manuales,
+    )
 
 
 def _cargas_programadas(ficha_id):
@@ -897,9 +938,8 @@ def ajustar_turno_por_asistencia(ficha_id, fecha_sesion):
     """Ajusta el turno del día: crea, repone ausentes y recalcula contadores.
 
     Cuando alguien no asiste se sustituye por la persona presente con menor carga
-    total y se le reserva su reposición en el siguiente cupo libre. Así la ausencia
-    no altera el total de turnos de nadie ni desaloja los turnos ya publicados de
-    los demás; el botón "Calcular turnos" puede reequilibrar todo el calendario.
+    total. El aprendiz no cumplido o ausente no suma turno completado, conservando
+    una menor carga que la cola justa agendará de forma orgánica.
     """
     config = obtener_configuracion(ficha_id)
     presentes = _presentes_en_fecha(ficha_id, fecha_sesion)
@@ -1089,6 +1129,7 @@ def asignar_o_actualizar_turno(
     observacion=None,
     origen='aprendiz_admin',
     actor_label=None,
+    recalcular_cascada=True,
 ):
     """Crea o actualiza un turno de aseo para una fecha específica asegurando validaciones y días hábiles."""
     if aprendiz_1_id == aprendiz_2_id:
@@ -1120,6 +1161,7 @@ def asignar_o_actualizar_turno(
             observacion=observacion,
             origen=origen,
             actor_label=actor,
+            recalcular_cascada=recalcular_cascada,
         )
     else:
         if not SesionAsistencia.query.filter_by(ficha_id=ficha_id, fecha=fecha).first():
@@ -1140,6 +1182,9 @@ def asignar_o_actualizar_turno(
             observacion=observacion or f'Asignación manual de {actor}.',
         )
         db.session.add(turno)
+        db.session.flush()
+        if recalcular_cascada:
+            rebalancear_en_cascada_tras_manual(ficha_id, fecha)
 
     db.session.flush()
     return turno
@@ -1152,6 +1197,7 @@ def reemplazar_aprendices(
     observacion=None,
     origen='instructor',
     actor_label=None,
+    recalcular_cascada=True,
 ):
     if aprendiz_1.id == aprendiz_2.id:
         raise ValueError('Un turno necesita dos aprendices diferentes.')
@@ -1184,6 +1230,9 @@ def reemplazar_aprendices(
         turno.estado = 'programado'
         turno.completado_1 = None
         turno.completado_2 = None
+        db.session.flush()
+        if recalcular_cascada:
+            rebalancear_en_cascada_tras_manual(turno.ficha_id, turno.fecha)
     else:
         turno.completado_1 = True
         turno.completado_2 = True

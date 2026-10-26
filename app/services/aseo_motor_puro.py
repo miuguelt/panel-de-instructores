@@ -36,6 +36,7 @@ def calcular_turnos_token_bucket(
     veces_cumplidas_iniciales=None,
     ultima_pareja_ids=None,
     ultima_fecha_asignada=None,
+    sesiones_previas_ids=None,
     rng=None,
 ):
     """Calcula asignaciones de aseo sesión a sesión mediante bolsa de rondas estricta.
@@ -54,6 +55,7 @@ def calcular_turnos_token_bucket(
         ultima_pareja_ids: pareja de la sesión anterior al tramo calculado, para no
             repetir personas en días consecutivos al recalcular un tramo intermedio.
         ultima_fecha_asignada: fecha de esa sesión anterior (antigüedad inicial).
+        sesiones_previas_ids: lista opcional de parejas de sesiones anteriores (historial de enfriamiento).
         rng: instancia opcional de random.Random para determinismo en pruebas.
 
     Retorna:
@@ -79,9 +81,25 @@ def calcular_turnos_token_bucket(
         cargas.setdefault(a_id, 0)
         veces_cumplidas.setdefault(a_id, 0)
 
-    # Sembrar el descanso y la antigüedad con la sesión previa al tramo calculado
+    # Ventana de enfriamiento dinámico: 70% de una ronda completa
+    n_activos = len(aprendiz_ids)
+    ronda_sesiones = (n_activos + 1) // 2 if n_activos > 0 else 1
+    k_enfriamiento = max(1, int(0.70 * ronda_sesiones))
+
+    # Sembrar el descanso y la antigüedad con las sesiones previas al tramo calculado
     elegibles = set(aprendiz_ids)
-    if ultima_pareja_ids:
+    if sesiones_previas_ids:
+        for sesion_previa in sesiones_previas_ids:
+            pareja_set = {a_id for a_id in sesion_previa if a_id in elegibles}
+            if pareja_set:
+                asignaciones_recientes.append(pareja_set)
+        if ultima_fecha_asignada and asignaciones_recientes:
+            for a_id in asignaciones_recientes[-1]:
+                ultima_asignacion[a_id] = max(
+                    ultima_asignacion.get(a_id) or date.min,
+                    ultima_fecha_asignada,
+                )
+    elif ultima_pareja_ids:
         pareja_previa = {a_id for a_id in ultima_pareja_ids if a_id in elegibles}
         if len(pareja_previa) == 2:
             asignaciones_recientes.append(pareja_previa)
@@ -154,16 +172,28 @@ def calcular_turnos_token_bucket(
         min_carga = min(cargas[a] for a in base)
         bolsa_ronda = [a for a in base if cargas[a] == min_carga]
 
-        # Candidato 1: la bolsa ya descarta a quienes trabajaron ayer si hay reemplazo
-        cands_1 = list(bolsa_ronda)
+        # 1. Menos turnos cumplidos prevalecen sobre antigüedad y enfriamiento
+        min_cumpl_1 = min(veces_cumplidas[a] for a in bolsa_ronda)
+        empatados_cumpl_1 = [a for a in bolsa_ronda if veces_cumplidas[a] == min_cumpl_1]
 
-        # 1. Menos turnos cumplidos prevalecen sobre antigüedad
-        min_cumpl_1 = min(veces_cumplidas[a] for a in cands_1)
-        empatados_1 = [a for a in cands_1 if veces_cumplidas[a] == min_cumpl_1]
+        # Candidato 1: aplicar enfriamiento dinámico de hasta 70% de la ronda entre empatados en cumplidos
+        cands_1 = []
+        for w in range(k_enfriamiento, 0, -1):
+            recientes_w = (
+                set().union(*asignaciones_recientes[-w:])
+                if asignaciones_recientes
+                else set()
+            )
+            disponibles_w = [a for a in empatados_cumpl_1 if a not in recientes_w]
+            if disponibles_w:
+                cands_1 = disponibles_w
+                break
+        if not cands_1:
+            cands_1 = list(empatados_cumpl_1)
 
         # 2. Priorizar a quien lleva más tiempo sin turno (antigüedad)
-        min_ult_1 = min(ultima_asignacion.get(a) or date.min for a in empatados_1)
-        empatados_1 = [a for a in empatados_1 if (ultima_asignacion.get(a) or date.min) == min_ult_1]
+        min_ult_1 = min(ultima_asignacion.get(a) or date.min for a in cands_1)
+        empatados_1 = [a for a in cands_1 if (ultima_asignacion.get(a) or date.min) == min_ult_1]
         elegido_1 = r.choice(empatados_1)
 
         # 2. Selección de Candidato 2 (Compañero)
@@ -182,19 +212,30 @@ def calcular_turnos_token_bucket(
             min_siguiente = min(cargas[a] for a in disponibles_siguiente)
             bolsa_restante = [a for a in disponibles_siguiente if cargas[a] == min_siguiente]
 
-        cands_2 = [a for a in bolsa_restante if a not in recientes_ids]
-        if not cands_2:
-            cands_2 = list(bolsa_restante)
+        # A) Menos turnos cumplidos primero
+        min_cumpl_2 = min(veces_cumplidas[a] for a in bolsa_restante)
+        empatados_cumpl_2 = [a for a in bolsa_restante if veces_cumplidas[a] == min_cumpl_2]
 
-        # Candidato 2:
-        # A) Menos turnos cumplidos primero (rotar compañeros no adelanta a quien tiene más cumplidos)
-        min_cumpl_2 = min(veces_cumplidas[a] for a in cands_2)
-        empatados_2 = [a for a in cands_2 if veces_cumplidas[a] == min_cumpl_2]
+        # Aplicar enfriamiento dinámico sobre el compañero
+        cands_2 = []
+        min_necesarios = 2 if len(aprendiz_ids) <= 8 and len(empatados_cumpl_2) >= 2 else 1
+        for w in range(k_enfriamiento, 0, -1):
+            recientes_w = (
+                set().union(*asignaciones_recientes[-w:])
+                if asignaciones_recientes
+                else set()
+            )
+            disponibles_w = [a for a in empatados_cumpl_2 if a not in recientes_w]
+            if len(disponibles_w) >= min_necesarios:
+                cands_2 = disponibles_w
+                break
+        if not cands_2:
+            cands_2 = [a for a in empatados_cumpl_2 if a not in recientes_ids] or list(empatados_cumpl_2)
 
         # B) Minimizar repeticiones previas de pareja con elegido_1
-        min_pareja = min(historial_parejas.get(tuple(sorted((elegido_1, a))), 0) for a in empatados_2)
+        min_pareja = min(historial_parejas.get(tuple(sorted((elegido_1, a))), 0) for a in cands_2)
         empatados_2 = [
-            a for a in empatados_2
+            a for a in cands_2
             if historial_parejas.get(tuple(sorted((elegido_1, a))), 0) == min_pareja
         ]
 
@@ -226,7 +267,7 @@ def calcular_turnos_token_bucket(
         asignaciones_recientes.append({elegido_1, elegido_2})
 
         razon_1 = (
-            f'Asignado por bolsa de rondas (Ronda {min_carga + 1}). '
+            f'Asignado por bolsa de rondas (Ronda {cargas[elegido_1]}). '
             f'Carga acumulada previa: {cargas[elegido_1] - 1}. '
             f'Compañero: ID {elegido_2} ({veces_juntos} aseo(s) previos juntos).'
         )
