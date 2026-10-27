@@ -1,7 +1,7 @@
 import logging
 import os
 
-from flask import Flask, make_response, redirect, render_template, request, url_for
+from flask import Flask, g, make_response, redirect, render_template, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
@@ -379,6 +379,9 @@ def create_app(test_config=None):
 
     @app.before_request
     def interceptar_cambio_password_obligatorio():
+        nombre_remember = app.config.get('REMEMBER_COOKIE_NAME', 'remember_token')
+        if not session.get('_user_id') and nombre_remember not in request.cookies:
+            return None
         if current_user.is_authenticated and getattr(current_user, 'debe_cambiar_password', False):
             endpoint = request.endpoint or ''
             rutas_permitidas = {'auth.cambiar_password_obligatorio', 'auth.logout', 'static', 'health'}
@@ -392,6 +395,10 @@ def create_app(test_config=None):
                     resp.headers['HX-Redirect'] = url_for('auth.cambiar_password_obligatorio')
                     return resp
                 return redirect(url_for('auth.cambiar_password_obligatorio'))
+
+    @app.teardown_request
+    def _limpiar_usuario_solicitud(exc=None):
+        g.pop('_login_user', None)
 
     if app.config['STARTUP_ERRORS']:
         log.critical(

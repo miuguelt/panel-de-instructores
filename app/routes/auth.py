@@ -360,5 +360,13 @@ def registro():
 def logout():
     logout_user()
     session.clear()
+    session['_remember'] = 'clear'
     flash('Sesión cerrada correctamente.', 'success')
-    return redirect(url_for('auth.login'))
+    resp = redirect(url_for('auth.login'))
+    nombre_remember = current_app.config.get('REMEMBER_COOKIE_NAME', 'remember_token')
+    resp.delete_cookie(
+        nombre_remember,
+        path=current_app.config.get('REMEMBER_COOKIE_PATH', '/'),
+        domain=current_app.config.get('REMEMBER_COOKIE_DOMAIN'),
+    )
+    return resp

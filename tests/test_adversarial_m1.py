@@ -77,8 +77,10 @@ class AdversarialCookieTestCase(unittest.TestCase):
         cookie_real = client.get_cookie('session')
         self.assertIsNotNone(cookie_real)
 
-        # Adulterar la firma alterando el último carácter
-        valor_adulterado = cookie_real.value[:-1] + ('A' if cookie_real.value[-1] != 'A' else 'B')
+        # Adulterar la firma alterando el primer carácter de la firma HMAC (evita bits de relleno base64)
+        partes = cookie_real.value.split('.')
+        sig_adulterada = ('A' if partes[-1][0] != 'A' else 'B') + partes[-1][1:]
+        valor_adulterado = f'{partes[0]}.{partes[1]}.{sig_adulterada}'
         client.set_cookie(key='session', value=valor_adulterado)
         client.delete_cookie('remember_token')
 
@@ -87,7 +89,6 @@ class AdversarialCookieTestCase(unittest.TestCase):
 
         resp = client.get('/instructor/')
         self.assertEqual(resp.status_code, 302, 'La cookie adulterada no debe otorgar acceso')
-        self.assertIn('/login', resp.headers['Location'])
         self.assertIn('/login', resp.headers['Location'])
 
     def test_inyeccion_de_cadenas_maliciosas_como_cookie(self):
