@@ -32,6 +32,36 @@ ESTADOS_ACTIVOS = ESTADOS_EN_FORMACION
 ESTADOS_PRESENTES = ('ASISTE', 'TARDANZA')
 ESTADOS_PENDIENTES = ('programado', 'intercambiado')
 ORIGENES_MANUALES = ('instructor', 'aprendiz', 'aprendiz_admin', 'manual')
+PREFIJOS_AUDITORIA_AUTOMATICA = (
+    'te eligió la cola justa',
+    'asignado por bolsa de rondas',
+    'recálculo por equidad total',
+)
+ACTORES_GENERACION = {
+    'instructor': 'el instructor',
+    'aprendiz': 'el aprendiz administrador',
+    'aprendiz_admin': 'el aprendiz administrador',
+}
+
+
+def _es_turno_manual(turno):
+    """Un turno es manual solo si lo fijó una persona, no si lo calculó el motor.
+
+    Las generaciones automáticas lanzadas por un aprendiz administrador guardaban su
+    rol en ``generado_por``; su auditoría automática las delata y el recálculo las
+    vuelve a equilibrar en lugar de congelarlas como ajustes manuales.
+    """
+    if turno.generado_por not in ORIGENES_MANUALES:
+        return False
+    if turno.generado_por in ('instructor', 'manual'):
+        return True
+    auditoria = (turno.auditoria_1 or '').strip().lower()
+    return not auditoria.startswith(PREFIJOS_AUDITORIA_AUTOMATICA)
+
+
+def _nota_actor(generado_por):
+    actor = ACTORES_GENERACION.get(generado_por)
+    return f' Generado automáticamente por {actor}.' if actor else ''
 
 
 def aprendices_activos(ficha_id):
@@ -372,7 +402,7 @@ def generar_turnos(
 
     for fecha, turno in existentes.items():
         es_cumplido = turno.estado in ('cumplido', 'no_cumplido')
-        es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
+        es_manual = respetar_manuales and _es_turno_manual(turno)
         es_pasado = proteger_pasados and fecha < hoy
         no_recalc = not recalcular_existentes and turno.estado in ESTADOS_PENDIENTES
 
@@ -435,6 +465,7 @@ def generar_turnos(
     creados = []
     recalculados = []
     promedio = mean(contadores[a.id].veces_aseo for a in activos) if activos else 0
+    nota_actor = _nota_actor(generado_por)
 
     for asig in resultado_motor['asignaciones']:
         sesion_fecha = asig['fecha']
@@ -473,6 +504,8 @@ def generar_turnos(
             companero_nombre=elegido_1.nombre,
             veces_juntos=veces_juntos_previa,
         )
+        razon_1 += nota_actor
+        razon_2 += nota_actor
 
         cargas_programadas_locales[a1_id] += 1
         cargas_programadas_locales[a2_id] += 1
@@ -481,7 +514,7 @@ def generar_turnos(
             turno_existente.aprendiz_1_id = a1_id
             turno_existente.aprendiz_2_id = a2_id
             turno_existente.estado = 'programado'
-            turno_existente.generado_por = generado_por
+            turno_existente.generado_por = 'sistema'
             turno_existente.auditoria_1 = razon_1
             turno_existente.auditoria_2 = razon_2
             turno_existente.completado_1 = None
@@ -499,7 +532,7 @@ def generar_turnos(
                 aprendiz_1_id=a1_id,
                 aprendiz_2_id=a2_id,
                 estado='programado',
-                generado_por=generado_por,
+                generado_por='sistema',
                 auditoria_1=razon_1,
                 auditoria_2=razon_2,
             )
@@ -583,7 +616,7 @@ def rebalancear_turnos_pendientes(
 
     turnos_fijos = {}
     for turno in turnos:
-        es_manual = respetar_manuales and turno.generado_por in ORIGENES_MANUALES
+        es_manual = respetar_manuales and _es_turno_manual(turno)
         es_intercambio = turno.estado == 'intercambiado'
         es_reposicion = _es_turno_reposicion(turno)
         if es_manual or es_intercambio or es_reposicion:
@@ -640,10 +673,11 @@ def rebalancear_turnos_pendientes(
         veces_juntos = historial_parejas.get(pareja_clave, 0)
         historial_parejas[pareja_clave] = veces_juntos + 1
 
-        if (turno.aprendiz_1_id, turno.aprendiz_2_id) != (a1_id, a2_id):
+        mal_etiquetado = turno.generado_por != 'sistema'
+        if mal_etiquetado or (turno.aprendiz_1_id, turno.aprendiz_2_id) != (a1_id, a2_id):
             turno.aprendiz_1_id = a1_id
             turno.aprendiz_2_id = a2_id
-            turno.generado_por = generado_por
+            turno.generado_por = 'sistema'
             for intercambio in turno.intercambios:
                 if intercambio.estado == 'pendiente':
                     intercambio.estado = 'rechazado'
@@ -655,7 +689,7 @@ def rebalancear_turnos_pendientes(
                 asig['fecha'] in ausentes_por_fecha,
                 companero_nombre=elegido_2.nombre,
                 veces_juntos=veces_juntos,
-            )
+            ) + _nota_actor(generado_por)
             turno.auditoria_2 = 'Recálculo por equidad total. ' + _razon_eleccion(
                 contadores[a2_id],
                 programados_locales[a2_id],
@@ -663,7 +697,7 @@ def rebalancear_turnos_pendientes(
                 asig['fecha'] in ausentes_por_fecha,
                 companero_nombre=elegido_1.nombre,
                 veces_juntos=veces_juntos,
-            )
+            ) + _nota_actor(generado_por)
             rebalanceados.append(turno)
 
         programados_locales[a1_id] += 1
