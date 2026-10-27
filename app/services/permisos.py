@@ -1,4 +1,6 @@
-from flask import session
+from functools import wraps
+
+from flask import abort, redirect, request, session, url_for
 from flask_login import current_user
 
 from app import db
@@ -6,6 +8,18 @@ from app.models.aprendiz import Aprendiz, ESTADOS_LLAMADO_LISTA
 from app.models.ficha import Ficha
 from app.models.ficha_instructor import FichaInstructor
 from app.models.tarea import Tarea
+
+
+def admin_required(f):
+    """Exige que el usuario esté autenticado y cuente con el rol de administrador."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login', next=request.url))
+        if not getattr(current_user, 'es_admin', False):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def puede_gestionar_ficha(ficha):

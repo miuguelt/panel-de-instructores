@@ -1,3 +1,4 @@
+from datetime import timedelta
 import logging
 import os
 import secrets
@@ -40,15 +41,58 @@ _INSECURE_SECRETS = {
     'cambiar-esta-clave-en-produccion',
     'cambiar-esta-clave-en-produccion-usar-valor-aleatorio-largo',
 }
-_secret_key = (os.getenv('SECRET_KEY') or '').strip()
-SECRET_KEY_IS_EPHEMERAL = False
-if _secret_key in _INSECURE_SECRETS:
+
+
+def _obtener_o_persistir_secret_key(base_dir):
+    """
+    Obtiene la clave secreta desde el entorno o la persiste en almacenamiento local
+    para garantizar que las sesiones no se invaliden en cada reinicio del proceso/contenedor.
+    """
+    env_secret = (os.getenv('SECRET_KEY') or '').strip()
+    if env_secret and env_secret not in _INSECURE_SECRETS:
+        return env_secret, False
+
+    # Fallback persistente en almacenamiento local
+    archivo_clave = os.getenv('SECRET_KEY_FILE') or os.path.join(base_dir, 'instance', '.secret_key')
+    try:
+        if os.path.isfile(archivo_clave):
+            with open(archivo_clave, 'r', encoding='utf-8') as f:
+                clave_guardada = f.read().strip()
+                if len(clave_guardada) >= 32 and clave_guardada not in _INSECURE_SECRETS:
+                    return clave_guardada, True
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        log.warning('No se pudo leer la clave secreta persistente desde %s (%s). Se regenerará.', archivo_clave, exc)
+
+    # Generar nueva clave de 128 caracteres (64 bytes hex)
+    nueva_clave = secrets.token_hex(64)
+    tmp_file = f'{archivo_clave}.tmp.{os.getpid()}.{secrets.token_hex(4)}'
+    try:
+        directorio_clave = os.path.dirname(archivo_clave)
+        if directorio_clave:
+            os.makedirs(directorio_clave, exist_ok=True)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        mode = 0o600
+        fd = os.open(tmp_file, flags, mode)
+        with open(fd, 'w', encoding='utf-8') as f:
+            f.write(nueva_clave)
+        os.replace(tmp_file, archivo_clave)
+    except OSError as exc:
+        log.warning('No se pudo guardar la clave secreta persistente en %s (%s).', archivo_clave, exc)
+        try:
+            if os.path.exists(tmp_file):
+                os.remove(tmp_file)
+        except OSError:
+            pass
+
+    return nueva_clave, True
+
+
+_secret_key, SECRET_KEY_IS_EPHEMERAL = _obtener_o_persistir_secret_key(BASE_DIR)
+if SECRET_KEY_IS_EPHEMERAL:
     # No abortar el proceso: una excepcion aqui mata a gunicorn en el arranque y
     # el contenedor entra en bucle de reinicios sin dejar rastro legible. Se
     # degrada a una clave efimera (mas segura que un default conocido) y se
     # registra el fallo de forma muy visible en los logs del contenedor.
-    SECRET_KEY_IS_EPHEMERAL = True
-    _secret_key = secrets.token_hex(64)
     log.critical(
         'SECRET_KEY insegura o vacia. '
         'Se genero una clave EFIMERA: las sesiones se invalidaran en cada reinicio. '
@@ -93,6 +137,22 @@ def _env_int(name, default, minimum=None, maximum=None):
 class Config:
     SECRET_KEY = _secret_key
     SECRET_KEY_IS_EPHEMERAL = SECRET_KEY_IS_EPHEMERAL
+
+    # Directivas de sesión para persistencia prolongada (1 año = 365 días)
+    PERMANENT_SESSION_LIFETIME = timedelta(days=365)
+    SESSION_COOKIE_NAME = 'session'
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = (
+        (os.getenv('FLASK_ENV') == 'production')
+        or (os.getenv('SESSION_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes'))
+        or (os.getenv('PUBLIC_BASE_URL', '').startswith('https://'))
+    )
+    REMEMBER_COOKIE_DURATION = timedelta(days=365)
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+    REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
+
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     HTTP_SLOW_REQUEST_MS = _env_int('HTTP_SLOW_REQUEST_MS', 1000, minimum=0)

@@ -38,6 +38,15 @@
             <button type="submit" class="btn btn-primary btn-full">Enviar enlace</button>
         </form>
 
+        <div class="alert alert-info" role="note" style="margin-top: 1.25rem; text-align: left;">
+            <strong>¿No recibes el mensaje en tu correo @sena.edu.co?</strong>
+            <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0; font-size: 0.85rem; line-height: 1.45;">
+                <li>Revisa tu carpeta de correo no deseado (spam) o la cuarentena institucional.</li>
+                <li>El enlace enviado expira en 30 minutos por seguridad.</li>
+                <li>Si no recibes el mensaje, acude a un instructor con rol de Administrador para solicitar un restablecimiento asistido.</li>
+            </ul>
+        </div>
+
         <div class="auth-footer">
             <a href="{{ url_for('auth.login') }}" class="btn btn-outline btn-full">Volver a iniciar sesión</a>
         </div>

@@ -5,7 +5,7 @@ from importlib import import_module
 
 def registrar_rutas(app):
     rutas = (
-        ('auth', 'auth_bp', None), ('api', 'api_bp', '/api'),
+        ('auth', 'auth_bp', None), ('admin', 'admin_bp', '/admin'), ('api', 'api_bp', '/api'),
         ('instructor', 'instructor_bp', '/instructor'),
         ('planeacion', 'planeacion_bp', '/instructor'),
         ('ranking', 'ranking_bp', '/instructor'), ('aseo', 'aseo_bp', '/instructor'),

@@ -14,6 +14,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 from flask_login import login_user, logout_user, login_required, current_user
@@ -142,6 +143,8 @@ def _destino_interno(destino):
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
+        if getattr(current_user, 'debe_cambiar_password', False):
+            return redirect(url_for('auth.cambiar_password_obligatorio'))
         return redirect(url_for('instructor.dashboard'))
 
     if request.method == 'POST':
@@ -158,6 +161,9 @@ def login():
                 flash('Tu cuenta está desactivada. Contacta al administrador.', 'error')
                 return render_template('login.html')
             login_user(instructor, remember=True)
+            session.permanent = True
+            if getattr(instructor, 'debe_cambiar_password', False):
+                return redirect(url_for('auth.cambiar_password_obligatorio'))
             next_page = _destino_interno(request.args.get('next'))
             return redirect(next_page or url_for('instructor.dashboard'))
         flash('Correo o contraseña incorrectos.', 'error')
@@ -193,7 +199,7 @@ def solicitar_recuperacion():
                 instructor.password_reset_expires_at = utc_now() + _RESET_EXPIRACION
                 db.session.commit()
 
-                enlace = f'{base_url}{url_for("auth.restablecer_contrasena")}#{token}'
+                enlace = f'{base_url}{url_for("auth.restablecer_contrasena")}?token={token}'
                 if not _enviar_correo_recuperacion(instructor, enlace):
                     instructor.password_reset_token_hash = None
                     instructor.password_reset_expires_at = None
@@ -216,13 +222,13 @@ def solicitar_recuperacion():
 @auth_bp.route('/restablecer-contrasena', methods=['GET', 'POST'])
 @limiter.limit('10 per minute', methods=['POST'])
 def restablecer_contrasena():
-    token = request.form.get('token', '') if request.method == 'POST' else ''
+    token = (request.form.get('token') or request.args.get('token') or '').strip()
 
     if request.method == 'POST':
         password = request.form.get('password', '')
         confirmacion = request.form.get('confirmacion', '')
-        if len(password) < 12:
-            flash('La nueva contraseña debe tener al menos 12 caracteres.', 'error')
+        if len(password) < 6:
+            flash('La nueva contraseña debe tener al menos 6 caracteres.', 'error')
             return render_template('restablecer_contrasena.html', token=token)
         if len(password) > 128:
             flash('La contraseña no puede superar 128 caracteres.', 'error')
@@ -263,7 +269,53 @@ def restablecer_contrasena():
         flash('Contraseña actualizada. Ya puedes iniciar sesión.', 'success')
         return redirect(url_for('auth.login'))
 
-    return render_template('restablecer_contrasena.html', token='')
+    token_get = token if (20 <= len(token) <= 128 and all(c in _TOKEN_URLSAFE for c in token)) else ''
+    return render_template('restablecer_contrasena.html', token=token_get)
+
+
+@auth_bp.route('/cambiar-password-obligatorio', methods=['GET', 'POST'])
+def cambiar_password_obligatorio():
+    """Obliga al instructor con clave temporal a definir una nueva contraseña."""
+    if not current_user.is_authenticated:
+        return redirect(url_for('auth.login'))
+
+    if not getattr(current_user, 'debe_cambiar_password', False):
+        return redirect(url_for('instructor.dashboard'))
+
+    if request.method == 'POST':
+        nueva_password = (
+            request.form.get('nueva_password')
+            or request.form.get('password')
+            or ''
+        )
+        confirmacion = request.form.get('confirmacion', '')
+
+        if len(nueva_password) < 6:
+            flash('La nueva contraseña debe tener al menos 6 caracteres.', 'error')
+            return render_template('cambiar_password_obligatorio.html')
+
+        if len(nueva_password) > 128:
+            flash('La contraseña no puede superar 128 caracteres.', 'error')
+            return render_template('cambiar_password_obligatorio.html')
+
+        if nueva_password != confirmacion:
+            flash('Las contraseñas no coinciden.', 'error')
+            return render_template('cambiar_password_obligatorio.html')
+
+        usuario = current_user._get_current_object()
+        usuario.set_password(nueva_password)
+        usuario.debe_cambiar_password = False
+        usuario.auth_version = (usuario.auth_version or 1) + 1
+        usuario.password_reset_token_hash = None
+        usuario.password_reset_expires_at = None
+        db.session.commit()
+
+        login_user(usuario, remember=True)
+        session.permanent = True
+        flash('Contraseña actualizada correctamente. Bienvenido al panel.', 'success')
+        return redirect(url_for('instructor.dashboard'))
+
+    return render_template('cambiar_password_obligatorio.html')
 
 
 @auth_bp.route('/registro', methods=['GET', 'POST'])
@@ -307,5 +359,6 @@ def registro():
 @login_required
 def logout():
     logout_user()
+    session.clear()
     flash('Sesión cerrada correctamente.', 'success')
     return redirect(url_for('auth.login'))

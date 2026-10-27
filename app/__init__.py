@@ -1,7 +1,7 @@
 import logging
 import os
 
-from flask import Flask, render_template, request
+from flask import Flask, make_response, redirect, render_template, request, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
@@ -357,6 +357,7 @@ def create_app(test_config=None):
             log.exception('Fallo al registrar blueprints de %s', module_path)
 
     _register('app.routes.auth', 'auth_bp')
+    _register('app.routes.admin', 'admin_bp', url_prefix='/admin')
     _register('app.routes.cargas', 'cargas_bp')
     _register('app.routes.api', 'api_bp', url_prefix='/api')
     _register('app.routes.instructor', 'instructor_bp', url_prefix='/instructor')
@@ -375,6 +376,22 @@ def create_app(test_config=None):
     _register('app.tyt.vistas', 'tyt_bp', url_prefix='/instructor')
     from app.services.cargas_confirmacion import registrar_confirmaciones
     registrar_confirmaciones(app)
+
+    @app.before_request
+    def interceptar_cambio_password_obligatorio():
+        if current_user.is_authenticated and getattr(current_user, 'debe_cambiar_password', False):
+            endpoint = request.endpoint or ''
+            rutas_permitidas = {'auth.cambiar_password_obligatorio', 'auth.logout', 'static', 'health'}
+            if (
+                endpoint not in rutas_permitidas
+                and not endpoint.startswith('static.')
+                and not request.path.startswith('/static/')
+            ):
+                if request.headers.get('HX-Request'):
+                    resp = make_response('', 200)
+                    resp.headers['HX-Redirect'] = url_for('auth.cambiar_password_obligatorio')
+                    return resp
+                return redirect(url_for('auth.cambiar_password_obligatorio'))
 
     if app.config['STARTUP_ERRORS']:
         log.critical(

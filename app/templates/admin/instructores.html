@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Administración de Instructores - SENA Control{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al Inicio">&larr; Volver al Inicio</a>
+        <h1>Administración de Cuentas de Instructores</h1>
+        <p class="text-muted">
+            Gestiona el acceso, estado institucional y soporte asistido de restablecimiento de contraseñas.
+        </p>
+    </div>
+</div>
+
+<!-- Tablero Bento de métricas administrativas -->
+<div class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Gestión institucional</span>
+        <h2>Instructores y credenciales</h2>
+        <p class="text-muted">
+            Total: <strong>{{ instructores|length }}</strong> · Activas: <strong>{{ instructores|selectattr('activo')|list|length }}</strong> · Cambios pendientes: <strong>{{ instructores|selectattr('debe_cambiar_password')|list|length }}</strong>
+        </p>
+    </div>
+</div>
+
+<!-- Buscador y filtro -->
+<div class="card form-card">
+    <form method="GET" action="{{ url_for('admin.listar_instructores') }}" class="form-inline">
+        <div class="form-row">
+            <div class="form-group flex-grow">
+                <label for="buscar-instructor" class="sr-only">Buscar por nombre o correo</label>
+                <input type="search" id="buscar-instructor" name="q" value="{{ q or '' }}"
+                       placeholder="Buscar instructor por nombre o correo institucional..."
+                       class="form-control">
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i data-lucide="search" class="icon-sm" aria-hidden="true"></i>
+                <span>Buscar</span>
+            </button>
+            {% if q %}
+            <a href="{{ url_for('admin.listar_instructores') }}" class="btn btn-outline">
+                Limpiar filtro
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Tabla de instructores -->
+<div class="table-container">
+    <div class="table-responsive" tabindex="0" aria-label="Listado de instructores">
+        <table class="table table-sena">
+            <caption class="sr-only">Listado de instructores registrados</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Instructor</th>
+                    <th scope="col">Correo Institucional</th>
+                    <th scope="col">Rol</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Seguridad</th>
+                    <th scope="col">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inst in instructores %}
+                <tr>
+                    <td>
+                        <strong>{{ inst.nombre }}</strong>
+                        <br><small class="text-muted">ID: {{ inst.id }}</small>
+                    </td>
+                    <td>
+                        <span>{{ inst.correo }}</span>
+                    </td>
+                    <td>
+                        {% if inst.es_admin %}
+                        <span class="badge badge-info">Administrador</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Colaborador</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if inst.activo %}
+                        <span class="badge badge-success">Activo</span>
+                        {% else %}
+                        <span class="badge badge-danger">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if inst.debe_cambiar_password %}
+                        <span class="badge badge-warning">Cambio obligatorio</span>
+                        {% else %}
+                        <span class="text-muted">Al día</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        {% if inst.activo %}
+                        <details class="dropdown-restablecer">
+                            <summary class="btn btn-sm btn-outline">
+                                <i data-lucide="key" class="icon-sm" aria-hidden="true"></i>
+                                <span>Restablecer clave</span>
+                            </summary>
+                            <div class="card form-card">
+                                <p class="text-muted">
+                                    Asigna una clave temporal o déjala vacía para que el sistema genere una automática:
+                                </p>
+                                <form method="POST" action="{{ url_for('admin.restablecer_clave_instructor', instructor_id=inst.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="form-group">
+                                        <label for="clave_temporal_{{ inst.id }}">Clave temporal (opcional):</label>
+                                        <input type="text" id="clave_temporal_{{ inst.id }}" name="clave_temporal"
+                                               class="form-control"
+                                               placeholder="Dejar vacía para autogenerar"
+                                               minlength="6" maxlength="128"
+                                               autocomplete="off">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm btn-full">
+                                        Confirmar restablecimiento
+                                    </button>
+                                </form>
+                            </div>
+                        </details>
+                        {% else %}
+                        <span class="text-muted">Cuenta inactiva</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">
+                        <p class="text-muted">No se encontraron instructores registrados{% if q %} para el criterio "{{ q }}"{% endif %}.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
@@ -12,6 +13,7 @@ class Instructor(UserMixin, db.Model):
     correo = db.Column(db.String(150), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     auth_version = db.Column(db.Integer, nullable=False, default=1, server_default='1')
+    debe_cambiar_password = db.Column(db.Boolean, default=False, nullable=False, server_default=sa.false())
     password_reset_token_hash = db.Column(
         db.String(64), unique=True, index=True, nullable=True
     )
@@ -44,6 +46,9 @@ class Instructor(UserMixin, db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
+    if user_id is None:
+        return None
+    user_id = str(user_id).strip()
     if not user_id:
         return None
 
@@ -55,14 +60,14 @@ def load_user(user_id):
             instructor = db.session.get(Instructor, int(user_id))
         except (TypeError, ValueError):
             return None
-        return instructor if instructor and instructor.auth_version == 1 else None
+        return instructor if instructor and instructor.activo and instructor.auth_version == 1 else None
 
     instructor_id, version = user_id.rsplit(':', 1)
     try:
-        instructor = db.session.get(Instructor, int(instructor_id))
-        version = int(version)
+        instructor = db.session.get(Instructor, int(instructor_id.strip()))
+        version = int(version.strip())
     except (TypeError, ValueError):
         return None
-    if instructor and instructor.auth_version == version:
+    if instructor and instructor.activo and instructor.auth_version == version:
         return instructor
     return None

@@ -2,7 +2,7 @@ import hashlib
 import secrets
 import unittest
 from datetime import timedelta
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 from app import create_app, db
@@ -66,10 +66,10 @@ class RecuperacionContrasenaTestCase(unittest.TestCase):
         self.assertIn('Si existe una cuenta activa'.encode(), respuesta_solicitud.data)
         self.assertIn('url', enlace_enviado)
         self.assertTrue(enlace_enviado['url'].startswith(
-            'https://panel.example.com/restablecer-contrasena#'
+            'https://panel.example.com/restablecer-contrasena?token='
         ))
 
-        token = urlsplit(enlace_enviado['url']).fragment
+        token = parse_qs(urlsplit(enlace_enviado['url']).query)['token'][0]
         db.session.refresh(self.instructor)
         self.assertEqual(
             self.instructor.password_reset_token_hash,
@@ -151,7 +151,7 @@ class RecuperacionContrasenaTestCase(unittest.TestCase):
         ):
             enviado = _enviar_correo_recuperacion(
                 self.instructor,
-                'https://panel.example.com/restablecer-contrasena#token-de-prueba',
+                'https://panel.example.com/restablecer-contrasena?token=token-de-prueba',
             )
 
         self.assertTrue(enviado)
@@ -178,6 +178,132 @@ class RecuperacionContrasenaTestCase(unittest.TestCase):
 
         self.assertTrue(clave.startswith('recuperacion:'))
         self.assertNotIn('instructora@example.com', clave)
+
+    def test_get_precarga_token_valido_en_formulario(self):
+        cliente = self.app.test_client()
+        token = secrets.token_urlsafe(32)
+        resp = cliente.get(f'/restablecer-contrasena?token={token}')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(f'value="{token}"'.encode(), resp.data)
+
+        # Token con caracteres inválidos o longitud inválida no debe precargarse
+        resp_invalido = cliente.get('/restablecer-contrasena?token=token_invalido!@#$%^')
+        self.assertEqual(resp_invalido.status_code, 200)
+        self.assertIn(b'value=""', resp_invalido.data)
+
+    def test_cambio_contrasena_acepta_seis_caracteres(self):
+        token = secrets.token_urlsafe(32)
+        self.instructor.password_reset_token_hash = hashlib.sha256(
+            token.encode('ascii')
+        ).hexdigest()
+        self.instructor.password_reset_expires_at = utc_now() + timedelta(minutes=30)
+        db.session.commit()
+
+        respuesta = self.app.test_client().post(
+            '/restablecer-contrasena',
+            data={
+                'token': token,
+                'password': 'abc123',
+                'confirmacion': 'abc123',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(respuesta.headers['Location'].endswith('/login'))
+        db.session.refresh(self.instructor)
+        self.assertTrue(self.instructor.check_password('abc123'))
+
+    def test_cambio_contrasena_rechaza_cinco_caracteres(self):
+        token = secrets.token_urlsafe(32)
+        self.instructor.password_reset_token_hash = hashlib.sha256(
+            token.encode('ascii')
+        ).hexdigest()
+        self.instructor.password_reset_expires_at = utc_now() + timedelta(minutes=30)
+        db.session.commit()
+
+        respuesta = self.app.test_client().post(
+            '/restablecer-contrasena',
+            data={
+                'token': token,
+                'password': 'abc12',
+                'confirmacion': 'abc12',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('La nueva contraseña debe tener al menos 6 caracteres.'.encode(), respuesta.data)
+        db.session.refresh(self.instructor)
+        self.assertTrue(self.instructor.check_password('ClaveAnteriorSegura123!'))
+
+    def test_cambio_contrasena_con_token_en_query_param(self):
+        token = secrets.token_urlsafe(32)
+        self.instructor.password_reset_token_hash = hashlib.sha256(
+            token.encode('ascii')
+        ).hexdigest()
+        self.instructor.password_reset_expires_at = utc_now() + timedelta(minutes=30)
+        db.session.commit()
+
+        # Enviar token por query param y omitir campo token en el body
+        respuesta = self.app.test_client().post(
+            f'/restablecer-contrasena?token={token}',
+            data={
+                'token': '',
+                'password': 'PasswordSegura789',
+                'confirmacion': 'PasswordSegura789',
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(respuesta.headers['Location'].endswith('/login'))
+        db.session.refresh(self.instructor)
+        self.assertTrue(self.instructor.check_password('PasswordSegura789'))
+
+    def test_cambio_contrasena_validaciones_longitud_y_coincidencia(self):
+        token = secrets.token_urlsafe(32)
+        self.instructor.password_reset_token_hash = hashlib.sha256(
+            token.encode('ascii')
+        ).hexdigest()
+        self.instructor.password_reset_expires_at = utc_now() + timedelta(minutes=30)
+        db.session.commit()
+
+        cliente = self.app.test_client()
+
+        # Contraseñas que no coinciden
+        resp_mismatch = cliente.post(
+            '/restablecer-contrasena',
+            data={
+                'token': token,
+                'password': 'PasswordValida1',
+                'confirmacion': 'PasswordValida2',
+            },
+        )
+        self.assertEqual(resp_mismatch.status_code, 200)
+        self.assertIn('Las contraseñas no coinciden.'.encode(), resp_mismatch.data)
+
+        # Contraseña superior a 128 caracteres
+        clave_larga = 'A' * 129
+        resp_larga = cliente.post(
+            '/restablecer-contrasena',
+            data={
+                'token': token,
+                'password': clave_larga,
+                'confirmacion': clave_larga,
+            },
+        )
+        self.assertEqual(resp_larga.status_code, 200)
+        self.assertIn('La contraseña no puede superar 128 caracteres.'.encode(), resp_larga.data)
+
+    def test_plantilla_recuperar_contrasena_incluye_orientacion_institucional(self):
+        resp = self.app.test_client().get('/recuperar-contrasena')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('@sena.edu.co'.encode(), resp.data)
+        self.assertIn('cuarentena institucional'.encode(), resp.data)
+        self.assertIn('30 minutos'.encode(), resp.data)
+        self.assertIn('Administrador'.encode(), resp.data)
+
+    def test_plantilla_restablecer_contrasena_instrucciones_seis_caracteres(self):
+        resp = self.app.test_client().get('/restablecer-contrasena')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('al menos 6 caracteres'.encode(), resp.data)
+        self.assertIn('minlength="6"'.encode(), resp.data)
+        self.assertIn('Administrador'.encode(), resp.data)
 
 
 if __name__ == '__main__':

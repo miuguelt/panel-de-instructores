@@ -71,6 +71,11 @@
                     <a href="{{ url_for('instructor.fichas') }}"
                        class="nav-link {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}is-active{% endif %}"
                        {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}aria-current="page"{% endif %}>Fichas</a>
+                    {% if current_user.es_admin %}
+                    <a href="{{ url_for('admin.listar_instructores') }}"
+                       class="nav-link {% if request.blueprint == 'admin' %}is-active{% endif %}"
+                       {% if request.blueprint == 'admin' %}aria-current="page"{% endif %}>Administración</a>
+                    {% endif %}
                 </div>
 
                 {% block nav_center %}{% endblock %}
