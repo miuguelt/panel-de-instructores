@@ -70,6 +70,35 @@ class AdminRestablecimientoTestCase(unittest.TestCase):
 
     # --- 1. Decorador y control de acceso @admin_required ---
 
+    def test_admin_required_decorador_invocacion_y_control_acceso(self):
+        """Verifica la invocación directa y el control de acceso del decorador admin_required."""
+        from flask_login import login_user
+        from werkzeug.exceptions import Forbidden
+        from app.services.permisos import admin_required
+
+        @admin_required
+        def vista_protegida(multiplicador, extra=1):
+            return 21 * multiplicador + extra
+
+        # 1. Usuario anónimo: redirige al inicio de sesión con next
+        with self.app.test_request_context('/admin/panel-prueba'):
+            respuesta = vista_protegida(2, extra=0)
+            self.assertEqual(respuesta.status_code, 302)
+            self.assertIn('/login', respuesta.headers['Location'])
+            self.assertIn('next=', respuesta.headers['Location'])
+
+        # 2. Instructor autenticado sin rol de administrador: rechaza con 403 Forbidden
+        with self.app.test_request_context('/admin/panel-prueba'):
+            login_user(self.colaborador)
+            with self.assertRaises(Forbidden):
+                vista_protegida(2, extra=0)
+
+        # 3. Administrador autenticado: ejecuta la función decorada y devuelve el resultado
+        with self.app.test_request_context('/admin/panel-prueba'):
+            login_user(self.admin)
+            resultado = vista_protegida(2, extra=0)
+            self.assertEqual(resultado, 42)
+
     def test_admin_required_anonimo_redirige_a_login(self):
         """Usuario anónimo es redirigido a login al intentar acceder a rutas administrativas."""
         cliente = self.app.test_client()
