@@ -306,6 +306,25 @@ test('fallbacks de vidrio: @supports not, transparencia reducida, contraste y co
     assert.match(css, /@media\s*\(prefers-reduced-transparency:\s*reduce\)/, 'debe existir @media (prefers-reduced-transparency: reduce)');
     assert.match(css, /@media\s*\(prefers-contrast:\s*more\)/, 'debe existir @media (prefers-contrast: more)');
     assert.match(css, /@media\s*\(forced-colors:\s*active\)/, 'debe existir @media (forced-colors: active)');
+
+    // El navbar tiene texto blanco y debe mantener fondo oscuro sólido accesible en todos los fallbacks
+    assert.match(stylesCss, /\.navbar\s*\{[\s\S]*?background-color:\s*var\(--navbar-bg-solid/, 'navbar debe tener background-color sólido de respaldo');
+    assert.doesNotMatch(stylesCss, /prefers-reduced-transparency:\s*reduce\)\s*\{[\s\S]*?\.navbar\s*,\s*\.ficha-toolbar/, 'navbar no debe heredar el fondo de tarjeta en transparencia reducida');
+    assert.doesNotMatch(stylesCss, /@supports\s+not\s*\([\s\S]*?\.navbar\s*,\s*\.ficha-toolbar/, 'navbar no debe heredar el fondo de tarjeta cuando backdrop-filter no está disponible');
+});
+
+test('navbar: contraste AAA del texto sobre el fondo sólido en todos los temas', () => {
+    for (const [tema, mapa] of Object.entries(TEMAS)) {
+        assert.ok(mapa.has('--navbar-bg-solid'), `El tema ${tema} debe definir --navbar-bg-solid`);
+        assert.ok(mapa.has('--navbar-text'), `El tema ${tema} debe definir --navbar-text`);
+        const fondo = tokenDeColor(mapa, '--navbar-bg-solid', tema);
+        const texto = tokenDeColor(mapa, '--navbar-text', tema);
+        const ratio = contrasteEntre(texto, fondo);
+        assert.ok(
+            ratio >= 7.0,
+            `${tema}: contraste texto navbar sobre fondo sólido dio ${ratio.toFixed(2)} (mínimo AAA 7.0)`
+        );
+    }
 });
 
 test('estados canónicos de botón y variantes outline accesibles', () => {
