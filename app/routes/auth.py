@@ -35,7 +35,9 @@ def _proteger_respuestas_de_recuperacion(response):
     if request.endpoint in ('auth.solicitar_recuperacion', 'auth.restablecer_contrasena'):
         response.headers['Cache-Control'] = 'no-store, max-age=0'
         response.headers['Pragma'] = 'no-cache'
-        response.headers['Referrer-Policy'] = 'no-referrer'
+        # same-origin y no no-referrer: sobre HTTPS, Flask-WTF rechaza todo POST
+        # sin cabecera Referer. El token del enlace sigue sin salir a terceros.
+        response.headers['Referrer-Policy'] = 'same-origin'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['Content-Security-Policy'] = (

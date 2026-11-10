@@ -62,7 +62,7 @@ class RecuperacionContrasenaTestCase(unittest.TestCase):
 
         self.assertEqual(respuesta_solicitud.status_code, 200)
         self.assertEqual(respuesta_solicitud.headers['Cache-Control'], 'no-store, max-age=0')
-        self.assertEqual(respuesta_solicitud.headers['Referrer-Policy'], 'no-referrer')
+        self.assertEqual(respuesta_solicitud.headers['Referrer-Policy'], 'same-origin')
         self.assertIn('Si existe una cuenta activa'.encode(), respuesta_solicitud.data)
         self.assertIn('url', enlace_enviado)
         self.assertTrue(enlace_enviado['url'].startswith(
