@@ -120,8 +120,8 @@ def _conectar_redis():
         try:
             cliente = _cliente_redis(socket_timeout=WORKER_SOCKET_TIMEOUT)
             log.info(
-                'WORKER_REDIS_OK intento=%s destino=%s cola=%s socket_timeout=%ss',
-                intento, _redis_destino(), app.config['IMPORT_QUEUE_NAME'],
+                'WORKER_REDIS_OK intento=%s cola=%s socket_timeout=%ss',
+                intento, app.config['IMPORT_QUEUE_NAME'],
                 WORKER_SOCKET_TIMEOUT,
             )
             with open(WORKER_READY_FILE, 'w', encoding='utf-8') as marker:
@@ -129,8 +129,8 @@ def _conectar_redis():
             return cliente
         except Exception as exc:
             log.error(
-                'WORKER_REDIS_ERROR intento=%s/%s destino=%s detalle=%s',
-                intento, max_intentos, _redis_destino(), exc,
+                'WORKER_REDIS_ERROR intento=%s/%s detalle=%s',
+                intento, max_intentos, exc,
                 exc_info=True,
             )
             if intento < max_intentos:
@@ -275,8 +275,8 @@ def main():
         log.warning('La cola no está disponible; se recuperarán las cargas pendientes desde la base de datos.')
     queue_name = app.config['IMPORT_QUEUE_NAME']
     log.info(
-        'WORKER_START pid=%s destino=%s cola=%s blpop_timeout=%ss socket_timeout=%ss',
-        os.getpid(), _redis_destino(), queue_name,
+        'WORKER_START pid=%s cola=%s blpop_timeout=%ss socket_timeout=%ss',
+        os.getpid(), queue_name,
         WORKER_BLPOP_TIMEOUT, WORKER_SOCKET_TIMEOUT,
     )
     ultima_revision_tyt = -300
@@ -330,8 +330,8 @@ def main():
             )
         except RedisError as exc:
             log.error(
-                'WORKER_REDIS_RUNTIME_ERROR destino=%s detalle=%s. Se reconectará.',
-                _redis_destino(), exc, exc_info=True,
+                'WORKER_REDIS_RUNTIME_ERROR detalle=%s. Se reconectará.',
+                exc, exc_info=True,
             )
             try:
                 os.remove(WORKER_READY_FILE)

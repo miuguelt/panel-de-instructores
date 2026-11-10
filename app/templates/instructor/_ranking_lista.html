@@ -94,9 +94,6 @@
             {% if fila.bonus %}
             <span class="bonus-text">✨ +{{ '%.1f'|format(fila.bonus) }} puntos</span>
             {% endif %}
-            {% if fila.alertas_criticas %}
-            <span class="badge badge-danger" title="Alerta crítica activa de deserción o comité">⚠️ Alerta activa</span>
-            {% endif %}
         </div>
         <div class="progress-track" role="progressbar"
              aria-label="Progreso del puntaje de {{ fila.aprendiz.nombre_completo }}"

@@ -336,7 +336,6 @@ def test_fallo_al_regenerar_grupos_conserva_equipos_actuales(entorno):
 
 @pytest.mark.parametrize('campo,maximo', [
     ('umbral_fallas_consecutivas', 30), ('umbral_fallas_acumuladas', 100),
-    ('umbral_fallas_esporadicas', 100), ('periodo_dias_esporadicas', 365),
     ('umbral_tareas_incumplidas', 100), ('dias_plazo_justificacion', 30),
     ('auto_escalar_dias', 365), ('umbral_notas_negativas', 50), ('periodo_dias_notas', 365),
 ])

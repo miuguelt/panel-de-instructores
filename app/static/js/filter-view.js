@@ -152,12 +152,15 @@
 
     function buscarRegion(clave) {
         if (!clave) return null;
-        var porAtributo = document.querySelector('[data-filter-region="' + clave.replace(/"/g, '\\"') + '"]');
+        var claveEscapada = (window.CSS && typeof CSS.escape === 'function')
+            ? CSS.escape(clave)
+            : clave.replace(/["\\]/g, '\\$&');
+        var porAtributo = document.querySelector('[data-filter-region="' + claveEscapada + '"]');
         if (porAtributo) return porAtributo;
         var porId = document.getElementById(clave);
         if (porId) return porId;
         try {
-            var porClase = document.querySelector('.' + clave);
+            var porClase = document.querySelector('.' + claveEscapada);
             if (porClase) return porClase;
         } catch (e) {}
         return null;

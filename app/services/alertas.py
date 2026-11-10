@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 import smtplib
 
@@ -26,22 +26,33 @@ from app.services.trabajos_grupales import obtener_destinatarios_y_entregas_grup
 
 
 # ─────────────────────────────────────────────
-# REGLAMENTO DEL APRENDIZ SENA — Resolución 009 de 2024
+# REGLAMENTO DEL APRENDIZ SENA — Acuerdo 009 de 2024 (Consejo Directivo Nacional)
+# Fuente única de artículos y páginas: app/services/normativa_sena.py
 # ─────────────────────────────────────────────
-# Art. 22: Faltas académicas
-#   - 3 inasistencias consecutivas injustificadas → comité
-#   - 5 inasistencias injustificadas en 3 meses → comité
-#   - Inasistencia >= 25% del total de horas → causal de deserción
-#   - Incumplimiento recurrente de evidencias → plan de mejoramiento
-#
-# Art. 28: Proceso formativo
-#   a) Llamado de atención verbal
-#   b) Plan de mejoramiento académico
-#   c) Comité de evaluación y seguimiento
+# Art. 30 num. 1 lit. a (pág. 30): 3 días continuos o 5 no continuos de
+#   inasistencia injustificada durante el proceso → deserción → comité (Art. 31).
+# Art. 30 num. 2 (pág. 31): etapa productiva no culminada al cierre por fecha
+#   del grupo → deserción → comité (ver comite_productiva.py).
+# Art. 46 (págs. 37-38): llamados de atención → plan de mejoramiento → comité.
+# El porcentaje mínimo de asistencia es un umbral preventivo del panel: el
+# reglamento no lo fija para la formación titulada.
 # ─────────────────────────────────────────────
 
 
 _SIN_CARGAR = object()
+
+VENTANA_REVISION_FICHAS_TERMINADAS = 400
+
+
+def _con_fundamento(detalle, clave_principal, *claves_adicionales):
+    """Agrega al detalle de la alerta la norma, artículo y página que la sustentan."""
+    from app.services.normativa_sena import fundamentos_de
+    fundamentos = fundamentos_de(clave_principal, *claves_adicionales)
+    detalle = dict(detalle)
+    detalle['fundamento'] = fundamentos[0]
+    detalle['fundamentos'] = fundamentos
+    detalle['reglamento'] = fundamentos[0]['referencia']
+    return detalle
 
 
 class ContextoFicha:
@@ -354,7 +365,7 @@ def _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora,
                 'aprendiz', aprendiz.id,
                 mensaje,
                 'alerta', f'alerta:{abierta.id}:{nivel}', ficha.id,
-                f'/aprendiz/{ficha.id}/panel?documento={aprendiz.documento}',
+                _url_panel_aprendiz(ficha.id),
                 contexto=contexto,
             )
         return abierta, False
@@ -384,10 +395,23 @@ def _crear_alerta(ficha, aprendiz, tipo, nivel, titulo, mensaje, detalle, ahora,
         'aprendiz', aprendiz.id,
         mensaje,
         'alerta', f'alerta:{alerta.id}:nueva', ficha.id,
-        f'/aprendiz/{ficha.id}/panel?documento={aprendiz.documento}',
+        _url_panel_aprendiz(ficha.id),
         contexto=contexto,
     )
     return alerta, True
+
+
+def fecha_colombia(ahora):
+    """Fecha civil en Colombia (UTC-5, sin horario de verano) de un instante UTC.
+
+    Las reglas cuentan días de formación: con la fecha UTC, desde las 7 p. m.
+    el sistema ya creía estar en el día siguiente.
+    """
+    if isinstance(ahora, datetime):
+        if ahora.tzinfo is not None:
+            ahora = ahora.astimezone(timezone.utc).replace(tzinfo=None)
+        return (ahora - timedelta(hours=5)).date()
+    return ahora
 
 
 def _contexto(ficha_id, contexto=None, ahora=None):
@@ -395,26 +419,41 @@ def _contexto(ficha_id, contexto=None, ahora=None):
     return contexto if contexto is not None else ContextoFicha(ficha_id, ahora)
 
 
-def _consecutivas_injustificadas(aprendiz_id, ficha_id, contexto=None):
+def plazo_justificacion_efectivo(config):
+    """Días hábiles para justificar: nunca menos de los 5 del Art. 28, par. 3."""
+    from app.services.debido_proceso import DIAS_HABILES_JUSTIFICACION
+    return max(DIAS_HABILES_JUSTIFICACION, int(config.dias_plazo_justificacion or 0))
+
+
+def _registros_consolidados(registros, hoy, dias_plazo):
+    """Registros cuyo plazo para justificar ya venció.
+
+    Una falta solo cuenta como injustificada cuando el aprendiz ya no puede
+    excusarla (Art. 28, par. 3, y Art. 29). Como el plazo crece con la fecha,
+    los registros consolidados son siempre un prefijo cronológico.
+    """
+    from app.services.debido_proceso import fecha_limite_justificacion
+    return [
+        (fecha, estado) for fecha, estado in registros
+        if fecha_limite_justificacion(fecha, dias_plazo) < hoy
+    ]
+
+
+def _consecutivas_injustificadas(aprendiz_id, ficha_id, contexto=None, registros=None):
+    """Máximo de faltas seguidas, contadas en sesiones de formación programadas.
+
+    «Días continuos» (Art. 30, num. 1, lit. a) se interpreta como sesiones
+    programadas seguidas: un día sin sesión no interrumpe ni suma la racha.
+    """
     ctx = _contexto(ficha_id, contexto)
     maximo = actual = 0
-    for _fecha, estado in ctx.registros(aprendiz_id):
+    for _fecha, estado in (registros if registros is not None else ctx.registros(aprendiz_id)):
         if estado == 'FALTA':
             actual += 1
             maximo = max(maximo, actual)
         else:
             actual = 0
     return maximo
-
-
-def _faltas_esporadicas_en_ventana(aprendiz_id, ficha_id, periodo_dias=90, contexto=None):
-    ctx = _contexto(ficha_id, contexto)
-    inicio_ventana = date.today() - timedelta(days=periodo_dias)
-    return sum(
-        1
-        for fecha, estado in ctx.registros(aprendiz_id)
-        if estado == 'FALTA' and fecha >= inicio_ventana
-    )
 
 
 def _incumplimientos_academicos(aprendiz_id, ficha_id, ahora, contexto=None):
@@ -481,7 +520,7 @@ def _obtener_cronograma(ficha, hoy=None):
 
 def actualizar_alertas_ficha(ficha_id, ahora=None):
     ahora = ahora or datetime.utcnow()
-    hoy = ahora.date()
+    hoy = fecha_colombia(ahora)
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha:
         return []
@@ -493,74 +532,65 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
     # mismos COUNT de asistencia y SELECT de entregas.
     contexto = ContextoFicha(ficha_id, ahora)
 
+    dias_plazo = plazo_justificacion_efectivo(config)
+
     for aprendiz in Aprendiz.query_en_formacion(ficha_id).all():
-        consecutivas = _consecutivas_injustificadas(aprendiz.id, ficha_id, contexto)
-        acumuladas = sum(
-            1 for _fecha, estado in contexto.registros(aprendiz.id) if estado == 'FALTA'
+        consolidados = _registros_consolidados(contexto.registros(aprendiz.id), hoy, dias_plazo)
+        consecutivas = _consecutivas_injustificadas(
+            aprendiz.id, ficha_id, contexto, registros=consolidados
         )
-        esporadicas = _faltas_esporadicas_en_ventana(
-            aprendiz.id, ficha_id, config.periodo_dias_esporadicas, contexto
-        )
+        acumuladas = sum(1 for _fecha, estado in consolidados if estado == 'FALTA')
         incumplidas = _incumplimientos_academicos(aprendiz.id, ficha_id, ahora, contexto)
         pct_asistencia = _porcentaje_asistencia(aprendiz.id, ficha_id, contexto)
         reglas = []
 
-        # ── R1: 3 sesiones consecutivas injustificadas → COMITÉ (Art. 22) ──
+        # ── R1: 3 sesiones consecutivas injustificadas → COMITÉ (Acuerdo 009, Art. 30 num. 1 lit. a) ──
         umbral_consec = config.umbral_fallas_consecutivas
         if consecutivas >= umbral_consec:
             reglas.append((
                 'comite_desercion', 'roja',
                 f'Riesgo de deserción: {consecutivas} sesiones seguidas sin justificar',
                 f'{aprendiz.nombre}: registra {consecutivas} inasistencias consecutivas sin '
-                'justificación. La Resolución 009 indica que esto activa proceso de comité.',
-                {
+                'justificación. El Acuerdo 009 de 2024, Art. 30, num. 1, lit. a (pág. 30), '
+                'lo define como deserción y el Art. 31 ordena reportarlo al comité.',
+                _con_fundamento({
                     'motivo': 'consecutivas_injustificadas',
                     'fallas_consecutivas': consecutivas,
                     'umbral': umbral_consec,
-                    'reglamento': 'Res. 009 Art. 22',
-                },
+                }, 'consecutivas_injustificadas', 'inasistencia_injustificada',
+                    'procedimiento_desercion_inasistencia'),
             ))
-        # ── R2: 5 faltas esporádicas en 3 meses → COMITÉ (Art. 22) ──
-        elif esporadicas >= config.umbral_fallas_esporadicas:
-            meses = round(config.periodo_dias_esporadicas / 30)
-            reglas.append((
-                'comite_desercion', 'roja',
-                f'Riesgo de deserción: {esporadicas} faltas en {meses} meses',
-                f'{aprendiz.nombre}: {esporadicas} inasistencias injustificadas '
-                f'en los últimos {meses} meses. La Resolución 009 establece '
-                f'{config.umbral_fallas_esporadicas} faltas en este período como causal de comité.',
-                {
-                    'motivo': 'esporadicas_trimestre',
-                    'fallas_esporadicas': esporadicas,
-                    'periodo_dias': config.periodo_dias_esporadicas,
-                    'umbral': config.umbral_fallas_esporadicas,
-                    'reglamento': 'Res. 009 Art. 22',
-                },
-            ))
-        # ── R3: Fallas acumuladas → SEGUIMIENTO ──
+        # ── R3: 5 fallas no continuas en todo el proceso → COMITÉ (Art. 30) ──
         elif acumuladas >= config.umbral_fallas_acumuladas:
             reglas.append((
-                'asistencia', 'amarilla',
-                'Seguimiento académico por inasistencia',
-                f'{aprendiz.nombre}: tienes {acumuladas} fallas no justificadas acumuladas. '
-                'Conversa con tu instructor para acordar un plan de apoyo.',
-                {'fallas_acumuladas': acumuladas, 'motivo': 'seguimiento',
-                 'reglamento': 'Res. 009 Art. 28'},
+                'comite_desercion', 'roja',
+                f'Riesgo de deserción: {acumuladas} faltas injustificadas en el proceso',
+                f'{aprendiz.nombre}: registra {acumuladas} inasistencias injustificadas '
+                'durante el proceso. El Acuerdo 009 de 2024, Art. 30, num. 1, lit. a '
+                '(pág. 30), define como deserción acumular cinco días no continuos.',
+                _con_fundamento(
+                    {'fallas_acumuladas': acumuladas, 'motivo': 'acumuladas_proceso',
+                     'umbral': config.umbral_fallas_acumuladas},
+                    'acumuladas_proceso', 'inasistencia_injustificada',
+                    'procedimiento_desercion_inasistencia',
+                ),
             ))
-        # ── R5: % asistencia < crítico → COMITÉ (Art. 22 — inasistencia >= 25%) ──
+        # ── R5: % asistencia < umbral preventivo del panel (sin respaldo normativo) ──
+        # Es solo un aviso preventivo: el Acuerdo no fija un mínimo, así que no
+        # es causal de comité ni comparte tipo con R1-R3.
         if pct_asistencia < config.porcentaje_minimo_asistencia:
             reglas.append((
-                'comite_desercion', 'roja',
-                f'Asistencia crítica: {pct_asistencia}% — por debajo del mínimo reglamentario',
+                'asistencia', 'amarilla',
+                f'Asistencia baja: {pct_asistencia}%',
                 f'{aprendiz.nombre}: tu asistencia es del {pct_asistencia}%. '
-                'La Resolución 009 establece que la inasistencia igual o superior al 25% '
-                'del total de horas programadas es causal de comité de evaluación.',
-                {
+                'Es un umbral preventivo configurado en el panel: el Acuerdo 009 de 2024 '
+                'no fija un porcentaje mínimo. Para remitir a comité verifique las causales '
+                'del Art. 30, num. 1, lit. a (pág. 30).',
+                _con_fundamento({
                     'motivo': 'porcentaje_asistencia',
                     'pct_asistencia': pct_asistencia,
                     'umbral': config.porcentaje_minimo_asistencia,
-                    'reglamento': 'Res. 009 Art. 22',
-                },
+                }, 'porcentaje_asistencia', 'consecutivas_injustificadas'),
             ))
 
         # ── R4/R6: Tareas incumplidas → plan de mejoramiento / comité ──
@@ -569,14 +599,14 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
                 'academica', 'roja',
                 'Incumplimiento académico requiere plan de mejoramiento',
                 f'{aprendiz.nombre}: hay {len(incumplidas)} actividades vencidas, tardías '
-                'o rechazadas. El instructor debe crear un plan de mejoramiento '
-                'conforme a la Resolución 009 Art. 28.',
-                {
+                'o rechazadas. Según el Acuerdo 009 de 2024, Art. 46, num. 1 (págs. 37-38), '
+                'proceden llamados de atención y plan de mejoramiento; si no se cumple, '
+                'el caso va a comité (parágrafo 4).',
+                _con_fundamento({
                     'tareas_incumplidas': len(incumplidas),
                     'tareas': [t.id for t in incumplidas],
                     'requiere_plan': True,
-                    'reglamento': 'Res. 009 Art. 28',
-                },
+                }, 'tareas_incumplidas'),
             ))
 
         # ── R7: llamados de atención del observador → SEGUIMIENTO integral ──
@@ -596,14 +626,13 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
                     f'atención en los últimos {config.periodo_dias_notas} días. '
                     'Revisa la bitácora y acuerda un plan de mejoramiento antes de que el '
                     'caso escale a comité.',
-                    {
+                    _con_fundamento({
                         'motivo': 'notas_observador',
                         'notas_negativas': llamados,
                         'umbral': config.umbral_notas_negativas,
                         'periodo_dias': config.periodo_dias_notas,
                         'requiere_plan': True,
-                        'reglamento': 'Res. 009 Art. 28',
-                    },
+                    }, 'notas_observador'),
                 ))
 
         tipos_activos = set()
@@ -621,6 +650,20 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
                 alerta.fecha_resuelta = ahora
         resultados.extend(reglas)
 
+    # Reglas que dependen de novedades y etapa productiva: se cargan una vez por ficha.
+    from app.services.cierre_lectivo import actualizar_alertas_cierre
+    from app.services.comite_productiva import actualizar_alertas_productiva
+    from app.services.novedades import actualizar_alertas_reintegro, cargar_datos_ficha
+    todos = Aprendiz.query.filter_by(ficha_id=ficha_id).all()
+    etapas, novedades = cargar_datos_ficha(ficha_id)
+    # Fichas terminadas por fecha: etapa productiva no culminada (Art. 30 num. 2).
+    actualizar_alertas_productiva(ficha, ahora, contexto=contexto, aprendices=todos,
+                                  etapas=etapas, novedades=novedades)
+    # Aplazamientos sin reintegro gestionado (Art. 18 num. 3 y Art. 30 num. 3).
+    actualizar_alertas_reintegro(ficha, ahora, todos, novedades, contexto=contexto)
+    # Pendientes antes del cierre de la etapa lectiva (prevención del Art. 30 num. 2).
+    actualizar_alertas_cierre(ficha, ahora, todos, etapas, contexto=contexto)
+
     db.session.commit()
     from app.services.cronograma import actualizar_alertas_cronograma
     actualizar_alertas_cronograma(ficha_id, ahora=ahora)
@@ -632,35 +675,39 @@ def actualizar_alertas_ficha(ficha_id, ahora=None):
 
 
 def auto_escalar_casos_pendientes(ficha_id, ahora=None, contexto=None):
+    """Recuerda al instructor los casos abiertos hace mucho; nunca escala solo.
+
+    Pasar un caso a comité exige el informe del instructor (Art. 51, num. 1):
+    el sistema solo avisa, una vez por alerta, y la decisión queda en manos
+    de una persona.
+    """
     ahora = ahora or datetime.utcnow()
     config = obtener_config_comite(ficha_id)
     ficha = db.session.get(Ficha, ficha_id)
-    # joinedload del aprendiz: el mensaje de escalamiento usa su nombre y sin
-    # esto cada alerta escalada dispara un SELECT adicional.
+    if not ficha:
+        return 0
     alertas = Alerta.query.options(joinedload(Alerta.aprendiz)).filter_by(
         ficha_id=ficha_id, estado='activa'
     ).filter(
         Alerta.aprendiz_id.isnot(None)
     ).all()
-    escaladas = 0
+    recordadas = 0
     for alerta in alertas:
         dias = (ahora - alerta.fecha_generada).days
         if dias >= config.auto_escalar_dias:
-            alerta.estado = 'escalada_comite'
-            alerta.fecha_escalada = ahora
-            alerta.auto_escalada = True
-            if ficha:
-                _notificar_instructores(
-                    ficha,
-                    f'El caso de {alerta.aprendiz.nombre_completo} fue escalado automáticamente a comité: {alerta.titulo}.',
-                    'escalamiento',
-                    f'escalamiento:{alerta.id}',
-                    f'/instructor/fichas/{ficha.id}/casos-seguimiento',
-                    contexto=contexto,
-                )
-            escaladas += 1
-    if escaladas:
+            _notificar_instructores(
+                ficha,
+                f'El caso de {alerta.aprendiz.nombre_completo} lleva {dias} días abierto '
+                f'({alerta.titulo}). Revise si corresponde remitirlo a comité con su informe.',
+                'escalamiento',
+                f'recordatorio-comite:{alerta.id}',
+                f'/instructor/fichas/{ficha.id}/casos-seguimiento',
+                contexto=contexto,
+            )
+            recordadas += 1
+    if recordadas:
         db.session.commit()
+    return recordadas
 
 
 # ── Evaluación automática programada ─────────
@@ -668,9 +715,13 @@ def auto_escalar_casos_pendientes(ficha_id, ahora=None, contexto=None):
 
 def ejecutar_revision_automatica():
     ahora = datetime.utcnow()
-    hoy = ahora.date()
+    hoy = fecha_colombia(ahora)
+    # Se incluyen fichas terminadas hasta poco más de un año atrás: en ese
+    # intervalo corren la remisión por etapa productiva (Art. 30 num. 2) y la
+    # cancelación administrativa (Art. 47 num. 2 par. 1).
+    desde = hoy - timedelta(days=VENTANA_REVISION_FICHAS_TERMINADAS)
     fichas = Ficha.query.filter(
-        (Ficha.fecha_fin >= hoy) | (Ficha.fecha_fin.is_(None))
+        (Ficha.fecha_fin >= desde) | (Ficha.fecha_fin.is_(None))
     ).all()
     evaluadas = 0
     for ficha in fichas:
@@ -684,12 +735,26 @@ def ejecutar_revision_automatica():
     return evaluadas
 
 
-# ── Plan de mejoramiento (Art. 28 Res. 009) ──
+# ── Plan de mejoramiento (Acuerdo 009 de 2024, Art. 46) ──
 
 
 def crear_plan_mejoramiento(aprendiz_id, ficha_id, instructor_id, actividades,
-                            fecha_limite=None, alerta_id=None, tarea_id=None):
+                            fecha_limite=None, alerta_id=None, tarea_id=None, fase=None,
+                            fecha_creacion=None):
+    """Crea el plan solo si cumple el Art. 46 (máximo 20 días calendario).
+
+    Lanza ``ValueError`` con los errores de ``validar_plan``; las advertencias
+    se devuelven en ``plan.advertencias`` para que la ruta las muestre.
+    """
+    from app.services.debido_proceso import validar_plan
+    ficha_plan = db.session.get(Ficha, ficha_id)
+    creacion = fecha_creacion or datetime.utcnow()
+    errores, advertencias = validar_plan(aprendiz_id, ficha_plan, creacion, fecha_limite, fase=fase)
+    if errores:
+        raise ValueError(' '.join(errores))
     plan = PlanMejoramiento(
+        fase=fase,
+        fecha_creacion=creacion,
         aprendiz_id=aprendiz_id,
         ficha_id=ficha_id,
         alerta_id=alerta_id,
@@ -713,9 +778,10 @@ def crear_plan_mejoramiento(aprendiz_id, ficha_id, instructor_id, actividades,
             'aprendiz', aprendiz_id,
             f'Tu instructor creó un plan de mejoramiento para ti. Revisa las actividades y fechas acordadas.',
             'alerta', f'plan-creado:{plan.id}', ficha_id,
-            f'/aprendiz/{ficha.id}/panel?documento={aprendiz.documento}',
+            _url_panel_aprendiz(ficha.id),
         )
     db.session.commit()
+    plan.advertencias = advertencias
     return plan
 
 
@@ -729,13 +795,22 @@ def cumplir_plan_mejoramiento(plan_id):
     return plan
 
 
-def vencer_planes_pendientes(ahora=None):
+def vencer_planes_pendientes(ahora=None, ficha_id=None):
+    """Marca vencidos los planes sin evidencia cuya fecha límite ya pasó.
+
+    Un plan con evidencia enviada espera la revisión del instructor: el
+    aprendiz cumplió a tiempo y no se le puede tratar como incumplido.
+    """
     ahora = ahora or datetime.utcnow()
-    vencidos = PlanMejoramiento.query.filter(
+    consulta = PlanMejoramiento.query.filter(
         PlanMejoramiento.estado == 'pendiente',
         PlanMejoramiento.fecha_limite.isnot(None),
         PlanMejoramiento.fecha_limite < ahora,
-    ).all()
+        PlanMejoramiento.evidencia_enviada_en.is_(None),
+    )
+    if ficha_id is not None:
+        consulta = consulta.filter(PlanMejoramiento.ficha_id == ficha_id)
+    vencidos = consulta.all()
     for plan in vencidos:
         plan.estado = 'vencido'
     if vencidos:
@@ -744,6 +819,11 @@ def vencer_planes_pendientes(ahora=None):
 
 
 # ── Recordatorios ────────────────────────────
+
+
+def _url_panel_aprendiz(ficha_id):
+    """Enlace al panel del aprendiz; nunca lleva la cédula (la sesión identifica)."""
+    return f'/aprendiz/{ficha_id}/panel'
 
 
 def crear_recordatorios_aprendiz(ficha_id, aprendiz_id, ahora=None):
@@ -799,7 +879,7 @@ def crear_recordatorios_aprendiz(ficha_id, aprendiz_id, ahora=None):
             f'Recuerda tu evidencia "{tarea.titulo}": vence el '
             f'{tarea.fecha_limite.strftime("%d/%m/%Y %H:%M")}.',
             'tarea', f'tarea:{tarea.id}:{ventana}', ficha_id,
-            f'/aprendiz/{ficha_id}/panel?documento={aprendiz.documento}',
+            _url_panel_aprendiz(ficha_id),
         )
 
     ultimo = RegistroAsistencia.query.join(SesionAsistencia).filter(
@@ -808,13 +888,16 @@ def crear_recordatorios_aprendiz(ficha_id, aprendiz_id, ahora=None):
         RegistroAsistencia.estado == 'FALTA',
     ).order_by(SesionAsistencia.fecha.desc()).first()
     if ultimo:
+        from app.services.debido_proceso import fecha_limite_justificacion
+        limite = fecha_limite_justificacion(ultimo.sesion.fecha, config.dias_plazo_justificacion)
         registrar_notificacion(
             'aprendiz', aprendiz_id,
             'Si tu inasistencia tiene una excusa médica, laboral excepcional o citación oficial, '
-            f'preséntala a tu instructor dentro de los {config.dias_plazo_justificacion} días sugeridos '
-            'para que pueda revisarla.',
+            f'preséntala a tu instructor a más tardar el {limite:%d/%m/%Y} '
+            f'({config.dias_plazo_justificacion} días hábiles, Acuerdo 009 de 2024, Art. 28, '
+            'parágrafo 3). Si no la justificas, cuenta como inasistencia injustificada.',
             'justificacion', f'justificacion:{ultimo.id}', ficha_id,
-            f'/aprendiz/{ficha_id}/panel?documento={aprendiz.documento}',
+            _url_panel_aprendiz(ficha_id),
         )
     db.session.commit()
 

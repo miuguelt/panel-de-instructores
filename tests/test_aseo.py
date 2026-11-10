@@ -345,9 +345,8 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertIn('Sábado'.encode(), respuesta_configuracion_dias.data)
         self.assertIn('Domingo'.encode(), respuesta_configuracion_dias.data)
 
-        panel = cliente.get(
-            f'/aprendiz/{self.ficha.id}/panel'
-            f'?documento={self.aprendices[0].documento}',
+        panel = cliente_aprendiz.get(
+            f'/aprendiz/{self.ficha.id}/panel',
             follow_redirects=True
         )
         self.assertEqual(panel.status_code, 200)
@@ -421,11 +420,11 @@ class TurnosAseoTestCase(unittest.TestCase):
         self._crear_sesion(fecha)
         db.session.commit()
         cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = self.aprendices[0].documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
 
-        respuesta = cliente.get(
-            f'/aprendiz/{self.ficha.id}/turnos-aseo'
-            f'?documento={self.aprendices[0].documento}'
-        )
+        respuesta = cliente.get(f'/aprendiz/{self.ficha.id}/turnos-aseo')
         self.assertEqual(respuesta.status_code, 200)
         self.assertIn('Turnos de aseo'.encode(), respuesta.data)
         self.assertIn('Tabla de equidad'.encode(), respuesta.data)

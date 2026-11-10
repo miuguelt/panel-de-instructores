@@ -4,8 +4,8 @@ Evalúa de manera determinística las diferentes dimensiones del proceso de form
 1. Ritmo de fases y cronograma (GFPI-F-134 vs SOFIA Plus).
 2. Juicios evaluativos y cobertura de competencias.
 3. Tareas y ritmo de calificaciones docentes.
-4. Asistencia y alertas preventivas de comité (Resolución 009 de 2024).
-5. Planes de mejoramiento y debido proceso (Art. 28).
+4. Asistencia y alertas preventivas de comité (Acuerdo 009 de 2024).
+5. Planes de mejoramiento y debido proceso (Acuerdo 009 de 2024, Art. 46).
 6. Recomendaciones personalizadas y logros alcanzados para el aprendiz.
 """
 
@@ -397,9 +397,9 @@ def _evaluar_asistencia_comite_instructor(
                 icono='🚨',
                 titulo=f'{total_comite} aprendiz{"ces" if total_comite > 1 else ""} en causal de comité',
                 mensaje=(
-                    f'Se han detectado {total_comite} aprendices que cumplen causales del '
-                    f'Reglamento del Aprendiz (Res. 009/2024 Art. 22) por inasistencia reiterada. '
-                    f'Es imperativo citar a comité o formalizar el debido proceso.'
+                    f'Hay {total_comite} aprendices con inasistencias sin justificar que, vencido '
+                    f'el plazo para excusarlas, configuran la causal del Acuerdo 009 de 2024 '
+                    f'(Art. 30, pág. 30). Revise cada caso y, si corresponde, remítalo a comité con su informe.'
                 ),
                 accion_texto='Gestionar casos de comité',
                 accion_url=f'/instructor/fichas/{ficha.id}/casos-seguimiento',
@@ -443,8 +443,8 @@ def _evaluar_asistencia_comite_instructor(
                 icono='📋',
                 titulo=f'{len(planes_urgentes)} plan{"es" if len(planes_urgentes) > 1 else ""} de mejora por vencer sin soporte',
                 mensaje=(
-                    f'Los planes acordados bajo Art. 28 vencen en menos de 48 horas y los aprendices '
-                    f'aún no han cargado evidencia. Si vencen sin cumplimiento procede auto-escalación a comité.'
+                    f'Los planes acordados bajo el Art. 46 vencen en menos de 48 horas y los aprendices '
+                    f'aún no han cargado evidencia. Si vencen sin cumplimiento, usted decide si remite el caso a comité.'
                 ),
                 accion_texto='Revisar planes',
                 accion_url=f'/instructor/fichas/{ficha.id}/planes-mejoramiento',
@@ -623,7 +623,7 @@ def obtener_recomendaciones_aprendiz(
             )
         )
 
-    # 3. Asistencia en riesgo (Res. 009)
+    # 3. Asistencia en riesgo (umbral preventivo del panel)
     total_sesiones = SesionAsistencia.query.filter_by(ficha_id=ficha_id).count()
     total_faltas = (
         RegistroAsistencia.query
@@ -631,7 +631,7 @@ def obtener_recomendaciones_aprendiz(
         .filter(
             SesionAsistencia.ficha_id == ficha_id,
             RegistroAsistencia.aprendiz_id == aprendiz_id,
-            RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
+            RegistroAsistencia.estado == 'FALTA',
         )
         .count()
     )
@@ -644,11 +644,12 @@ def obtener_recomendaciones_aprendiz(
                     categoria=CAT_ASISTENCIA,
                     severidad=SEV_PREVENTIVA,
                     icono='⚠️',
-                    titulo='Tu asistencia está cerca del límite reglamentario',
+                    titulo='Tu asistencia está cerca del límite preventivo de tu ficha',
                     mensaje=(
-                        f'Tu porcentaje actual es del {pct_asis}%. La Resolución 009 establece '
-                        f'que bajar del 75% es causal de comité de evaluación y deserción. '
-                        f'¡Cuida tus próximas asistencias!'
+                        f'Tu porcentaje actual es del {pct_asis}%. Tu ficha usa el 75% como '
+                        f'límite preventivo. Recuerda que el Acuerdo 009 de 2024 (Art. 30, '
+                        f'pág. 30) considera deserción tres días seguidos o cinco no continuos '
+                        f'de inasistencia sin justificar. Cuida tus próximas asistencias.'
                     ),
                     accion_texto='Consultar historial de asistencia',
                     accion_url='#seccion-asistencia',

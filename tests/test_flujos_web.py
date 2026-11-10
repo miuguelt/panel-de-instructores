@@ -146,6 +146,9 @@ class FlujosWebTestCase(unittest.TestCase):
             sesion['_fresh'] = True
 
     def test_paginas_principales_y_reportes_responden(self):
+        with self.cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = self.aprendiz.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
         rutas = (
             '/instructor/',
             '/instructor/fichas',
@@ -165,8 +168,8 @@ class FlujosWebTestCase(unittest.TestCase):
             f'/instructor/fichas/{self.ficha.id}/reporte-asistencia?formato=excel',
             f'/instructor/fichas/{self.ficha.id}/reporte-asistencia?formato=pdf',
             f'/aprendiz/{self.ficha.id}',
-            f'/aprendiz/{self.ficha.id}/panel?documento={self.aprendiz.documento}',
-            f'/aprendiz/{self.ficha.id}/notificaciones?documento={self.aprendiz.documento}',
+            f'/aprendiz/{self.ficha.id}/panel',
+            f'/aprendiz/{self.ficha.id}/notificaciones',
             '/api/health',
         )
         for ruta in rutas:
@@ -449,6 +452,7 @@ class FlujosWebTestCase(unittest.TestCase):
         tarea = Tarea.query.filter_by(titulo='Tarea desechable').one()
 
         cliente_publico = self.app.test_client()
+        cliente_publico.post(f'/aprendiz/{self.ficha.id}', data={'documento': self.aprendiz.documento})
         cliente_publico.post(
             f'/aprendiz/{self.ficha.id}/subir-evidencia/{tarea.id}',
             data={
@@ -522,6 +526,7 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertIn('Guardar cumplimiento'.encode(), pantalla.data)
 
         cliente_publico = self.app.test_client()
+        cliente_publico.post(f'/aprendiz/{self.ficha.id}', data={'documento': self.aprendiz.documento})
         intento = cliente_publico.post(
             f'/aprendiz/{self.ficha.id}/subir-evidencia/{actividad.id}',
             data={
@@ -841,8 +846,11 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertIn('llamado de atención', aviso.mensaje)
 
         cliente_publico = self.app.test_client()
+        with cliente_publico.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = self.aprendiz.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
         panel = cliente_publico.get(
-            f'/aprendiz/{self.ficha.id}/panel?documento={self.aprendiz.documento}',
+            f'/aprendiz/{self.ficha.id}/panel',
             follow_redirects=True,
         )
         self.assertEqual(panel.status_code, 200)
@@ -910,15 +918,16 @@ class FlujosWebTestCase(unittest.TestCase):
 
         g.pop('_login_user', None)
         cliente_publico = self.app.test_client()
+        cliente_publico.post(f'/aprendiz/{self.ficha.id}', data={'documento': self.aprendiz.documento})
         descarga = cliente_publico.get(
             f'/aprendiz/descargar/{tarea.material_apoyo_url}'
-            f'?ficha_id={self.ficha.id}&documento={self.aprendiz.documento}'
+            f'?ficha_id={self.ficha.id}'
         )
         self.assertEqual(descarga.status_code, 200)
         descarga.close()
 
         g.pop('_login_user', None)
-        sin_identidad = cliente_publico.get(
+        sin_identidad = self.app.test_client().get(
             f'/aprendiz/descargar/{tarea.material_apoyo_url}'
         )
         self.assertEqual(sin_identidad.status_code, 404)
@@ -1046,6 +1055,7 @@ class FlujosWebTestCase(unittest.TestCase):
 
     def test_entrega_se_conserva_si_falla_un_servicio_secundario(self):
         cliente_publico = self.app.test_client()
+        cliente_publico.post(f'/aprendiz/{self.ficha.id}', data={'documento': self.aprendiz.documento})
         with patch(
             'app.routes.aprendiz.actualizar_alertas_ficha',
             side_effect=RuntimeError('alerts unavailable'),
@@ -1063,12 +1073,13 @@ class FlujosWebTestCase(unittest.TestCase):
                     ),
                 },
                 content_type='multipart/form-data',
-                follow_redirects=True,
             )
-        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.status_code, 302)
+        with cliente_publico.session_transaction() as sesion:
+            mensajes = ' '.join(texto for _, texto in sesion.get('_flashes', []))
         self.assertIn(
-            'La evidencia quedó guardada, pero no fue posible actualizar todos los indicadores'.encode('utf-8'),
-            respuesta.data,
+            'La evidencia quedó guardada, pero no fue posible actualizar todos los indicadores',
+            mensajes,
         )
         entrega = Entrega.query.filter_by(
             tarea_id=self.tarea.id, aprendiz_id=self.aprendiz.id
@@ -1528,8 +1539,11 @@ class FlujosWebTestCase(unittest.TestCase):
             f'/instructor/fichas/{ficha_id}/fila-atencion/estado-actual',
         ).status_code, 200)
 
+        with self.cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = self.aprendiz.documento
+            sesion['aprendiz_ficha_id'] = ficha_id
         self.assertEqual(self.cliente.get(
-            f'/aprendiz/{ficha_id}/descargar-reporte?documento={self.aprendiz.documento}',
+            f'/aprendiz/{ficha_id}/descargar-reporte',
         ).mimetype, 'application/pdf')
         registro = RegistroAsistencia.query.first()
         self.assertEqual(self.cliente.get(
@@ -1537,6 +1551,7 @@ class FlujosWebTestCase(unittest.TestCase):
         ).status_code, 404)
         with self.cliente.session_transaction() as sesion:
             sesion['aprendiz_documento'] = self.aprendiz.documento
+            sesion['aprendiz_ficha_id'] = ficha_id
         self.assertEqual(self.cliente.post(
             f'/aprendiz/{ficha_id}/pedir-turno', data={'motivo': 'Consulta'},
         ).status_code, 302)
@@ -1692,7 +1707,7 @@ class FlujosWebTestCase(unittest.TestCase):
         app_falso = Mock()
         app_falso.config = {'STARTUP_ERRORS': []}
         registrar_rutas(app_falso)
-        self.assertEqual(app_falso.register_blueprint.call_count, 14)
+        self.assertEqual(app_falso.register_blueprint.call_count, 15)
         self.assertEqual(app_falso.config['STARTUP_ERRORS'], [])
 
 

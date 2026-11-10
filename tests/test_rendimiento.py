@@ -278,8 +278,8 @@ class SinConsultasNMasUnoTestCase(BaseRendimiento):
 
     def test_el_panel_del_aprendiz_no_escala_con_la_ficha(self):
         url = f'/aprendiz/{self.ficha.id}/panel'
-        self.cliente.get(f'{url}?documento={self.documento_aprendiz}',
-                         follow_redirects=True)
+        self.cliente.post(f'/aprendiz/{self.ficha.id}',
+                          data={'documento': self.documento_aprendiz})
         _respuesta, consultas = self.contar_consultas(url)
         pequena = len(consultas)
 
@@ -290,8 +290,8 @@ class SinConsultasNMasUnoTestCase(BaseRendimiento):
         try:
             self.setUp()
             url = f'/aprendiz/{self.ficha.id}/panel'
-            self.cliente.get(f'{url}?documento={self.documento_aprendiz}',
-                             follow_redirects=True)
+            self.cliente.post(f'/aprendiz/{self.ficha.id}',
+                              data={'documento': self.documento_aprendiz})
             respuesta, consultas = self.contar_consultas(url)
             self.assertEqual(respuesta.status_code, 200)
             self.assertLessEqual(

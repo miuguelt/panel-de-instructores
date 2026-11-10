@@ -555,6 +555,14 @@ def _resolver_ficha(ficha_actual, metadata, instructor_id, crear_ficha):
     if ficha:
         validar_reporte_ficha(ficha, metadata)
         _asegurar_configuraciones(ficha)
+        ya_vinculado = ficha.instructor_id == instructor_id or FichaInstructor.query.filter_by(
+            ficha_id=ficha.id, instructor_id=instructor_id
+        ).first() is not None
+        if not ya_vinculado:
+            # El reporte oficial basta para vincularse, pero la ficha es de otro
+            # instructor: solo se agregan aprendices y juicios nuevos, sin
+            # sobrescribir lo que ya registró su titular. Vale para todos los lotes.
+            metadata['_solo_agregar'] = True
         return ficha, False
 
     ficha = Ficha(
@@ -617,14 +625,15 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
         ficha_actual, metadata, instructor_id, crear_ficha
     )
     carga_inicial_juicios = not JuicioEvaluativo.query.filter_by(ficha_id=ficha.id).first()
+    solo_agregar = bool(metadata.get('_solo_agregar'))
 
-    if metadata.get('codigo_ficha'):
+    if metadata.get('codigo_ficha') and not solo_agregar:
         ficha.codigo = metadata['codigo_ficha']
         ficha.codigo_ficha = metadata['codigo_ficha']
-    if metadata.get('codigo_programa'):
+    if metadata.get('codigo_programa') and not solo_agregar:
         ficha.codigo_programa = metadata['codigo_programa']
     for campo in ('nombre_programa', 'fecha_inicio', 'fecha_fin'):
-        if metadata.get(campo):
+        if metadata.get(campo) and not solo_agregar:
             setattr(ficha, campo, metadata[campo])
 
     asociacion = FichaInstructor.query.filter_by(
@@ -681,7 +690,7 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
             }
             aprendices_db[documento] = aprendiz
             nuevos += 1
-        else:
+        elif not solo_agregar:
             cambios = False
             for campo in ('nombre', 'apellidos', 'tipo_documento', 'estado'):
                 valor = registro[campo]
@@ -795,6 +804,8 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
             }
             juicios_nuevos += 1
             vistos.execute('INSERT OR IGNORE INTO nuevos (huella) VALUES (?)', (registro['huella_calc'],))
+        elif solo_agregar:
+            juicios_repetidos += 1
         else:
             if _actualizar_datos_juicio(
                 juicios_db[clave],
@@ -913,7 +924,7 @@ def _importar_lote(archivo, ficha_actual, instructor_id, crear_ficha, metadata, 
 
     db.session.flush()
     return {
-        'ficha': ficha, 'ficha_creada': ficha_creada,
+        'ficha': ficha, 'ficha_creada': ficha_creada, 'solo_agregar': solo_agregar,
         'metadata': metadata, 'nuevos': nuevos,
         'actualizados': actualizados, 'juicios_nuevos': juicios_nuevos,
         'juicios_actualizados': juicios_actualizados,

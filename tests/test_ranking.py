@@ -177,6 +177,9 @@ class RankingTestCase(unittest.TestCase):
             sesion['_user_id'] = str(self.instructor.id)
             sesion['_fresh'] = True
 
+        with cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = self.ana.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
         rutas = (
             f'/instructor/fichas/{self.ficha.id}/ranking',
             f'/instructor/fichas/{self.ficha.id}/insignias',
@@ -184,7 +187,7 @@ class RankingTestCase(unittest.TestCase):
             f'/instructor/fichas/{self.ficha.id}/ranking/exportar?formato=pdf',
             f'/instructor/fichas/{self.ficha.id}/insignias/exportar?formato=excel',
             f'/instructor/fichas/{self.ficha.id}/insignias/exportar?formato=pdf',
-            f'/aprendiz/{self.ficha.id}/panel?documento={self.ana.documento}',
+            f'/aprendiz/{self.ficha.id}/panel',
         )
         for ruta in rutas:
             with self.subTest(ruta=ruta):

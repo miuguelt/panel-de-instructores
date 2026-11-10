@@ -163,7 +163,7 @@ def seleccionar_pruebas(funciones, raiz, ampliar=False, excluir=()):
         except OSError:
             continue
 
-    elegidos = set()
+    elegidos = {}
     for item in funciones:
         ruta = item['archivo']
         if not ruta.endswith('.py'):
@@ -178,15 +178,23 @@ def seleccionar_pruebas(funciones, raiz, ampliar=False, excluir=()):
 
         for archivo, texto in textos.items():
             tallo = archivo.stem.lower()
-            coincide = tallo.startswith(f'test_{prefijo}') or nombre in texto
-            if not coincide and ampliar:
-                coincide = modulo_clave in texto or bool(patron_import.search(texto))
-            if coincide:
-                elegidos.add(archivo)
+            es_directo = tallo == f'test_{partes[-1].lower()}' or tallo == f'test_{prefijo}'
+            coincide_nombre = nombre in texto
+            coincide_prefijo = tallo.startswith(f'test_{prefijo}')
+            coincide_ampliado = False
+            if not (es_directo or coincide_nombre or coincide_prefijo) and ampliar:
+                coincide_ampliado = modulo_clave in texto or bool(patron_import.search(texto))
 
+            if es_directo or coincide_nombre or coincide_prefijo or coincide_ampliado:
+                # Prioridad menor = mayor precedencia: directos primero, luego por coincidencia de nombre.
+                prioridad = 0 if es_directo else (1 if coincide_nombre else (2 if coincide_prefijo else 3))
+                if archivo not in elegidos or prioridad < elegidos[archivo]:
+                    elegidos[archivo] = prioridad
+
+    ordenados = sorted(elegidos.keys(), key=lambda p: (elegidos[p], p.name))
     return [
         p.relative_to(raiz).as_posix()
-        for p in sorted(elegidos)[:MAX_ARCHIVOS_PRUEBA]
+        for p in ordenados[:MAX_ARCHIVOS_PRUEBA]
     ]
 
 

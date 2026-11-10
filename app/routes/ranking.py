@@ -304,7 +304,6 @@ def _ranking_excel(ficha, filas, periodo):
     ws.append([])
     ws.append([
         'Posición',
-        'Documento',
         'Aprendiz',
         'Asistencia %',
         'Evidencias %',
@@ -317,7 +316,6 @@ def _ranking_excel(ficha, filas, periodo):
     for fila in filas:
         ws.append([
             fila['posicion'],
-            fila['aprendiz'].documento,
             fila['aprendiz'].nombre_completo,
             fila['porcentaje_asistencia'],
             fila['porcentaje_evidencias'],
@@ -335,8 +333,8 @@ def _ranking_excel(ficha, filas, periodo):
         celda.alignment = Alignment(horizontal='center')
     ws.freeze_panes = 'A5'
     for columna, ancho in {
-        'A': 11, 'B': 18, 'C': 34, 'D': 15, 'E': 15,
-        'F': 15, 'G': 16, 'H': 14, 'I': 12, 'J': 12,
+        'A': 11, 'B': 34, 'C': 15, 'D': 15, 'E': 15,
+        'F': 16, 'G': 14, 'H': 12, 'I': 12,
     }.items():
         ws.column_dimensions[columna].width = ancho
 
@@ -561,12 +559,11 @@ def _insignias_excel(ficha, aprendices, por_aprendiz):
     ws.append([f'Reconocimientos de participación - Ficha {ficha.codigo}'])
     ws.append(['Estos reconocimientos no hacen parte de la evaluación oficial.'])
     ws.append([])
-    ws.append(['Documento', 'Aprendiz', 'Insignia', 'Fecha', 'Otorgada por'])
+    ws.append(['Aprendiz', 'Insignia', 'Fecha', 'Otorgada por'])
     for aprendiz in aprendices:
         items = por_aprendiz.get(aprendiz.id) or [None]
         for item in items:
             ws.append([
-                aprendiz.documento,
                 aprendiz.nombre_completo,
                 item.insignia.nombre if item else 'Sin insignias todavía',
                 item.fecha_obtencion.strftime('%d/%m/%Y') if item else '',
@@ -575,11 +572,10 @@ def _insignias_excel(ficha, aprendices, por_aprendiz):
     for celda in ws[4]:
         celda.fill = PatternFill('solid', fgColor='39A900')
         celda.font = Font(color='FFFFFF', bold=True)
-    ws.column_dimensions['A'].width = 18
-    ws.column_dimensions['B'].width = 34
-    ws.column_dimensions['C'].width = 28
-    ws.column_dimensions['D'].width = 14
-    ws.column_dimensions['E'].width = 18
+    ws.column_dimensions['A'].width = 34
+    ws.column_dimensions['B'].width = 28
+    ws.column_dimensions['C'].width = 14
+    ws.column_dimensions['D'].width = 18
     salida = io.BytesIO()
     wb.save(salida)
     salida.seek(0)

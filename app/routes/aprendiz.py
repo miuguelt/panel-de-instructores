@@ -45,6 +45,8 @@ from app.services.archivos import (
     resolver_archivo_subido,
 )
 from app.services.permisos import (
+    aprendiz_puede_escribir,
+    bloquear_escritura_aprendiz_inactivo,
     aprendiz_de_sesion,
     puede_administrar_ficha_como_aprendiz,
     puede_gestionar_ficha,
@@ -53,10 +55,11 @@ from app.services.permisos import (
 from datetime import date, datetime, timedelta
 
 aprendiz_bp = Blueprint('aprendiz', __name__, template_folder='../templates/aprendiz')
+aprendiz_bp.before_request(bloquear_escritura_aprendiz_inactivo)
 
 
 def verificar_acceso(ficha_id):
-    documento = request.form.get('documento') or request.args.get('documento', '')
+    documento = request.form.get('documento') or ''
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha:
         return None, None, 'Ficha no encontrada.'
@@ -71,16 +74,14 @@ def verificar_acceso(ficha_id):
 
 
 def _documento_aprendiz_para_ficha(ficha_id):
-    """Obtiene la identidad activa sin permitir cambiarla desde un POST."""
+    """Obtiene la identidad de la sesión; un documento del formulario no la crea ni la cambia."""
     documento_formulario = (request.form.get('documento') or '').strip()
     documento_sesion = (session.get('aprendiz_documento') or '').strip()
-    ficha_sesion = session.get('aprendiz_ficha_id')
-
-    if ficha_sesion == ficha_id and documento_sesion:
-        if documento_formulario and documento_formulario != documento_sesion:
-            return None
-        return documento_sesion
-    return documento_formulario or documento_sesion
+    if session.get('aprendiz_ficha_id') != ficha_id or not documento_sesion:
+        return None
+    if documento_formulario and documento_formulario != documento_sesion:
+        return None
+    return documento_sesion
 
 
 @aprendiz_bp.route('/<int:ficha_id>', methods=['GET', 'POST'])
@@ -102,13 +103,8 @@ def vista_aprendiz(ficha_id):
 @aprendiz_bp.route('/<int:ficha_id>/panel')
 @limiter.limit("60 per minute")
 def panel(ficha_id):
-    documento = session.get('aprendiz_documento', '')
-    url_documento = request.args.get('documento', '')
-    if url_documento and url_documento != documento:
-        documento = url_documento
-        session['aprendiz_documento'] = documento
-        session['aprendiz_ficha_id'] = ficha_id
-    if url_documento:
+    # Enlaces antiguos traían la cédula en la URL: se descarta sin abrir sesión.
+    if 'documento' in request.args:
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
     ficha = db.session.get(Ficha, ficha_id)
@@ -116,14 +112,19 @@ def panel(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
 
-    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
+    aprendiz = aprendiz_de_sesion(ficha_id)
     if not aprendiz:
         flash('Documento no valido para esta ficha.', 'error')
         return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
 
-    actualizar_alertas_ficha(ficha_id)
-    crear_recordatorios_aprendiz(ficha_id, aprendiz.id)
-    vencer_planes_pendientes()
+    # Las alertas y los recordatorios son secundarios: si fallan, el panel se muestra igual.
+    try:
+        actualizar_alertas_ficha(ficha_id)
+        crear_recordatorios_aprendiz(ficha_id, aprendiz.id)
+        vencer_planes_pendientes(ficha_id=ficha_id)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('No fue posible actualizar las alertas del panel del aprendiz.')
 
     total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
     total_faltas = RegistroAsistencia.query.join(SesionAsistencia).filter(
@@ -149,13 +150,12 @@ def panel(ficha_id):
     else:
         nivel_alerta = 'verde'
 
-    pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones else 100
+    # Las excusas no restan: solo las faltas sin justificar bajan el porcentaje.
+    pct_asistencia = ((total_sesiones - faltas_no_justificadas) / total_sesiones * 100) if total_sesiones else 100
 
+    # El panel solo lee el ranking: recalcularlo y guardar instantáneas en cada
+    # visita distorsionaba la posición anterior de todo el grupo.
     filas_ranking = None
-    try:
-        filas_ranking, _ = actualizar_participacion_ficha(ficha_id)
-    except Exception:
-        pass
 
     # Las insignias nuevas se marcan aqui, antes de armar el resto de la vista:
     # este es el ultimo commit del request y un commit expira los objetos vivos
@@ -314,13 +314,11 @@ def panel(ficha_id):
         (fila for fila in filas_ranking if fila['aprendiz'].id == aprendiz.id),
         None,
     )
-    if config_ranking.modo_visibilidad == 'publico':
-        ranking_visible = filas_ranking
-    else:
-        top_cinco = filas_ranking[:5]
-        ranking_visible = list(top_cinco)
-        if fila_propia and fila_propia not in ranking_visible:
-            ranking_visible.append(fila_propia)
+    # Sin importar el modo de la ficha, el aprendiz ve el podio y su propia
+    # fila: nadie queda expuesto en los últimos puestos ante el grupo.
+    ranking_visible = list(filas_ranking[:3])
+    if fila_propia and fila_propia not in ranking_visible:
+        ranking_visible.append(fila_propia)
 
     punto_siguiente = None
     if fila_propia and fila_propia['posicion'] > 1:
@@ -359,6 +357,11 @@ def panel(ficha_id):
         .filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id)
         .order_by(NotaObservador.fecha.desc(), NotaObservador.id.desc())
         .all()
+    )
+    from app.models.alertas import LlamadoAtencion
+    llamados_atencion = (
+        LlamadoAtencion.query.filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id)
+        .order_by(LlamadoAtencion.fecha.desc(), LlamadoAtencion.id.desc()).all()
     )
     planes_mejoramiento = (
         PlanMejoramiento.query
@@ -671,6 +674,8 @@ def panel(ficha_id):
                            otorgamientos=otorgamientos,
                            alertas_activas=alertas_activas,
                            notas_observador=notas_observador,
+                           llamados_atencion=llamados_atencion,
+                           solo_lectura=not aprendiz_puede_escribir(aprendiz),
                            planes_mejoramiento=planes_mejoramiento,
                            notificaciones=notificaciones_aprendiz,
                            notification_cursor=notificacion_mas_reciente[0] if notificacion_mas_reciente else 0,
@@ -806,12 +811,11 @@ def asistencia_admin(ficha_id):
 @aprendiz_bp.route('/<int:ficha_id>/descargar-reporte')
 @limiter.limit("10 per minute")
 def descargar_reporte(ficha_id):
-    documento = session.get('aprendiz_documento', '') or request.args.get('documento', '')
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha:
         abort(404)
-        
-    aprendiz = Aprendiz.query.filter_by(documento=documento, ficha_id=ficha_id).first()
+
+    aprendiz = aprendiz_de_sesion(ficha_id)
     if not aprendiz:
         abort(404)
         
@@ -1466,12 +1470,8 @@ def _puede_descargar_archivo(candidatos):
             for material in materiales
         )
 
-    ficha_id = request.args.get('ficha_id', type=int)
-    documento = (session.get('aprendiz_documento', '') or request.args.get('documento', '')).strip()
-    aprendiz = Aprendiz.query.filter_by(
-        ficha_id=ficha_id,
-        documento=documento,
-    ).first() if ficha_id and documento else None
+    ficha_id = request.args.get('ficha_id', type=int) or session.get('aprendiz_ficha_id')
+    aprendiz = aprendiz_de_sesion(ficha_id) if ficha_id else None
     if not aprendiz:
         return False
     if any(tarea.ficha_id == ficha_id for tarea in tareas):
@@ -1698,10 +1698,13 @@ def guardar_portafolio(ficha_id):
     try:
         github_valido = normalizar_url_portafolio(github_raw, tipo='github')
         notion_valido = normalizar_url_portafolio(notion_raw, tipo='notion')
-    except ValueError as e:
+    except ValueError as error:
+        # Los textos salen de normalizar_url_portafolio, escritos para el aprendiz:
+        # dicen qué enlace corregir y no exponen detalles internos.
+        mensaje_val = str(error) or 'Las direcciones web ingresadas no tienen un formato válido.'
         if es_ajax:
-            return jsonify({'ok': False, 'error': str(e)}), 400
-        flash(str(e), 'error')
+            return jsonify({'ok': False, 'error': mensaje_val}), 400
+        flash(mensaje_val, 'error')
         return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
 
     aprendiz.enlace_github = github_valido
@@ -1727,3 +1730,24 @@ def guardar_portafolio(ficha_id):
 
     flash(mensaje_exito, 'success')
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+
+@aprendiz_bp.route('/<int:ficha_id>/llamados/<int:llamado_id>/descargos', methods=['POST'])
+@limiter.limit("10 per minute")
+def presentar_descargos(ficha_id, llamado_id):
+    """El aprendiz deja por escrito su versión sobre un llamado de atención."""
+    from app.models.alertas import LlamadoAtencion
+    from app.services.debido_proceso import ReglaDebidoProceso, registrar_descargos
+    aprendiz = aprendiz_de_sesion(ficha_id)
+    llamado = db.session.get(LlamadoAtencion, llamado_id)
+    if not aprendiz or not llamado or llamado.aprendiz_id != aprendiz.id or llamado.ficha_id != ficha_id:
+        flash('No encontramos ese llamado de atención en tu ficha.', 'error')
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
+    try:
+        registrar_descargos(llamado, request.form.get('descargos'))
+    except ReglaDebidoProceso as error:
+        db.session.rollback()
+        flash(str(error), 'error')
+    else:
+        flash('Tus descargos quedaron registrados. Tu instructor y el comité podrán leerlos.', 'success')
+    return redirect(url_for('aprendiz.panel', ficha_id=ficha_id) + '#seccion-llamados')

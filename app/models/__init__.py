@@ -12,6 +12,7 @@ from app.models.alertas import (
     PushDispatch,
     PushSubscription,
     PlanMejoramiento,
+    LlamadoAtencion,
 )
 from app.models.ranking import ConfiguracionRanking, PuntajeHistorico
 from app.models.insignia import Insignia, InsigniaOtorgada
@@ -41,6 +42,7 @@ from app.models.archivo_ficha import (
     TIPO_REPORTE_JUICIOS,
 )
 from app.models.observador import NotaObservador
+from app.models.novedades import EtapaProductiva, NovedadAprendiz, SeguimientoProductiva
 from app.models.resultado_calculado import ResultadoCalculadoFicha
 from app.features.personalizacion_aprendiz.models import PersonalizacionAprendiz
 from app.features.experiencia_aprendiz.models import ExperienciaAprendiz
@@ -49,7 +51,8 @@ __all__ = [
     'Instructor', 'Ficha', 'Corte', 'Aprendiz',
     'SesionAsistencia', 'RegistroAsistencia',
     'Tarea', 'Entrega', 'ProrrogaTarea', 'ConfiguracionAlertas', 'ConfiguracionAlertasComite',
-    'Alerta', 'Notificacion', 'PushDispatch', 'PushSubscription', 'PlanMejoramiento',
+    'Alerta', 'Notificacion', 'PushDispatch', 'PushSubscription', 'PlanMejoramiento', 'LlamadoAtencion',
+    'NovedadAprendiz', 'EtapaProductiva', 'SeguimientoProductiva',
     'ConfiguracionRanking', 'PuntajeHistorico',
     'Insignia', 'InsigniaOtorgada',
     'Grupo', 'GrupoAprendiz', 'GrupoMensaje', 'TurnoAtencion',

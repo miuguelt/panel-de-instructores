@@ -38,7 +38,7 @@ def _alerta_ficha(ficha, tipo, nivel, titulo, mensaje, detalle, ahora):
                                    ficha.id, f'/instructor/fichas/{ficha.id}/alertas')
         for aprendiz in Aprendiz.query_en_formacion(ficha.id).all():
             registrar_notificacion('aprendiz', aprendiz.id, mensaje, 'cronograma', clave,
-                                   ficha.id, f'/aprendiz/{ficha.id}/panel?documento={aprendiz.documento}')
+                                   ficha.id, f'/aprendiz/{ficha.id}/panel')
     return alerta
 
 

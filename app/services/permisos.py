@@ -193,3 +193,36 @@ def cambiar_estado_activo_aprendiz(ficha_id, aprendiz_id, activo=None):
 
     db.session.flush()
     return aprendiz
+
+
+def aprendiz_puede_escribir(aprendiz):
+    """True si el aprendiz sigue en formación y puede enviar soportes o solicitudes.
+
+    Quien fue cancelado, trasladado, aplazado o se retiró conserva la consulta
+    de su historial y su reporte, pero no puede crear registros nuevos.
+    """
+    from app.models.aprendiz import ESTADOS_LLAMADO_LISTA, normalizar_estado
+    return bool(
+        aprendiz
+        and aprendiz.activo
+        and normalizar_estado(aprendiz.estado) in ESTADOS_LLAMADO_LISTA
+    )
+
+
+def bloquear_escritura_aprendiz_inactivo():
+    """Hook ``before_request``: rechaza POST de un aprendiz en solo lectura."""
+    from flask import flash, redirect, request, url_for
+    if request.method != 'POST' or request.endpoint == 'aprendiz.vista_aprendiz':
+        return None
+    ficha_id = (request.view_args or {}).get('ficha_id')
+    if ficha_id is None:
+        return None
+    aprendiz = aprendiz_de_sesion(ficha_id)
+    if aprendiz is None or aprendiz_puede_escribir(aprendiz):
+        return None
+    flash(
+        'Tu matrícula ya no está en formación, así que el panel quedó en modo de consulta. '
+        'Si crees que es un error, comunícate con tu instructor.',
+        'warning',
+    )
+    return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))

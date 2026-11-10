@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Novedades y etapa productiva - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn-back" title="Volver a casos de seguimiento">&larr; Volver</a>
+        <h1>Novedades y etapa productiva</h1>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('comite.normativa') }}" class="btn btn-outline">Normativa SENA</a>
+    </div>
+</div>
+
+<div class="card reglamento-card">
+    <p class="devbrain-prose">
+        Registre aquí los aplazamientos, traslados, retiros y reintegros de la ficha {{ ficha.codigo }},
+        y la etapa productiva de cada aprendiz. Con estos datos el panel deja de recomendar comité a quien
+        tiene la planeación de su etapa productiva avalada antes del cierre (Acuerdo 009 de 2024, Art. 30,
+        numeral 2, página 31) y avisa cuándo un aprendiz aplazado debe pedir el reintegro: dentro de los
+        cinco días hábiles previos al fin del aplazamiento (Art. 18, numeral 3, página 23) y, como máximo,
+        tres días hábiles antes (Art. 30, numeral 3, página 31).
+    </p>
+    {% set fundamentos = fundamentos_novedades %}
+    {% set titulo_sustento = 'Ver las normas sobre novedades y etapa productiva' %}
+    {% include 'instructor/_fundamento_normativo.html' %}
+</div>
+
+{% if not filas %}
+<div class="empty-state">
+    <h3>Todavía no hay aprendices registrados</h3>
+    <p>Importe el reporte de la ficha para registrar novedades y etapa productiva.</p>
+</div>
+{% endif %}
+
+{% for fila in filas %}
+{% set a = fila.aprendiz %}
+{% set pid = 'ap-' ~ a.id %}
+<section class="card" id="aprendiz-{{ a.id }}" aria-labelledby="{{ pid }}-titulo">
+    <h2 id="{{ pid }}-titulo">{{ a.nombre_completo }}</h2>
+    <p class="text-muted">{{ a.tipo_documento }} {{ a.documento }} · Estado en el reporte: {{ fila.estado_etiqueta }}</p>
+
+    {% if fila.recomendacion %}
+    <div class="alert-banner {{ 'alert-red' if fila.recomendacion.nivel == 'roja' else 'alert-yellow' }}">
+        <strong>{{ fila.recomendacion.titulo }}</strong>
+        <p class="devbrain-prose">{{ fila.recomendacion.motivo }}</p>
+        {% set fundamentos = fila.recomendacion.fundamentos %}
+        {% set titulo_sustento = '¿Por qué se envía a comité? Ver sustento normativo' if fila.recomendacion.nivel == 'roja' else 'Ver sustento normativo del reintegro' %}
+        {% include 'instructor/_fundamento_normativo.html' %}
+    </div>
+    {% endif %}
+
+    <h3>Novedades</h3>
+    {% if fila.aplazamiento %}
+    <p class="devbrain-prose">
+        Aplazamiento autorizado hasta el {{ fila.fechas_reintegro.fin.strftime('%d/%m/%Y') }}.
+        Debe pedir el reintegro desde el {{ fila.fechas_reintegro.aviso.strftime('%d/%m/%Y') }} y a más tardar el
+        {{ fila.fechas_reintegro.limite.strftime('%d/%m/%Y') }}.
+        {% if fila.reintegro_solicitado %}<strong>El reintegro ya fue solicitado.</strong>{% endif %}
+    </p>
+    {% endif %}
+    {% if fila.novedades %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead><tr><th>Novedad</th><th>Solicitud</th><th>Periodo</th><th>Estado</th><th>Cambiar estado</th></tr></thead>
+            <tbody>
+                {% for n in fila.novedades %}
+                <tr>
+                    <td>{{ n.etiqueta_tipo }}{% if n.causa %}<br><small>{{ causas[n.causa] }}</small>{% endif %}{% if n.ampliacion %}<br><small>Con ampliación del comité</small>{% endif %}</td>
+                    <td>{{ n.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
+                    <td>{% if n.fecha_inicio %}{{ n.fecha_inicio.strftime('%d/%m/%Y') }}{% endif %}{% if n.fecha_fin %} – {{ n.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}</td>
+                    <td>{{ n.etiqueta_estado }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('comite.cambiar_estado_novedad_aprendiz', ficha_id=ficha.id, novedad_id=n.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label class="sr-only" for="{{ pid }}-estado-{{ n.id }}">Nuevo estado</label>
+                            <select id="{{ pid }}-estado-{{ n.id }}" name="estado">
+                                {% for clave, etiqueta in estados_novedad.items() %}<option value="{{ clave }}" {% if clave == n.estado %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+                            </select>
+                            {% if n.ampliacion and n.estado == 'solicitada' %}
+                            <label class="sr-only" for="{{ pid }}-acta-{{ n.id }}">Acta del comité</label>
+                            <input id="{{ pid }}-acta-{{ n.id }}" name="acta_comite" type="text" maxlength="60" placeholder="Acta del comité">
+                            {% endif %}
+                            <button type="submit" class="btn btn-sm btn-outline">Guardar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted">Sin novedades registradas.</p>
+    {% endif %}
+
+    <details>
+        <summary>Registrar una novedad</summary>
+        <form method="POST" action="{{ url_for('comite.registrar_novedad_aprendiz', ficha_id=ficha.id, aprendiz_id=a.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="{{ pid }}-tipo">Tipo de novedad</label>
+                <select id="{{ pid }}-tipo" name="tipo" required>
+                    {% for clave, etiqueta in tipos.items() %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-estado">Estado</label>
+                <select id="{{ pid }}-estado" name="estado">
+                    {% for clave, etiqueta in estados_novedad.items() %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-fecha-solicitud">Fecha de solicitud</label>
+                <input type="date" id="{{ pid }}-fecha-solicitud" name="fecha_solicitud" value="{{ hoy.isoformat() }}" required>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-fecha-inicio">Fecha de inicio (aplazamiento)</label>
+                <input type="date" id="{{ pid }}-fecha-inicio" name="fecha_inicio">
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-fecha-fin">Fecha fin (aplazamiento)</label>
+                <input type="date" id="{{ pid }}-fecha-fin" name="fecha_fin" aria-describedby="{{ pid }}-ayuda-fin">
+                <small id="{{ pid }}-ayuda-fin">Máximo 3 meses; 6 si el comité recomendó la ampliación (Art. 18, num. 2, pág. 22).</small>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-causa">Causa del aplazamiento</label>
+                <select id="{{ pid }}-causa" name="causa">
+                    <option value="">No aplica</option>
+                    {% for clave, etiqueta in causas.items() %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <label class="followup-checkbox"><input type="checkbox" name="ampliacion" value="1"> El comité recomendó ampliar el aplazamiento</label>
+            <div class="form-group">
+                <label for="{{ pid }}-acta">Acta del comité (obligatoria para autorizar una ampliación)</label>
+                <input id="{{ pid }}-acta" name="acta_comite" type="text" maxlength="60">
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-observacion">Observación</label>
+                <textarea id="{{ pid }}-observacion" name="observacion" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Registrar novedad</button>
+        </form>
+    </details>
+
+    <h3>Etapa productiva</h3>
+    {% set e = fila.etapa %}
+    {% if e %}
+    <p class="devbrain-prose">
+        {{ e.etiqueta_alternativa }}{% if e.empresa %} en {{ e.empresa }}{% endif %} · {{ e.etiqueta_estado }}.
+        {% if e.planeacion_avalada %}Planeación avalada el {{ e.fecha_aval.strftime('%d/%m/%Y') }}.{% else %}<strong>Planeación sin aval registrado.</strong>{% endif %}
+        {% if e.instructor_seguimiento %}Instructor de seguimiento: {{ e.instructor_seguimiento }}.{% endif %}
+    </p>
+    {% if e.seguimientos %}
+    <ul>
+        {% for s in e.seguimientos %}<li>{{ s.etiqueta_momento }} — {{ s.fecha.strftime('%d/%m/%Y') }}{% if s.observacion %}: {{ s.observacion }}{% endif %}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p class="text-muted">Sin etapa productiva registrada.</p>
+    {% endif %}
+
+    <details>
+        <summary>{{ 'Actualizar la etapa productiva' if e else 'Registrar la etapa productiva' }}</summary>
+        <form method="POST" action="{{ url_for('comite.guardar_etapa_productiva', ficha_id=ficha.id, aprendiz_id=a.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="{{ pid }}-alternativa">Alternativa</label>
+                <select id="{{ pid }}-alternativa" name="alternativa" required>
+                    {% for clave, etiqueta in alternativas.items() %}<option value="{{ clave }}" {% if e and e.alternativa == clave %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-estado-ep">Estado</label>
+                <select id="{{ pid }}-estado-ep" name="estado">
+                    {% for clave, etiqueta in estados_productiva.items() %}<option value="{{ clave }}" {% if e and e.estado == clave %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-empresa">Empresa o entidad</label>
+                <input type="text" id="{{ pid }}-empresa" name="empresa" maxlength="200" value="{{ e.empresa if e and e.empresa else '' }}">
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-ep-inicio">Fecha de inicio</label>
+                <input type="date" id="{{ pid }}-ep-inicio" name="fecha_inicio" value="{{ e.fecha_inicio.isoformat() if e and e.fecha_inicio else '' }}">
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-ep-fin">Fecha fin estimada</label>
+                <input type="date" id="{{ pid }}-ep-fin" name="fecha_fin_estimada" value="{{ e.fecha_fin_estimada.isoformat() if e and e.fecha_fin_estimada else '' }}">
+            </div>
+            <label class="followup-checkbox"><input type="checkbox" name="planeacion_avalada" value="1" {% if e and e.planeacion_avalada %}checked{% endif %}> La planeación de la etapa productiva está avalada</label>
+            <div class="form-group">
+                <label for="{{ pid }}-aval">Fecha del aval</label>
+                <input type="date" id="{{ pid }}-aval" name="fecha_aval" value="{{ e.fecha_aval.isoformat() if e and e.fecha_aval else '' }}">
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-instructor-ep">Instructor de seguimiento</label>
+                <input type="text" id="{{ pid }}-instructor-ep" name="instructor_seguimiento" maxlength="150" value="{{ e.instructor_seguimiento if e and e.instructor_seguimiento else '' }}">
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Guardar etapa productiva</button>
+        </form>
+    </details>
+
+    {% if e %}
+    <details>
+        <summary>Registrar un momento de seguimiento</summary>
+        <form method="POST" action="{{ url_for('comite.registrar_seguimiento_productiva', ficha_id=ficha.id, aprendiz_id=a.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="{{ pid }}-momento">Momento</label>
+                <select id="{{ pid }}-momento" name="momento" required>
+                    {% for clave, etiqueta in momentos.items() if clave not in fila.momentos %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-fecha-seg">Fecha</label>
+                <input type="date" id="{{ pid }}-fecha-seg" name="fecha" value="{{ hoy.isoformat() }}" required>
+            </div>
+            <div class="form-group">
+                <label for="{{ pid }}-obs-seg">Observación</label>
+                <textarea id="{{ pid }}-obs-seg" name="observacion" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Registrar seguimiento</button>
+        </form>
+    </details>
+    {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

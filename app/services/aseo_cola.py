@@ -90,8 +90,9 @@ def razon_eleccion(
     partes = [
         f'Te eligió la cola justa porque tu carga era de {carga}: '
         f'{contador.veces_aseo} turno(s) cumplido(s) y {programados} programado(s).',
-        'Con la misma carga se procura evitar sesiones consecutivas y se prioriza '
-        'a quien tiene menos turnos cumplidos, antes de rotar compañeros.',
+        'El turno no se repite en sesiones seguidas mientras haya otra persona '
+        'disponible. Entre quienes descansaron, entra quien tiene menor carga y, con la misma carga, quien '
+        'tiene menos turnos cumplidos.',
         f'El promedio de turnos cumplidos del grupo elegible era {promedio:.1f}.',
     ]
     if contador.ultima_vez_aseo:

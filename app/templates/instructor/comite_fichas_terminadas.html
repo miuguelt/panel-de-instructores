@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Fichas terminadas: remisiones a comité - SENA Control{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al panel">&larr; Volver</a>
+        <h1>Fichas terminadas: remisiones a comité</h1>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('comite.normativa') }}" class="btn btn-outline">Normativa SENA</a>
+        <a href="{{ url_for('comite.reporte_coordinacion') }}" class="btn btn-outline">Reporte para coordinación (Excel)</a>
+        {% if total %}<a href="{{ url_for('comite.fichas_terminadas', formato='csv') }}" class="btn btn-primary">Descargar CSV para el acta</a>{% endif %}
+    </div>
+</div>
+
+<div class="card reglamento-card">
+    <p class="devbrain-prose">
+        Según el Acuerdo 009 de 2024, Art. 30, numeral 2 (página 31), el plazo límite para la etapa
+        productiva es la finalización por fecha del grupo. Esta vista lista, al {{ hoy.strftime('%d/%m/%Y') }},
+        a los aprendices de fichas ya cerradas que siguen en formación, inducción, condicionados o aplazados.
+        Pasado un año sin certificación procede la cancelación por vía administrativa
+        (Art. 47, numeral 2, parágrafo 1, página 39).
+    </p>
+    <p class="devbrain-prose text-muted">
+        El sistema recomienda; la decisión es del comité. Antes de remitir, confirme en el aplicativo de
+        gestión académica que no exista una etapa productiva, novedad o certificación sin reflejar en el
+        reporte importado.
+    </p>
+</div>
+
+{% if not analisis %}
+<div class="empty-state">
+    <h3>No hay fichas terminadas por fecha</h3>
+    <p>Cuando una de sus fichas supere su fecha fin, aparecerá aquí con los aprendices pendientes.</p>
+</div>
+{% endif %}
+
+{% for item in analisis %}
+<section class="card" aria-labelledby="ficha-{{ item.ficha.id }}">
+    <h2 id="ficha-{{ item.ficha.id }}">Ficha {{ item.ficha.codigo }} — {{ item.ficha.nombre_programa }}</h2>
+    <p class="text-muted">Terminó el {{ item.fecha_fin.strftime('%d/%m/%Y') }} (hace {{ item.dias_desde_cierre }} días) · {{ item.total_aprendices }} {{ 'aprendiz registrado' if item.total_aprendices == 1 else 'aprendices registrados' }}</p>
+    {% if item.recomendaciones %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr><th>Aprendiz</th><th>Documento</th><th>Estado</th><th>Acción recomendada</th></tr>
+            </thead>
+            <tbody>
+                {% for r in item.recomendaciones %}
+                <tr>
+                    <td>{{ r.nombre }}</td>
+                    <td>{{ r.documento }}</td>
+                    <td>{{ r.estado_etiqueta }}</td>
+                    <td><strong>{{ acciones[r.accion] }}</strong></td>
+                </tr>
+                <tr class="fila-sustento">
+                    <td colspan="4">
+                        <p class="devbrain-prose">{{ r.motivo }}</p>
+                        {% for advertencia in r.advertencias %}<p class="devbrain-prose text-muted">{{ advertencia }}</p>{% endfor %}
+                        {% set fundamentos = r.fundamentos %}
+                        {% set titulo_sustento = '¿Por qué se envía a comité? Ver sustento normativo' if r.accion == 'remitir_comite' else 'Ver sustento normativo de la cancelación' %}
+                        {% include 'instructor/_fundamento_normativo.html' %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>Todos los aprendices de esta ficha cerraron su proceso: no hay remisiones pendientes.</p>
+    {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

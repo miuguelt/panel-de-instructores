@@ -111,12 +111,14 @@ def _probe_redis(redis_url: str) -> str:
         client = _redis.from_url(safe_url, socket_connect_timeout=3, socket_timeout=3)
         client.ping()
         client.close()
-        log.info('Redis disponible: %s. Rate limiter activo.', safe_url.split('@')[-1])
+        endpoint_limpio = safe_url.split('@')[-1]
+        log.info('Redis disponible en host/puerto: %s. Rate limiter activo.', endpoint_limpio)
         return safe_url
     except Exception as exc:
+        endpoint_limpio = safe_url.split('@')[-1]
         log.warning(
             'Redis no disponible (%s: %s). Host/puerto intentados: %s. Rate limiter usara memory://',
-            type(exc).__name__, exc, safe_url.split('@')[-1],
+            type(exc).__name__, exc, endpoint_limpio,
         )
         return 'memory://'
 
@@ -335,8 +337,7 @@ def create_app(test_config=None):
 
     except Exception:
         log.exception(
-            'Rate limiter no pudo inicializarse con %s. Operando sin rate-limit.',
-            _sanitize_storage_uri(_storage_uri),
+            'Rate limiter no pudo inicializarse correctamente. Operando con fallback sin rate-limit.',
         )
         limiter.enabled = False
         app.config['LIMITER_BACKEND'] = 'deshabilitado'
@@ -365,6 +366,7 @@ def create_app(test_config=None):
     _register('app.routes.ranking', 'ranking_bp', url_prefix='/instructor')
     _register('app.routes.aseo', 'aseo_bp', url_prefix='/instructor')
     _register('app.routes.seguimiento', 'seguimiento_bp', url_prefix='/instructor')
+    _register('app.routes.comite', 'comite_bp', url_prefix='/instructor')
     _register('app.routes.aprendiz', 'aprendiz_bp', url_prefix='/aprendiz')
     _register('app.features.personalizacion_aprendiz.routes', 'personalizacion_aprendiz_bp')
     _register('app.features.experiencia_aprendiz.routes', 'experiencia_aprendiz_bp')

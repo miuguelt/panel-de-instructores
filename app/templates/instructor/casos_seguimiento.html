@@ -98,16 +98,6 @@
                 <small>Activa seguimiento preventivo.</small>
             </div>
             <div class="form-group">
-                <label for="umbral_fallas_esporadicas">Faltas en la ventana</label>
-                <input id="umbral_fallas_esporadicas" name="umbral_fallas_esporadicas" type="number" min="1" max="100" value="{{ config_comite.umbral_fallas_esporadicas }}" required>
-                <small>Periodo: {{ config_comite.periodo_dias_esporadicas }} días.</small>
-            </div>
-            <div class="form-group">
-                <label for="periodo_dias_esporadicas">Ventana de análisis</label>
-                <input id="periodo_dias_esporadicas" name="periodo_dias_esporadicas" type="number" min="30" max="365" value="{{ config_comite.periodo_dias_esporadicas }}" required>
-                <small>Días calendario.</small>
-            </div>
-            <div class="form-group">
                 <label for="umbral_tareas_incumplidas">Tareas incumplidas</label>
                 <input id="umbral_tareas_incumplidas" name="umbral_tareas_incumplidas" type="number" min="1" max="100" value="{{ config_comite.umbral_tareas_incumplidas }}" required>
                 <small>Activa plan de mejoramiento.</small>
@@ -118,9 +108,9 @@
                 <small>Por debajo, prioriza el caso.</small>
             </div>
             <div class="form-group">
-                <label for="auto_escalar_dias">Auto-escalar después de</label>
+                <label for="auto_escalar_dias">Recordar casos abiertos después de</label>
                 <input id="auto_escalar_dias" name="auto_escalar_dias" type="number" min="1" max="365" value="{{ config_comite.auto_escalar_dias }}" required>
-                <small>Días sin cierre instructor.</small>
+                <small>Días sin cierre. El sistema avisa; usted decide si remite a comité.</small>
             </div>
             <div class="form-group">
                 <label for="umbral_notas_negativas">Llamados de atención</label>
@@ -133,9 +123,9 @@
                 <small>Días hacia atrás que se cuentan.</small>
             </div>
             <div class="form-group">
-                <label for="dias_plazo_justificacion">Plazo sugerido de justificación</label>
-                <input id="dias_plazo_justificacion" name="dias_plazo_justificacion" type="number" min="1" max="30" value="{{ config_comite.dias_plazo_justificacion }}" required>
-                <small>Se comunica al aprendiz.</small>
+                <label for="dias_plazo_justificacion">Plazo de justificación (días hábiles; el reglamento fija 5)</label>
+                <input id="dias_plazo_justificacion" name="dias_plazo_justificacion" type="number" min="5" max="30" value="{{ config_comite.dias_plazo_justificacion }}" required>
+                <small>Mínimo 5. Se comunica al aprendiz.</small>
             </div>
         </div>
         <label class="followup-checkbox">
@@ -212,6 +202,7 @@
                     <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}" class="btn btn-sm btn-outline">Ver historial</a>
                     <a href="{{ url_for('instructor.observador', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}#registrar" class="btn btn-sm btn-outline">Registrar observación</a>
                     <a href="{{ url_for('seguimiento.reporte_comite', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}" class="btn btn-sm btn-outline">Generar borrador PDF</a>
+                    <a href="{{ url_for('comite.novedades_productiva', ficha_id=ficha.id) }}#aprendiz-{{ caso.aprendiz.id }}" class="btn btn-sm btn-outline">Novedades y etapa productiva</a>
                 </div>
             </header>
 
@@ -236,7 +227,73 @@
                     <strong>{{ case_plans|length }}</strong>
                     <small>{{ planes_pendientes|length }} plan{{ '' if planes_pendientes|length == 1 else 'es' }} pendiente{{ '' if planes_pendientes|length == 1 else 's' }}</small>
                 </div>
+                <div class="case-metric">
+                    <span>Llamados escritos</span>
+                    <strong>{{ caso.llamados }}</strong>
+                    <small>Art. 46, Acuerdo 009</small>
+                </div>
             </div>
+
+            {% if caso.llamados_lista %}
+            <details class="case-llamado">
+                <summary>Llamados registrados ({{ caso.llamados_lista|length }})</summary>
+                <ul class="case-llamados-list">
+                    {% for llamado in caso.llamados_lista %}
+                    <li>
+                        <strong>{{ 'Académico' if llamado.tipo == 'academico' else 'Disciplinario' }} n.º {{ llamado.numero }}</strong>
+                        · {{ llamado.fecha.strftime('%d/%m/%Y') }}
+                        {% if not llamado.vigente %}<span class="badge badge-secondary">Anulado: {{ llamado.motivo_anulacion }}</span>{% endif %}
+                        <p>{{ llamado.descripcion }}</p>
+                        {% if llamado.descargos %}<p><em>Descargos del aprendiz ({{ llamado.descargos_en.strftime('%d/%m/%Y') }}):</em> {{ llamado.descargos }}</p>
+                        {% elif llamado.vigente %}<p class="text-muted">El aprendiz aún no presenta descargos.</p>{% endif %}
+                        {% if llamado.vigente %}
+                        <form method="POST" action="{{ url_for('comite.anular_llamado_atencion', ficha_id=ficha.id, llamado_id=llamado.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label for="anular-{{ llamado.id }}">Motivo de anulación</label>
+                            <input id="anular-{{ llamado.id }}" name="motivo" type="text" maxlength="300" required>
+                            <button type="submit" class="btn btn-sm btn-outline">Anular llamado</button>
+                        </form>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </details>
+            {% endif %}
+
+            <details class="case-llamado">
+                <summary>Registrar llamado de atención escrito</summary>
+                <form method="POST" action="{{ url_for('comite.registrar_llamado_atencion', ficha_id=ficha.id, aprendiz_id=caso.aprendiz.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% set lid = 'llamado-' ~ caso.aprendiz.id %}
+                    <div class="form-group">
+                        <label for="{{ lid }}-tipo">Tipo de llamado</label>
+                        <select id="{{ lid }}-tipo" name="tipo" required>
+                            <option value="academico">Académico</option>
+                            <option value="disciplinario">Disciplinario</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ lid }}-fase">Fase del proyecto formativo</label>
+                        <select id="{{ lid }}-fase" name="fase">
+                            <option value="">Sin fase (solo llamados disciplinarios)</option>
+                            <option value="analisis">Análisis</option>
+                            <option value="planeacion">Planeación</option>
+                            <option value="ejecucion">Ejecución</option>
+                            <option value="evaluacion">Evaluación</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ lid }}-descripcion">Hechos que motivan el llamado</label>
+                        <textarea id="{{ lid }}-descripcion" name="descripcion" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ lid }}-orientaciones">Orientaciones o recomendaciones</label>
+                        <textarea id="{{ lid }}-orientaciones" name="orientaciones" rows="3" aria-describedby="{{ lid }}-ayuda"></textarea>
+                        <small id="{{ lid }}-ayuda">Obligatorias en el segundo llamado. Se permiten hasta dos llamados académicos por fase y dos disciplinarios en todo el programa (Acuerdo 009 de 2024, Art. 46, págs. 37-38).</small>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Registrar llamado</button>
+                </form>
+            </details>
 
             <div class="case-alert-list">
                 {% for alerta in caso.alertas %}
@@ -255,8 +312,12 @@
                             {% if detalle.get('fallas_acumuladas') %}<span>{{ detalle.get('fallas_acumuladas') }} faltas acumuladas</span>{% endif %}
                             {% if detalle.get('tareas_incumplidas') %}<span>{{ detalle.get('tareas_incumplidas') }} tareas incumplidas</span>{% endif %}
                             {% if detalle.get('pct_asistencia') is not none %}<span>Asistencia {{ detalle.get('pct_asistencia') }}%</span>{% endif %}
-                            {% if alerta.auto_escalada %}<span class="case-auto-escalated">Escalado automáticamente</span>{% endif %}
+                            {% if detalle.get('dias_vencida') is not none %}<span>Ficha cerrada hace {{ detalle.get('dias_vencida') }} días</span>{% endif %}
+                            {% if alerta.auto_escalada %}<span class="case-auto-escalated">Escalado automáticamente (registro anterior)</span>{% endif %}
                         </div>
+                        {% for advertencia in detalle.get('advertencias', []) %}<p class="text-muted">{{ advertencia }}</p>{% endfor %}
+                        {% set fundamentos = detalle.get('fundamentos') or ([detalle.get('fundamento')] if detalle.get('fundamento') else []) %}
+                        {% include 'instructor/_fundamento_normativo.html' %}
                     </div>
                     <div class="case-actions">
                         {% if alerta.estado == 'activa' %}
@@ -277,6 +338,8 @@
                               data-confirm="¿Confirma el cierre de este caso escalado?"
                               data-confirm-title="Cerrar caso escalado" data-confirm-label="Cerrar caso">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label for="acta-{{ alerta.id }}">Acta del comité</label>
+                            <input id="acta-{{ alerta.id }}" name="acta_comite" type="text" maxlength="60" required placeholder="Número del acta">
                             <button type="submit" class="btn btn-sm btn-primary">Cerrar caso</button>
                         </form>
                         {% endif %}

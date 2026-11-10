@@ -128,8 +128,8 @@ def construir_calendario_mes(asistencia_map, anio, mes):
 
         if evento:
             etiqueta = evento.get('etiqueta') or evento.get('estado') or 'Sin registro'
-            causal = evento.get('causal') or ''
-            fecha_fmt = evento.get('fecha_fmt') or iso
+            causal = evento.get('causal_justificacion') or evento.get('causal') or ''
+            fecha_fmt = f'{dia:02d}/{iso[5:7]}/{iso[:4]}'
             titulo = f"{etiqueta}{': ' + causal if causal else ''} ({fecha_fmt})"
         else:
             titulo = f'Sin marcación registrada ({iso})'

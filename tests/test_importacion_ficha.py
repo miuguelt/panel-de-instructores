@@ -155,6 +155,31 @@ class ImportacionFichaTestCase(unittest.TestCase):
         salida.seek(0)
         return FileStorage(stream=salida, filename='Reporte de Juicios Evaluativos.xlsx')
 
+    def test_reporte_de_ficha_ajena_vincula_sin_sobrescribir(self):
+        # El reporte oficial basta para vincularse, pero no cambia lo que registró el titular.
+        importar_archivo(self._reporte_para_crear(), None, self.a.id, crear_ficha=True)
+        db.session.commit()
+        ficha = Ficha.query.filter_by(codigo='3336360').one()
+        aprendiz = Aprendiz.query.filter_by(ficha_id=ficha.id).one()
+        ficha.fecha_fin = date(2027, 3, 31)
+        aprendiz.estado = 'CONDICIONADO'
+        db.session.commit()
+
+        resultado = importar_archivo(self._reporte_para_crear(), None, self.b.id, crear_ficha=True)
+        db.session.commit()
+        self.assertTrue(resultado['solo_agregar'])
+        self.assertEqual(resultado['actualizados'], 0)
+        db.session.refresh(ficha)
+        db.session.refresh(aprendiz)
+        self.assertEqual(ficha.fecha_fin, date(2027, 3, 31))
+        self.assertEqual(aprendiz.estado, 'CONDICIONADO')
+        self.assertIsNotNone(FichaInstructor.query.filter_by(
+            ficha_id=ficha.id, instructor_id=self.b.id).first())
+
+        # El titular sí actualiza su propia ficha con el reporte.
+        propio = importar_archivo(self._reporte_para_crear(), None, self.a.id, crear_ficha=True)
+        self.assertFalse(propio['solo_agregar'])
+
     def test_reporte_consolida_aprendiz_y_juicio(self):
         resultado = importar_archivo(self._archivo(), self.ficha, self.a.id)
         db.session.commit()

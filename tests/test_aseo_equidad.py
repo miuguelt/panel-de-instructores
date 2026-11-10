@@ -232,7 +232,7 @@ def test_explicacion_muestra_cumplidos_pendientes_y_prioridad():
     explicacion = razon_eleccion(contador, 2, 1.5, False)
     assert 'carga era de 3' in explicacion
     assert '1 turno(s) cumplido(s) y 2 programado(s)' in explicacion
-    assert 'menos turnos cumplidos, antes de rotar compañeros' in explicacion
+    assert 'con la misma carga, quien tiene menos turnos cumplidos' in explicacion
     assert '12/08/2026' in explicacion
     assert 'Tu compañero' not in explicacion
     assert 'te marcaba como presente' not in explicacion

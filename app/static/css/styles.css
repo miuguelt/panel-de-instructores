@@ -1010,6 +1010,14 @@ body {
 }
 .nav-user { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .nav-identity { display: grid; text-align: right; line-height: 1.2; }
+/* Con el enlace «Comité» la barra no cabe entre 701 y 900 px: el nombre del
+   instructor se oculta antes que los enlaces de navegación. */
+@media (max-width: 900px) {
+    .nav-identity { display: none; }
+    /* En las páginas de ficha la marca incluye el código y el programa: los enlaces
+       se compactan para que la barra no desborde. */
+    .nav-primary .nav-link { min-width: 0; padding-inline: 9px; }
+}
 .nav-identity small { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--navbar-text-muted); opacity: 1; }
 .nav-name { max-width: 190px; overflow: hidden; font-size: 13px; white-space: normal; word-wrap: break-word; color: var(--navbar-text); }
 .nav-icon-button {

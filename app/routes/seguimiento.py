@@ -100,7 +100,7 @@ def casos_seguimiento(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
     actualizar_alertas_ficha(ficha_id)
-    vencer_planes_pendientes()
+    vencer_planes_pendientes(ficha_id=ficha_id)
     asegurar_resumen_semanal(ficha)
     ahora = datetime.utcnow()
     planes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id).all()
@@ -112,9 +112,16 @@ def casos_seguimiento(ficha_id):
     lineas_tiempo = obtener_lineas_tiempo(
         ficha_id, {alertas[0].aprendiz_id for alertas in casos_alertas}
     )
+    from app.models.alertas import LlamadoAtencion
+    llamados_por_aprendiz = {}
+    for llamado in LlamadoAtencion.query.filter_by(ficha_id=ficha_id).order_by(
+        LlamadoAtencion.fecha.asc(), LlamadoAtencion.id.asc()
+    ).all():
+        llamados_por_aprendiz.setdefault(llamado.aprendiz_id, []).append(llamado)
     for alertas in casos_alertas:
         aprendiz = alertas[0].aprendiz
         indicadores = obtener_indicadores_caso(aprendiz.id, ficha_id, ahora, contexto)
+        llamados_caso = llamados_por_aprendiz.get(aprendiz.id, [])
         planes_aprendiz = [plan for plan in planes if plan.aprendiz_id == aprendiz.id]
         casos.append({
             'aprendiz': aprendiz,
@@ -122,6 +129,8 @@ def casos_seguimiento(ficha_id):
             'timeline': lineas_tiempo.get(aprendiz.id, []),
             'indicadores': indicadores,
             'planes': planes_aprendiz,
+            'llamados': sum(1 for llamado in llamados_caso if llamado.vigente),
+            'llamados_lista': llamados_caso,
             'prioridad': 'roja' if any(alerta.nivel == 'roja' for alerta in alertas) else 'amarilla',
             'estado': 'escalada_comite' if any(
                 alerta.estado == 'escalada_comite' for alerta in alertas
@@ -158,10 +167,9 @@ def configurar_alertas_comite(ficha_id):
         config = obtener_config_comite(ficha_id)
         config.umbral_fallas_consecutivas = max(1, int(request.form.get('umbral_fallas_consecutivas', 3)))
         config.umbral_fallas_acumuladas = max(1, int(request.form.get('umbral_fallas_acumuladas', 5)))
-        config.umbral_fallas_esporadicas = max(1, int(request.form.get('umbral_fallas_esporadicas', 5)))
-        config.periodo_dias_esporadicas = max(30, int(request.form.get('periodo_dias_esporadicas', 90)))
         config.umbral_tareas_incumplidas = max(1, int(request.form.get('umbral_tareas_incumplidas', 3)))
-        config.dias_plazo_justificacion = max(1, int(request.form.get('dias_plazo_justificacion', 2)))
+        # El Art. 28, par. 3, fija 5 días hábiles: el plazo puede ampliarse, no reducirse.
+        config.dias_plazo_justificacion = max(5, int(request.form.get('dias_plazo_justificacion', 5)))
         config.porcentaje_minimo_asistencia = min(
             100, max(1, int(request.form.get('porcentaje_minimo_asistencia', 75)))
         )
@@ -171,7 +179,6 @@ def configurar_alertas_comite(ficha_id):
         config.periodo_dias_notas = max(1, int(request.form.get('periodo_dias_notas', 30)))
         maximos = {
             'umbral_fallas_consecutivas': 30, 'umbral_fallas_acumuladas': 100,
-            'umbral_fallas_esporadicas': 100, 'periodo_dias_esporadicas': 365,
             'umbral_tareas_incumplidas': 100, 'dias_plazo_justificacion': 30,
             'auto_escalar_dias': 365, 'umbral_notas_negativas': 50,
             'periodo_dias_notas': 365,
@@ -214,6 +221,14 @@ def resolver_alerta(ficha_id, alerta_id):
         flash('Este caso ya fue cerrado.', 'warning')
         return redirect(url_for('seguimiento.casos_seguimiento', ficha_id=ficha_id))
     era_escalada = alerta.estado == 'escalada_comite'
+    acta = (request.form.get('acta_comite') or '').strip()
+    if era_escalada and not acta:
+        # Un caso remitido lo cierra el comité: sin su acta, el instructor no lo resuelve.
+        flash('Para cerrar un caso remitido a comité, registra el número del acta del comité.', 'error')
+        return redirect(url_for('seguimiento.casos_seguimiento', ficha_id=ficha_id))
+    if acta:
+        nota = f'Cerrado con acta del comité {acta}.'
+        alerta.observaciones = f'{alerta.observaciones} {nota}'.strip() if alerta.observaciones else nota
     alerta.estado = 'resuelta'
     alerta.fecha_resuelta = datetime.utcnow()
     alerta.resuelta_por = current_user.id
@@ -222,7 +237,7 @@ def resolver_alerta(ficha_id, alerta_id):
             'aprendiz', alerta.aprendiz_id,
             'Tu instructor registró que este caso quedó revisado. Si necesitas aclarar algo, puedes conversar con él o ella.',
             'caso_resuelto', f'caso-resuelto:{alerta.id}', ficha_id,
-            f'/aprendiz/{ficha_id}/panel?documento={alerta.aprendiz.documento}',
+            f'/aprendiz/{ficha_id}/panel',
         )
     db.session.commit()
     mensaje = (
@@ -293,7 +308,17 @@ def gestionar_planes(ficha_id):
             except ValueError:
                 flash('Fecha límite no válida.', 'error')
                 return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
-        crear_plan_mejoramiento(aprendiz_id, ficha_id, current_user.id, actividades, fecha_limite, alerta_id, tarea_id=tarea_id)
+        try:
+            plan = crear_plan_mejoramiento(
+                aprendiz_id, ficha_id, current_user.id, actividades, fecha_limite, alerta_id,
+                tarea_id=tarea_id, fase=request.form.get('fase') or None,
+            )
+        except ValueError as error:
+            db.session.rollback()
+            flash(str(error), 'error')
+            return redirect(url_for('seguimiento.gestionar_planes', ficha_id=ficha_id))
+        for advertencia in getattr(plan, 'advertencias', []):
+            flash(advertencia, 'warning')
         flash('Plan de mejoramiento creado. El aprendiz recibirá una notificación.', 'success')
         return redirect(url_for('seguimiento.casos_seguimiento', ficha_id=ficha_id))
     planes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id).order_by(
@@ -374,7 +399,7 @@ def auto_evaluar_ficha(ficha_id):
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('instructor.fichas'))
     actualizar_alertas_ficha(ficha_id)
-    flash('Revisión automática ejecutada. Alertas y casos actualizados según Resolución 009 de 2024.', 'success')
+    flash('Revisión automática ejecutada. Alertas y casos actualizados según el Acuerdo 009 de 2024.', 'success')
     return redirect(url_for('seguimiento.casos_seguimiento', ficha_id=ficha_id))
 
 
@@ -391,6 +416,63 @@ def reporte_comite(ficha_id, aprendiz_id):
     ).all()
     timeline = obtener_linea_tiempo(aprendiz_id, ficha_id)
     return _generar_reporte_comite(ficha, aprendiz, alertas, timeline)
+
+
+def _secciones_debido_proceso(ficha, aprendiz, alertas, estilos, estilo_celda, ancho_util):
+    """Normas, medidas previas, plazos y citación del Art. 51 del Acuerdo 009 de 2024."""
+    from reportlab.lib import colors
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+
+    from app.services.debido_proceso import TIPOS_LLAMADO, armar_expediente
+
+    exp = armar_expediente(ficha, aprendiz, alertas)
+    estilo_tabla = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2d8600')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ])
+    elementos = [Spacer(1, 12), Paragraph('Normas del reglamento que sustentan el caso', estilos['Heading2'])]
+    filas = [['Referencia y página', 'Qué establece']]
+    for f in exp['fundamentos']:
+        filas.append([Paragraph(escape(f['referencia']), estilo_celda), Paragraph(escape(f['cita']), estilo_celda)])
+    tabla = Table(filas, colWidths=[ancho_util * 0.4, ancho_util * 0.6], repeatRows=1)
+    tabla.setStyle(estilo_tabla)
+    elementos += [tabla, Spacer(1, 12), Paragraph('Medidas formativas previas', estilos['Heading2'])]
+    filas = [['Fecha', 'Medida', 'Descripción']]
+    for llamado in exp['llamados']:
+        filas.append([
+            llamado.fecha.strftime('%d/%m/%Y'),
+            f'Llamado {TIPOS_LLAMADO[llamado.tipo].lower()} {llamado.numero}',
+            Paragraph(escape(llamado.descripcion), estilo_celda),
+        ])
+    for plan in exp['planes']:
+        filas.append([
+            plan.fecha_creacion.strftime('%d/%m/%Y'), f'Plan de mejoramiento ({plan.estado})',
+            Paragraph(escape(plan.actividades), estilo_celda),
+        ])
+    if len(filas) == 1:
+        filas.append(['—', 'Sin registros', Paragraph('No hay llamados de atención ni planes registrados.', estilo_celda)])
+    tabla = Table(filas, colWidths=[ancho_util * 0.15, ancho_util * 0.25, ancho_util * 0.6], repeatRows=1)
+    tabla.setStyle(estilo_tabla)
+    plazos = exp['plazos']
+    elementos += [
+        tabla, Spacer(1, 12),
+        Paragraph('Plazos del procedimiento (Art. 51, págs. 43-44)', estilos['Heading2']),
+        Paragraph(
+            f"Tipo de falta: <b>{exp['tipo_falta']}</b>. Si el informe se radica el "
+            f"{plazos['fecha_informe']:%d/%m/%Y}, la citación debe hacerse a más tardar el "
+            f"{plazos['citacion_limite']:%d/%m/%Y} (3 días hábiles) y la sesión del comité a más "
+            f"tardar el {plazos['sesion_limite']:%d/%m/%Y} (10 días hábiles).",
+            estilo_celda,
+        ),
+        Spacer(1, 8),
+        Paragraph('Contenido mínimo de la citación (Art. 51, num. 2, pág. 44)', estilos['Heading2']),
+    ]
+    elementos += [Paragraph(escape(item), estilo_celda) for item in exp['contenido_citacion']]
+    return elementos
 
 
 def _generar_reporte_comite(ficha, aprendiz, alertas, timeline):
@@ -469,6 +551,7 @@ def _generar_reporte_comite(ficha, aprendiz, alertas, timeline):
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     elementos.append(tabla_timeline)
+    elementos.extend(_secciones_debido_proceso(ficha, aprendiz, alertas, estilos, estilo_celda, ancho_util))
     doc.build(elementos)
     salida.seek(0)
     return send_file(
@@ -569,13 +652,13 @@ def gestionar_suscripcion_push_aprendiz(ficha_id):
         return jsonify({'ok': True, 'mensaje': 'Los avisos del navegador quedaron desactivados.'})
     except PermissionError as error:
         db.session.rollback()
-        return jsonify({'error': str(error)}), 409
+        return jsonify({'error': 'Esta suscripción ya está vinculada a otra sesión.'}), 409
     except ValueError as error:
         db.session.rollback()
-        return jsonify({'error': str(error)}), 400
+        return jsonify({'error': 'Los datos de la suscripción no son válidos.'}), 400
     except RuntimeError as error:
         db.session.rollback()
-        return jsonify({'error': str(error)}), 503
+        return jsonify({'error': 'Los avisos del navegador todavía no están habilitados.'}), 503
     except SQLAlchemyError:
         db.session.rollback()
         return jsonify({'error': 'No se pudo guardar la suscripción. Inténtalo de nuevo.'}), 500

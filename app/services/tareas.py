@@ -416,7 +416,7 @@ def conceder_prorroga_tarea(
             tipo='tarea',
             clave=f'prorroga:{tarea.id}:{aprendiz.id}:{nueva_fecha_limite.isoformat()}',
             ficha_id=tarea.ficha_id,
-            url=f'/aprendiz/{tarea.ficha_id}/panel?documento={aprendiz.documento}',
+            url=f'/aprendiz/{tarea.ficha_id}/panel',
         )
         db.session.commit()
 

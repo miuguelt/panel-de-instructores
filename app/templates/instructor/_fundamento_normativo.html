@@ -1,0 +1,20 @@
+{# Sustento normativo de una alerta o recomendación de comité.
+   Espera `fundamentos`: lista de dicts generados por app.services.normativa_sena. #}
+{% if fundamentos %}
+<details class="fundamento-normativo">
+    <summary>{{ titulo_sustento or '¿Por qué se envía a comité? Ver sustento normativo' }}</summary>
+    <ul class="fundamento-lista">
+        {% for f in fundamentos %}
+        <li class="fundamento-item">
+            <strong>{{ f.referencia }}</strong>
+            <p class="devbrain-prose">{{ f.cita }}</p>
+            {% if f.url %}
+            <a href="{{ f.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">Abrir el PDF en la página {{ f.pagina }}</a>
+            {% elif not f.verificado %}
+            <span class="badge-solid-warning">Sin respaldo normativo explícito</span>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</details>
+{% endif %}

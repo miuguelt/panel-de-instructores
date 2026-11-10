@@ -12,6 +12,7 @@ def registrar_rutas(app):
         ('grupos', 'grupos_bp', '/instructor'),
         ('atencion', 'atencion_bp', '/instructor'),
         ('seguimiento', 'seguimiento_bp', '/instructor'),
+        ('comite', 'comite_bp', '/instructor'),
         ('aprendiz', 'aprendiz_bp', '/aprendiz'),
         ('aseo', 'aseo_aprendiz_bp', '/aprendiz'),
         ('seguimiento', 'aprendiz_seguimiento_bp', '/aprendiz'),

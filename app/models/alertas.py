@@ -25,15 +25,15 @@ class ConfiguracionAlertasComite(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, unique=True)
 
-    # --- Valores fijados por Resolución 009 de 2024 ---
+    # --- Valores de referencia del Acuerdo 009 de 2024 ---
     umbral_fallas_consecutivas = db.Column(db.Integer, nullable=False, default=3)
     umbral_fallas_acumuladas = db.Column(db.Integer, nullable=False, default=5)
     umbral_fallas_esporadicas = db.Column(db.Integer, nullable=False, default=5)
     periodo_dias_esporadicas = db.Column(db.Integer, nullable=False, default=90)
     umbral_tareas_incumplidas = db.Column(db.Integer, nullable=False, default=3)
-    dias_plazo_justificacion = db.Column(db.Integer, nullable=False, default=2)
+    dias_plazo_justificacion = db.Column(db.Integer, nullable=False, default=5, server_default="5")
 
-    # --- Nuevos campos Resolución 009 ---
+    # --- Umbrales preventivos configurables del panel ---
     porcentaje_minimo_asistencia = db.Column(db.Integer, nullable=False, default=75)
     auto_escalar_dias = db.Column(db.Integer, nullable=False, default=15)
 
@@ -232,9 +232,53 @@ class PlanMejoramiento(db.Model):
     observaciones_aprendiz = db.Column(db.Text, nullable=True)
     evidencia_url = db.Column(db.String(500), nullable=True)
     evidencia_enviada_en = db.Column(db.DateTime, nullable=True)
+    # Fase del proyecto formativo: el tope de planes es por fase (Art. 46, par. 1).
+    fase = db.Column(db.String(30), nullable=True)
     creado_por = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=True)
 
     aprendiz = db.relationship('Aprendiz', backref=db.backref('planes_mejoramiento', lazy='dynamic'))
     ficha = db.relationship('Ficha', backref=db.backref('planes_mejoramiento', lazy='dynamic'))
     alerta = db.relationship('Alerta', backref=db.backref('planes_mejoramiento', lazy='dynamic'))
     tarea = db.relationship('Tarea', backref=db.backref('planes_mejoramiento', lazy='dynamic'))
+
+
+class LlamadoAtencion(db.Model):
+    """Llamado de atención escrito: medida formativa previa al plan de mejoramiento.
+
+    Acuerdo 009 de 2024, Art. 46: hasta dos académicos por fase del proyecto
+    formativo (num. 1, lit. a, pág. 37) y hasta dos disciplinarios durante el
+    programa (num. 2, lit. a, pág. 38).
+    """
+
+    __tablename__ = 'llamados_atencion'
+
+    id = db.Column(db.Integer, primary_key=True)
+    aprendiz_id = db.Column(db.Integer, db.ForeignKey('aprendices.id'), nullable=False, index=True)
+    ficha_id = db.Column(db.Integer, db.ForeignKey('fichas.id'), nullable=False, index=True)
+    tipo = db.Column(db.String(20), nullable=False)
+    etapa = db.Column(db.String(20), nullable=False, default='lectiva')
+    fase = db.Column(db.String(30), nullable=True)
+    numero = db.Column(db.Integer, nullable=False)
+    fecha = db.Column(db.Date, nullable=False)
+    descripcion = db.Column(db.Text, nullable=False)
+    orientaciones = db.Column(db.Text, nullable=True)
+    alerta_id = db.Column(db.Integer, db.ForeignKey('alertas.id'), nullable=True)
+    creado_por = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=True)
+    creado_en = db.Column(db.DateTime, nullable=False, default=utc_now)
+    # Derecho de defensa: el aprendiz puede dejar sus descargos por escrito.
+    descargos = db.Column(db.Text, nullable=True)
+    descargos_en = db.Column(db.DateTime, nullable=True)
+    # Un llamado mal registrado se anula con motivo; no se borra ni cuenta en el tope.
+    anulado_en = db.Column(db.DateTime, nullable=True)
+    anulado_por = db.Column(db.Integer, db.ForeignKey('instructores.id'), nullable=True)
+    motivo_anulacion = db.Column(db.Text, nullable=True)
+
+    aprendiz = db.relationship('Aprendiz', backref=db.backref('llamados_atencion', lazy='dynamic'))
+
+    @property
+    def vigente(self):
+        return self.anulado_en is None
+
+    __table_args__ = (
+        db.Index('ix_llamados_aprendiz_tipo', 'aprendiz_id', 'tipo'),
+    )

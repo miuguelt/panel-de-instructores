@@ -97,12 +97,12 @@ def preferencias(ficha_id):
             aprendiz.id, preferencias_nuevas, revision, foto_nueva, quitar == 'true',
         )
         return respuesta_preferencias(registro, ficha_id)
-    except ConflictoPersonalizacion as exc:
-        return problema(str(exc), 409)
-    except FotoDemasiadoGrande as exc:
-        return problema(str(exc), 413)
-    except ValueError as exc:
-        return problema(str(exc), 400)
+    except ConflictoPersonalizacion:
+        return problema('Las preferencias cambiaron en otra sesión. Recarga el panel para continuar.', 409)
+    except FotoDemasiadoGrande:
+        return problema('La foto supera el tamaño máximo permitido.', 413)
+    except ValueError:
+        return problema('Los datos de personalización enviados no son válidos.', 400)
     except SQLAlchemyError as exc:
         db.session.rollback()
         current_app.logger.error('No se pudo consultar o guardar la personalización (%s).', type(exc).__name__)

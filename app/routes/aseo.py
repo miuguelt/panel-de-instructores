@@ -41,6 +41,7 @@ from app.services.aseo_calendario import (
 )
 from app.services.permisos import (
     aprendiz_de_sesion,
+    bloquear_escritura_aprendiz_inactivo,
     puede_administrar_ficha_como_aprendiz,
     puede_gestionar_ficha,
 )
@@ -50,6 +51,7 @@ aseo_bp = Blueprint('aseo', __name__, template_folder='../templates/instructor')
 aseo_aprendiz_bp = Blueprint(
     'aseo_aprendiz', __name__, template_folder='../templates/aprendiz'
 )
+aseo_aprendiz_bp.before_request(bloquear_escritura_aprendiz_inactivo)
 
 MESES = (
     '',
@@ -1057,17 +1059,16 @@ def responder_intercambio(ficha_id, intercambio_id):
 @aseo_aprendiz_bp.route('/<int:ficha_id>/turnos-aseo')
 @limiter.limit('60 per minute')
 def transparencia(ficha_id):
-    documento = session.get('aprendiz_documento', '') or request.args.get('documento', '').strip()
     ficha = db.session.get(Ficha, ficha_id)
     if not ficha:
         flash('Ficha no encontrada.', 'error')
         return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
 
-    aprendiz = None
-    if documento:
-        aprendiz = Aprendiz.query.filter_by(
-            documento=documento, ficha_id=ficha_id
-        ).first()
+    # Solo quien pertenece a la ficha ve nombres e historial de aseo del grupo.
+    aprendiz = aprendiz_de_sesion(ficha_id)
+    if not aprendiz:
+        flash('Ingresa con tu documento para ver los turnos de aseo de tu ficha.', 'error')
+        return redirect(url_for('aprendiz.vista_aprendiz', ficha_id=ficha_id))
 
     mes = _mes_consulta(request.args.get('mes'))
     nombre_mes = f'{MESES[mes.month]} {mes.year}'
@@ -1114,7 +1115,7 @@ def transparencia(ficha_id):
         'aprendiz/transparencia_aseo.html',
         ficha=ficha,
         aprendiz=aprendiz,
-        documento=documento,
+        documento=aprendiz.documento,
         equidad=datos['equidad'],
         equidad_delta=datos.get('equidad_delta', 0),
         orden=orden,

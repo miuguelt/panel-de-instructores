@@ -272,7 +272,8 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         corte = None
     inicio = corte.fecha_inicio if corte else _inicio_periodo(config, periodo, ahora)
     inicio_corte = corte.fecha_inicio if corte else config.inicio_corte
-    aprendices = Aprendiz.query_en_formacion(ficha_id).all()
+    # Mismo universo que el llamado a lista: los condicionados siguen en clase.
+    aprendices = Aprendiz.query_llamado_lista(ficha_id).all()
 
     # 1. Sesiones y Asistencia
     consulta_sesiones = SesionAsistencia.query.filter_by(ficha_id=ficha_id)
@@ -368,11 +369,16 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
     turnos_aseo = consulta_turnos.all()
 
     consulta_planes = PlanMejoramiento.query.filter_by(ficha_id=ficha_id)
+    if inicio:
+        consulta_planes = consulta_planes.filter(PlanMejoramiento.fecha_creacion >= inicio)
+    consulta_planes = consulta_planes.filter(PlanMejoramiento.fecha_creacion <= ahora)
     planes_por_aprendiz = defaultdict(list)
     for plan in consulta_planes.all():
         planes_por_aprendiz[plan.aprendiz_id].append(plan)
 
     consulta_alertas = Alerta.query.filter_by(ficha_id=ficha_id, estado='activa')
+    if inicio:
+        consulta_alertas = consulta_alertas.filter(Alerta.fecha_generada >= inicio)
     alertas_por_aprendiz = defaultdict(list)
     for alerta in consulta_alertas.all():
         if alerta.aprendiz_id:
@@ -384,10 +390,12 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         PuntajeHistorico.ficha_id == ficha_id,
         PuntajeHistorico.fecha_corte <= fecha_referencia,
     )
-    if corte_id is not None:
-        consulta_historicos = consulta_historicos.filter(
-            PuntajeHistorico.corte_id == corte_id
-        )
+    # Sin corte, la tendencia compara solo con instantáneas del ranking general.
+    consulta_historicos = consulta_historicos.filter(
+        PuntajeHistorico.corte_id == corte_id
+        if corte_id is not None
+        else PuntajeHistorico.corte_id.is_(None)
+    )
     historicos = consulta_historicos.order_by(PuntajeHistorico.fecha_corte.desc()).all()
     anterior_por_aprendiz = {}
     for historico in historicos:
@@ -542,8 +550,10 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
             + (reconocimientos * 2.0)
             + (planes_cumplidos * 2.0)
             + (len(medallas_grupo) * 1.5)
-            - (llamados_atencion * 2.0)
         )
+        # Los llamados de atención y las alertas siguen el debido proceso del
+        # reglamento; restarlos aquí sería una sanción paralela, así que no
+        # afectan el puntaje.
 
         puntos_asistencia = (peso_asist_efectivo * porcentaje_asistencia) / 100.0
         puntos_evidencias = (peso_evid_efectivo * porcentaje_evidencias) / 100.0
@@ -562,7 +572,6 @@ def calcular_ranking(ficha_id, periodo='general', ahora=None, corte_id=None):
         penalizacion = (
             no_justificadas * config.penalizacion_falla_injustificada
             + max(0.0, -merito_formativo)
-            + (alertas_criticas * 5.0)
         )
 
         total = max(0.0, puntos_asistencia + puntos_evidencias + puntos_juicios + bonus - penalizacion)

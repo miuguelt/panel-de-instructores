@@ -236,6 +236,11 @@
     <!-- ============================================================ -->
     {% if experiencia_data %}{% include 'aprendiz/_experiencia.html' %}{% endif %}
 
+    {% if solo_lectura %}
+    <div class="alert alert-warning" role="status">
+        Tu matrícula ya no está en formación. Puedes consultar tu historial y descargar tu reporte, pero no enviar soportes, evidencias ni solicitudes.
+    </div>
+    {% endif %}
     <section class="learner-priority-dashboard" aria-labelledby="priority-dashboard-title">
         <div class="priority-dashboard-heading">
             <div>
@@ -1357,10 +1362,45 @@
     </section>
     {% endif %}
 
+    {% if llamados_atencion %}
+    <section class="card learner-observer-card" id="seccion-llamados" aria-labelledby="learner-llamados-title" data-learner-tab="convivencia">
+        <div class="learner-observer-heading">
+            <div>
+                <span class="eyebrow">Debido proceso</span>
+                <h2 id="learner-llamados-title">Llamados de atención</h2>
+            </div>
+        </div>
+        <p class="text-muted">Tienes derecho a dar tu versión de los hechos. Lo que escribas queda en tu expediente y lo leen tu instructor y el comité.</p>
+        <ul class="learner-observer-list">
+            {% for llamado in llamados_atencion %}
+            <li class="learner-observer-item">
+                <div class="learner-observer-item-head">
+                    <strong>{{ 'Académico' if llamado.tipo == 'academico' else 'Disciplinario' }} n.º {{ llamado.numero }}</strong>
+                    {% if not llamado.vigente %}<span class="badge badge-secondary">Anulado</span>{% endif %}
+                </div>
+                <small>{{ llamado.fecha.strftime('%d/%m/%Y') }}</small>
+                <p>{{ llamado.descripcion }}</p>
+                {% if llamado.orientaciones %}<p><strong>Orientaciones:</strong> {{ llamado.orientaciones }}</p>{% endif %}
+                {% if llamado.descargos %}
+                <p><strong>Tus descargos ({{ llamado.descargos_en.strftime('%d/%m/%Y') }}):</strong> {{ llamado.descargos }}</p>
+                {% elif llamado.vigente and not solo_lectura %}
+                <form method="POST" action="{{ url_for('aprendiz.presentar_descargos', ficha_id=ficha.id, llamado_id=llamado.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label for="descargos-{{ llamado.id }}">Tus descargos</label>
+                    <textarea id="descargos-{{ llamado.id }}" name="descargos" rows="3" maxlength="3000" required></textarea>
+                    <button type="submit" class="btn btn-sm btn-primary">Enviar descargos</button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
     <section class="card learner-plan-card" aria-labelledby="learner-plan-title" data-learner-tab="convivencia">
         <div class="learner-observer-heading">
             <div>
-                <span class="eyebrow">Debido proceso · Art. 28</span>
+                <span class="eyebrow">Debido proceso · Art. 46</span>
                 <h2 id="learner-plan-title">Mis planes de mejoramiento</h2>
             </div>
             <span class="badge badge-secondary">{{ planes_mejoramiento|length }} plan{% if planes_mejoramiento|length != 1 %}es{% endif %}</span>

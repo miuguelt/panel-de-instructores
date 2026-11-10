@@ -891,6 +891,18 @@ def _programar_reposicion(ficha_id, aprendiz, desde_fecha, forzar=False):
     return turno
 
 
+def _pareja_sesion_anterior(ficha_id, fecha):
+    """IDs del turno inmediatamente anterior, para respetar el descanso en suplencias."""
+    anterior = (
+        TurnoAseo.query.filter(TurnoAseo.ficha_id == ficha_id, TurnoAseo.fecha < fecha)
+        .order_by(TurnoAseo.fecha.desc())
+        .first()
+    )
+    if not anterior:
+        return set()
+    return {a for a in (anterior.aprendiz_1_id, anterior.aprendiz_2_id) if a}
+
+
 def _reemplazar_ausentes_del_dia(turno, presentes):
     """Si falta alguien del turno, pone un suplente presente y agenda reposición."""
     if not presentes:
@@ -931,6 +943,7 @@ def _reemplazar_ausentes_del_dia(turno, presentes):
             ultima_prog,
             companero_id=otro_id,
             historial_parejas=historial_parejas,
+            evitar_ids=_pareja_sesion_anterior(turno.ficha_id, turno.fecha),
         )
         ausente = db.session.get(Aprendiz, actual_id)
         if not ausente:
@@ -1048,8 +1061,9 @@ def recalcular_contadores(ficha_id):
         contador.veces_aseo = 0
         contador.ultima_vez_aseo = None
 
-    turnos = TurnoAseo.query.filter_by(
-        ficha_id=ficha_id, estado='cumplido'
+    turnos = TurnoAseo.query.filter(
+        TurnoAseo.ficha_id == ficha_id,
+        TurnoAseo.estado.in_(('cumplido', 'no_cumplido')),
     ).order_by(TurnoAseo.fecha, TurnoAseo.id).all()
     for turno in turnos:
         pares = [
@@ -1057,6 +1071,9 @@ def recalcular_contadores(ficha_id):
             (turno.aprendiz_2_id, turno.completado_2),
         ]
         for aprendiz_id, completado in pares:
+            # En un turno no cumplido solo suma quien quedó marcado como cumplidor.
+            if turno.estado == 'no_cumplido' and completado is not True:
+                continue
             # Si completado es explícitamente False (ausente confirmado), no cuenta.
             # Si es True o None (compatibilidad histórica o marcado cumplido directo), cuenta como cumplido.
             if completado is False:
@@ -1407,7 +1424,11 @@ def resumen_aprendiz(ficha_id, aprendiz):
     config = obtener_configuracion(ficha_id)
     contadores = asegurar_contadores(ficha_id)
     activos = aprendices_activos(ficha_id)
-    contador = contadores[aprendiz.id]
+    # Solo hay contador para quienes siguen en formación; un aprendiz
+    # condicionado o en solo lectura ve su historial con un contador vacío.
+    contador = contadores.get(aprendiz.id) or ContadorAseo(
+        aprendiz_id=aprendiz.id, ficha_id=ficha_id, veces_aseo=0,
+    )
 
     ultimos = TurnoAseo.query.filter_by(
         ficha_id=ficha_id, estado='cumplido'

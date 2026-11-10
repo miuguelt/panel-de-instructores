@@ -43,7 +43,7 @@
         if (enlace.getAttribute('hx-boost') === 'false') return false;
 
         const href = enlace.getAttribute('href');
-        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
+        if (!href || href.startsWith('#') || /^(?:javascript|data|vbscript):/i.test(href)) return false;
         return esDestinoInterno(enlace.href);
     }
 

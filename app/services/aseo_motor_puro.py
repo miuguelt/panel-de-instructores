@@ -118,7 +118,8 @@ def calcular_turnos_token_bucket(
         es_cumplido = fijo.get('estado') == 'cumplido'
         es_manual = fijo.get('es_manual', False)
         # Si tiene la directiva explícita o es manual no cumplido, incrementa carga
-        if fijo.get('incrementar_carga', False) or (es_manual and not es_cumplido):
+        es_pendiente = fijo.get('estado', 'programado') in ('programado', 'intercambiado')
+        if fijo.get('incrementar_carga', False) or (es_manual and es_pendiente):
             cargas[a1] += 1
             cargas[a2] += 1
         ultima_asignacion[a1] = max(ultima_asignacion.get(a1) or date.min, fecha)

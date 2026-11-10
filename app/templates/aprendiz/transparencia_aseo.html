@@ -133,7 +133,7 @@
             </thead>
             <tbody>
                 {% for fila in equidad %}
-                <tr data-estado="{{ fila.aprendiz.estado }}"{% if aprendiz and fila.aprendiz.id == aprendiz.id %} class="is-me"{% endif %}>
+                <tr{% if aprendiz and fila.aprendiz.id == aprendiz.id %} class="is-me"{% endif %}>
                     <td data-label="Aprendiz"><strong>{{ fila.aprendiz.nombre_completo }}</strong></td>
                     <td data-label="En periodo"><span class="equity-count">{{ fila.veces_periodo }}</span></td>
                     <td data-label="Cumplidos"><span class="equity-count">{{ fila.veces_total }}</span></td>

@@ -34,7 +34,7 @@ class RegistroFunciones:
             return
         codigo = frame.f_code
         if codigo not in self.codigos:
-            archivo = os.path.normcase(os.path.abspath(codigo.co_filename))
+            archivo = os.path.normcase(os.path.realpath(codigo.co_filename))
             if not (archivo.startswith(self.app) or archivo in self.runtime):
                 self.codigos[codigo] = None
             else:

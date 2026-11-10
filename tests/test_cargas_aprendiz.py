@@ -19,6 +19,7 @@ class TestCargasAprendiz(unittest.TestCase):
 
     def cargar_soporte(self):
         registro = RegistroAsistencia.query.filter_by(aprendiz_id=self.aprendiz.id).one()
+        self.cliente.post(f'/aprendiz/{self.ficha.id}', data={'documento': self.aprendiz.documento})
         return self.cliente.post(f'/aprendiz/{self.ficha.id}/justificar/{registro.id}',
             data={'documento': self.aprendiz.documento, 'soporte': (BytesIO(b'%PDF-1.4\nsoporte\n%%EOF'), 'soporte.pdf')},
             headers={'X-Requested-With': 'XMLHttpRequest'}, content_type='multipart/form-data')

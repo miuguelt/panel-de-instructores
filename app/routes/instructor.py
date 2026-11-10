@@ -746,6 +746,11 @@ def importar_reporte_ficha():
             f"Ficha {ficha.codigo} {accion} automáticamente. "
             f"{_resumen_importacion(resultado)}"
         )
+        if resultado.get('solo_agregar'):
+            mensaje += (
+                ' La ficha ya pertenecía a otro instructor: quedaste como colaborador y solo '
+                'se agregaron aprendices y juicios nuevos, sin cambiar los datos existentes.'
+            )
         if resultado['errores']:
             flash(mensaje + f" {len(resultado['errores'])} filas no se pudieron importar.", 'warning')
             for error in resultado['errores'][:10]:
@@ -1239,12 +1244,14 @@ def historial_aprendiz(ficha_id, aprendiz_id):
         'FALTA': {'label': 'Falta injustificada', 'count': 0, 'tone': 'danger'},
         'FALTA_JUSTIFICADA': {'label': 'Falta justificada', 'count': 0, 'tone': 'info'},
         'EXCUSA_MEDICA': {'label': 'Excusa médica', 'count': 0, 'tone': 'info'},
+        'SIN_REGISTRO': {'label': 'Sin registro', 'count': 0, 'tone': 'secondary'},
     }
     asistencia_por_mes = defaultdict(lambda: {
         'total': 0, 'asistio': 0, 'tardanzas': 0, 'faltas': 0, 'justificadas': 0,
     })
     for registro in registros_aprendiz:
-        estado = registro.estado if registro.estado in estados_asistencia else 'FALTA'
+        # Un estado desconocido no se presume falta injustificada.
+        estado = registro.estado if registro.estado in estados_asistencia else 'SIN_REGISTRO'
         estados_asistencia[estado]['count'] += 1
         if registro.sesion and registro.sesion.fecha:
             mes = registro.sesion.fecha.strftime('%Y-%m')
@@ -1256,7 +1263,7 @@ def historial_aprendiz(ficha_id, aprendiz_id):
                 mensual['tardanzas'] += 1
             elif estado == 'FALTA':
                 mensual['faltas'] += 1
-            else:
+            elif estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
                 mensual['justificadas'] += 1
 
     asistencia_detalle = [{
@@ -1391,10 +1398,12 @@ def guardar_portafolio_instructor(ficha_id, aprendiz_id):
     try:
         github_valido = normalizar_url_portafolio(github_raw, tipo='github')
         notion_valido = normalizar_url_portafolio(notion_raw, tipo='notion')
-    except ValueError as e:
+    except ValueError as error:
+        # Mensajes propios de normalizar_url_portafolio: indican qué enlace corregir.
+        mensaje_val = str(error) or 'Las direcciones web ingresadas no tienen un formato válido.'
         if es_ajax:
-            return jsonify({'ok': False, 'error': str(e)}), 400
-        flash(str(e), 'error')
+            return jsonify({'ok': False, 'error': mensaje_val}), 400
+        flash(mensaje_val, 'error')
         return redirect(url_for('instructor.historial_aprendiz', ficha_id=ficha_id, aprendiz_id=aprendiz.id))
 
     aprendiz.enlace_github = github_valido
@@ -3193,7 +3202,7 @@ def observador(ficha_id):
                 f'({nota.etiqueta_categoria}, {nota.fecha.strftime("%d/%m/%Y")}). '
                 'Revísalo en tu panel y habla con tu instructor.',
                 'observador', f'observador:{nota.id}', ficha_id,
-                f'/aprendiz/{ficha_id}/panel?documento={aprendiz_nota.documento}'
+                f'/aprendiz/{ficha_id}/panel'
                 if aprendiz_nota else None,
             )
             db.session.commit()
@@ -3619,8 +3628,8 @@ def programar_competencia(ficha_id):
                 fecha_fin=f_fin,
                 instructor_id=current_user.id,
             )
-        except ValueError as err:
-            return jsonify({'success': False, 'error': str(err)}), 400
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Los parámetros de fechas para la competencia no son válidos.'}), 400
 
     juicios_comp = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id, competencia=competencia_nombre).all()
     raps_unicos = []

@@ -122,9 +122,11 @@ class FiltroEnFormacionTestCase(unittest.TestCase):
         contadores = ContadorAseo.query.filter_by(ficha_id=self.ficha.id).all()
         self.assertEqual([c.aprendiz_id for c in contadores], [self.activo.id])
 
-    def test_ranking_solo_incluye_aprendices_en_formacion(self):
+    def test_ranking_incluye_a_quienes_siguen_en_clase(self):
+        # Mismo universo que el llamado a lista: en formación y condicionados.
         filas, _ = calcular_ranking(self.ficha.id)
-        self.assertEqual([fila['aprendiz'].id for fila in filas], [self.activo.id])
+        self.assertEqual(
+            {fila['aprendiz'].id for fila in filas}, {self.activo.id, self.condicionado.id})
 
     def test_alertas_no_se_generan_para_quienes_salieron_de_formacion(self):
         sesion = SesionAsistencia(ficha_id=self.ficha.id, fecha=date.today())

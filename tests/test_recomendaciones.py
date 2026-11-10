@@ -186,7 +186,7 @@ class RecomendacionesTestCase(unittest.TestCase):
         db.session.commit()
 
         recoms = obtener_recomendaciones_aprendiz(self.ficha.id, self.aprendiz1.id)
-        rec_asis = next((r for r in recoms if r.categoria == CAT_ASISTENCIA and 'límite reglamentario' in r.titulo), None)
+        rec_asis = next((r for r in recoms if r.categoria == CAT_ASISTENCIA and 'límite preventivo' in r.titulo), None)
         self.assertIsNotNone(rec_asis)
         self.assertIn('80%', rec_asis.mensaje)
         self.assertEqual(rec_asis.severidad, SEV_PREVENTIVA)

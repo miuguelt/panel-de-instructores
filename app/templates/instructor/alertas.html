@@ -40,7 +40,7 @@
     <div class="alertas-hero-head">
         <span class="alertas-hero-icon">⚖️</span>
         <div>
-            <h3 class="alertas-hero-title">Reglas automáticas — Resolución 009 de 2024</h3>
+            <h3 class="alertas-hero-title">Reglas automáticas — Acuerdo 009 de 2024</h3>
             <p class="text-muted alertas-hero-text">Reglamento del Aprendiz SENA. Estas reglas se evalúan automáticamente y no requieren configuración.</p>
         </div>
     </div>
@@ -58,19 +58,14 @@
                     <td>Alerta roja → preparar comité</td>
                 </tr>
                 <tr>
-                    <td>Faltas esporádicas en {{ config_comite.periodo_dias_esporadicas }} días</td>
-                    <td><strong>{{ config_comite.umbral_fallas_esporadicas }}</strong> faltas</td>
-                    <td>Alerta roja → preparar comité</td>
-                </tr>
-                <tr>
-                    <td>% asistencia mínimo reglamentario</td>
+                    <td>% de asistencia preventivo (el Acuerdo no fija un mínimo)</td>
                     <td><strong>{{ config_comite.porcentaje_minimo_asistencia }}%</strong></td>
-                    <td>Alerta roja → preparar comité</td>
+                    <td>Alerta amarilla → conversar con el aprendiz</td>
                 </tr>
                 <tr>
-                    <td>Fallas acumuladas para seguimiento</td>
+                    <td>Faltas no continuas en todo el proceso</td>
                     <td><strong>{{ config_comite.umbral_fallas_acumuladas }}</strong> faltas</td>
-                    <td>Alerta amarilla → plan de apoyo</td>
+                    <td>Alerta roja → preparar comité</td>
                 </tr>
                 <tr>
                     <td>Tareas incumplidas</td>
@@ -85,9 +80,9 @@
                     <td>Alerta amarilla → plan de mejoramiento</td>
                 </tr>
                 <tr>
-                    <td>Auto-escalación por inacción del instructor</td>
+                    <td>Recordatorio de casos abiertos</td>
                     <td><strong>{{ config_comite.auto_escalar_dias }}</strong> días sin resolver</td>
-                    <td>Escala automáticamente a comité</td>
+                    <td>Aviso al instructor; él decide si remite a comité</td>
                 </tr>
             </tbody>
         </table>
@@ -130,17 +125,13 @@
 <details class="card form-card settings-card">
     <summary>
         <span>Parámetros de seguimiento normativo</span>
-        <small>Basados en Resolución 009</small>
+        <small>Basados en el Acuerdo 009 de 2024</small>
     </summary>
-    <p class="text-muted">Estos valores están fijados por el Reglamento del Aprendiz SENA (Res. 009 de 2024). Se muestran como referencia informativa.</p>
+    <p class="text-muted">Estos valores toman como referencia el Reglamento del Aprendiz SENA (Acuerdo 009 de 2024); el porcentaje mínimo de asistencia es un umbral preventivo del panel. Se muestran como referencia informativa.</p>
     <div class="form-row">
         <div class="form-group">
             <label>Sesiones consecutivas sin justificar</label>
             <input type="number" value="{{ config_comite.umbral_fallas_consecutivas }}" disabled>
-        </div>
-        <div class="form-group">
-            <label>Faltas esporádicas en {{ config_comite.periodo_dias_esporadicas }} días</label>
-            <input type="number" value="{{ config_comite.umbral_fallas_esporadicas }}" disabled>
         </div>
         <div class="form-group">
             <label>% mínimo de asistencia</label>
@@ -155,7 +146,7 @@
             <input type="number" value="{{ config_comite.umbral_tareas_incumplidas }}" disabled>
         </div>
         <div class="form-group">
-            <label>Días para auto-escalar a comité</label>
+            <label>Días para recordar casos abiertos</label>
             <input type="number" value="{{ config_comite.auto_escalar_dias }}" disabled>
         </div>
         <div class="form-group">

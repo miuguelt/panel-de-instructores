@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Normativa SENA - SENA Control{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title-cluster">
+        <a href="{{ url_for('comite.fichas_terminadas') }}" class="btn-back" title="Volver a remisiones">&larr; Volver</a>
+        <h1>Normativa SENA</h1>
+    </div>
+</div>
+
+{% for norma in normas %}
+<section class="card">
+    <h2>{{ norma.titulo }}</h2>
+    <p class="devbrain-prose">Expedido por el {{ norma.entidad }}. Publicado en el {{ norma.publicacion }}. Deroga los {{ norma.deroga }}. El PDF tiene {{ norma.paginas }} páginas y su numeración impresa coincide con la del archivo.</p>
+    <div class="card-actions">
+        <a href="{{ url_for('comite.descargar_norma', norma_id=norma.id) }}" target="_blank" rel="noopener" class="btn btn-primary">Abrir PDF</a>
+        <a href="{{ url_for('comite.descargar_norma', norma_id=norma.id, descargar='1') }}" class="btn btn-outline">Descargar PDF</a>
+        <a href="{{ norma.url_oficial }}" target="_blank" rel="noopener" class="btn btn-outline">Texto en el normograma SENA</a>
+    </div>
+</section>
+{% endfor %}
+
+<section class="card">
+    <h2>Dónde verificar cada causal</h2>
+    <div class="table-responsive">
+        <table class="table">
+            <thead><tr><th>Referencia</th><th>Qué establece</th><th>PDF</th></tr></thead>
+            <tbody>
+                {% for f in fundamentos %}
+                <tr>
+                    <td>{{ f.referencia }}</td>
+                    <td class="devbrain-prose">{{ f.cita }}</td>
+                    <td>{% if f.url %}<a href="{{ f.url }}" target="_blank" rel="noopener">Página {{ f.pagina }}</a>{% else %}No aplica{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

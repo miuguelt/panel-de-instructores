@@ -53,7 +53,9 @@ class AlertasTestCase(unittest.TestCase):
             umbral_fallas_acumuladas=5,
             umbral_tareas_incumplidas=2,
         ))
-        for dias in (2, 1, 0):
+        # Faltas de hace tres semanas: el plazo de 5 días hábiles para
+        # justificarlas ya venció, así que cuentan como injustificadas.
+        for dias in (23, 22, 21):
             sesion = SesionAsistencia(
                 ficha_id=self.ficha.id,
                 fecha=date.today() - timedelta(days=dias),
@@ -85,14 +87,15 @@ class AlertasTestCase(unittest.TestCase):
         actualizar_alertas_ficha(self.ficha.id)
         alertas = Alerta.query.filter_by(ficha_id=self.ficha.id, estado='activa').all()
         tipos = {alerta.tipo for alerta in alertas}
-        # 3 consecutivas + 0% asistencia = comite_desercion, 2 tareas incumplidas = academica
-        self.assertIn('comite_desercion', tipos)
-        self.assertIn('academica', tipos)
+        # 3 consecutivas = comite_desercion; 0% de asistencia = aviso preventivo
+        # aparte (asistencia); 2 tareas incumplidas = academica.
+        self.assertEqual(tipos, {'comite_desercion', 'asistencia', 'academica'})
         self.assertTrue(all(alerta.estado == 'activa' for alerta in alertas))
-        self.assertEqual(Notificacion.query.count(), 4)
+        # Cada alerta avisa al instructor y al aprendiz una sola vez.
+        self.assertEqual(Notificacion.query.count(), 6)
 
         actualizar_alertas_ficha(self.ficha.id)
-        self.assertEqual(Notificacion.query.count(), 4)
+        self.assertEqual(Notificacion.query.count(), 6)
 
     def test_paneles_y_borrador_comite_responden(self):
         actualizar_alertas_ficha(self.ficha.id)
@@ -100,12 +103,14 @@ class AlertasTestCase(unittest.TestCase):
         with cliente.session_transaction() as sesion:
             sesion['_user_id'] = str(self.instructor.id)
             sesion['_fresh'] = True
+            sesion['aprendiz_documento'] = self.aprendiz.documento
+            sesion['aprendiz_ficha_id'] = self.ficha.id
         rutas = (
             f'/instructor/fichas/{self.ficha.id}/casos-seguimiento',
             '/instructor/notificaciones',
             f'/instructor/fichas/{self.ficha.id}/casos/{self.aprendiz.id}/reporte-comite',
-            f'/aprendiz/{self.ficha.id}/panel?documento={self.aprendiz.documento}',
-            f'/aprendiz/{self.ficha.id}/notificaciones?documento={self.aprendiz.documento}',
+            f'/aprendiz/{self.ficha.id}/panel',
+            f'/aprendiz/{self.ficha.id}/notificaciones',
         )
         for ruta in rutas:
             with self.subTest(ruta=ruta):
@@ -200,13 +205,14 @@ class AlertasTestCase(unittest.TestCase):
         # 3 sesiones, 3 faltas = 0% asistencia
         self.assertEqual(pct, 0.0)
 
-    def test_regla_porcentaje_asistencia_genera_comite(self):
+    def test_regla_porcentaje_asistencia_es_solo_preventiva(self):
         actualizar_alertas_ficha(self.ficha.id)
-        comite_alertas = Alerta.query.filter_by(
-            ficha_id=self.ficha.id, aprendiz_id=self.aprendiz.id,
-            tipo='comite_desercion',
-        ).all()
-        self.assertGreater(len(comite_alertas), 0)
+        alerta = Alerta.query.filter_by(
+            ficha_id=self.ficha.id, aprendiz_id=self.aprendiz.id, tipo='asistencia',
+        ).one()
+        self.assertEqual(alerta.nivel, 'amarilla')
+        self.assertNotIn('reglamentario', alerta.titulo)
+        self.assertIn('no fija un porcentaje mínimo', alerta.mensaje)
 
     def test_auto_escalacion_tras_dias_sin_resolver(self):
         pasado = datetime.utcnow() - timedelta(days=20)
@@ -220,10 +226,16 @@ class AlertasTestCase(unittest.TestCase):
         config = ConfiguracionAlertasComite.query.filter_by(ficha_id=self.ficha.id).first()
         config.auto_escalar_dias = 15
         db.session.commit()
-        auto_escalar_casos_pendientes(self.ficha.id)
+        self.assertEqual(auto_escalar_casos_pendientes(self.ficha.id), 1)
         db.session.refresh(alerta)
-        self.assertEqual(alerta.estado, 'escalada_comite')
-        self.assertTrue(alerta.auto_escalada)
+        # El sistema solo recuerda: la remisión a comité la decide el instructor.
+        self.assertEqual(alerta.estado, 'activa')
+        self.assertFalse(alerta.auto_escalada)
+        aviso = Notificacion.query.filter_by(clave=f'recordatorio-comite:{alerta.id}').one()
+        self.assertIn('Revise si corresponde remitirlo a comité', aviso.mensaje)
+        auto_escalar_casos_pendientes(self.ficha.id)
+        self.assertEqual(
+            Notificacion.query.filter_by(clave=f'recordatorio-comite:{alerta.id}').count(), 1)
 
     def test_plan_mejoramiento_crear_y_cumplir(self):
         plan = crear_plan_mejoramiento(
@@ -241,11 +253,23 @@ class AlertasTestCase(unittest.TestCase):
             self.aprendiz.id, self.ficha.id, self.instructor.id,
             'Entregar tareas.',
             fecha_limite=datetime.utcnow() - timedelta(days=1),
+            fecha_creacion=datetime.utcnow() - timedelta(days=10),
         )
+        con_evidencia = crear_plan_mejoramiento(
+            self.aprendiz.id, self.ficha.id, self.instructor.id,
+            'Entregar evidencia.',
+            fecha_limite=datetime.utcnow() - timedelta(days=1),
+            fecha_creacion=datetime.utcnow() - timedelta(days=10),
+        )
+        con_evidencia.evidencia_enviada_en = datetime.utcnow() - timedelta(days=2)
+        db.session.commit()
         vencidos = vencer_planes_pendientes()
         self.assertEqual(vencidos, 1)
         db.session.refresh(plan)
+        db.session.refresh(con_evidencia)
         self.assertEqual(plan.estado, 'vencido')
+        # Quien envió evidencia a tiempo espera la revisión: no queda incumplido.
+        self.assertEqual(con_evidencia.estado, 'pendiente')
 
     def test_ejecutar_revision_automatica_corres_sin_error(self):
         evaluadas = ejecutar_revision_automatica()
@@ -257,7 +281,7 @@ class AlertasTestCase(unittest.TestCase):
             ficha_id=self.ficha.id, aprendiz_id=self.aprendiz.id
         ).all()
         tipos = {a.tipo for a in alertas}
-        # 3 consecutivas + 0% asistencia = comite_desercion, 2 tareas = academica
+        # 3 consecutivas = comite_desercion, 2 tareas = academica
         self.assertIn('comite_desercion', tipos)
         self.assertIn('academica', tipos)
 

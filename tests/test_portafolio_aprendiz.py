@@ -204,6 +204,16 @@ class PortafolioAprendizTestCase(unittest.TestCase):
         self.assertEqual(resp_ajax.status_code, 400)
         self.assertIn('github.com', resp_ajax.get_json().get('error', ''))
 
+        # Sin AJAX, el mismo error vuelve al panel como aviso (antes fallaba con un NameError).
+        resp_form = self.client.post(
+            f'/aprendiz/{self.ficha.id}/guardar-portafolio',
+            data={'enlace_github': 'https://invalido.com/repo', 'enlace_notion': ''},
+        )
+        self.assertEqual(resp_form.status_code, 302)
+        with self.client.session_transaction() as sess:
+            mensajes = ' '.join(texto for _, texto in sess.get('_flashes', []))
+        self.assertIn('github.com', mensajes)
+
         # Formulario normal
         resp_form = self.client.post(
             f'/aprendiz/{self.ficha.id}/guardar-portafolio',
@@ -269,6 +279,19 @@ class PortafolioAprendizTestCase(unittest.TestCase):
                 follow_redirects=False,
             )
             self.assertEqual(resp_form.status_code, 302)
+
+    def test_instructor_ve_que_enlace_corregir(self):
+        self.client.post('/login', data={'correo': 'carlos@sena.edu.co', 'password': 'clave-segura'})
+        url = f'/instructor/fichas/{self.ficha.id}/aprendices/{self.aprendiz.id}/portafolio'
+        datos = {'enlace_github': 'https://invalido.com/repo', 'enlace_notion': ''}
+        resp = self.client.post(url, data=datos)
+        self.assertEqual(resp.status_code, 302)
+        with self.client.session_transaction() as sess:
+            mensajes = ' '.join(texto for _, texto in sess.get('_flashes', []))
+        self.assertIn('github.com', mensajes)
+        resp_ajax = self.client.post(url, json=datos, headers={'Accept': 'application/json'})
+        self.assertEqual(resp_ajax.status_code, 400)
+        self.assertIn('github.com', resp_ajax.get_json().get('error', ''))
 
     def test_instructor_guardar_portafolio_exito_y_permisos(self):
         """Instructor autorizado puede actualizar enlaces de aprendiz; no autorizado es rechazado."""

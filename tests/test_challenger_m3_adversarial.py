@@ -120,8 +120,9 @@ class AlembicMigrationV46EmpiricalTestCase(unittest.TestCase):
         )
         scripts = ScriptDirectory.from_config(config_alembic)
 
-        heads = scripts.get_heads()
-        self.assertEqual(heads, ['v46cambiopassword'])
+        # v46 dejó de ser head al llegar w47 (llamados de atención); la cadena se conserva.
+        self.assertEqual(scripts.get_heads(), ['y49auditoriasena'])
+        self.assertEqual(scripts.get_revision('w47llamadosatencion').down_revision, 'v46cambiopassword')
         rev_v46 = scripts.get_revision('v46cambiopassword')
         self.assertEqual(rev_v46.down_revision, 'u45avisospush')
 

@@ -71,6 +71,9 @@
                     <a href="{{ url_for('instructor.fichas') }}"
                        class="nav-link {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}is-active{% endif %}"
                        {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}aria-current="page"{% endif %}>Fichas</a>
+                    <a href="{{ url_for('comite.fichas_terminadas') }}"
+                       class="nav-link {% if request.blueprint == 'comite' %}is-active{% endif %}"
+                       {% if request.blueprint == 'comite' %}aria-current="page"{% endif %}>Comité</a>
                     {% if current_user.es_admin %}
                     <a href="{{ url_for('admin.listar_instructores') }}"
                        class="nav-link {% if request.blueprint == 'admin' %}is-active{% endif %}"
@@ -175,6 +178,11 @@
                        class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}" title="Casos de seguimiento"{% if request.endpoint == 'seguimiento.casos_seguimiento' %} aria-current="page"{% endif %}>
                         <i data-lucide="search-check" class="nav-icon" aria-hidden="true"></i>
                         <span>Seguimiento</span>
+                    </a>
+                    <a href="{{ url_for('comite.novedades_productiva', ficha_id=ficha.id) }}"
+                       class="{% if request.endpoint == 'comite.novedades_productiva' %}is-active{% endif %}" title="Novedades y etapa productiva"{% if request.endpoint == 'comite.novedades_productiva' %} aria-current="page"{% endif %}>
+                        <i data-lucide="briefcase" class="nav-icon" aria-hidden="true"></i>
+                        <span>Novedades</span>
                     </a>
 
                     <span class="ficha-nav-divider" aria-hidden="true"></span>
@@ -308,7 +316,8 @@
                 const a = e.target.closest('a');
                 if (!a || !a.href) return;
                 if (a.origin !== window.location.origin || a.hasAttribute('download') || a.target === '_blank') return;
-                if (a.getAttribute('href').startsWith('#') || a.getAttribute('href').startsWith('javascript:')) return;
+                const rawHref = a.getAttribute('href') || '';
+                if (rawHref.startsWith('#') || /^(?:javascript|data|vbscript):/i.test(rawHref)) return;
                 if (a.href.includes('/descargar') || a.href.includes('/logout') || a.href.includes('/exportar') || a.href.includes('/plantilla')) return;
                 iniciarProgreso();
             }, { passive: true });
