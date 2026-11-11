@@ -109,7 +109,7 @@
     .pl-actions-main {
         width: 100%;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
         gap: 6px;
     }
     .pl-actions-main .btn {
@@ -1252,7 +1252,7 @@
 /* Resumen de la competencia dentro de Vista Integral */
 .pl-competencia-summary {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
     gap: 0.7rem;
     padding: 1rem 1.2rem;
     background: color-mix(in srgb, var(--accent-primary) 4%, var(--bg-surface));
@@ -1348,7 +1348,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 .pl-pedagogico-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
     gap: 0.6rem;
     padding: 0.75rem 1.5rem;
     background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-surface));
@@ -1548,7 +1548,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 /* Cuadrícula de Perfil del Instructor */
 .pl-perfil-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
     gap: 0.9rem;
 }
 .pl-perfil-card {
@@ -2027,7 +2027,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 .pl-cfd-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(3.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 3.5rem), 1fr));
     gap: 0.6rem;
     align-items: end;
     min-height: 12rem;
@@ -2191,7 +2191,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 
 .pl-heat-stat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
     gap: 0.75rem;
     margin-bottom: 1rem;
 }
@@ -2249,7 +2249,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 /* --- Barra de Resumen Rápido EVM --- */
 .pl-evm-quick-bar {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
     gap: 0.6rem;
     padding: 0.6rem 0.9rem;
     background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-surface));
@@ -2312,7 +2312,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 .pl-phase-control-kpis {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
     gap: 0.6rem;
     margin: 0.75rem 0;
 }
@@ -2608,7 +2608,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
     .pl-actions-group-buttons {
         width: 100%;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 90px), 1fr));
         gap: 4px;
     }
     .pl-actions-group-buttons .btn {

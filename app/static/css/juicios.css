@@ -11,7 +11,7 @@
     /* ── Stats cards ── */
     .juicios-stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
         gap: 1rem;
     }
     .juicio-stat-card {
@@ -40,7 +40,7 @@
     /* ── Competencia grid ── */
     .comp-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
         gap: 1.1rem;
     }
     .comp-card {
@@ -148,7 +148,7 @@
     /* Stat pills row */
     .modal-kpi-row {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
         gap: .8rem;
     }
     .modal-kpi {

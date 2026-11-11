@@ -47,6 +47,8 @@
   - `node tests_js/tokens_accesibilidad_m1.test.cjs`: tokens de superficie en los tres temas, contraste compuesto por alfa, fallbacks y estados canónicos de botón.
   - `node tests_js/responsive_bento_m2.test.cjs`: calibración de `--surface-glass` del tema Sena y contraste de `--text-main` sobre la superficie compuesta.
   - `node tests_js/grupos_layout.test.cjs`: la regla `.bento-sidebar` vive en `app/static/css/grupos.css`.
+  - `node --test tests_js/clases_definidas.test.cjs`: toda clase utilitaria (`d-flex`, `mb-3`, `text-success`, `table-hover`…) tiene regla propia en `app/static/css/utilidades.css` (la aplicación no carga Bootstrap), los componentes estructurales tienen estilo y el número de clases sin regla ni gancho de JavaScript solo puede bajar (145).
+  - `node --test tests_js/composicion_responsive.test.cjs`: ninguna rejilla `auto-fit/auto-fill` exige un mínimo fijo (se usa `minmax(min(100%, X), 1fr)`), la marca de la barra cede espacio, la navegación baja a su propia fila por debajo de 1280 px, las cabeceras limitan la columna de acciones con `fit-content(60%)` y los nombres de aprendices envuelven en lugar de recortarse.
   - `python -m pytest tests/test_ui_ux_design_and_depth.py -q`: tokens y selectores canónicos presentes en `styles.css`.
   - `node tests_browser/diseno_visual.test.cjs`: estilos calculados de botón, tarjeta, alerta, insignia, input, tabla y modal; foco visible; cambio de tema; cero desbordamiento en 320, 390, 768, 1440, 1920 y 2560 px. Requiere lanzar Chromium real (sesión con `danger-full-access`, porque el sandbox confinado falla con `spawn EPERM`).
 

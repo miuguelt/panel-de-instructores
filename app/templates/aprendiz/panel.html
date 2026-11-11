@@ -221,9 +221,9 @@
                     {% endif %}
                 </div>
             {% else %}
-                <form action="{{ url_for('aprendiz.pedir_turno', ficha_id=ficha.id) }}" method="POST" class="d-flex align-items-center" style="gap: 1rem;">
+                <form action="{{ url_for('aprendiz.pedir_turno', ficha_id=ficha.id) }}" method="POST" class="d-flex align-items-center flex-wrap" style="gap: 1rem;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="text" name="motivo" class="form-control" placeholder="¿Sobre qué necesitas ayuda? (Opcional)" maxlength="200" style="flex: 1;">
+                    <input type="text" name="motivo" class="form-control" placeholder="¿Sobre qué necesitas ayuda? (Opcional)" maxlength="200" style="flex: 1 1 14rem; min-width: 0;">
                     <button type="submit" class="btn btn-primary">Pedir Turno</button>
                 </form>
             {% endif %}

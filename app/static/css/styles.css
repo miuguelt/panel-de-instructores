@@ -772,7 +772,7 @@ dialog.app-modal-overlay::backdrop {
 }
 .app-modal-kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
     gap: 0.7rem;
 }
 .app-modal-kpi {
@@ -812,7 +812,7 @@ dialog.app-modal-overlay::backdrop {
 }
 .app-modal-person-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
     gap: 0.7rem;
 }
 .app-modal-person-card {
@@ -2756,7 +2756,7 @@ input[type="radio"] {
 }
 .empty-state-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
     gap: 18px;
     text-align: left;
     margin-bottom: 24px;
@@ -3190,7 +3190,7 @@ input[type="radio"] {
 
 .ranking-overview {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
     gap: 10px;
 }
 .ranking-overview-card {
@@ -4144,7 +4144,7 @@ input[type="radio"] {
 }
 .cleaning-summary-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
     gap: 12px;
     margin-bottom: 20px;
 }
@@ -4295,7 +4295,7 @@ input[type="radio"] {
 
 .cleaning-dates-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
     gap: 12px;
 }
 
@@ -4340,7 +4340,7 @@ input[type="radio"] {
 
 .cleaning-options-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
     gap: 12px;
 }
 
@@ -4384,7 +4384,7 @@ input[type="radio"] {
 
 .cleaning-weekday-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 105px), 1fr));
     gap: 8px;
 }
 
@@ -5545,7 +5545,7 @@ input[type="radio"] {
 .dash-stat-alertas strong { color: var(--sena-orange); }
 .ficha-action-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
     gap: 12px;
     width: 100%;
 }
@@ -6612,7 +6612,7 @@ input[type="radio"] {
 
 .comp-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
     gap: 10px;
     margin-bottom: 20px;
 }
@@ -6756,7 +6756,7 @@ input[type="radio"] {
 /* Instructor grid */
 .instructor-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
     gap: 10px;
 }
 
@@ -7352,7 +7352,7 @@ input[type="radio"] {
 
 .competencia-modal-overview {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
     gap: 0.75rem;
 }
 
@@ -8211,7 +8211,7 @@ input[type="radio"] {
     .module-header .header-actions {
         width: 100%;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
         gap: 8px;
     }
     .page-header-actions .btn,
@@ -9982,7 +9982,7 @@ input[type="radio"] {
 
 .secondary-details-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
     gap: 12px;
 }
 
@@ -11365,7 +11365,7 @@ input[type="radio"] {
 
 .urgent-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
     gap: 16px;
 }
 
@@ -11504,7 +11504,7 @@ input[type="radio"] {
 
 .vision-two-col {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
     gap: 20px;
 }
 
@@ -11977,7 +11977,7 @@ input[type="radio"] {
 }
 .achievements-bento-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     gap: 1.15rem;
 }
 
@@ -12198,7 +12198,7 @@ input[type="radio"] {
 /* --- Countdown Strip --- */
 .ficha-countdown-strip {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
     gap: 12px;
     margin-bottom: 16px;
 }
@@ -13418,7 +13418,7 @@ main#contenido-principal {
 
 .portafolio-cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
     gap: 1.25rem;
 }
 
@@ -13830,7 +13830,7 @@ main#contenido-principal {
     }
     .ficha-toolbar,
     .card,
-    .alert,
+    .alert:not([class*="alert-"]),
     .auth-card,
     .app-modal-content,
     .table-filters-container {
@@ -13849,7 +13849,7 @@ main#contenido-principal {
     }
     .ficha-toolbar,
     .card,
-    .alert,
+    .alert:not([class*="alert-"]),
     .auth-card,
     .app-modal-content,
     .table-filters-container {
@@ -13857,7 +13857,9 @@ main#contenido-principal {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
-    .btn,
+    /* Solo variantes neutras: las rellenas (.btn-info, .btn-warning…) ya son sólidas
+       y su texto claro quedaría invisible sobre una superficie blanca. */
+    .btn:not([class*="btn-"]),
     .btn-outline,
     .btn-secondary,
     .btn-ghost {
@@ -13917,6 +13919,290 @@ main#contenido-principal {
         outline-offset: 2px;
     }
 }
+
+/* ==========================================================================
+   CORRECCIONES DE COMPOSICIÓN (10 de noviembre de 2026)
+   Auditoría con datos extensos a 390, 768, 1009 y 1280 px. Este bloque va al
+   final para prevalecer sobre los ajustes responsive acumulados arriba.
+   ========================================================================== */
+
+/* --- Barra principal ------------------------------------------------------
+   La marca de ficha incluye el nombre completo del programa. Antes ocupaba su
+   ancho natural (flex: 0 0 auto) y la navegación quedaba en 1 px: los enlaces
+   se dibujaban encima del nombre del instructor y «Salir» salía de pantalla.
+   Ahora la marca cede espacio y, cuando no cabe todo, la navegación baja a su
+   propia fila con desplazamiento horizontal contenido. */
+.nav-shell { flex-wrap: wrap; row-gap: 6px; }
+.nav-brand { flex: 0 1 26rem; min-width: 0; }
+.nav-brand-copy { min-width: 0; }
+.nav-subtitle { overflow-wrap: break-word; }
+.nav-primary { flex: 0 0 auto; }
+
+@media (max-width: 1279px) {
+    .nav-shell { flex-wrap: wrap; }
+    .nav-primary {
+        order: 4;
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+    }
+    .nav-primary::-webkit-scrollbar { display: none; }
+    .nav-primary .nav-link { flex: 0 0 auto; }
+}
+
+@media (max-width: 760px) {
+    /* En celular la marca comparte la primera fila con notificaciones y «Salir». */
+    .nav-brand { flex: 1 1 0; }
+}
+
+/* Barra contextual (p. ej. Juicios): se acomoda en su propia fila y envuelve
+   sus acciones en lugar de empujar la página 264 px fuera de la pantalla. */
+.nav-context-slot { min-width: 0; }
+.nav-context-bar { flex-wrap: wrap; min-width: 0; row-gap: 6px; }
+.nav-context-text { min-width: 0; overflow-wrap: break-word; }
+@media (max-width: 1279px) {
+    .nav-context-slot { order: 3; flex: 1 1 100%; width: 100%; }
+    .nav-context-bar { width: 100%; justify-content: space-between; border-radius: var(--radius-lg); }
+}
+@media (max-width: 760px) {
+    .nav-context-btn-action { white-space: normal; text-align: start; }
+}
+
+/* --- Cabeceras de página --------------------------------------------------
+   La columna de acciones (auto) tomaba su ancho máximo y reducía el título a
+   115 px. fit-content limita las acciones y deja que envuelvan. */
+@media (min-width: 768px) {
+    .page-header,
+    .page-header-row,
+    .module-header,
+    .cleaning-page-header,
+    .pl-header,
+    .vision-header {
+        grid-template-columns: minmax(min(100%, 22rem), 1fr) fit-content(60%);
+    }
+}
+.page-header > *,
+.vision-header > * { min-width: 0; }
+.vision-header-actions { justify-content: flex-end; }
+.page-header-actions .btn,
+.vision-header-actions .btn { white-space: normal; text-align: center; }
+
+/* --- Rejillas y formularios -------------------------------------------- */
+/* Las columnas de 380 px no cabían en pantallas de 390 px. */
+.vision-two-col { grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
+.vision-two-col > * { min-width: 0; }
+
+/* Los campos usaban flex: 1 (base 0) y se comprimían sin pasar de línea. */
+.form-row > .form-group { flex: 1 1 min(14rem, 100%); }
+.form-row > .btn,
+.form-row > button { flex: 0 0 auto; }
+
+/* Medidores TyT: la cifra grande no cabía junto a su etiqueta. */
+.tyt-meter-heading { flex-wrap: wrap; row-gap: 4px; }
+.tyt-meter-heading > span { min-width: 0; }
+
+/* Asistencia: el bloque de estadísticas cede ante los botones. */
+.stats-inline { min-width: 0; }
+
+/* Encabezados numéricos del ranking: envuelven en vez de invadir la columna vecina. */
+th.td-count { white-space: normal; }
+
+/* Etiqueta y valor de los KPI del tablero: la etiqueta pasa de línea si no cabe. */
+.bento-kpi-top { flex-wrap: wrap; }
+
+/* Acordeón de fases: en celular la acción baja de línea y el título conserva espacio. */
+.ficha-phase-summary { flex-wrap: wrap; }
+.ficha-phase-summary-main { flex: 1 1 13rem; }
+.ficha-phase-summary-copy { min-width: 0; }
+
+/* Botones de ancho completo (formularios dentro de menús desplegables): envuelven. */
+.btn-full { white-space: normal; text-align: center; }
+.dropdown-restablecer > .card { min-width: min(16rem, 70vw); }
+
+/* Pie de las tarjetas de progreso del aprendiz: los dos datos pasan de línea. */
+.progress-card-footer { flex-wrap: wrap; }
+.progress-card-footer span { white-space: normal; }
+
+/* Pestañas de planeación: desplazamiento horizontal contenido en su barra. */
+.pl-modal-tab { flex: 0 0 auto; }
+
+/* Hijos de tarjetas flex con texto largo: evitan forzar el ancho del padre. */
+.urgent-card-header > div,
+.bento-kpi-top > *,
+.vision-card-header > * { min-width: 0; }
+
+/* Estados vacíos: el mensaje corto acompaña al icono y al título centrados.
+   devbrain-prose.js asigna text-align en línea a todo párrafo; aquí el
+   componente conserva su alineación de composición. */
+/* text-layout-exception: mensaje breve de estado vacío centrado con su icono y título; el texto se muestra completo y envuelve con normalidad. */
+.empty-state p,
+.text-center > p,
+p.text-center {
+    text-align: center !important;
+    text-align-last: center;
+}
+
+/* --- Componentes que las plantillas usaban sin regla -------------------- */
+.alert-content { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
+
+.empty-icon {
+    display: block;
+    margin: 0 auto 0.75rem;
+    font-size: 2.5rem;
+    line-height: 1;
+}
+
+.hover-link { color: inherit; text-decoration: none; }
+.hover-link:hover,
+.hover-link:focus-visible { color: var(--accent-primary); text-decoration: underline; }
+
+.card-subtle {
+    background: var(--surface-glass-subtle, var(--bg-surface));
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-md);
+}
+
+.badge-primary,
+.badge-accent {
+    background: var(--accent-primary);
+    color: var(--button-on-accent);
+    border-color: transparent;
+}
+.badge-ghost {
+    background: transparent;
+    color: var(--text-main);
+    border-color: var(--border-control);
+    text-transform: none;
+}
+.badge-subtle {
+    background: var(--surface-selected, var(--bg-surface));
+    color: var(--text-strong);
+    border-color: var(--border-divider);
+}
+.badge-sm { padding: 1px 7px; font-size: 10px; }
+
+.reglamento-card {
+    display: grid;
+    gap: 0.75rem;
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+    margin-bottom: 1.25rem;
+    border-left: 4px solid var(--accent-primary);
+}
+.reglamento-card > :last-child { margin-bottom: 0; }
+
+.devbrain-prose { color: var(--text-main); line-height: 1.6; }
+.devbrain-prose + .devbrain-prose { margin-top: 0.5rem; }
+
+.fila-sustento td { background: var(--surface-header); }
+
+.fundamento-normativo {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface-data);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-md);
+}
+.fundamento-normativo > summary {
+    min-height: var(--control-h-sm);
+    display: flex;
+    align-items: center;
+    font-weight: 700;
+    color: var(--text-strong);
+    cursor: pointer;
+}
+.fundamento-lista {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.5rem 0 0;
+    padding-inline-start: 1.25rem;
+}
+.fundamento-item { line-height: 1.5; color: var(--text-main); }
+
+.urgent-card-body { flex: 1 1 auto; min-width: 0; }
+.urgent-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-divider);
+}
+.urgent-card-status { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.vision-card-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bento-kpi-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Modal de RAPs vencidos */
+.app-modal-content--large { width: min(100%, 56.25rem); }
+.app-modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text-strong);
+    overflow-wrap: break-word;
+}
+.raps-vencidos-modal-shell { min-width: 0; }
+.raps-vencidos-header-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-width: 0;
+}
+.raps-vencidos-header-wrap > div { min-width: 0; }
+.raps-vencidos-toolbar .btn-group { flex-wrap: wrap; }
+.raps-vencidos-list > * { min-width: 0; }
+
+/* Barras de progreso por aprendiz en Alertas: sin altura propia no se veían. */
+.progress-bar-container {
+    height: 10px;
+    overflow: hidden;
+    background-color: var(--border-data);
+    border-radius: var(--radius-pill);
+}
+.progress-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    border-radius: inherit;
+}
+.progress-fill.bg-rojo { background: var(--status-danger-solid); }
+.progress-fill.bg-amarillo { background: var(--status-warning-solid); }
+.progress-fill.bg-verde { background: var(--status-success-solid); }
+.progress-tech { accent-color: var(--accent-primary); }
+.progress-section { min-width: 0; }
+
+/* Liga de escuadrones del aprendiz: cuatro columnas fijas no cabían en celular. */
+.col-pos,
+.col-name,
+.col-score { min-width: 0; }
+.col-name { overflow-wrap: break-word; }
+.col-score { text-align: end; }
+@media (max-width: 560px) {
+    .squad-league-table .squad-league-header-row,
+    .squad-league-table .squad-league-row {
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        column-gap: 0.5rem;
+    }
+    .squad-league-table .squad-league-header-row .col-stats { display: none; }
+    .squad-league-table .squad-league-row .col-stats { grid-column: 2 / -1; grid-row: 2; margin-top: 4px; }
+}
+
+/* Historial del aprendiz: portafolio y competencias */
+.report-competency-section { min-width: 0; }
+.report-portafolio-card { min-width: 0; overflow-wrap: break-word; }
+.report-portafolio-grid > * { min-width: 0; }
+.portafolio-item-box { min-width: 0; overflow-wrap: break-word; }
 
 /* devbrain-prose-contract:start */
 /* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */

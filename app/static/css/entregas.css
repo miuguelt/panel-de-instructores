@@ -7,7 +7,7 @@
 
     .entregas-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
         gap: 24px;
         margin-top: 24px;
     }
@@ -138,7 +138,7 @@
     
     .stats-container {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
         gap: 16px;
         margin-top: 24px;
         margin-bottom: 8px;

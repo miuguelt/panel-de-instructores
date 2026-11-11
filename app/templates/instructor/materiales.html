@@ -33,7 +33,7 @@
   </div>
 </div>
 
-<div class="cards-grid" id="gridMateriales" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">
+<div class="cards-grid" id="gridMateriales" style="grid-template-columns:repeat(auto-fill, minmax(min(100%, 300px), 1fr));">
   {% for m in materiales %}
   {% set ext = m.nombre_archivo.split('.')[-1].lower() if '.' in m.nombre_archivo else '' %}
   {% set icon_class = 'file-icon-other' %}

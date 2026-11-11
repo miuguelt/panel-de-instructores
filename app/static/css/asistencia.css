@@ -145,7 +145,7 @@
 /* Dashboard KPI Horizontal */
 .kpis-fullscreen-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: 1.25rem;
 }
 
@@ -642,16 +642,16 @@
 .col-nombre {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    min-width: 0;
 }
 .aprendiz-name {
     font-size: 13px;
     font-weight: 600;
     color: var(--text-strong);
     cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* El nombre completo identifica al aprendiz: envuelve en lugar de recortarse. */
+    white-space: normal;
+    overflow-wrap: break-word;
     text-decoration: underline;
     text-decoration-style: dotted;
     text-underline-offset: 3px;
@@ -730,6 +730,27 @@
 .stat-level-verde    .stat-pct { color: var(--status-success-text); }
 .stat-level-amarillo .stat-pct { color: var(--status-warning-text); }
 .stat-level-rojo     .stat-pct { color: var(--status-danger-text); }
+
+/* En anchos medios y en celular las estadísticas bajan a una segunda línea:
+   antes se recortaban (overflow: hidden) junto a los botones de estado. */
+@media (max-width: 1100px) {
+    .asistencia-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 6px;
+    }
+    .asistencia-row .col-stats {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        overflow: visible;
+    }
+    .asistencia-row .col-botones { flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-width: 560px) {
+    .asistencia-row { grid-template-columns: minmax(0, 1fr); }
+    .asistencia-row .col-stats { grid-row: auto; }
+    .asistencia-row .col-botones { justify-content: flex-start; }
+    .asistencia-row .asistencia-buttons { flex-wrap: wrap; }
+}
 
 /* Columna botones */
 .col-botones {

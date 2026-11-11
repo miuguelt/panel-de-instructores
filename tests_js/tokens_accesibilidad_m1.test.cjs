@@ -313,6 +313,44 @@ test('fallbacks de vidrio: @supports not, transparencia reducida, contraste y co
     assert.doesNotMatch(stylesCss, /@supports\s+not\s*\([\s\S]*?\.navbar\s*,\s*\.ficha-toolbar/, 'navbar no debe heredar el fondo de tarjeta cuando backdrop-filter no está disponible');
 });
 
+/** Cuerpo de cada bloque @media o @supports cuya condición contiene `condicion`. */
+function bloquesCondicionales(css, condicion) {
+    const bloques = [];
+    let desde = 0;
+    while ((desde = css.indexOf(condicion, desde)) !== -1) {
+        const apertura = css.indexOf('{', desde);
+        let profundidad = 1;
+        let i = apertura + 1;
+        while (profundidad > 0 && i < css.length) {
+            if (css[i] === '{') profundidad += 1;
+            else if (css[i] === '}') profundidad -= 1;
+            i += 1;
+        }
+        bloques.push(css.slice(apertura + 1, i - 1));
+        desde = i;
+    }
+    return bloques;
+}
+
+test('fallbacks de vidrio: no pintan de superficie neutra los botones ni las alertas con variante', () => {
+    // Con la transparencia de Windows desactivada, `.btn { background-color: superficie }`
+    // dejaba .btn-info, .btn-warning, .btn-danger y .btn-success en blanco con texto blanco,
+    // y `.alert` perdía el tinte que distingue advertencia, peligro y éxito.
+    const condiciones = ['prefers-reduced-transparency: reduce', '@supports not ('];
+    for (const condicion of condiciones) {
+        for (const cuerpo of bloquesCondicionales(stylesCss, condicion)) {
+            for (const regla of cuerpo.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+                const selectores = regla[1].split(',').map(s => s.trim());
+                const pintaFondo = /background(-color)?\s*:/.test(regla[2]);
+                for (const generico of ['.btn', '.alert']) {
+                    assert.ok(!(pintaFondo && selectores.includes(generico)),
+                        `${condicion}: «${generico}» genérico no debe recibir fondo neutro (${regla[1].trim()})`);
+                }
+            }
+        }
+    }
+});
+
 test('navbar: contraste AAA del texto sobre el fondo sólido en todos los temas', () => {
     for (const [tema, mapa] of Object.entries(TEMAS)) {
         assert.ok(mapa.has('--navbar-bg-solid'), `El tema ${tema} debe definir --navbar-bg-solid`);

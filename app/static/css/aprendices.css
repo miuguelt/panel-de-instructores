@@ -501,8 +501,10 @@
 }
 
 @container (min-width: 460px) {
+    /* auto-fit: el contenedor de la consulta es el acordeón, no la subtarjeta;
+       con columnas fijas la caja del enlace quedaba en 86 px. */
     .share-qr-cluster {
-        grid-template-columns: minmax(144px, 168px) minmax(0, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
     }
 }
 

@@ -130,7 +130,7 @@ test('utilidades.css usa solo tokens del sistema, sin colores literales', () => 
 });
 
 // Ratchet: clases sin regla CSS que tampoco usa ningún JavaScript (gancho). Solo puede bajar.
-const PRESUPUESTO_SIN_REGLA = 175;
+const PRESUPUESTO_SIN_REGLA = 145;
 
 test('el número de clases sin regla ni gancho de JavaScript no crece', () => {
     const definidas = clasesDefinidas();
