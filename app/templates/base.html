@@ -120,103 +120,65 @@
             </div>
         </nav>
 
-        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion', 'grupos') %}
+        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion', 'grupos', 'atencion', 'tyt', 'comite') %}
+        {% set ep = request.endpoint %}
+        {% set corte_q = corte_actual.id if corte_actual is defined and corte_actual else None %}
+        {# Módulos principales: siempre visibles. El resto vive en «Más módulos». #}
+        {% set modulos_principales = [
+            {'label': 'Visión general', 'icon': 'layout-dashboard', 'title': 'Centro de mando de la ficha', 'url': url_for('instructor.vision_general', ficha_id=ficha.id, corte_id=corte_q), 'activo': ep == 'instructor.vision_general'},
+            {'label': 'Asistencia', 'icon': 'clipboard-check', 'title': 'Llamado a lista y asistencia', 'url': url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=corte_q), 'activo': ep == 'instructor.asistencia'},
+            {'label': 'Tareas', 'icon': 'file-check', 'title': 'Tareas y evidencias', 'url': url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_q), 'activo': ep in ('instructor.tareas', 'instructor.ver_entregas', 'instructor.evidencias_faltantes')},
+            {'label': 'Aprendices', 'icon': 'users', 'title': 'Directorio de aprendices', 'url': url_for('instructor.aprendices', ficha_id=ficha.id), 'activo': ep in ('instructor.aprendices', 'instructor.historial_aprendiz', 'instructor.configuracion_aprendices')},
+            {'label': 'Juicios', 'icon': 'graduation-cap', 'title': 'Juicios evaluativos y RAPs', 'url': url_for('instructor.juicios', ficha_id=ficha.id), 'activo': ep == 'instructor.juicios'},
+            {'label': 'Planeación', 'icon': 'compass', 'title': 'Planeación pedagógica y línea de tiempo', 'url': url_for('planeacion.analisis', ficha_id=ficha.id), 'activo': request.blueprint == 'planeacion'},
+            {'label': 'Alertas', 'icon': 'alert-triangle', 'title': 'Alertas tempranas de riesgo', 'url': url_for('instructor.alertas', ficha_id=ficha.id), 'activo': ep in ('instructor.alertas', 'instructor.guardar_config_alertas')},
+        ] %}
+        {% set grupos_secundarios = [
+            {'titulo': 'Seguimiento y convivencia', 'modulos': [
+                {'label': 'Observador', 'icon': 'book-open', 'title': 'Observador del aprendiz', 'url': url_for('instructor.observador', ficha_id=ficha.id), 'activo': ep == 'instructor.observador'},
+                {'label': 'Casos de seguimiento', 'icon': 'search-check', 'title': 'Casos y planes de mejoramiento', 'url': url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id), 'activo': ep in ('seguimiento.casos_seguimiento', 'seguimiento.gestionar_planes')},
+                {'label': 'Novedades', 'icon': 'briefcase', 'title': 'Novedades y etapa productiva', 'url': url_for('comite.novedades_productiva', ficha_id=ficha.id), 'activo': ep == 'comite.novedades_productiva'},
+                {'label': 'Fila de atención', 'icon': 'hand', 'title': 'Turnos de atención a aprendices', 'url': url_for('atencion.fila_atencion', ficha_id=ficha.id), 'activo': request.blueprint == 'atencion'},
+                {'label': 'Seguimiento TyT', 'icon': 'target', 'title': 'Preparación para las pruebas Saber TyT', 'url': url_for('tyt.detalle', ficha_id=ficha.id), 'activo': request.blueprint == 'tyt'},
+                {'label': 'Aseo', 'icon': 'sparkles', 'title': 'Turnos de aseo del ambiente', 'url': url_for('aseo.turnos', ficha_id=ficha.id), 'activo': request.blueprint == 'aseo'},
+            ]},
+            {'titulo': 'Recursos y participación', 'modulos': [
+                {'label': 'Estadísticas', 'icon': 'bar-chart-3', 'title': 'Estadísticas y reportes', 'url': url_for('instructor.estadisticas', ficha_id=ficha.id), 'activo': ep == 'instructor.estadisticas'},
+                {'label': 'Materiales', 'icon': 'folder', 'title': 'Materiales de apoyo', 'url': url_for('instructor.materiales', ficha_id=ficha.id), 'activo': ep == 'instructor.materiales'},
+                {'label': 'Ranking', 'icon': 'trophy', 'title': 'Ranking de participación e insignias', 'url': url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_q), 'activo': request.blueprint == 'ranking'},
+                {'label': 'Grupos', 'icon': 'users-2', 'title': 'Gestión de grupos y equipos', 'url': url_for('grupos.listar_grupos', ficha_id=ficha.id), 'activo': request.blueprint == 'grupos'},
+            ]},
+        ] %}
+        {% set ns_menu = namespace(activo=None) %}
+        {% for grupo in grupos_secundarios %}{% for m in grupo.modulos %}{% if m.activo %}{% set ns_menu.activo = m %}{% endif %}{% endfor %}{% endfor %}
         <div class="ficha-toolbar">
             <div class="ficha-toolbar-inner">
                 <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
-                    <!-- Visión General (Centro de mando) -->
-                    <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint == 'instructor.vision_general' %}is-active{% endif %}" title="Visión general de la ficha (Centro de mando)"{% if request.endpoint == 'instructor.vision_general' %} aria-current="page"{% endif %}>
-                        <i data-lucide="layout-dashboard" class="nav-icon" aria-hidden="true"></i>
-                        <span>Visión General</span>
+                    {% for m in modulos_principales %}
+                    <a href="{{ m.url }}" class="{% if m.activo %}is-active{% endif %}" title="{{ m.title }}"{% if m.activo %} aria-current="page"{% endif %}>
+                        <i data-lucide="{{ m.icon }}" class="nav-icon" aria-hidden="true"></i>
+                        <span class="ficha-nav-label">{{ m.label }}</span>
                     </a>
-
-                    <span class="ficha-nav-divider" aria-hidden="true"></span>
-
-                    <!-- Día a Día -->
-                    <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint == 'instructor.asistencia' %}is-active{% endif %}" title="Llamado a lista y asistencia"{% if request.endpoint == 'instructor.asistencia' %} aria-current="page"{% endif %}>
-                        <i data-lucide="clipboard-check" class="nav-icon" aria-hidden="true"></i>
-                        <span>Asistencia</span>
-                    </a>
-                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %}is-active{% endif %}" title="Tareas y evidencias"{% if request.endpoint in ('instructor.tareas', 'instructor.ver_entregas') %} aria-current="page"{% endif %}>
-                        <i data-lucide="file-check" class="nav-icon" aria-hidden="true"></i>
-                        <span>Tareas</span>
-                    </a>
-                    <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'aseo.turnos' %}is-active{% endif %}" title="Turnos de aseo del ambiente"{% if request.endpoint == 'aseo.turnos' %} aria-current="page"{% endif %}>
-                        <i data-lucide="sparkles" class="nav-icon" aria-hidden="true"></i>
-                        <span>Aseo</span>
-                    </a>
-
-                    <span class="ficha-nav-divider" aria-hidden="true"></span>
-
-                    <!-- Académico -->
-                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %}is-active{% endif %}" title="Directorio de aprendices"{% if request.endpoint in ('instructor.aprendices', 'instructor.historial_aprendiz') %} aria-current="page"{% endif %}>
-                        <i data-lucide="users" class="nav-icon" aria-hidden="true"></i>
-                        <span>Aprendices</span>
-                    </a>
-                    <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.juicios',) %}is-active{% endif %}" title="Juicios evaluativos y RAPs"{% if request.endpoint in ('instructor.juicios',) %} aria-current="page"{% endif %}>
-                        <i data-lucide="graduation-cap" class="nav-icon" aria-hidden="true"></i>
-                        <span>Juicios</span>
-                    </a>
-                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'planeacion.analisis' %}is-active{% endif %}" title="Planeación pedagógica y línea de tiempo"{% if request.endpoint == 'planeacion.analisis' %} aria-current="page"{% endif %}>
-                        <i data-lucide="compass" class="nav-icon" aria-hidden="true"></i>
-                        <span>Planeación</span>
-                    </a>
-                    <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.estadisticas',) %}is-active{% endif %}" title="Estadísticas y reportes"{% if request.endpoint in ('instructor.estadisticas',) %} aria-current="page"{% endif %}>
-                        <i data-lucide="bar-chart-3" class="nav-icon" aria-hidden="true"></i>
-                        <span>Estadísticas</span>
-                    </a>
-
-                    <span class="ficha-nav-divider" aria-hidden="true"></span>
-
-                    <!-- Seguimiento y Convivencia -->
-                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %}is-active{% endif %}" title="Alertas tempranas de riesgo"{% if request.endpoint in ('instructor.alertas', 'instructor.guardar_config_alertas') %} aria-current="page"{% endif %}>
-                        <i data-lucide="alert-triangle" class="nav-icon" aria-hidden="true"></i>
-                        <span>Alertas</span>
-                    </a>
-                    <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'instructor.observador' %}is-active{% endif %}" title="Observador del aprendiz"{% if request.endpoint == 'instructor.observador' %} aria-current="page"{% endif %}>
-                        <i data-lucide="book-open" class="nav-icon" aria-hidden="true"></i>
-                        <span>Observador</span>
-                    </a>
-                    <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'seguimiento.casos_seguimiento' %}is-active{% endif %}" title="Casos de seguimiento"{% if request.endpoint == 'seguimiento.casos_seguimiento' %} aria-current="page"{% endif %}>
-                        <i data-lucide="search-check" class="nav-icon" aria-hidden="true"></i>
-                        <span>Seguimiento</span>
-                    </a>
-                    <a href="{{ url_for('comite.novedades_productiva', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'comite.novedades_productiva' %}is-active{% endif %}" title="Novedades y etapa productiva"{% if request.endpoint == 'comite.novedades_productiva' %} aria-current="page"{% endif %}>
-                        <i data-lucide="briefcase" class="nav-icon" aria-hidden="true"></i>
-                        <span>Novedades</span>
-                    </a>
-
-                    <span class="ficha-nav-divider" aria-hidden="true"></span>
-
-                    <!-- Recursos y Gamificación -->
-                    <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}"
-                       class="{% if request.endpoint == 'instructor.materiales' %}is-active{% endif %}" title="Materiales de apoyo"{% if request.endpoint == 'instructor.materiales' %} aria-current="page"{% endif %}>
-                        <i data-lucide="folder" class="nav-icon" aria-hidden="true"></i>
-                        <span>Materiales</span>
-                    </a>
-                    <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual is defined and corte_actual else None) }}"
-                       class="{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %}is-active{% endif %}" title="Ranking de participación"{% if request.endpoint in ('ranking.ranking', 'ranking.insignias') %} aria-current="page"{% endif %}>
-                        <i data-lucide="trophy" class="nav-icon" aria-hidden="true"></i>
-                        <span>Ranking</span>
-                    </a>
-                    <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}"
-                       class="{% if request.blueprint == 'grupos' %}is-active{% endif %}" title="Gestión de grupos y equipos"{% if request.blueprint == 'grupos' %} aria-current="page"{% endif %}>
-                        <i data-lucide="users-2" class="nav-icon" aria-hidden="true"></i>
-                        <span>Grupos</span>
-                    </a>
+                    {% endfor %}
+                    <button type="button" class="ficha-nav-more{% if ns_menu.activo %} is-active{% endif %}" popovertarget="ficha-nav-mas" aria-haspopup="true"{% if ns_menu.activo %} aria-label="Más módulos. Módulo actual: {{ ns_menu.activo.label }}"{% endif %}>
+                        <i data-lucide="{{ ns_menu.activo.icon if ns_menu.activo else 'layout-grid' }}" class="nav-icon" aria-hidden="true"></i>
+                        <span>{{ ns_menu.activo.label if ns_menu.activo else 'Más módulos' }}</span>
+                        <i data-lucide="chevron-down" class="nav-icon ficha-nav-more-chevron" aria-hidden="true"></i>
+                    </button>
                 </nav>
+                <div id="ficha-nav-mas" popover class="ficha-nav-popover" aria-label="Más módulos de la ficha {{ ficha.codigo }}">
+                    {% for grupo in grupos_secundarios %}
+                    <div class="ficha-nav-group" role="group" aria-labelledby="ficha-nav-grupo-{{ loop.index }}">
+                        <p class="ficha-nav-group-title" id="ficha-nav-grupo-{{ loop.index }}">{{ grupo.titulo }}</p>
+                        {% for m in grupo.modulos %}
+                        <a href="{{ m.url }}" class="ficha-nav-item{% if m.activo %} is-active{% endif %}" title="{{ m.title }}"{% if m.activo %} aria-current="page"{% endif %}>
+                            <i data-lucide="{{ m.icon }}" class="nav-icon" aria-hidden="true"></i>
+                            <span class="ficha-nav-label">{{ m.label }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
         {% endif %}
