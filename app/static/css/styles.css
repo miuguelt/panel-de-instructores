@@ -14342,6 +14342,12 @@ p.text-center {
     border-color: var(--border-glass-strong);
 }
 
+@media (min-width: 761px) and (max-width: 1100px) {
+    /* Entre tabletas y portátiles pequeños los 7 módulos caben junto a «Más». */
+    .ficha-nav a { padding-inline: 9px; gap: 6px; }
+    .ficha-nav-more { padding-inline: 10px; }
+}
+
 @media (max-width: 760px) {
     .ficha-nav-more {
         min-height: 42px;
