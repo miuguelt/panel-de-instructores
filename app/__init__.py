@@ -443,6 +443,16 @@ def create_app(test_config=None):
     app.jinja_env.globals['alertas_modulo'] = _alertas_modulo
     app.jinja_env.globals['alertas_aprendiz'] = _alertas_aprendiz
 
+    def _contador_compacto(valor, tope=99):
+        """Texto de un distintivo numérico: la cifra exacta hasta `tope` y «tope+» después."""
+        try:
+            cantidad = max(int(valor), 0)
+        except (TypeError, ValueError):
+            cantidad = 0
+        return f'{tope}+' if cantidad > tope else str(cantidad)
+
+    app.jinja_env.filters['contador_compacto'] = _contador_compacto
+
     _static_v_cache = {}
 
     @app.context_processor

@@ -138,6 +138,120 @@ class DesignSystemAndDepthTestCase(unittest.TestCase):
         ):
             self.assertIn(selector, self.css_content, f'Falta el componente {selector}')
 
+    @staticmethod
+    def _desbalance_de_llaves(css):
+        """Devuelve (línea, motivo) del primer desbalance de llaves, o None.
+
+        Ignora comentarios y cadenas para no contar llaves que no abren bloques.
+        """
+        profundidad = 0
+        linea = 1
+        i = 0
+        total = len(css)
+        while i < total:
+            caracter = css[i]
+            if caracter == '\n':
+                linea += 1
+            elif css.startswith('/*', i):
+                fin = css.find('*/', i + 2)
+                fin = total if fin == -1 else fin + 2
+                linea += css.count('\n', i, fin)
+                i = fin
+                continue
+            elif caracter in ('"', "'"):
+                i += 1
+                while i < total and css[i] != caracter:
+                    if css[i] == '\\':
+                        i += 1
+                    elif css[i] == '\n':
+                        linea += 1
+                    i += 1
+            elif caracter == '{':
+                profundidad += 1
+            elif caracter == '}':
+                profundidad -= 1
+                if profundidad < 0:
+                    return linea, 'llave de cierre sin bloque abierto'
+            i += 1
+        if profundidad:
+            return linea, f'quedan {profundidad} bloques sin cerrar'
+        return None
+
+    def test_detector_de_llaves_reconoce_css_valido_e_invalido(self):
+        """El detector distingue bloques bien cerrados, sobrantes y faltantes."""
+        valido = '/* } */ .a { content: "}"; } @media (x) { .b { c: d; } }'
+        self.assertIsNone(self._desbalance_de_llaves(valido))
+        self.assertEqual(
+            self._desbalance_de_llaves('.a { b: c; }\n}\n.d { e: f; }'),
+            (2, 'llave de cierre sin bloque abierto'),
+        )
+        self.assertEqual(
+            self._desbalance_de_llaves('.a { b: c;'),
+            (1, 'quedan 1 bloques sin cerrar'),
+        )
+
+    def test_css_llaves_balanceadas(self):
+        """Una llave suelta anula la regla siguiente: ninguna hoja de estilos puede tenerla."""
+        carpeta = os.path.join(self.app.root_path, 'static', 'css')
+        hojas = sorted(nombre for nombre in os.listdir(carpeta) if nombre.endswith('.css'))
+        self.assertIn('styles.css', hojas)
+        for nombre in hojas:
+            with open(os.path.join(carpeta, nombre), 'r', encoding='utf-8') as archivo:
+                desbalance = self._desbalance_de_llaves(archivo.read())
+            self.assertIsNone(desbalance, f'{nombre}: {desbalance}')
+
+    def test_nav_user_es_fila_flexible(self):
+        """El bloque de usuario del menú se dispone en una fila alineada a la derecha."""
+        import re
+
+        reglas = re.findall(r'(?m)^\.nav-user\s*\{([^}]*)\}', self.css_content)
+        self.assertEqual(len(reglas), 1, 'Debe existir una sola regla base .nav-user')
+        declaraciones = {
+            parte.split(':', 1)[0].strip(): parte.split(':', 1)[1].strip()
+            for parte in reglas[0].split(';') if ':' in parte
+        }
+        self.assertEqual(declaraciones.get('display'), 'flex')
+        self.assertEqual(declaraciones.get('align-items'), 'center')
+        self.assertEqual(declaraciones.get('margin-left'), 'auto')
+        self.assertEqual(declaraciones.get('flex'), '0 0 auto')
+        # La regla anterior debe cerrar una sola vez; una llave extra invalida .nav-user.
+        self.assertIsNone(
+            re.search(r'\}\s*\}\s*\.nav-user\s*\{', self.css_content),
+            'Hay una llave suelta antes de .nav-user',
+        )
+
+    def test_contador_compacto_limita_cifras_altas(self):
+        """El contador del menú muestra 99+ por encima de 99 y la cifra exacta hasta 99."""
+        contador = self.app.jinja_env.filters['contador_compacto']
+        self.assertEqual(contador(5), '5')
+        self.assertEqual(contador(99), '99')
+        self.assertEqual(contador(100), '99+')
+        self.assertEqual(contador(217), '99+')
+        self.assertEqual(contador(12, tope=9), '9+')
+        self.assertEqual(contador(None), '0')
+        self.assertEqual(contador('no numérico'), '0')
+        self.assertEqual(contador(-3), '0')
+
+    def test_base_template_muestra_contador_compacto_y_cifra_exacta_accesible(self):
+        """El distintivo usa la forma compacta; la etiqueta accesible conserva el total."""
+        from flask import render_template_string
+
+        base_path = os.path.join(self.app.root_path, 'templates', 'base.html')
+        with open(base_path, 'r', encoding='utf-8') as f:
+            base_html = f.read()
+
+        self.assertIn(
+            '<span class="notification-count">{{ notificaciones_no_leidas|contador_compacto }}</span>',
+            base_html,
+        )
+        self.assertIn('{{ notificaciones_no_leidas }} sin leer', base_html)
+
+        with self.app.test_request_context('/'):
+            html = render_template_string(
+                '<span class="notification-count">{{ n|contador_compacto }}</span>', n=217,
+            )
+        self.assertEqual(html, '<span class="notification-count">99+</span>')
+
     def test_base_template_includes_lucide_and_scripts(self):
         """Verifica que base.html incluya lucide.min.js e inicialice los iconos."""
         base_path = os.path.join(self.app.root_path, 'templates', 'base.html')

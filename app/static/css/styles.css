@@ -990,6 +990,8 @@ body {
     display: flex;
     align-items: center;
     align-self: stretch;
+    flex: 0 1 auto;
+    min-width: 0;
     gap: 6px;
 }
 .nav-link {
@@ -1047,8 +1049,8 @@ body {
     outline-offset: 2px;
     box-shadow: var(--focus-ring);
 }
-}
-.nav-user { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.nav-user { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; margin-left: auto; }
+.nav-logout { min-height: 42px; white-space: nowrap; }
 .nav-identity { display: grid; text-align: right; line-height: 1.2; }
 /* Con el enlace «Comité» la barra no cabe entre 701 y 900 px: el nombre del
    instructor se oculta antes que los enlaces de navegación. */
@@ -3037,15 +3039,18 @@ input[type="radio"] {
 }
 .notification-count {
     position: absolute;
-    top: -9px;
-    right: -10px;
-    min-width: 17px;
+    /* Anclado por la izquierda: con más dígitos crece hacia afuera y no tapa la campana. */
+    top: -6px;
+    left: 20px;
+    min-width: 18px;
     padding: 2px 4px;
     color: white;
     background: var(--sena-red);
+    border: 2px solid var(--navbar-bg-solid, #133c00);
     border-radius: 999px;
     font-size: 10px;
     font-weight: 800;
+    line-height: 1;
     text-align: center;
 }
 

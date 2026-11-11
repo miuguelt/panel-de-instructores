@@ -105,7 +105,7 @@
                        aria-label="Notificaciones{% if notificaciones_no_leidas %}: {{ notificaciones_no_leidas }} sin leer{% endif %}"
                        title="Notificaciones">
                         <i data-lucide="bell" class="icon-md" aria-hidden="true"></i>
-                        {% if notificaciones_no_leidas %}<span class="notification-count">{{ notificaciones_no_leidas }}</span>{% endif %}
+                        {% if notificaciones_no_leidas %}<span class="notification-count">{{ notificaciones_no_leidas|contador_compacto }}</span>{% endif %}
                     </a>
                     <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form" hx-boost="false">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
