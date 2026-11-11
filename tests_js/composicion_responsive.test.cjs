@@ -127,3 +127,24 @@ test('asistencia: el nombre del aprendiz envuelve y las estadísticas no se reco
     assert.match(estadisticas, /grid-column:\s*1 \/ -1/);
     assert.match(estadisticas, /overflow:\s*visible/);
 });
+
+test('menú de la ficha: el panel «Más módulos» solo se muestra abierto', () => {
+    // Un display propio en la regla base anularía el ocultamiento nativo del popover.
+    assert.doesNotMatch(ultimaRegla(styles, '.ficha-nav-popover'), /display\s*:/);
+    assert.match(ultimaRegla(styles, '.ficha-nav-popover:popover-open'), /display:\s*grid/);
+    assert.match(ultimaRegla(styles, '.ficha-nav-popover:popover-open'), /minmax\(min\(100%,\s*14rem\),\s*1fr\)/);
+});
+
+test('menú de la ficha: el botón «Más módulos» queda visible al desplazar y se ancla al panel', () => {
+    const boton = ultimaRegla(styles, '.ficha-nav-more');
+    assert.match(boton, /position:\s*sticky/);
+    assert.match(boton, /right:\s*0/);
+    assert.match(boton, /min-height:\s*44px|min-height:\s*42px/);
+    assert.match(styles, /@supports \(anchor-name: --ficha-nav-mas\)\s*\{[\s\S]*?position-anchor:\s*--ficha-nav-mas/);
+});
+
+test('menú de la ficha: en celular el texto genérico se oculta solo visualmente', () => {
+    const oculto = reglaEnMedia(styles, '(max-width: 760px)', '.ficha-nav-more:not(.is-active) .ficha-nav-more-text');
+    assert.match(oculto, /clip-path:\s*inset\(50%\)/);
+    assert.doesNotMatch(oculto, /display:\s*none/);
+});

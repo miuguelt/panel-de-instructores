@@ -14204,6 +14204,169 @@ p.text-center {
 .report-portafolio-grid > * { min-width: 0; }
 .portafolio-item-box { min-width: 0; overflow-wrap: break-word; }
 
+/* --- Menú de la ficha (10 de noviembre de 2026) -----------------------------
+   Antes eran 16 módulos en una fila: incluso a 1440 px los últimos quedaban
+   ocultos tras un desplazamiento sin señal visible. Ahora hay 7 principales y
+   el resto en «Más módulos», un popover nativo (cierra con Escape o clic fuera,
+   sin JavaScript propio) anclado al botón donde el navegador lo admite. */
+.ficha-nav { align-items: center; }
+.ficha-nav a,
+.ficha-nav-more { min-height: 44px; }
+
+.ficha-nav-more {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding: 0 12px 0 14px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--text-strong);
+    background: var(--surface-data);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-control);
+    box-shadow: -14px 0 14px -8px var(--surface-data);
+    cursor: pointer;
+    transition: color var(--dur-base) var(--ease-standard),
+                background-color var(--dur-base) var(--ease-standard),
+                border-color var(--dur-base) var(--ease-standard);
+}
+.ficha-nav-more .nav-icon {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+.ficha-nav-more .ficha-nav-more-chevron {
+    transition: transform var(--dur-base) var(--ease-standard);
+}
+.ficha-nav-more:hover {
+    color: var(--accent-hover);
+    border-color: var(--accent-primary);
+}
+.ficha-nav-more.is-active {
+    color: var(--accent-hover);
+    background: var(--surface-selected);
+    border-color: var(--accent-primary);
+}
+.ficha-nav-more:focus-visible,
+.ficha-nav-item:focus-visible,
+.ficha-nav a:focus-visible {
+    outline: var(--focus-width) solid var(--accent-primary);
+    outline-offset: var(--focus-offset);
+}
+.ficha-nav:has(+ .ficha-nav-popover:popover-open) .ficha-nav-more-chevron {
+    transform: rotate(180deg);
+}
+
+/* Panel «Más módulos». Sin anclaje CSS, el navegador lo centra en pantalla. */
+.ficha-nav-popover {
+    width: min(34rem, calc(100vw - 24px));
+    max-height: min(80vh, 36rem);
+    padding: 14px;
+    color: var(--text-main);
+    background: var(--surface-data);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    overflow-y: auto;
+}
+.ficha-nav-popover:popover-open {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 14px 18px;
+}
+.ficha-nav-popover::backdrop { background: transparent; }
+@supports (anchor-name: --ficha-nav-mas) {
+    .ficha-nav-more { anchor-name: --ficha-nav-mas; }
+    .ficha-nav-popover {
+        position-anchor: --ficha-nav-mas;
+        inset: auto;
+        top: anchor(bottom);
+        right: anchor(right);
+        margin: 8px 0 0;
+        position-try-fallbacks: flip-inline;
+    }
+}
+@supports not (anchor-name: --ficha-nav-mas) {
+    .ficha-nav-popover::backdrop { background: color-mix(in srgb, var(--text-strong) 28%, transparent); }
+}
+
+.ficha-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.ficha-nav-group-title {
+    margin: 0 0 4px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.ficha-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    text-decoration: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+}
+.ficha-nav-item .nav-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    color: var(--accent-primary);
+}
+.ficha-nav-item:hover {
+    color: var(--accent-hover);
+    background: var(--surface-hover);
+}
+.ficha-nav-item.is-active {
+    color: var(--accent-hover);
+    font-weight: 700;
+    background: var(--surface-selected);
+    border-color: var(--border-glass-strong);
+}
+
+@media (max-width: 760px) {
+    .ficha-nav-more {
+        min-height: 42px;
+        min-width: 56px;
+        padding: 0 9px;
+        font-size: 11.5px;
+    }
+    /* En celular el botón queda compacto para no tapar los módulos de la fila;
+       el texto sigue disponible para lectores de pantalla. */
+    .ficha-nav-more:not(.is-active) .ficha-nav-more-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
+@media (forced-colors: active) {
+    .ficha-nav-more,
+    .ficha-nav-popover { border: 1px solid ButtonText; }
+    .ficha-nav-item.is-active { outline: 2px solid Highlight; }
+}
+
 /* devbrain-prose-contract:start */
 /* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
 :where(p, dd, blockquote) {
