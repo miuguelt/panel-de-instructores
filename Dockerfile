@@ -54,7 +54,7 @@ ENV FLASK_APP=wsgi.py \
 EXPOSE 8009
 
 # Health check: Coolify lo usa para detectar estado del contenedor
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
+HEALTHCHECK --interval=5m --timeout=10s --start-period=30s --start-interval=5s --retries=5 \
     CMD curl -f http://localhost:8009/health || exit 1
 
 USER adso

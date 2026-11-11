@@ -53,7 +53,8 @@ services:
       - "8009"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
-      interval: 30s
+      interval: 5m
+      start_interval: 5s
       timeout: 10s
       retries: 5
       start_period: 30s
@@ -113,7 +114,8 @@ services:
       - uploads:/app/uploads
     healthcheck:
       test: ["CMD", "python3", "-c", "import os; raise SystemExit(0 if os.path.exists('/tmp/adso-worker-ready') else 1)"]
-      interval: 30s
+      interval: 5m
+      start_interval: 5s
       timeout: 10s
       retries: 3
       start_period: 30s
