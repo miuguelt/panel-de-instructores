@@ -78,7 +78,9 @@ def descargar_norma(norma_id):
 @comite_bp.route('/comite/fichas-terminadas')
 @login_required
 def fichas_terminadas():
-    hoy = date.today()
+    from app.services.alertas import fecha_colombia
+    from datetime import datetime
+    hoy = fecha_colombia(datetime.utcnow())
     analisis = analizar_fichas_terminadas(_fichas_del_usuario(), hoy)
     if request.args.get('formato') == 'csv':
         salida = io.StringIO()

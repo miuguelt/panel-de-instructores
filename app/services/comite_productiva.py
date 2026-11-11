@@ -170,7 +170,11 @@ def analizar_ficha(ficha, aprendices, hoy, etapas=None, novedades=None):
 
 def analizar_fichas_terminadas(fichas, hoy=None):
     """Resumen por ficha terminada con los aprendices a remitir a comité."""
-    hoy = _a_fecha(hoy) or date.today()
+    if hoy is None:
+        from app.services.alertas import fecha_colombia
+        hoy = fecha_colombia(datetime.utcnow())
+    else:
+        hoy = _a_fecha(hoy)
     resultado = []
     for ficha in fichas:
         if not ficha_terminada(ficha, hoy):
