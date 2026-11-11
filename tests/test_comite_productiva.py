@@ -8,7 +8,11 @@ from app import create_app, db
 from app.models import Alerta, Aprendiz, Ficha, Instructor, RegistroAsistencia, SesionAsistencia
 from app.routes.comite import filas_csv
 from app.services import comite_productiva as cp
-from app.services.alertas import actualizar_alertas_ficha, ejecutar_revision_automatica
+from app.services.alertas import (
+    actualizar_alertas_ficha,
+    ejecutar_revision_automatica,
+    fecha_colombia,
+)
 
 HOY = date(2026, 11, 9)
 
@@ -123,7 +127,7 @@ class IntegracionComiteTest(unittest.TestCase):
         self.ajeno.set_password('clave-segura')
         db.session.add_all([self.instructor, self.ajeno])
         db.session.flush()
-        hoy = date.today()
+        hoy = fecha_colombia(datetime.utcnow())
         self.terminada = Ficha(codigo='T1', nombre_programa='ADSO', instructor_id=self.instructor.id,
                                fecha_inicio=hoy - timedelta(days=800), fecha_fin=hoy - timedelta(days=20))
         self.activa = Ficha(codigo='A1', nombre_programa='ADSO', instructor_id=self.instructor.id,
@@ -183,9 +187,10 @@ class IntegracionComiteTest(unittest.TestCase):
         self.assertEqual(estados[self.aplazado.id], 'activa')
 
     def test_revision_automatica_incluye_terminadas_recientes_y_omite_antiguas(self):
+        hoy = fecha_colombia(datetime.utcnow())
         antigua = Ficha(codigo='V1', nombre_programa='ADSO', instructor_id=self.instructor.id,
-                        fecha_inicio=date.today() - timedelta(days=1500),
-                        fecha_fin=date.today() - timedelta(days=500))
+                        fecha_inicio=hoy - timedelta(days=1500),
+                        fecha_fin=hoy - timedelta(days=500))
         db.session.add(antigua)
         db.session.flush()
         db.session.add(Aprendiz(documento='9', nombre='Eva', apellidos='Luz',
@@ -263,8 +268,9 @@ class FundamentoEnAlertasExistentesTest(unittest.TestCase):
         self.contexto.pop()
 
     def _registros(self, dias, estado):
+        hoy = fecha_colombia(datetime.utcnow())
         for d in dias:
-            sesion = SesionAsistencia(ficha_id=self.ficha.id, fecha=date.today() - timedelta(days=d))
+            sesion = SesionAsistencia(ficha_id=self.ficha.id, fecha=hoy - timedelta(days=d))
             db.session.add(sesion)
             db.session.flush()
             db.session.add(RegistroAsistencia(sesion_id=sesion.id, aprendiz_id=self.aprendiz.id, estado=estado))
