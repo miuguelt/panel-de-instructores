@@ -160,7 +160,7 @@
                         <span class="ficha-nav-label">{{ m.label }}</span>
                     </a>
                     {% endfor %}
-                    <button type="button" class="ficha-nav-more{% if ns_menu.activo %} is-active{% endif %}" popovertarget="ficha-nav-mas" aria-haspopup="true"{% if ns_menu.activo %} aria-label="Más módulos. Módulo actual: {{ ns_menu.activo.label }}"{% endif %}>
+                    <button type="button" class="ficha-nav-more{% if ns_menu.activo %} is-active{% endif %}" popovertarget="ficha-nav-mas" aria-haspopup="true" aria-label="Más módulos{% if ns_menu.activo %}. Módulo actual: {{ ns_menu.activo.label }}{% endif %}">
                         <i data-lucide="{{ ns_menu.activo.icon if ns_menu.activo else 'layout-grid' }}" class="nav-icon" aria-hidden="true"></i>
                         <span class="ficha-nav-more-text">{{ ns_menu.activo.label if ns_menu.activo else 'Más módulos' }}</span>
                         <i data-lucide="chevron-down" class="nav-icon ficha-nav-more-chevron" aria-hidden="true"></i>

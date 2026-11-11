@@ -14350,15 +14350,8 @@ p.text-center {
         font-size: 11.5px;
     }
     /* En celular el botón queda compacto para no tapar los módulos de la fila;
-       el texto sigue disponible para lectores de pantalla. */
-    .ficha-nav-more:not(.is-active) .ficha-nav-more-text {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-    }
+       su nombre accesible sigue en aria-label. */
+    .ficha-nav-more:not(.is-active) .ficha-nav-more-text { display: none; }
 }
 
 @media (forced-colors: active) {

@@ -60,7 +60,8 @@ function reglasDePrimerNivel(css) {
 
 /** Declaraciones de la última regla de primer nivel cuyo selector es exactamente `selector`. */
 function ultimaRegla(css, selector) {
-    const coincidencias = reglasDePrimerNivel(css).filter(r => r.cabecera === selector);
+    const normalizar = texto => texto.replace(/\s+/g, ' ').trim();
+    const coincidencias = reglasDePrimerNivel(css).filter(r => normalizar(r.cabecera) === normalizar(selector));
     assert.ok(coincidencias.length > 0, `Falta la regla ${selector}`);
     return coincidencias.at(-1).cuerpo;
 }
@@ -139,12 +140,13 @@ test('menú de la ficha: el botón «Más módulos» queda visible al desplazar 
     const boton = ultimaRegla(styles, '.ficha-nav-more');
     assert.match(boton, /position:\s*sticky/);
     assert.match(boton, /right:\s*0/);
-    assert.match(boton, /min-height:\s*44px|min-height:\s*42px/);
+    assert.match(ultimaRegla(styles, '.ficha-nav a, .ficha-nav-more'), /min-height:\s*44px/);
     assert.match(styles, /@supports \(anchor-name: --ficha-nav-mas\)\s*\{[\s\S]*?position-anchor:\s*--ficha-nav-mas/);
 });
 
-test('menú de la ficha: en celular el texto genérico se oculta solo visualmente', () => {
+test('menú de la ficha: en celular el botón es compacto y conserva su nombre accesible', () => {
     const oculto = reglaEnMedia(styles, '(max-width: 760px)', '.ficha-nav-more:not(.is-active) .ficha-nav-more-text');
-    assert.match(oculto, /clip-path:\s*inset\(50%\)/);
-    assert.doesNotMatch(oculto, /display:\s*none/);
+    assert.match(oculto, /display:\s*none/);
+    const base = fs.readFileSync(path.join(plantillasDir, 'base.html'), 'utf8');
+    assert.match(base, /class="ficha-nav-more[^"]*"[^>]*aria-label="Más módulos/);
 });

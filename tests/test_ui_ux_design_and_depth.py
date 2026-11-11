@@ -268,20 +268,10 @@ class DesignSystemAndDepthTestCase(unittest.TestCase):
         with open(base_path, 'r', encoding='utf-8') as f:
             base_html = f.read()
 
-        self.assertIn('data-lucide="layout-dashboard"', base_html)
-        self.assertIn('data-lucide="clipboard-check"', base_html)
-        self.assertIn('data-lucide="file-check"', base_html)
-        self.assertIn('data-lucide="sparkles"', base_html)
-        self.assertIn('data-lucide="users"', base_html)
-        self.assertIn('data-lucide="graduation-cap"', base_html)
-        self.assertIn('data-lucide="compass"', base_html)
-        self.assertIn('data-lucide="bar-chart-3"', base_html)
-        self.assertIn('data-lucide="alert-triangle"', base_html)
-        self.assertIn('data-lucide="book-open"', base_html)
-        self.assertIn('data-lucide="search-check"', base_html)
-        self.assertIn('data-lucide="folder"', base_html)
-        self.assertIn('data-lucide="trophy"', base_html)
-        self.assertIn('data-lucide="users-2"', base_html)
+        # El menú de la ficha declara cada icono en su lista de módulos y lo pinta con data-lucide.
+        self.assertIn('data-lucide="{{ m.icon }}"', base_html)
+        for icono in ('layout-dashboard', 'clipboard-check', 'file-check', 'sparkles', 'users', 'graduation-cap', 'compass', 'bar-chart-3', 'alert-triangle', 'book-open', 'search-check', 'folder', 'trophy', 'users-2'):
+            self.assertIn(f"'icon': '{icono}'", base_html)
         self.assertIn('data-lucide="bell"', base_html)
         self.assertIn('data-lucide="log-out"', base_html)
 
