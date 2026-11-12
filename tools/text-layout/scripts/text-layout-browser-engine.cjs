@@ -98,14 +98,14 @@ async function getFreePort() {
   return port;
 }
 
-async function waitForTarget(port, attempts = 40) {
+async function waitForTarget(port, attempts = 60) {
   let version = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       version = await getJson(`http://127.0.0.1:${port}/json/version`);
       if (version.webSocketDebuggerUrl) return version;
     } catch {
-      await wait(150);
+      await wait(200);
     }
   }
   throw new Error('Microsoft Edge no abrió el puerto de depuración remoto.');

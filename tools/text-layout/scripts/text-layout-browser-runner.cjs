@@ -18,6 +18,7 @@ async function runBrowserAudit(root, options = {}) {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'devbrain-text-layout-'));
   const browser = spawn(edgePath, [
     `--remote-debugging-port=${port}`,
+    '--remote-debugging-address=127.0.0.1',
     '--headless=new',
     '--disable-gpu',
     '--no-first-run',
@@ -37,7 +38,7 @@ async function runBrowserAudit(root, options = {}) {
   const viewports = options.viewports || DEFAULT_VIEWPORTS;
 
   try {
-    const version = await waitForTarget(port, options.startupAttempts || 40);
+    const version = await waitForTarget(port, options.startupAttempts || 60);
     const tabs = await getJson(`http://127.0.0.1:${port}/json/list`);
     const tab = tabs.find(item => item.type === 'page');
     if (!tab || !tab.webSocketDebuggerUrl) throw new Error('Microsoft Edge no publicó una pestaña para auditar.');
