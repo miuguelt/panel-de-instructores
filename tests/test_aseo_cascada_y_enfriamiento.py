@@ -205,3 +205,37 @@ class TestAseoCascadaYEnfriamiento(unittest.TestCase):
                 4,
                 f"El aprendiz {a_id} repitió demasiado pronto (distancia de {distancia_sesiones} sesiones).",
             )
+
+    def test_reposicion_evita_companero_consecutivo_del_dia_anterior(self):
+        """Verifica que _programar_reposicion no elija como compañero a quien estuvo de turno el día anterior."""
+        from app.services.aseo import _programar_reposicion
+        f1 = self.fechas[0]
+        f2 = self.fechas[1]
+
+        # En f1, asignamos a aprendiz 1 y 2
+        t1 = TurnoAseo(
+            ficha_id=self.ficha.id,
+            fecha=f1,
+            aprendiz_1_id=self.aprendices[0].id,
+            aprendiz_2_id=self.aprendices[1].id,
+            estado='cumplido',
+            generado_por='sistema',
+        )
+        db.session.add(t1)
+        db.session.commit()
+
+        # Aprendiz 3 no cumplió en una fecha previa y se le programa reposición en f2
+        # Los aprendices 1 y 2 estuvieron en f1, por lo que el compañero en f2 NO debe ser 1 ni 2
+        # mientras existan otros candidatos disponibles (aprendices 4..10 con carga 0).
+        t_rep = _programar_reposicion(self.ficha.id, self.aprendices[2], f1, forzar=True)
+        self.assertIsNotNone(t_rep)
+        self.assertEqual(t_rep.fecha, f2)
+        self.assertTrue(t_rep.incluye(self.aprendices[2].id))
+
+        companero_id = t_rep.aprendiz_2_id if t_rep.aprendiz_1_id == self.aprendices[2].id else t_rep.aprendiz_1_id
+        self.assertNotIn(
+            companero_id,
+            {self.aprendices[0].id, self.aprendices[1].id},
+            "El compañero de la reposición fue asignado en días consecutivos a pesar de haber opciones con descanso.",
+        )
+

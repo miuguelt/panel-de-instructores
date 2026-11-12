@@ -857,6 +857,7 @@ def _programar_reposicion(ficha_id, aprendiz, desde_fecha, forzar=False):
         return turno if (turno.estado in ESTADOS_PENDIENTES and turno.incluye(aprendiz.id)) else None
 
     activos = companeros
+    pareja_anterior = _pareja_sesion_anterior(ficha_id, fecha)
     companero = _elegir_por_cola_justa(
         activos,
         contadores,
@@ -864,6 +865,7 @@ def _programar_reposicion(ficha_id, aprendiz, desde_fecha, forzar=False):
         ultima_prog,
         companero_id=aprendiz.id,
         historial_parejas=historial_parejas,
+        evitar_ids=pareja_anterior,
     )
     turno = TurnoAseo(
         ficha_id=ficha_id,
