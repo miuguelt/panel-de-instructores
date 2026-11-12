@@ -268,12 +268,17 @@ class DesignSystemAndDepthTestCase(unittest.TestCase):
         with open(base_path, 'r', encoding='utf-8') as f:
             base_html = f.read()
 
-        # El menú de la ficha declara cada icono en su lista de módulos y lo pinta con data-lucide.
+        nav_path = os.path.join(self.app.root_path, 'navegacion.py')
+        with open(nav_path, 'r', encoding='utf-8') as f:
+            nav_py = f.read()
+
+        # El menú de la ficha declara cada icono en navegacion.py y base.html lo pinta con data-lucide.
         self.assertIn('data-lucide="{{ m.icon }}"', base_html)
         for icono in ('layout-dashboard', 'clipboard-check', 'file-check', 'sparkles', 'users', 'graduation-cap', 'compass', 'bar-chart-3', 'alert-triangle', 'book-open', 'search-check', 'folder', 'trophy', 'users-2'):
-            self.assertIn(f"'icon': '{icono}'", base_html)
+            self.assertIn(f"'{icono}'", nav_py)
         self.assertIn('data-lucide="bell"', base_html)
         self.assertIn('data-lucide="log-out"', base_html)
+
 
     def test_dashboard_template_renders_lucide_icons(self):
         """Verifica que dashboard.html renderice los iconos vectoriales de Lucide."""
