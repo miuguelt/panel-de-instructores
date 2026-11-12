@@ -1,13 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Fichas - SENA Control{% endblock %}
 
+{% from "components/_ui.html" import page_header %}
 {% block content %}
-<div class="page-header">
-    <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al Inicio">&larr; Volver al Inicio</a>
-        <h1>Gestión de Fichas de Formación</h1>
-    </div>
-</div>
+{{ page_header('Gestión de Fichas de Formación', icono='folder-kanban') }}
 
 <div class="card form-card report-import-card">
     <div class="import-heading">

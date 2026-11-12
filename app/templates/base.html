@@ -65,42 +65,27 @@
                 </a>
 
                 {% if current_user.is_authenticated %}
+                {% set ep_general = request.endpoint %}
+                {% set enlaces_generales = [
+                    {'label': 'Inicio', 'icon': 'layout-grid', 'url': url_for('instructor.dashboard'), 'activo': ep_general == 'instructor.dashboard'},
+                    {'label': 'Fichas', 'icon': 'folder-kanban', 'url': url_for('instructor.fichas'), 'activo': ep_general in ('instructor.fichas', 'instructor.importar_reporte_ficha')},
+                    {'label': 'Comité', 'icon': 'users', 'url': url_for('comite.fichas_terminadas'), 'activo': request.blueprint == 'comite'},
+                ] %}
+                {% if current_user.es_admin %}
+                {% set enlaces_generales = enlaces_generales + [{'label': 'Administración', 'icon': 'shield-check', 'url': url_for('admin.listar_instructores'), 'activo': request.blueprint == 'admin'}] %}
+                {% endif %}
                 <div class="nav-primary" aria-label="Secciones generales">
-                    <a href="{{ url_for('instructor.dashboard') }}"
-                       class="nav-link {% if request.endpoint == 'instructor.dashboard' %}is-active{% endif %}"
-                       {% if request.endpoint == 'instructor.dashboard' %}aria-current="page"{% endif %}>
-                        <i data-lucide="layout-grid" class="nav-link-icon" aria-hidden="true"></i>
-                        <span>Inicio</span>
+                    {% for e in enlaces_generales %}
+                    <a href="{{ e.url }}" class="nav-link {% if e.activo %}is-active{% endif %}"{% if e.activo %} aria-current="page"{% endif %}>
+                        <i data-lucide="{{ e.icon }}" class="nav-link-icon" aria-hidden="true"></i>
+                        <span>{{ e.label }}</span>
                     </a>
-                    <a href="{{ url_for('instructor.fichas') }}"
-                       class="nav-link {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}is-active{% endif %}"
-                       {% if request.endpoint in ('instructor.fichas', 'instructor.importar_reporte_ficha') %}aria-current="page"{% endif %}>
-                        <i data-lucide="folder-kanban" class="nav-link-icon" aria-hidden="true"></i>
-                        <span>Fichas</span>
-                    </a>
-                    <a href="{{ url_for('comite.fichas_terminadas') }}"
-                       class="nav-link {% if request.blueprint == 'comite' %}is-active{% endif %}"
-                       {% if request.blueprint == 'comite' %}aria-current="page"{% endif %}>
-                        <i data-lucide="users" class="nav-link-icon" aria-hidden="true"></i>
-                        <span>Comité</span>
-                    </a>
-                    {% if current_user.es_admin %}
-                    <a href="{{ url_for('admin.listar_instructores') }}"
-                       class="nav-link {% if request.blueprint == 'admin' %}is-active{% endif %}"
-                       {% if request.blueprint == 'admin' %}aria-current="page"{% endif %}>
-                        <i data-lucide="shield-check" class="nav-link-icon" aria-hidden="true"></i>
-                        <span>Administración</span>
-                    </a>
-                    {% endif %}
+                    {% endfor %}
                 </div>
 
                 {% block nav_center %}{% endblock %}
 
                 <div class="nav-user">
-                    <span class="nav-identity">
-                        <small>Instructor</small>
-                        <strong class="nav-name">{{ current_user.nombre }}</strong>
-                    </span>
                     <a href="{{ url_for('seguimiento.notificaciones_instructor') }}"
                        class="nav-icon-button"
                        aria-label="Notificaciones{% if notificaciones_no_leidas %}: {{ notificaciones_no_leidas }} sin leer{% endif %}"
@@ -108,66 +93,79 @@
                         <i data-lucide="bell" class="icon-md" aria-hidden="true"></i>
                         {% if notificaciones_no_leidas %}<span class="notification-count">{{ notificaciones_no_leidas|contador_compacto }}</span>{% endif %}
                     </a>
-                    <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form" hx-boost="false">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-sm btn-outline nav-logout">
-                            <i data-lucide="log-out" class="icon-sm" aria-hidden="true"></i>
-                            <span>Salir</span>
+                    {% set partes_nombre = (current_user.nombre or '?').split() %}
+                    <button type="button" class="nav-user-trigger" popovertarget="nav-user-menu" aria-haspopup="true"
+                            aria-label="Menú de usuario: {{ current_user.nombre }}">
+                        <span class="nav-avatar" aria-hidden="true">{{ (partes_nombre[0][:1] ~ (partes_nombre[1][:1] if partes_nombre|length > 1 else ''))|upper }}</span>
+                        <i data-lucide="menu" class="icon-sm nav-user-hamburger" aria-hidden="true"></i>
+                        <i data-lucide="chevron-down" class="icon-sm nav-user-chevron" aria-hidden="true"></i>
+                    </button>
+                    <div id="nav-user-menu" popover class="nav-user-popover app-popover" aria-label="Menú de usuario">
+                        <div class="nav-identity">
+                            <small>{{ 'Administrador' if current_user.es_admin else 'Instructor' }}</small>
+                            <strong class="nav-name">{{ current_user.nombre }}</strong>
+                        </div>
+                        <div class="nav-user-links" aria-label="Secciones generales (móvil)">
+                            {% for e in enlaces_generales %}
+                            <a href="{{ e.url }}" class="app-popover-item {% if e.activo %}is-active{% endif %}"{% if e.activo %} aria-current="page"{% endif %}>
+                                <i data-lucide="{{ e.icon }}" class="icon-sm" aria-hidden="true"></i>
+                                <span>{{ e.label }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="app-popover-item">
+                            <i data-lucide="bell" class="icon-sm" aria-hidden="true"></i>
+                            <span>Notificaciones</span>
+                            {% if notificaciones_no_leidas %}<span class="app-popover-count">{{ notificaciones_no_leidas|contador_compacto }}</span>{% endif %}
+                        </a>
+                        <button type="button" onclick="toggleTheme()" class="app-popover-item theme-toggle-btn"
+                                title="Cambiar tema de interfaz. Tema actual: SENA" aria-label="Cambiar tema de interfaz">
+                            <i data-lucide="palette" class="icon-sm" aria-hidden="true"></i>
+                            <span>Cambiar tema</span>
                         </button>
-                    </form>
+                        <span id="theme-float-status" class="sr-only" aria-live="polite"></span>
+                        <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form" hx-boost="false">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="app-popover-item nav-logout">
+                                <i data-lucide="log-out" class="icon-sm" aria-hidden="true"></i>
+                                <span>Salir</span>
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 {% endif %}
             </div>
         </nav>
 
-        {% if current_user.is_authenticated and ficha is defined and ficha and request.blueprint in ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion', 'grupos', 'atencion', 'tyt', 'comite') %}
-        {% set ep = request.endpoint %}
-        {% set corte_q = corte_actual.id if corte_actual is defined and corte_actual else None %}
-        {# Módulos principales: siempre visibles. El resto vive en «Más módulos». #}
-        {% set modulos_principales = [
-            {'label': 'Visión general', 'icon': 'layout-dashboard', 'title': 'Centro de mando de la ficha', 'url': url_for('instructor.vision_general', ficha_id=ficha.id, corte_id=corte_q), 'activo': ep == 'instructor.vision_general'},
-            {'label': 'Asistencia', 'icon': 'clipboard-check', 'title': 'Llamado a lista y asistencia', 'url': url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=corte_q), 'activo': ep == 'instructor.asistencia'},
-            {'label': 'Tareas', 'icon': 'file-check', 'title': 'Tareas y evidencias', 'url': url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_q), 'activo': ep in ('instructor.tareas', 'instructor.ver_entregas', 'instructor.evidencias_faltantes')},
-            {'label': 'Aprendices', 'icon': 'users', 'title': 'Directorio de aprendices', 'url': url_for('instructor.aprendices', ficha_id=ficha.id), 'activo': ep in ('instructor.aprendices', 'instructor.historial_aprendiz', 'instructor.configuracion_aprendices')},
-            {'label': 'Juicios', 'icon': 'graduation-cap', 'title': 'Juicios evaluativos y RAPs', 'url': url_for('instructor.juicios', ficha_id=ficha.id), 'activo': ep == 'instructor.juicios'},
-            {'label': 'Planeación', 'icon': 'compass', 'title': 'Planeación pedagógica y línea de tiempo', 'url': url_for('planeacion.analisis', ficha_id=ficha.id), 'activo': request.blueprint == 'planeacion'},
-            {'label': 'Alertas', 'icon': 'alert-triangle', 'title': 'Alertas tempranas de riesgo', 'url': url_for('instructor.alertas', ficha_id=ficha.id), 'activo': ep in ('instructor.alertas', 'instructor.guardar_config_alertas')},
-        ] %}
-        {% set grupos_secundarios = [
-            {'titulo': 'Seguimiento y convivencia', 'modulos': [
-                {'label': 'Observador', 'icon': 'book-open', 'title': 'Observador del aprendiz', 'url': url_for('instructor.observador', ficha_id=ficha.id), 'activo': ep == 'instructor.observador'},
-                {'label': 'Casos de seguimiento', 'icon': 'search-check', 'title': 'Casos y planes de mejoramiento', 'url': url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id), 'activo': ep in ('seguimiento.casos_seguimiento', 'seguimiento.gestionar_planes')},
-                {'label': 'Novedades', 'icon': 'briefcase', 'title': 'Novedades y etapa productiva', 'url': url_for('comite.novedades_productiva', ficha_id=ficha.id), 'activo': ep == 'comite.novedades_productiva'},
-                {'label': 'Fila de atención', 'icon': 'hand', 'title': 'Turnos de atención a aprendices', 'url': url_for('atencion.fila_atencion', ficha_id=ficha.id), 'activo': request.blueprint == 'atencion'},
-                {'label': 'Seguimiento TyT', 'icon': 'target', 'title': 'Preparación para las pruebas Saber TyT', 'url': url_for('tyt.detalle', ficha_id=ficha.id), 'activo': request.blueprint == 'tyt'},
-                {'label': 'Aseo', 'icon': 'sparkles', 'title': 'Turnos de aseo del ambiente', 'url': url_for('aseo.turnos', ficha_id=ficha.id), 'activo': request.blueprint == 'aseo'},
-            ]},
-            {'titulo': 'Recursos y participación', 'modulos': [
-                {'label': 'Estadísticas', 'icon': 'bar-chart-3', 'title': 'Estadísticas y reportes', 'url': url_for('instructor.estadisticas', ficha_id=ficha.id), 'activo': ep == 'instructor.estadisticas'},
-                {'label': 'Materiales', 'icon': 'folder', 'title': 'Materiales de apoyo', 'url': url_for('instructor.materiales', ficha_id=ficha.id), 'activo': ep == 'instructor.materiales'},
-                {'label': 'Ranking', 'icon': 'trophy', 'title': 'Ranking de participación e insignias', 'url': url_for('ranking.ranking', ficha_id=ficha.id, corte_id=corte_q), 'activo': request.blueprint == 'ranking'},
-                {'label': 'Grupos', 'icon': 'users-2', 'title': 'Gestión de grupos y equipos', 'url': url_for('grupos.listar_grupos', ficha_id=ficha.id), 'activo': request.blueprint == 'grupos'},
-            ]},
-        ] %}
-        {% set ns_menu = namespace(activo=None) %}
-        {% for grupo in grupos_secundarios %}{% for m in grupo.modulos %}{% if m.activo %}{% set ns_menu.activo = m %}{% endif %}{% endfor %}{% endfor %}
+        {% set menu = nav_ficha(ficha, corte_actual if corte_actual is defined else None) if current_user.is_authenticated and ficha is defined and ficha else None %}
+        {% if menu %}
+        {% set activo_mas = menu.activo_secundario %}
         <div class="ficha-toolbar">
             <div class="ficha-toolbar-inner">
                 <nav class="ficha-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
-                    {% for m in modulos_principales %}
+                    {% for m in menu.principales %}
                     <a href="{{ m.url }}" class="{% if m.activo %}is-active{% endif %}" title="{{ m.title }}"{% if m.activo %} aria-current="page"{% endif %}>
                         <i data-lucide="{{ m.icon }}" class="nav-icon" aria-hidden="true"></i>
                         <span class="ficha-nav-label">{{ m.label }}</span>
                     </a>
+                    {% if loop.first %}
+                    {% set al = menu.alertas %}
+                    <a href="{{ al.url }}" class="ficha-nav-alertas{% if al.activo %} is-active{% endif %}{% if al.count %} has-count{% endif %}"
+                       title="{{ al.title }}"{% if al.activo %} aria-current="page"{% endif %}
+                       aria-label="Alertas{% if al.count %}: {{ al.count }} activas{% endif %}">
+                        <i data-lucide="{{ al.icon }}" class="nav-icon" aria-hidden="true"></i>
+                        {% if al.count %}<span class="ficha-nav-alertas-count">{{ al.count|contador_compacto }}</span>{% endif %}
+                    </a>
+                    {% endif %}
                     {% endfor %}
-                    <button type="button" class="ficha-nav-more{% if ns_menu.activo %} is-active{% endif %}" popovertarget="ficha-nav-mas" aria-haspopup="true" aria-label="Más módulos{% if ns_menu.activo %}. Módulo actual: {{ ns_menu.activo.label }}{% endif %}">
-                        <i data-lucide="{{ ns_menu.activo.icon if ns_menu.activo else 'layout-grid' }}" class="nav-icon" aria-hidden="true"></i>
-                        <span class="ficha-nav-more-text">{{ ns_menu.activo.label if ns_menu.activo else 'Más módulos' }}</span>
+                    <button type="button" class="ficha-nav-more{% if activo_mas %} is-active{% endif %}" popovertarget="ficha-nav-mas" aria-haspopup="true" aria-label="Más módulos{% if activo_mas %}. Módulo actual: {{ activo_mas.label }}{% endif %}">
+                        <i data-lucide="{{ activo_mas.icon if activo_mas else 'layout-grid' }}" class="nav-icon" aria-hidden="true"></i>
+                        <span class="ficha-nav-more-text">{{ activo_mas.label if activo_mas else 'Más módulos' }}</span>
                         <i data-lucide="chevron-down" class="nav-icon ficha-nav-more-chevron" aria-hidden="true"></i>
                     </button>
                 </nav>
-                <div id="ficha-nav-mas" popover class="ficha-nav-popover" aria-label="Más módulos de la ficha {{ ficha.codigo }}">
-                    {% for grupo in grupos_secundarios %}
+                <div id="ficha-nav-mas" popover class="ficha-nav-popover app-popover" aria-label="Más módulos de la ficha {{ ficha.codigo }}">
+                    {% for grupo in menu.grupos %}
                     <div class="ficha-nav-group" role="group" aria-labelledby="ficha-nav-grupo-{{ loop.index }}">
                         <p class="ficha-nav-group-title" id="ficha-nav-grupo-{{ loop.index }}">{{ grupo.titulo }}</p>
                         {% for m in grupo.modulos %}
@@ -185,12 +183,16 @@
     </header>
     {% endblock %}
 
+    {% if not current_user.is_authenticated %}
+    {# Sin sesión de instructor (login, panel del aprendiz) no hay menú de usuario:
+       el tema se cambia con este botón flotante. #}
     <div class="theme-float">
         <button type="button" onclick="toggleTheme()" class="theme-float-single-btn" title="Cambiar tema de interfaz. Tema actual: SENA" aria-label="Cambiar tema de interfaz">
             <svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         </button>
         <span id="theme-float-status" class="sr-only" aria-live="polite"></span>
     </div>
+    {% endif %}
 
     <main id="contenido-principal" class="container" tabindex="-1">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -307,7 +309,7 @@
         var ADSO_THEME_NAMES = { sena: 'SENA', elegant: 'Elegante', ocean: 'Océano' };
         function actualizarEtiquetaTema(themeName) {
             var nombre = ADSO_THEME_NAMES[themeName] || 'SENA';
-            var boton = document.querySelector('.theme-float-single-btn');
+            var boton = document.querySelector('.theme-toggle-btn, .theme-float-single-btn');
             if (boton) {
                 boton.setAttribute('title', 'Cambiar tema de interfaz. Tema actual: ' + nombre);
                 boton.setAttribute('aria-label', 'Cambiar tema de interfaz');

@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
 {% endblock %}
 
+{% from "components/_ui.html" import acciones %}
 {% block content %}
 <div class="dashboard">
     <section class="dashboard-hero" aria-labelledby="dashboard-title">
@@ -14,9 +15,11 @@
             <h1 id="dashboard-title">Mis fichas</h1>
             <p>Consulta el avance y entra directamente al módulo que necesitas.</p>
         </div>
+        {% if fichas %}
         <a href="{{ url_for('instructor.fichas') }}" class="btn btn-primary btn-lg">
             <i data-lucide="folder-plus" class="icon-md" aria-hidden="true"></i> Crear o importar ficha
         </a>
+        {% endif %}
     </section>
 
     {% if fichas %}
@@ -112,15 +115,13 @@
                     <h2 class="card-title">{{ ficha.nombre_programa|trim('.') }}</h2>
                 </div>
                 <div class="ficha-header-actions">
-                    <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-ficha-planeacion btn-ficha-vision-general ficha-vision-general-cta" title="Abrir Centro de Control y Visión General de la ficha">
-                        <span>🌟 Visión General</span> <span aria-hidden="true">&rarr;</span>
-                    </a>
-                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn-ficha-planeacion" title="Ver análisis pedagógico detallado, horas y competencias">
-                        <span>Planeación & Juicios</span> <span aria-hidden="true">↗</span>
-                    </a>
-                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="ficha-open-link" title="Ver directorio completo de aprendices">
-                        Ver aprendices <span aria-hidden="true">→</span>
-                    </a>
+                    {{ acciones('ficha-acciones-' ~ ficha.id,
+                        principal={'label': 'Abrir ficha', 'icon': 'layout-dashboard', 'url': url_for('instructor.vision_general', ficha_id=ficha.id)},
+                        secundarias=[
+                            {'label': 'Planeación', 'icon': 'compass', 'url': url_for('planeacion.analisis', ficha_id=ficha.id)},
+                            {'label': 'Juicios', 'icon': 'graduation-cap', 'url': url_for('instructor.juicios', ficha_id=ficha.id)},
+                            {'label': 'Aprendices', 'icon': 'users', 'url': url_for('instructor.aprendices', ficha_id=ficha.id)},
+                        ]) }}
                 </div>
             </header>
 
@@ -837,7 +838,7 @@
                                 </div>
                             </div>
                             <div class="secondary-details-actions">
-                                <a href="{{ url_for('tyt.detalle', ficha_id=ficha.id) }}" class="btn-detail-link">
+                                <a href="{{ url_for('tyt.detalle', ficha_id=ficha.id) }}" class="btn btn-ghost btn-sm">
                                     Ver cuánto le falta a cada aprendiz para el hito del 70% →
                                 </a>
                             </div>
@@ -1103,10 +1104,14 @@
                         </td>
                         <td>
                             <div class="compact-actions-row">
-                                <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-xs btn-primary" title="Tomar lista">📋 Asistencia</a>
-                                <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Ver tareas">📝 Tareas</a>
-                                <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Ver juicios">🎓 Juicios</a>
-                                <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Ver planeación">🧭 Planeación</a>
+                                {{ acciones('compact-acciones-' ~ ficha.id,
+                                    principal={'label': 'Asistencia', 'icon': 'clipboard-check', 'url': url_for('instructor.asistencia', ficha_id=ficha.id)},
+                                    secundarias=[
+                                        {'label': 'Visión general', 'icon': 'layout-dashboard', 'url': url_for('instructor.vision_general', ficha_id=ficha.id)},
+                                        {'label': 'Tareas', 'icon': 'file-check', 'url': url_for('instructor.tareas', ficha_id=ficha.id)},
+                                        {'label': 'Juicios', 'icon': 'graduation-cap', 'url': url_for('instructor.juicios', ficha_id=ficha.id)},
+                                        {'label': 'Planeación', 'icon': 'compass', 'url': url_for('planeacion.analisis', ficha_id=ficha.id)},
+                                    ]) }}
                             </div>
                         </td>
                     </tr>
@@ -1153,7 +1158,7 @@
                     <div class="empty-card-title">Crear Ficha Manualmente</div>
                     <div class="empty-card-desc">Si aún no dispones del reporte oficial de SOFIA Plus, ingresa el código de ficha, programa y fechas para comenzar a usar los módulos de inmediato.</div>
                 </div>
-                <a href="{{ url_for('instructor.fichas') }}" class="btn btn-outline btn-full">
+                <a href="{{ url_for('instructor.fichas') }}#codigo" class="btn btn-outline btn-full">
                     Crear ficha manual &rarr;
                 </a>
             </div>

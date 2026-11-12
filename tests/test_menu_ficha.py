@@ -17,9 +17,9 @@ from app.models import (
     Instructor,
 )
 
-PRINCIPALES = ('Visión general', 'Asistencia', 'Tareas', 'Aprendices', 'Juicios', 'Planeación', 'Alertas')
+PRINCIPALES = ('Visión general', 'Asistencia', 'Tareas', 'Aprendices', 'Juicios', 'Planeación', 'Aseo')
 SECUNDARIOS = ('Observador', 'Casos de seguimiento', 'Novedades', 'Fila de atención', 'Seguimiento TyT',
-               'Aseo', 'Estadísticas', 'Materiales', 'Ranking', 'Grupos')
+               'Estadísticas', 'Materiales', 'Ranking', 'Grupos')
 
 
 class MenuFichaTestCase(unittest.TestCase):
@@ -109,6 +109,29 @@ class MenuFichaTestCase(unittest.TestCase):
             nav, _ = self._menu(ruta)
             boton = re.search(r'<button[^>]*ficha-nav-more[^>]*>[\s\S]*?</button>', nav).group(0)
             self.assertIn(etiqueta, boton, ruta)
+
+    def test_alertas_es_distintivo_junto_a_vision_general(self):
+        from app.models.alertas import Alerta
+        db.session.add(Alerta(ficha_id=self.ficha.id, titulo='Riesgo', mensaje='Inasistencia'))
+        db.session.commit()
+        nav, mas = self._menu(f'/instructor/fichas/{self.ficha.id}/tareas')
+        enlace = re.search(r'<a [^>]*class="ficha-nav-alertas[^"]*"[^>]*>[\s\S]*?</a>', nav)
+        self.assertIsNotNone(enlace)
+        self.assertIn('aria-label="Alertas: 1 activas"', enlace.group(0))
+        self.assertIn('ficha-nav-alertas-count">1<', enlace.group(0))
+        self.assertLess(nav.index('Visión general'), nav.index('ficha-nav-alertas'))
+        self.assertLess(nav.index('ficha-nav-alertas'), nav.index('>Asistencia<'))
+        self.assertNotIn('Alertas', mas)
+
+    def test_menu_de_usuario_agrupa_tema_notificaciones_y_salir(self):
+        html = self.cliente.get('/instructor/').get_data(as_text=True)
+        menu = re.search(r'<div id="nav-user-menu" popover[\s\S]*?</form>\s*</div>', html)
+        self.assertIsNotNone(menu)
+        self.assertIn('popovertarget="nav-user-menu"', html)
+        for texto in ('Instructora de prueba', 'Notificaciones', 'Cambiar tema', 'Salir', 'name="csrf_token"', 'toggleTheme()'):
+            self.assertIn(texto, menu.group(0))
+        self.assertNotIn('class="theme-float"', html)
+        self.assertIn('class="nav-icon-button"', html)
 
     def test_paginas_sin_ficha_no_muestran_el_menu(self):
         html = self.cliente.get('/instructor/').get_data(as_text=True)

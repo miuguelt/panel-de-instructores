@@ -453,6 +453,9 @@ def create_app(test_config=None):
 
     app.jinja_env.filters['contador_compacto'] = _contador_compacto
 
+    from app.navegacion import registrar as registrar_navegacion
+    registrar_navegacion(app)
+
     _static_v_cache = {}
 
     @app.context_processor

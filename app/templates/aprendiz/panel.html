@@ -349,30 +349,30 @@
         <div class="learner-tab-navigation-bar">
             <div class="learner-tabs-track" role="tablist" aria-label="Pestañas principales del panel">
                 <button type="button" class="learner-tab-btn is-active" data-tab-target="resumen" role="tab" aria-selected="true" id="btn-tab-resumen-main">
-                    <span class="tab-icon">📊</span>
+                    <i data-lucide="layout-dashboard" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Resumen</span>
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="evidencias" role="tab" aria-selected="false" id="btn-tab-evidencias-main">
-                    <span class="tab-icon">📋</span>
+                    <i data-lucide="file-check" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Mis Evidencias</span>
                     <span class="tab-pill-badge" id="tab-evidencias-counter">{{ tareas_individuales|length }}</span>
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="grupo" role="tab" aria-selected="false" id="btn-tab-grupo-main">
-                    <span class="tab-icon">👥</span>
+                    <i data-lucide="users-2" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Mi grupo</span>
                     {% if trabajos_grupo %}<span class="tab-pill-badge">{{ trabajos_grupo|length }}</span>{% endif %}
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="juicios" role="tab" aria-selected="false" id="btn-tab-juicios-main">
-                    <span class="tab-icon">🎓</span>
+                    <i data-lucide="graduation-cap" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Juicios de Evaluación</span>
                     <span class="tab-pill-badge">{{ stats_juicios.pct_total }}%</span>
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="rendimiento" role="tab" aria-selected="false" id="btn-tab-rendimiento-main">
-                    <span class="tab-icon">🏆</span>
+                    <i data-lucide="trophy" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Rendimiento & Logros</span>
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="convivencia" role="tab" aria-selected="false" id="btn-tab-convivencia-main">
-                    <span class="tab-icon">🤝</span>
+                    <i data-lucide="sparkles" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Aseo & Convivencia</span>
                 </button>
             </div>

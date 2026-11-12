@@ -1,0 +1,58 @@
+{#- Componentes de interfaz reutilizables.
+
+    Uso:
+      {% from "components/_ui.html" import page_header, acciones %}
+      {% call page_header('Fichas', subtitulo='Tus grupos', icono='folder-kanban') %}
+        <a class="btn btn-primary" href="...">Nueva ficha</a>
+      {% endcall %}
+
+    Regla: cada cabecera muestra como máximo 1 botón principal y 2 secundarios;
+    el resto va en «Más acciones» (macro `acciones`).
+-#}
+
+{% macro page_header(titulo, subtitulo=None, icono=None, volver=None, clase='') -%}
+<header class="page-header {{ clase }}">
+    <div class="page-header-copy">
+        <div class="page-header-title">
+            {% if volver %}
+            <a href="{{ volver }}" class="btn btn-ghost btn-sm btn-back" aria-label="Volver">
+                <i data-lucide="arrow-left" class="icon-sm" aria-hidden="true"></i>
+            </a>
+            {% endif %}
+            {% if icono %}<i data-lucide="{{ icono }}" class="page-header-icon" aria-hidden="true"></i>{% endif %}
+            <h1>{{ titulo }}</h1>
+        </div>
+        {% if subtitulo %}<p class="text-muted">{{ subtitulo }}</p>{% endif %}
+    </div>
+    {% if caller %}
+    <div class="page-header-actions">{{ caller() }}</div>
+    {% endif %}
+</header>
+{%- endmacro %}
+
+{#- Botón principal + menú «Más acciones».
+    `principal` y cada elemento de `secundarias` son dicts con label, url y
+    opcionalmente icon. -#}
+{% macro acciones(id, principal=None, secundarias=[], etiqueta='Más acciones') -%}
+<div class="acciones-mas">
+    {% if principal %}
+    <a href="{{ principal.url }}" class="btn btn-primary btn-sm">
+        {% if principal.icon %}<i data-lucide="{{ principal.icon }}" class="icon-sm" aria-hidden="true"></i>{% endif %}
+        <span>{{ principal.label }}</span>
+    </a>
+    {% endif %}
+    {% if secundarias %}
+    <button type="button" class="btn btn-outline btn-sm btn-icon" popovertarget="{{ id }}" aria-haspopup="true" aria-label="{{ etiqueta }}" title="{{ etiqueta }}">
+        <i data-lucide="more-horizontal" class="icon-sm" aria-hidden="true"></i>
+    </button>
+    <div id="{{ id }}" popover class="app-popover acciones-mas-popover" aria-label="{{ etiqueta }}">
+        {% for s in secundarias %}
+        <a href="{{ s.url }}" class="app-popover-item">
+            {% if s.icon %}<i data-lucide="{{ s.icon }}" class="icon-sm" aria-hidden="true"></i>{% endif %}
+            <span>{{ s.label }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}

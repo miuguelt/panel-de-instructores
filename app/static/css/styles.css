@@ -1051,11 +1051,10 @@ body {
 }
 .nav-user { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; margin-left: auto; }
 .nav-logout { min-height: 42px; white-space: nowrap; }
-.nav-identity { display: grid; text-align: right; line-height: 1.2; }
-/* Con el enlace «Comité» la barra no cabe entre 701 y 900 px: el nombre del
-   instructor se oculta antes que los enlaces de navegación. */
-@media (max-width: 900px) {
-    .nav-identity { display: none; }
+.nav-identity { display: grid; line-height: 1.2; }
+/* El nombre del instructor vive en el menú de usuario; entre 761 y 1100 px los
+   enlaces se compactan. */
+@media (max-width: 1100px) {
     /* En las páginas de ficha la marca incluye el código y el programa: los enlaces
        se compactan para que la barra no desborde. */
     .nav-primary .nav-link { min-width: 0; padding-inline: 9px; }
@@ -1210,7 +1209,7 @@ body {
     }
 }
 
-@media (max-width: 950px) {
+@media (max-width: 1100px) {
     .nav-context-title-ext {
         display: none;
     }
@@ -1733,14 +1732,12 @@ select optgroup {
     transform: translateX(-2px);
 }
 
-.page-header,
 .module-header {
     margin-bottom: 22px;
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
-.page-header h1,
 .module-header h1,
 .module-header .header-content h1 {
     font-size: clamp(22px, 5vw, 30px);
@@ -5103,17 +5100,6 @@ input[type="radio"] {
     .cleaning-controls { grid-template-columns: 1.8fr 1.2fr; }
 }
 
-.page-header {
-    position: relative;
-    margin-bottom: 24px;
-}
-.page-header h1 {
-    max-width: 850px;
-    color: var(--text-strong);
-    font-size: clamp(24px, 4vw, 34px);
-    line-height: 1.16;
-    letter-spacing: -.025em;
-}
 .page-header > .text-muted { margin-top: 5px; }
 .btn-back {
     min-height: 42px;
@@ -6015,9 +6001,6 @@ input[type="radio"] {
         gap: 5px;
         margin-left: 0;
         flex: 0 0 auto;
-    }
-    .nav-identity {
-        display: none;
     }
     .nav-icon-button {
         width: 42px;
@@ -7962,11 +7945,6 @@ input[type="radio"] {
     50% { opacity: 0.85; transform: scale(0.97); }
 }
 
-/* ── Ficha Nav Scroll Effect ── */
-.ficha-toolbar-inner {
-    position: relative;
-}
-
 /* =========================================
    DASHBOARD: BUSCADOR Y VISTAS (TARJETAS / COMPACTA)
    ========================================= */
@@ -8523,10 +8501,6 @@ input[type="radio"] {
 }
 
 @media (max-width: 700px) {
-    .nav-identity {
-        display: none;
-    }
-
     .dashboard-hero {
         align-items: stretch;
         flex-direction: column;
@@ -14264,9 +14238,8 @@ p.text-center {
     transform: rotate(180deg);
 }
 
-/* Panel «Más módulos». Sin anclaje CSS, el navegador lo centra en pantalla. */
-.ficha-nav-popover {
-    width: min(34rem, calc(100vw - 24px));
+/* Base común de los popovers nativos (Más módulos, menú de usuario, Más acciones). */
+.app-popover {
     max-height: min(80vh, 36rem);
     padding: 14px;
     color: var(--text-main);
@@ -14275,6 +14248,48 @@ p.text-center {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
     overflow-y: auto;
+}
+.app-popover::backdrop { background: transparent; }
+.app-popover-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    text-align: start;
+    text-decoration: none;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+}
+.app-popover-item:hover { color: var(--accent-hover); background: var(--surface-hover); }
+.app-popover-item.is-active { color: var(--accent-hover); background: var(--surface-selected); }
+.app-popover-item:focus-visible {
+    outline: var(--focus-width) solid var(--accent-primary);
+    outline-offset: var(--focus-offset);
+}
+.app-popover-item.is-danger { color: var(--danger); }
+.app-popover-count {
+    margin-left: auto;
+    min-width: 22px;
+    padding: 1px 7px;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+    color: var(--color-white);
+    background: var(--danger);
+    border-radius: 999px;
+}
+
+/* Panel «Más módulos». Sin anclaje CSS, el navegador lo centra en pantalla. */
+.ficha-nav-popover {
+    width: min(34rem, calc(100vw - 24px));
 }
 .ficha-nav-popover:popover-open {
     display: grid;
@@ -14384,3 +14399,105 @@ p.text-center {
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* --- Menú de usuario (12 de noviembre de 2026) ----------------------------
+   Identidad, notificaciones, tema y salida en un solo popover. La campana sigue
+   visible. Puntos de corte de la navegación: 760, 1100 y 1280 px. */
+.nav-user-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 8px 0 4px;
+    font: inherit;
+    color: var(--navbar-text);
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    cursor: pointer;
+}
+.nav-user-trigger:hover { background: rgba(255, 255, 255, 0.20); }
+.nav-user-trigger:focus-visible { outline: var(--focus-width) solid var(--navbar-text); outline-offset: 2px; }
+.nav-avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent-hover);
+    background: var(--color-white);
+    border-radius: 50%;
+}
+.nav-user-hamburger { display: none; }
+.nav-user-popover { width: min(18rem, calc(100vw - 24px)); padding: 10px; }
+.nav-user-popover:popover-open { display: flex; flex-direction: column; gap: 2px; }
+.nav-user-popover .nav-identity {
+    padding: 6px 10px 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-divider);
+}
+.nav-user-popover .nav-identity small { color: var(--text-muted); }
+.nav-user-popover .nav-name { max-width: none; color: var(--text-strong); font-size: 14px; }
+.nav-user-popover .logout-form { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border-divider); }
+.nav-user-popover .nav-logout { color: var(--danger); }
+.nav-user-links { display: none; flex-direction: column; gap: 2px; padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px solid var(--border-divider); }
+@supports (anchor-name: --nav-user) {
+    .nav-user-trigger { anchor-name: --nav-user; }
+    .nav-user-popover {
+        position-anchor: --nav-user;
+        inset: auto;
+        top: anchor(bottom);
+        right: anchor(right);
+        margin: 8px 0 0;
+    }
+}
+@supports not (anchor-name: --nav-user) {
+    .nav-user-popover::backdrop { background: color-mix(in srgb, var(--text-strong) 28%, transparent); }
+}
+@media (max-width: 760px) {
+    /* En celular los enlaces generales pasan al menú (botón hamburguesa). */
+    .nav-shell > .nav-primary { display: none; }
+    .nav-user-links { display: flex; }
+    .nav-user-hamburger { display: inline-block; }
+    .nav-user-chevron { display: none; }
+}
+
+/* Acceso a Alertas junto a «Visión general»: icono compacto con contador. */
+.ficha-nav a.ficha-nav-alertas {
+    position: relative;
+    flex: 0 0 auto;
+    justify-content: center;
+    min-width: 44px;
+    padding-inline: 10px;
+}
+.ficha-nav a.ficha-nav-alertas.has-count { color: var(--danger); }
+.ficha-nav-alertas-count {
+    min-width: 20px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 18px;
+    text-align: center;
+    color: var(--color-white);
+    background: var(--danger);
+    border-radius: 999px;
+}
+
+/* La fila de módulos sigue desplazándose en pantallas pequeñas: un degradado en
+   el borde indica que hay más módulos. */
+@media (max-width: 1100px) {
+    .ficha-nav {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    }
+}
+
+/* --- Cabecera de página y «Más acciones» (components/_ui.html) ------------ */
+.page-header-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.page-header-title { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.page-header-icon { width: 24px; height: 24px; color: var(--accent-primary); flex-shrink: 0; }
+.acciones-mas { position: relative; display: inline-flex; }
+.acciones-mas-popover { width: min(16rem, calc(100vw - 24px)); padding: 8px; }
+.acciones-mas-popover:popover-open { display: flex; flex-direction: column; gap: 2px; }
+.acciones-mas-popover form { margin: 0; }
