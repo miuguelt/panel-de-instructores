@@ -2924,6 +2924,15 @@ def _generar_excel_asistencia(ficha, aprendices, sesiones):
     ws.append(encabezado)
 
     sesiones_ids = [s.id for s in sesiones]
+    registros_map = {}
+    if sesiones_ids:
+        registros_bulk = RegistroAsistencia.query.filter(
+            RegistroAsistencia.sesion_id.in_(sesiones_ids)
+        ).all()
+        registros_map = {
+            (r.sesion_id, r.aprendiz_id): r.estado
+            for r in registros_bulk
+        }
 
     for ap in aprendices:
         fila = [ap.documento, ap.nombre, ap.apellidos]
@@ -2931,12 +2940,12 @@ def _generar_excel_asistencia(ficha, aprendices, sesiones):
         justificadas = 0
 
         for s in sesiones:
-            registro = RegistroAsistencia.query.filter_by(sesion_id=s.id, aprendiz_id=ap.id).first()
-            estado = registro.estado if registro else '-'
+            estado_reg = registros_map.get((s.id, ap.id))
+            estado = estado_reg if estado_reg else '-'
             fila.append(estado)
-            if registro and registro.estado in ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
+            if estado_reg in ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
                 total_faltas += 1
-                if registro.estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
+                if estado_reg in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
                     justificadas += 1
 
         no_justificadas = total_faltas - justificadas
@@ -2983,21 +2992,25 @@ def _generar_pdf_asistencia(ficha, aprendices, sesiones):
     datos = [['Documento', 'Nombre', 'Apellidos', 'Faltas', 'Justif.', 'No Justif.', '% Asist.']]
     sesiones_ids = [s.id for s in sesiones] if sesiones else []
 
+    faltas_por_aprendiz = {}
+    justificadas_por_aprendiz = {}
+    if sesiones_ids:
+        registros_faltas = RegistroAsistencia.query.filter(
+            RegistroAsistencia.sesion_id.in_(sesiones_ids),
+            RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
+        ).all()
+        for reg in registros_faltas:
+            faltas_por_aprendiz[reg.aprendiz_id] = faltas_por_aprendiz.get(reg.aprendiz_id, 0) + 1
+            if reg.estado in ('FALTA_JUSTIFICADA', 'EXCUSA_MEDICA'):
+                justificadas_por_aprendiz[reg.aprendiz_id] = justificadas_por_aprendiz.get(reg.aprendiz_id, 0) + 1
+
     for ap in aprendices:
         if not sesiones_ids:
             total = just = no_just = 0
             pct = 100
         else:
-            total = RegistroAsistencia.query.filter(
-                RegistroAsistencia.sesion_id.in_(sesiones_ids),
-                RegistroAsistencia.aprendiz_id == ap.id,
-                RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
-            ).count()
-            just = RegistroAsistencia.query.filter(
-                RegistroAsistencia.sesion_id.in_(sesiones_ids),
-                RegistroAsistencia.aprendiz_id == ap.id,
-                RegistroAsistencia.estado.in_(['FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
-            ).count()
+            total = faltas_por_aprendiz.get(ap.id, 0)
+            just = justificadas_por_aprendiz.get(ap.id, 0)
             no_just = total - just
             pct = ((len(sesiones) - total) / len(sesiones) * 100)
             
@@ -3741,9 +3754,10 @@ def estadisticas(ficha_id):
         del stats['aprendices_aprobados']
         
     # Obtener los top 5 aprendices en riesgo
+    aprendices_dict = {a.id: a for a in aprendices}
     top_aprendices_riesgo = []
     for a_id, count in sorted(aprendices_riesgo_dict.items(), key=lambda x: x[1], reverse=True)[:10]:
-        ap = db.session.get(Aprendiz, a_id)
+        ap = aprendices_dict.get(a_id)
         if ap:
             top_aprendices_riesgo.append({
                 'aprendiz': ap,
@@ -3759,7 +3773,6 @@ def estadisticas(ficha_id):
 
     # 3. Estadísticas por competencia
     competencias_stats = {}
-    aprendices_dict = {a.id: a for a in aprendices}
     
     for j in juicios:
         comp = j.competencia or 'Sin nombre'

@@ -622,9 +622,9 @@
 
         let horasBadge = '';
         if (comp.horas) {
-            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${comp.horas} horas</span> `;
+            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${escapeHtml(String(comp.horas))} horas</span> `;
         } else if (comp.horas_planeadas) {
-            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${comp.horas_planeadas} horas planeadas</span> `;
+            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${escapeHtml(String(comp.horas_planeadas))} horas planeadas</span> `;
         }
 
         metaEl.innerHTML = badgeHtml(comp.tipo) + ' ' +
@@ -709,7 +709,7 @@
             const rapDist = (comp.raps_distribucion_mapa && comp.raps_distribucion_mapa[rap]) || null;
             let rapFechaHtml = '';
             if (rapDist && rapDist.fecha_inicio_texto && rapDist.fecha_fin_texto) {
-                rapFechaHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">📅 ${escapeHtml(rapDist.fecha_inicio_texto)} al ${escapeHtml(rapDist.fecha_fin_texto)} · ${rapDist.dias} días</span>`;
+                rapFechaHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">📅 ${escapeHtml(rapDist.fecha_inicio_texto)} al ${escapeHtml(rapDist.fecha_fin_texto)} · ${escapeHtml(String(rapDist.dias))} días</span>`;
             }
             let rapHorasHtml = '';
             if (rapDist && rapDist.horas) {

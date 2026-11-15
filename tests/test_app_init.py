@@ -221,6 +221,21 @@ class AppInitEndpointsTestCase(unittest.TestCase):
             self.assertEqual(codigo, 500)
             self.assertIn('Error interno del servidor', respuesta)
 
+    def test_cabeceras_seguridad_globales(self):
+        respuesta = self.cliente.get('/login')
+        self.assertEqual(respuesta.headers.get('X-Content-Type-Options'), 'nosniff')
+        self.assertEqual(respuesta.headers.get('X-Frame-Options'), 'SAMEORIGIN')
+        self.assertEqual(respuesta.headers.get('Referrer-Policy'), 'same-origin')
+        self.assertIn('camera=()', respuesta.headers.get('Permissions-Policy', ''))
+
+    def test_health_no_expone_rutas_internas(self):
+        respuesta = self.cliente.get('/health')
+        datos = respuesta.get_json()
+        self.assertNotIn('ruta', datos['uploads'])
+        self.assertNotIn('detalle', datos['uploads'])
+        self.assertNotIn('startup_errors', datos)
+        self.assertIn('startup_errors_count', datos)
+
 
 if __name__ == '__main__':
     unittest.main()

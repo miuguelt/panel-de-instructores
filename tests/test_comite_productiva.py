@@ -3,11 +3,13 @@ from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
 from flask import g
+from sqlalchemy import event
 
 from app import create_app, db
 from app.models import Alerta, Aprendiz, Ficha, Instructor, RegistroAsistencia, SesionAsistencia
 from app.routes.comite import filas_csv
 from app.services import comite_productiva as cp
+from app.services import novedades as nv
 from app.services.alertas import (
     actualizar_alertas_ficha,
     ejecutar_revision_automatica,
@@ -242,6 +244,84 @@ class IntegracionComiteTest(unittest.TestCase):
 
     def test_vista_requiere_sesion(self):
         self.assertEqual(self.cliente.get('/instructor/comite/fichas-terminadas').status_code, 302)
+
+    def _contar_consultas(self, funcion):
+        consultas = []
+
+        def registrar(conn, cursor, statement, params, context, executemany):
+            consultas.append(statement)
+
+        event.listen(db.engine, 'before_cursor_execute', registrar)
+        try:
+            resultado = funcion()
+        finally:
+            event.remove(db.engine, 'before_cursor_execute', registrar)
+        return resultado, consultas
+
+    def test_analizar_fichas_terminadas_consulta_en_lote_o1(self):
+        hoy = fecha_colombia(datetime.utcnow())
+        t2 = Ficha(codigo='T2', nombre_programa='ADSO', instructor_id=self.instructor.id,
+                   fecha_inicio=hoy - timedelta(days=700), fecha_fin=hoy - timedelta(days=10))
+        t3 = Ficha(codigo='T3', nombre_programa='ADSO', instructor_id=self.instructor.id,
+                   fecha_inicio=hoy - timedelta(days=600), fecha_fin=hoy - timedelta(days=5))
+        db.session.add_all([t2, t3])
+        db.session.flush()
+
+        a_t2_aval = Aprendiz(documento='20', nombre='Elena', apellidos='Mora',
+                             ficha_id=t2.id, estado='EN_FORMACION')
+        a_t2_sin = Aprendiz(documento='21', nombre='Fabián', apellidos='Cruz',
+                            ficha_id=t2.id, estado='EN_FORMACION')
+        a_t3_apl = Aprendiz(documento='30', nombre='Gina', apellidos='Vera',
+                            ficha_id=t3.id, estado='APLAZADO')
+        a_t3_sin = Aprendiz(documento='31', nombre='Hugo', apellidos='León',
+                            ficha_id=t3.id, estado='EN_FORMACION')
+        db.session.add_all([a_t2_aval, a_t2_sin, a_t3_apl, a_t3_sin])
+        db.session.commit()
+
+        nv.registrar_etapa_productiva(
+            a_t2_aval, t2, 'pasantia', planeacion_avalada=True,
+            fecha_aval=t2.fecha_fin - timedelta(days=1),
+        )
+        nv.registrar_novedad(
+            a_t3_apl, t3, 'aplazamiento',
+            fecha_solicitud=hoy - timedelta(days=15),
+            estado='autorizada',
+            fecha_inicio=hoy - timedelta(days=10),
+            fecha_fin=hoy + timedelta(days=20),
+            causa='incapacidad',
+        )
+
+        # Materializar fichas antes de medir para evitar lazy-loads por expire_on_commit
+        fichas = Ficha.query.order_by(Ficha.id).all()
+        resultado, consultas = self._contar_consultas(
+            lambda: cp.analizar_fichas_terminadas(fichas, hoy=hoy)
+        )
+        self.assertLessEqual(len(consultas), 3, '\n'.join(consultas))
+        self.assertEqual(len(resultado), 3)
+
+        por_codigo = {r['ficha'].codigo: r for r in resultado}
+        self.assertEqual(
+            [r['documento'] for r in por_codigo['T2']['recomendaciones']],
+            ['21'],
+        )
+        self.assertEqual(
+            [r['documento'] for r in por_codigo['T3']['recomendaciones']],
+            ['31'],
+        )
+
+    def test_analizar_fichas_terminadas_sin_terminadas_no_consulta_bd(self):
+        activas = Ficha.query.filter_by(id=self.activa.id).all()
+        resultado_activas, consultas_activas = self._contar_consultas(
+            lambda: cp.analizar_fichas_terminadas(activas)
+        )
+        self.assertEqual(resultado_activas, [])
+        self.assertEqual(len(consultas_activas), 0, '\n'.join(consultas_activas))
+
+        resultado_vacio, consultas_vacio = self._contar_consultas(
+            lambda: cp.analizar_fichas_terminadas([])
+        )
+        self.assertEqual(resultado_vacio, [])
+        self.assertEqual(len(consultas_vacio), 0, '\n'.join(consultas_vacio))
 
 
 class FundamentoEnAlertasExistentesTest(unittest.TestCase):

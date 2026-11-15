@@ -256,3 +256,5 @@ memory-bank/
 
 # Artefactos temporales de ejecuciones locales de pruebas
 /tmp_pytest*/
+/temp_*.html
+/test_*.html

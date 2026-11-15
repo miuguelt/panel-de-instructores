@@ -19,7 +19,7 @@ from flask import (
 )
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy import func
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from app import db, limiter
 from app.helpers import utc_now
@@ -143,6 +143,7 @@ def _destino_interno(destino):
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit('15 per minute', methods=['POST'])
 def login():
     if current_user.is_authenticated:
         if getattr(current_user, 'debe_cambiar_password', False):
@@ -156,7 +157,8 @@ def login():
         try:
             instructor = Instructor.query.filter_by(correo=correo).first()
         except OperationalError:
-            flash('Error de conexión con la base de datos. Verifica que PostgreSQL esté corriendo en puerto 5434.', 'error')
+            current_app.logger.exception('Error de conexión con la base de datos durante login.')
+            flash('Servicio temporalmente no disponible. Intenta nuevamente en unos momentos.', 'error')
             return render_template('login.html')
         if instructor and instructor.check_password(password):
             if not instructor.activo:
@@ -321,6 +323,7 @@ def cambiar_password_obligatorio():
 
 
 @auth_bp.route('/registro', methods=['GET', 'POST'])
+@limiter.limit('10 per hour', methods=['POST'])
 def registro():
     if current_user.is_authenticated:
         return redirect(url_for('instructor.dashboard'))
@@ -346,10 +349,19 @@ def registro():
             flash('La contraseña debe tener mínimo 6 caracteres.', 'error')
             return render_template('registro.html')
 
+        if len(password) > 128:
+            flash('La contraseña no puede superar 128 caracteres.', 'error')
+            return render_template('registro.html')
+
         instructor = Instructor(nombre=nombre, correo=correo, rol='colaborador')
         instructor.set_password(password)
         db.session.add(instructor)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('Ya existe una cuenta con ese correo.', 'error')
+            return render_template('registro.html')
 
         flash('Registro exitoso. Ya puedes iniciar sesión.', 'success')
         return redirect(url_for('auth.login'))

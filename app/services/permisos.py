@@ -83,8 +83,7 @@ def puede_gestionar_asistencia(corte, ficha=None):
     if not current_user.is_authenticated:
         return False
     if corte is None:
-        ficha_obj = ficha or (db.session.get(Ficha, corte.ficha_id) if corte else None)
-        return puede_gestionar_ficha(ficha_obj) if ficha_obj else True
+        return puede_gestionar_ficha(ficha) if ficha else False
     if not corte.esta_activo:
         return False
     if getattr(current_user, 'es_admin', False) or corte.instructor_id == current_user.id:
@@ -100,8 +99,7 @@ def puede_crear_tarea_en_corte(corte, ficha=None):
     if not current_user.is_authenticated:
         return False
     if corte is None:
-        ficha_obj = ficha or (db.session.get(Ficha, corte.ficha_id) if corte else None)
-        return puede_gestionar_ficha(ficha_obj) if ficha_obj else True
+        return puede_gestionar_ficha(ficha) if ficha else False
     if not corte.esta_activo:
         return False
     if getattr(current_user, 'es_admin', False) or corte.instructor_id == current_user.id:

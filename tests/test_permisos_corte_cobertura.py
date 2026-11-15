@@ -5,7 +5,11 @@ from unittest.mock import patch
 
 import pytest
 
-from app.services.permisos import puede_gestionar_corte
+from app.services.permisos import (
+    puede_crear_tarea_en_corte,
+    puede_gestionar_asistencia,
+    puede_gestionar_corte,
+)
 
 
 @pytest.mark.parametrize(
@@ -27,3 +31,10 @@ def test_solo_el_responsable_o_administrador_edita_un_corte_activo(
     corte = SimpleNamespace(instructor_id=1 if propietario else 2, esta_activo=activo)
     with patch('app.services.permisos.current_user', usuario):
         assert puede_gestionar_corte(corte if existe else None) is permitido
+
+
+def test_asistencia_y_tarea_sin_corte_ni_ficha_fallan_cerrado():
+    usuario = SimpleNamespace(id=1, is_authenticated=True, es_admin=False)
+    with patch('app.services.permisos.current_user', usuario):
+        assert puede_gestionar_asistencia(None, None) is False
+        assert puede_crear_tarea_en_corte(None, None) is False

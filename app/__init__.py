@@ -236,6 +236,11 @@ def _registrar_cache_estaticos(app):
             politica = response.headers.get('Cache-Control', '').lower()
             if 'no-store' not in politica:
                 response.headers['Cache-Control'] = 'private, no-store, max-age=0'
+
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+        response.headers.setdefault('Referrer-Policy', 'same-origin')
+        response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
         return response
 
 
@@ -421,6 +426,7 @@ def create_app(test_config=None):
                 todas = obtener_recomendaciones_ficha(ficha_id, categorias={categoria})
                 setattr(g, cache_key, todas)
             except Exception:
+                log.warning('No se pudieron cargar alertas de módulo (ficha_id=%s, categoria=%s).', ficha_id, categoria, exc_info=True)
                 todas = []
                 setattr(g, cache_key, todas)
         return [r for r in todas if r.categoria == categoria]
@@ -438,6 +444,7 @@ def create_app(test_config=None):
             setattr(g, cache_key, todas)
             return todas
         except Exception:
+            log.warning('No se pudieron cargar alertas de aprendiz (ficha_id=%s, aprendiz_id=%s).', ficha_id, aprendiz_id, exc_info=True)
             return []
 
     app.jinja_env.globals['alertas_modulo'] = _alertas_modulo
@@ -493,6 +500,7 @@ def create_app(test_config=None):
                 else:
                     static_v = '1.0'
             except Exception:
+                log.warning('No se pudo calcular el hash de styles.css; usando fallback 1.0.', exc_info=True)
                 static_v = '1.0'
 
         return {
@@ -551,7 +559,9 @@ def create_app(test_config=None):
         El detalle del fallo va en el cuerpo.
         """
         from flask import jsonify
-        uploads = dict(app.config.get('UPLOADS_ESTADO') or {})
+        uploads_raw = app.config.get('UPLOADS_ESTADO') or {}
+        uploads = {'escribible': bool(uploads_raw.get('escribible'))}
+        startup_errors = app.config.get('STARTUP_ERRORS', [])
         estado = {
             'status': 'ok',
             'database': 'connected',
@@ -559,7 +569,7 @@ def create_app(test_config=None):
             'rate_limiter': app.config.get('LIMITER_BACKEND'),
             'secret_key': 'efimera (revisar SECRET_KEY)' if SECRET_KEY_IS_EPHEMERAL else 'ok',
             'uploads': uploads,
-            'startup_errors': app.config.get('STARTUP_ERRORS', []),
+            'startup_errors_count': len(startup_errors),
         }
         try:
             with db.engine.connect():
@@ -573,10 +583,12 @@ def create_app(test_config=None):
         # Inventario bajo demanda: recorrer el volumen en cada latido del
         # healthcheck de Docker seria I/O gratuito cada 30 s.
         if request.args.get('uploads') == '1':
-            uploads.update(_inventario_uploads(app.config.get('UPLOAD_FOLDER')))
+            inv = _inventario_uploads(app.config.get('UPLOAD_FOLDER'))
+            inv.pop('error', None)
+            uploads.update(inv)
             estado['uploads'] = uploads
 
-        if estado['startup_errors'] or SECRET_KEY_IS_EPHEMERAL or not uploads.get('escribible'):
+        if startup_errors or SECRET_KEY_IS_EPHEMERAL or not uploads.get('escribible'):
             estado['status'] = 'degraded'
         return jsonify(estado), 200
 

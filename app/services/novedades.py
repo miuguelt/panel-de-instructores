@@ -12,6 +12,8 @@ de 3 días, citando ambas normas.
 from collections import defaultdict
 from datetime import date, datetime
 
+from sqlalchemy.orm import noload
+
 from app import db
 from app.models.aprendiz import normalizar_estado
 from app.models.novedades import (
@@ -290,16 +292,29 @@ def registrar_seguimiento(etapa, momento, fecha, observacion=None, instructor_id
     return seguimiento
 
 
+def cargar_datos_fichas(ficha_ids, incluir_seguimientos=True):
+    """Etapas y novedades de múltiples fichas en dos consultas, indexadas por ficha_id."""
+    ids = list({fid for fid in ficha_ids if fid is not None})
+    resultado = {fid: ({}, defaultdict(list)) for fid in ids}
+    if not ids:
+        return resultado
+    etapas_query = EtapaProductiva.query.filter(EtapaProductiva.ficha_id.in_(ids))
+    if not incluir_seguimientos:
+        etapas_query = etapas_query.options(noload(EtapaProductiva.seguimientos))
+    for etapa in etapas_query.all():
+        resultado[etapa.ficha_id][0][etapa.aprendiz_id] = etapa
+    for novedad in (
+        NovedadAprendiz.query.filter(NovedadAprendiz.ficha_id.in_(ids))
+        .order_by(NovedadAprendiz.fecha_solicitud.asc(), NovedadAprendiz.id.asc())
+        .all()
+    ):
+        resultado[novedad.ficha_id][1][novedad.aprendiz_id].append(novedad)
+    return resultado
+
+
 def cargar_datos_ficha(ficha_id):
     """Etapas y novedades de la ficha en dos consultas, indexadas por aprendiz."""
-    etapas = {
-        e.aprendiz_id: e for e in EtapaProductiva.query.filter_by(ficha_id=ficha_id).all()
-    }
-    novedades = defaultdict(list)
-    for novedad in NovedadAprendiz.query.filter_by(ficha_id=ficha_id).order_by(
-            NovedadAprendiz.fecha_solicitud.asc(), NovedadAprendiz.id.asc()).all():
-        novedades[novedad.aprendiz_id].append(novedad)
-    return etapas, novedades
+    return cargar_datos_fichas([ficha_id]).get(ficha_id, ({}, defaultdict(list)))
 
 
 def actualizar_alertas_reintegro(ficha, ahora, aprendices, novedades, contexto=None):

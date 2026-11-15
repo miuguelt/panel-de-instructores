@@ -13,6 +13,7 @@ Las funciones de evaluación son puras (sin base de datos) para poder probar
 cada límite de fecha y cada estado por separado.
 """
 
+from collections import defaultdict
 from datetime import date, datetime
 
 from app.models.aprendiz import Aprendiz, etiqueta_estado, normalizar_estado
@@ -175,13 +176,24 @@ def analizar_fichas_terminadas(fichas, hoy=None):
         hoy = fecha_colombia(datetime.utcnow())
     else:
         hoy = _a_fecha(hoy)
+
+    fichas_fin = [f for f in fichas if ficha_terminada(f, hoy)]
+    if not fichas_fin:
+        return []
+
+    ficha_ids = list({f.id for f in fichas_fin if getattr(f, 'id', None) is not None})
+    aprendices_por_ficha = defaultdict(list)
+    datos_por_ficha = {}
+    if ficha_ids:
+        from app.services.novedades import cargar_datos_fichas
+        for aprendiz in Aprendiz.query.filter(Aprendiz.ficha_id.in_(ficha_ids)).all():
+            aprendices_por_ficha[aprendiz.ficha_id].append(aprendiz)
+        datos_por_ficha = cargar_datos_fichas(ficha_ids, incluir_seguimientos=False)
+
     resultado = []
-    for ficha in fichas:
-        if not ficha_terminada(ficha, hoy):
-            continue
-        from app.services.novedades import cargar_datos_ficha
-        aprendices = Aprendiz.query.filter_by(ficha_id=ficha.id).all()
-        etapas, novedades = cargar_datos_ficha(ficha.id)
+    for ficha in fichas_fin:
+        aprendices = aprendices_por_ficha.get(ficha.id, [])
+        etapas, novedades = datos_por_ficha.get(ficha.id, ({}, {}))
         recomendaciones = analizar_ficha(ficha, aprendices, hoy, etapas, novedades)
         resultado.append({
             'ficha': ficha,
