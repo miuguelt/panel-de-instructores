@@ -3512,11 +3512,17 @@ def juicios(ficha_id):
     )
     competencias_ordenadas_juicios = calcular_fechas_competencias_y_raps(ficha, competencias_ordenadas_juicios)
     auditoria_duracion = auditar_duracion_programa(ficha)
+    total_competencias_curso = len(competencias_ordenadas_juicios)
+    competencias_aprobadas_curso = sum(1 for c in competencias_ordenadas_juicios if c.get('pct') == 100)
+    pct_competencias_curso = round((competencias_aprobadas_curso / total_competencias_curso * 100), 1) if total_competencias_curso > 0 else 0.0
 
     return render_template('juicios.html', ficha=ficha, estadisticas=estadisticas, 
                            aprendices_stats=aprendices_stats, cronograma=obtener_cronograma(ficha),
                            pct_global_juicios=pct_global_juicios,
                            competencias_summary=competencias_ordenadas_juicios,
+                           total_competencias_curso=total_competencias_curso,
+                           competencias_aprobadas_curso=competencias_aprobadas_curso,
+                           pct_competencias_curso=pct_competencias_curso,
                            instructores_resumen=instructores_ordenados,
                            rango_aprobacion=rango_aprobacion,
                            primera_evaluacion=primera_evaluacion,
