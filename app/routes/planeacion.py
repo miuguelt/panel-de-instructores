@@ -39,6 +39,7 @@ from app.services.respuestas_planeacion import (
     mensaje_recuperacion as _mensaje_recuperacion,
     metadata_ficha as _metadata_ficha,
     programa_vigente as _programa_vigente,
+    contexto_panorama,
     respuesta_carga as _respuesta_carga,
 )
 from app.services.versiones_archivos import (
@@ -106,24 +107,8 @@ def analisis(ficha_id):
     return render_template(
         'instructor/planeacion.html',
         ficha=ficha,
-        analisis=panorama.get('analisis') if panorama else None,
-        calendario=panorama.get('calendario') if panorama else None,
-        linea=panorama.get('linea') if panorama else None,
-        seguimiento_fases=panorama.get('seguimiento_fases') if panorama else None,
-        estado=panorama.get('estado') if panorama else None,
+        **contexto_panorama(panorama),
         fecha_carga_reporte=fecha_local(version_reporte.creado_en) if version_reporte else None,
-        proyeccion=panorama.get('proyeccion') if panorama else None,
-        diagnostico=panorama.get('diagnostico', []) if panorama else [],
-        veredicto=panorama.get('veredicto') if panorama else None,
-        contraste=panorama.get('contraste') if panorama else None,
-        catalogo_pedagogico=panorama.get('catalogo_pedagogico', {}) if panorama else {},
-        seguimiento_evaluacion=panorama.get('seguimiento_evaluacion', {}) if panorama else {},
-        analisis_vencimiento=panorama.get('analisis_vencimiento') if panorama else None,
-        desempeno_ficha=panorama.get('desempeno_ficha') if panorama else None,
-        radar=panorama.get('radar') if panorama else None,
-        heatmap_docente=panorama.get('heatmap_docente') if panorama else None,
-        curva_svg=panorama.get('curva_svg') if panorama else None,
-        fases_progreso=panorama.get('fases_progreso', []) if panorama else [],
         programa=programa,
         version_programa=version_programa,
         contenido_planeacion=contenido,
@@ -138,7 +123,6 @@ def analisis(ficha_id):
         etiquetas_tipo=ETIQUETAS_TIPO,
         error_planeacion=error_planeacion,
         importacion_id=request.args.get('importacion_id', type=int),
-        hoy=panorama.get('hoy') if panorama else None,
     )
 
 

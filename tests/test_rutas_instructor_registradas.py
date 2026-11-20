@@ -47,6 +47,17 @@ class RutasInstructorRegistradasTestCase(unittest.TestCase):
         rotos = {endpoint: archivo for endpoint, archivo in usados.items() if endpoint not in self.endpoints}
         self.assertEqual(rotos, {}, 'Estos url_for apuntan a rutas que no existen.')
 
+    def test_los_modulos_de_rutas_restaurados_no_superan_400_lineas(self):
+        modulos = ['actividades_evidencias', 'alertas_materiales', 'competencias', 'entregas',
+                   'estadisticas', 'juicios', 'observador', 'tareas']
+        largos = {}
+        for nombre in modulos:
+            ruta = RAIZ / 'app' / 'routes' / 'instructor' / f'{nombre}.py'
+            lineas = len(ruta.read_text(encoding='utf-8').splitlines())
+            if lineas > 400:
+                largos[nombre] = lineas
+        self.assertEqual(largos, {})
+
 
 if __name__ == '__main__':
     unittest.main()

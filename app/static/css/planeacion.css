@@ -1700,58 +1700,6 @@ details.pl-collapsible-section > .pl-collapsible-body {
     align-items: center;
 }
 
-/* --- Línea de Hitos Cronológicos de la Ficha --- */
-.pl-fechas-timeline {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.85rem;
-    background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-surface));
-    border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    flex-wrap: wrap;
-}
-.pl-fecha-node {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.35rem 0.6rem;
-    border-radius: 10px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-divider);
-    min-width: 0;
-}
-.pl-fecha-node.is-inicio { border-left: 3px solid var(--accent-primary); }
-.pl-fecha-node.is-hoy { border-left: 3px solid var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--bg-card)); }
-.pl-fecha-node.is-fin-lectiva { border-left: 3px solid var(--warning); }
-.pl-fecha-node.is-proyectado { border-left: 3px solid var(--success); }
-.pl-fecha-node.is-fin-ficha { border-left: 3px solid var(--text-muted); }
-
-.pl-fecha-icon { font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
-.pl-fecha-info { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-.pl-fecha-info small {
-    color: var(--text-muted);
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-}
-.pl-fecha-info strong {
-    color: var(--text-strong);
-    font-size: 0.85rem;
-    font-weight: 800;
-    white-space: nowrap;
-}
-.pl-fecha-arrow {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    opacity: 0.6;
-    user-select: none;
-}
-
 /* --- Caja de Lectura Ejecutiva de la Curva S --- */
 .pl-curva-lectura-box {
     margin: 0.75rem 0 1rem;
@@ -2280,54 +2228,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
     color: var(--text-muted);
 }
 
-/* --- Pipeline de Avance por Fases --- */
-.pl-phase-control {
-    border-top: 4px solid var(--pl-tone, var(--accent-primary));
-}
-.pl-phase-answer {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.8rem;
-    align-items: center;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--pl-tone, var(--border-subtle));
-    border-left-width: 4px;
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--pl-tone, var(--accent-primary)) 8%, var(--bg-surface));
-}
-.pl-phase-answer-icon { font-size: 1.5rem; line-height: 1; }
-.pl-phase-answer-title,
-.pl-phase-answer > div > strong:first-child {
-    display: block;
-    color: var(--text-strong);
-    font-size: 0.96rem;
-    line-height: 1.35;
-}
-.pl-phase-answer p { margin: 0.3rem 0 0; color: var(--text-main); font-size: 0.78rem; line-height: 1.5; }
-.pl-phase-answer p strong {
-    display: inline;
-    color: var(--text-strong);
-    font-size: inherit;
-    font-weight: 700;
-}
-.pl-phase-control-kpis {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
-    gap: 0.6rem;
-    margin: 0.75rem 0;
-}
-.pl-phase-control-kpis > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    padding: 0.65rem 0.75rem;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-}
-.pl-phase-control-kpis span { color: var(--text-muted); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
-.pl-phase-control-kpis strong { color: var(--text-strong); font-size: 1.05rem; line-height: 1.2; }
-.pl-phase-control-kpis small { color: var(--text-muted); font-size: 0.68rem; line-height: 1.4; }
+/* --- Seguidor de fases del proyecto formativo (bloque de estado) --- */
 .pl-phase-track {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2365,14 +2266,7 @@ details.pl-collapsible-section > .pl-collapsible-body {
 .pl-phase-track-item .pl-progress-wrap { margin-top: 0.1rem; height: 6px; }
 .pl-phase-track-item .pl-progress-bar { background: var(--pl-tone, var(--accent-primary)); }
 .pl-phase-track-note { color: var(--text-muted); font-size: 0.67rem; line-height: 1.4; }
-.pl-phase-method { margin: 0.8rem 0 0; padding-top: 0.7rem; border-top: 1px dashed var(--border-divider); }
 
-.pl-fases-pipeline {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-    gap: 0.75rem;
-    margin-top: 0.4rem;
-}
 .pl-fase-node {
     display: flex;
     flex-direction: column;
@@ -2422,7 +2316,6 @@ details.pl-collapsible-section > .pl-collapsible-body {
 }
 
 @media (max-width: 560px) {
-    .pl-phase-answer { grid-template-columns: 1fr; }
     .pl-phase-track { grid-template-columns: 1fr; }
 }
 
@@ -2795,14 +2688,8 @@ details.pl-collapsible-section > .pl-collapsible-body {
     border-radius: 6px;
 }
 
-/* --- Pantallas medianas: hitos y barras de filtros --- */
+/* --- Pantallas medianas: barras de filtros --- */
 @media (max-width: 1100px) {
-    .pl-fechas-timeline {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.6rem;
-    }
-    .pl-fecha-arrow { display: none; }
     .pl-gantt-filter-bar,
     .pl-mode-switch {
         flex-wrap: wrap;

@@ -58,3 +58,23 @@ def respuesta_carga(ficha_id, ok, mensaje, status=200):
             cuerpo['redirect'] = url_for('planeacion.analisis', ficha_id=ficha_id)
         return jsonify(cuerpo), status
     return redirect(url_for('planeacion.analisis', ficha_id=ficha_id))
+
+
+# Claves del panorama que consume la plantilla; la fábrica produce el vacío
+# seguro cuando el panorama no existe o no trae la clave.
+CLAVES_PANORAMA = {
+    'analisis': None, 'calendario': None, 'linea': None, 'seguimiento_fases': None,
+    'estado': None, 'proyeccion': None, 'diagnostico': list, 'veredicto': None,
+    'contraste': None, 'catalogo_pedagogico': dict, 'seguimiento_evaluacion': dict,
+    'analisis_vencimiento': None, 'desempeno_ficha': None, 'radar': None,
+    'heatmap_docente': None, 'curva_svg': None, 'fases_progreso': list, 'hoy': None,
+}
+
+
+def contexto_panorama(panorama):
+    """Variables de plantilla tomadas del panorama, con vacíos seguros si falta."""
+    panorama = panorama or {}
+    return {
+        clave: panorama[clave] if clave in panorama else (fabrica() if fabrica else None)
+        for clave, fabrica in CLAVES_PANORAMA.items()
+    }

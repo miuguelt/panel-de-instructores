@@ -49,10 +49,6 @@
 .pl-page .pl-kpi > span { font-size: .88rem; }
 .pl-page .pl-kpi > strong { font-size: clamp(1.15rem, .95rem + .5vw, 1.5rem); line-height: 1.4; }
 .pl-page .pl-kpi small { font-size: .8rem; line-height: 1.5; }
-.pl-page .pl-fechas-timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
-.pl-page .pl-fecha-node { min-width: 0; }
-.pl-page .pl-fecha-info :is(small, strong) { white-space: normal; overflow-wrap: break-word; }
-.pl-page .pl-fecha-arrow { display: none; }
 .pl-page .pl-carga-head { align-items: stretch; }
 .pl-page .pl-carga-head > div:first-child { flex: 1 1 22rem; min-width: 0; }
 .pl-page .pl-sync-meter-container { flex: 1 1 16rem; min-width: 0; }

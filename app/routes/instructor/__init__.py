@@ -198,10 +198,15 @@ def _actualizar_indicadores_carga(ficha_id, corte_id=None):
 
 
 from . import (  # noqa: E402, F401
-    alertas_materiales_observador,
+    actividades_evidencias,
+    alertas_materiales,
     aprendices,
     asistencia,
+    competencias,
     dashboard_fichas,
-    juicios_estadisticas,
-    tareas_entregas,
+    entregas,
+    estadisticas,
+    juicios,
+    observador,
+    tareas,
 )
