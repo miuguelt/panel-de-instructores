@@ -20,6 +20,7 @@ from app.services.archivos import ArchivoService, ErrorArchivo, resolver_archivo
 from app.services.carga_documentos import procesar_carga_unificada
 from app.services.importacion_ficha import ErrorImportacion
 from app.services.importacion_jobs import encolar_recalculo_resumen
+from app.services.estado_ficha import fecha_local
 from app.services.panorama_planeacion import construir_panorama
 from app.services.planeacion import comparar_fuentes, parsear_planeacion
 from app.services.programa_formacion import parsear_programa
@@ -109,6 +110,8 @@ def analisis(ficha_id):
         calendario=panorama.get('calendario') if panorama else None,
         linea=panorama.get('linea') if panorama else None,
         seguimiento_fases=panorama.get('seguimiento_fases') if panorama else None,
+        estado=panorama.get('estado') if panorama else None,
+        fecha_carga_reporte=fecha_local(version_reporte.creado_en) if version_reporte else None,
         proyeccion=panorama.get('proyeccion') if panorama else None,
         diagnostico=panorama.get('diagnostico', []) if panorama else [],
         veredicto=panorama.get('veredicto') if panorama else None,

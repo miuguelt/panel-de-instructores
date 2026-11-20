@@ -1,17 +1,17 @@
 /* Espacio de trabajo de planeación: contexto, navegación y lectura progresiva. */
 .pl-workspace-header {
-    padding: clamp(1rem, 2vw, 2rem);
+    padding: clamp(.85rem, 1.4vw, 1.4rem);
     border: 1px solid var(--border-divider);
     border-top: 4px solid var(--accent-primary);
     border-radius: 18px;
     background: var(--bg-card);
 }
 .pl-back-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-muted); font-size: .9rem; }
-.pl-heading-row { display: grid; gap: 1.5rem; margin-top: .65rem; }
+.pl-heading-row { display: grid; gap: 1rem; margin-top: .25rem; }
 .pl-heading-row > *, .pl-heading-context > *, .pl-nav-primary, .pl-nav-more { min-width: 0; }
 .pl-eyebrow { margin: 0 0 .4rem; color: var(--text-muted); font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.pl-heading-copy h1 { margin: 0; color: var(--text-strong); font-size: clamp(1.7rem, 1.2rem + 1.5vw, 2.5rem); line-height: 1.15; letter-spacing: -.035em; }
-.pl-heading-context { display: flex; align-items: baseline; flex-wrap: wrap; gap: .65rem; margin: 1rem 0 .65rem; color: var(--text-strong); font-weight: 600; overflow-wrap: break-word; }
+.pl-heading-copy h1 { margin: 0; color: var(--text-strong); font-size: clamp(1.4rem, 1.1rem + 1vw, 1.95rem); line-height: 1.15; letter-spacing: -.035em; }
+.pl-heading-context { display: flex; align-items: baseline; flex-wrap: wrap; gap: .65rem; margin: .5rem 0 .35rem; color: var(--text-strong); font-weight: 600; overflow-wrap: break-word; }
 .pl-ficha-code { padding: .3rem .65rem; border: 1px solid var(--border-divider); border-radius: 6px; background: var(--bg-surface); font-variant-numeric: tabular-nums; }
 .pl-heading-description { margin: 0; max-width:100%; color: var(--text-muted); line-height: 1.65; }
 .pl-heading-actions { display: flex; flex-direction: column; gap: .65rem; align-items: stretch; }
@@ -69,8 +69,8 @@
 .pl-page .pl-empty p { width: 100%; max-width:100%; margin: .8rem auto 1.25rem; line-height: 1.7; text-align:var(--text-align-reading, start); }
 .pl-page :is(a, button, summary, input):focus-visible { outline: 3px solid var(--accent-primary); outline-offset: 3px; }
 @media (min-width: 1100px) {
-    .pl-heading-row { grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem); align-items: center; }
-    .pl-heading-actions { align-items: flex-end; }
+    .pl-heading-row { grid-template-columns: minmax(0, 1fr) minmax(16rem, 34rem); align-items: center; }
+    .pl-heading-actions { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
     .pl-heading-secondary { justify-content: flex-end; }
     .pl-heading-secondary .btn { flex: 0 1 auto; }
     .pl-page .pl-subnav { position: sticky; top: 144px; }

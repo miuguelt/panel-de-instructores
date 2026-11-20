@@ -1,63 +1,13 @@
-{# Veredicto temporal, indicadores EVM, Curva S con incertidumbre, Diagrama de Flujo Acumulado y Radar Curricular. #}
+{# Ritmo y cobertura, Curva S con incertidumbre, flujo acumulado, radar curricular y carga docente.
+   El estado de la ficha (fechas, fase y avance) vive en _planeacion_estado.html. #}
 
-<section class="pl-verdict pl-tone-{{ veredicto.tono }}" id="seccion-resumen">
-    <span class="pl-verdict-icon" aria-hidden="true">{{ veredicto.icono }}</span>
-    <div>
-        <strong class="pl-verdict-title">{{ veredicto.titulo }}</strong>
-        <p>{{ veredicto.detalle }}</p>
+<section class="pl-card" id="seccion-ritmo">
+    <div class="pl-card-head">
+        <h2>Ritmo y cobertura</h2>
+        <p>Cómo avanzan las competencias técnicas, las transversales y la evaluación frente a lo planeado.</p>
     </div>
-</section>
-
 <div class="pl-kpis">
     {% set desfase = linea.resumen.trimestres_desfase %}
-
-    {# 1. Momento de la Ficha #}
-    <div class="pl-kpi pl-tone-info">
-        <span>Momento de la ficha</span>
-        <strong>{{ calendario.bloque_actual.etiqueta if calendario.bloque_actual else '—' }} · {{ calendario.porcentaje_lectiva }}%</strong>
-        <div class="pl-bar pl-tone-info" title="Avance lectivo global: {{ calendario.porcentaje_lectiva }}%">
-            <i style="width: {{ calendario.porcentaje_lectiva }}%"></i>
-        </div>
-        <small>
-            {% if calendario.bloque_actual %}
-            {{ calendario.bloque_actual.nombre }} de {{ calendario.trimestres_lectivos }} ({{ calendario.bloque_actual.porcentaje_transcurrido }}% transcurrido)
-            {% else %}
-            Fuera del rango lectivo de la ficha
-            {% endif %}
-        </small>
-    </div>
-
-    {# 2. Índice EVM SPI (Schedule Performance Index) #}
-    {% set evm = proyeccion.evm if proyeccion and proyeccion.evm else None %}
-    {% set tono_spi = evm.tono if evm else 'neutral' %}
-    <div class="pl-kpi pl-tone-{{ tono_spi }}">
-        <span>Ritmo frente al plan (Velocidad)</span>
-        <strong>{{ evm.spi if evm else '1.0' }} <small style="font-size:0.75rem; font-weight:600;">(SPI)</small></strong>
-        <div class="pl-bar pl-tone-{{ tono_spi }}" title="SPI: {{ evm.spi if evm else 0 }}">
-            <i style="width: {{ [((evm.spi or 1.0) * 100)|round|int, 100]|min }}%"></i>
-        </div>
-        <small>
-            {% if evm %}
-            {{ evm.label }} · {{ '+' if evm.sv_horas > 0 else '' }}{{ evm.sv_horas }} h frente al plan. 1.0 = ritmo exacto.
-            {% else %}
-            Sin datos calculables
-            {% endif %}
-        </small>
-    </div>
-
-    {# 3. Horas aprobadas vs horas que el plan ya debería tener #}
-    <div class="pl-kpi pl-tone-info">
-        <span>Horas aprobadas vs planeadas</span>
-        <strong>{{ evm.ev_horas|round|int if evm and evm.ev_horas is not none else 0 }} / {{ evm.pv_horas|round|int if evm else 0 }} h</strong>
-        <div class="pl-bar pl-tone-info" title="Horas aprobadas en SOFIA Plus vs horas planeadas a la fecha">
-            {% set pct_ev = ((evm.ev_horas / evm.total_horas) * 100)|round|int if evm and evm.total_horas else 0 %}
-            <i style="width: {{ pct_ev }}%"></i>
-        </div>
-        <small>
-            {{ pct_ev }}% del total técnico de la ficha ({{ evm.total_horas|round|int if evm else 0 }} h lectivas)
-        </small>
-    </div>
-
     {# 4. Técnicas al Día vs Retrasadas #}
     {% set total_exigibles = linea.resumen.competencias_exigibles %}
     {% set atrasadas_cnt = linea.resumen.competencias_atrasadas %}
@@ -95,31 +45,12 @@
     {% set tono_ritmo = 'pl-tone-danger' if proyeccion.estado == 'en_riesgo' else ('pl-tone-warning' if proyeccion.estado == 'ajustado' else 'pl-tone-success') %}
     <div class="pl-kpi {{ tono_ritmo }}">
         <span>Ritmo de evaluación</span>
-        <strong>{{ proyeccion.ritmo_mensual|round(1) }} / mes</strong>
+        <strong>{{ proyeccion.ritmo_mensual|round(1) }} por mes</strong>
         <div class="pl-bar {{ tono_ritmo }}" title="Aprobaciones acumuladas: {{ proyeccion.porcentaje_pares }}%">
             <i style="width: {{ proyeccion.porcentaje_pares }}%"></i>
         </div>
         <small>
-            {{ proyeccion.porcentaje_pares }}% evaluado · Req: {{ proyeccion.ritmo_requerido|round(1) }}/mes ({{ proyeccion.pares_pendientes }} pend.)
-        </small>
-    </div>
-
-    {# 7. Cierre Lectivo Proyectado #}
-    {% set tono_cierre = 'pl-tone-danger' if proyeccion.estado == 'en_riesgo' else ('pl-tone-warning' if proyeccion.estado == 'ajustado' else 'pl-tone-success') %}
-    <div class="pl-kpi {{ tono_cierre }}">
-        <span>Fecha estimada de cierre</span>
-        <strong>{{ proyeccion.fecha_proyectada.strftime('%d/%m/%Y') if proyeccion.fecha_proyectada else '—' }}</strong>
-        <div class="pl-bar {{ tono_cierre }}" title="Proyección de cierre al ritmo actual">
-            <i style="width: {{ 100 if proyeccion.estado in ('completado', 'holgado', 'ajustado') else 35 }}%"></i>
-        </div>
-        <small>
-            {% if proyeccion.dias_vs_fin_lectiva is none %}
-            Falta ritmo medible
-            {% elif proyeccion.dias_vs_fin_lectiva > 0 %}
-            +{{ proyeccion.dias_vs_fin_lectiva }} días vs fin lectivo ({{ calendario.fin_lectiva.strftime('%d/%m/%Y') }})
-            {% else %}
-            {{ -proyeccion.dias_vs_fin_lectiva }} días de margen antes del fin lectivo
-            {% endif %}
+            {{ proyeccion.porcentaje_pares }} % evaluado · se requieren {{ proyeccion.ritmo_requerido|round(1) }} por mes para {{ proyeccion.pares_pendientes }} pendientes
         </small>
     </div>
 
@@ -138,71 +69,7 @@
     {% endif %}
 </div>
 
-{# Control explícito de fase: tiempo esperado frente a RAP evaluados. #}
-{% if seguimiento_fases %}
-{% set fase_esperada = seguimiento_fases.fase_esperada %}
-{% set fase_real = seguimiento_fases.fase_real %}
-{% set resultado_tono = 'danger' if seguimiento_fases.estado == 'atrasado' else ('success' if seguimiento_fases.estado in ('al_dia', 'adelantado', 'completado') else 'info') %}
-<section class="pl-card pl-phase-control pl-tone-{{ resultado_tono }}" id="seccion-seguimiento-fases">
-    <div class="pl-card-head">
-        <h2>¿En qué fase debería ir el proyecto formativo?</h2>
-        <p>El sistema cruza la ventana temporal de la Planeación Pedagógica GFPI-F-134 con los resultados de aprendizaje que ya tienen juicio en el reporte cargado.</p>
-    </div>
-
-    <div class="pl-phase-answer pl-tone-{{ resultado_tono }}">
-        <div class="pl-phase-answer-icon" aria-hidden="true">{{ '⏰' if seguimiento_fases.estado == 'atrasado' else ('✅' if seguimiento_fases.estado in ('al_dia', 'completado') else '🚀') }}</div>
-        <div>
-            <strong class="pl-phase-answer-title">
-                {% if seguimiento_fases.estado == 'completado' %}
-                Todos los resultados de aprendizaje están cerrados.
-                {% elif fase_esperada and fase_real and fase_real.nombre != fase_esperada.nombre %}
-                Debería estar en {{ fase_esperada.nombre }}; la fase real está en {{ fase_real.nombre }}.
-                {% elif fase_esperada %}
-                La fase esperada y la fase real son {{ fase_esperada.nombre }}.
-                {% else %}
-                No hay una fase calculable con los documentos disponibles.
-                {% endif %}
-            </strong>
-            <p>
-                A la fecha {{ seguimiento_fases.hoy.strftime('%d/%m/%Y') }}, se han evaluado <strong>{{ seguimiento_fases.resultados.evaluados }} de {{ seguimiento_fases.resultados.total }} RAPs</strong>;
-                por calendario deberían estar evaluados aproximadamente <strong>{{ seguimiento_fases.resultados.esperados }}</strong>.
-                {% if seguimiento_fases.resultados.brecha < 0 %}
-                Faltan {{ -seguimiento_fases.resultados.brecha }} RAPs frente al ritmo esperado.
-                {% elif seguimiento_fases.resultados.brecha > 0 %}
-                Hay {{ seguimiento_fases.resultados.brecha }} RAPs evaluados por encima del ritmo esperado.
-                {% else %}
-                El conteo de RAPs evaluados coincide con el ritmo esperado.
-                {% endif %}
-            </p>
-        </div>
-    </div>
-
-    <div class="pl-phase-control-kpis">
-        <div><span>RAPs evaluados</span><strong>{{ seguimiento_fases.resultados.evaluados }}/{{ seguimiento_fases.resultados.total }}</strong><small>{{ seguimiento_fases.resultados.porcentaje_evaluados }}% con juicio registrado</small></div>
-        <div><span>RAPs cerrados</span><strong>{{ seguimiento_fases.resultados.aprobados }}/{{ seguimiento_fases.resultados.total }}</strong><small>Umbral de cierre: 80% de aprendices vigentes</small></div>
-        <div><span>RAPs esperados al corte</span><strong>{{ seguimiento_fases.resultados.esperados }}</strong><small>{{ seguimiento_fases.resultados.esperados_decimal }} RAPs según tiempo transcurrido</small></div>
-        <div><span>Proyección de todos los RAPs</span><strong>{{ seguimiento_fases.proyeccion.fecha_cierre.strftime('%d/%m/%Y') if seguimiento_fases.proyeccion.fecha_cierre else 'Sin datos' }}</strong><small>{% if seguimiento_fases.proyeccion.estado == 'en_riesgo' %}No alcanzaría la fecha fin del programa{% elif seguimiento_fases.proyeccion.estado == 'viable' %}Fecha dentro del plazo del programa{% elif seguimiento_fases.proyeccion.estado == 'completado' %}Ya no hay RAPs pendientes{% else %}Se requieren más evaluaciones fechadas{% endif %}</small></div>
-    </div>
-
-    <div class="pl-phase-track" aria-label="Fases del proyecto formativo">
-        {% for fase in seguimiento_fases.fases if fase.orden < 4 %}
-        {% set es_esperada = fase_esperada and fase.nombre == fase_esperada.nombre %}
-        {% set es_real = fase_real and fase.nombre == fase_real.nombre %}
-        {% set tono_fase = 'danger' if fase.estado_ritmo == 'atrasado' else ('success' if fase.estado_ritmo in ('al_dia', 'adelantado') else ('neutral' if fase.estado_ritmo == 'futura' else 'info')) %}
-        <article class="pl-phase-track-item pl-tone-{{ tono_fase }} {{ 'is-expected' if es_esperada else '' }} {{ 'is-real' if es_real else '' }}">
-            <div class="pl-phase-track-head">
-                <span class="pl-phase-track-icon">{{ fase.icono }}</span>
-                <div><strong>{{ fase.nombre }}</strong><small>{% if es_esperada %}Debería estar aquí{% elif es_real %}Fase real{% elif fase.estado_tiempo == 'cumplida' %}Cerrada{% elif fase.estado_tiempo == 'futura' %}Futura{% else %}En seguimiento{% endif %}</small></div>
-            </div>
-            <div class="pl-phase-track-count"><strong>{{ fase.resultados_evaluados }}/{{ fase.resultados_total }}</strong> evaluados</div>
-            <div class="pl-progress-wrap"><div class="pl-progress-bar" style="width: {{ fase.porcentaje_evaluados }}%;"></div></div>
-            <small class="pl-phase-track-note">{{ fase.resultados_aprobados }} cerrado{{'' if fase.resultados_aprobados == 1 else 's'}} · {{ fase.resultados_esperados }} esperado{{'' if fase.resultados_esperados == 1 else 's'}} · {% if fase.brecha_resultados < 0 %}{{ -fase.brecha_resultados }} pendiente{{'' if -fase.brecha_resultados == 1 else 's'}} de ritmo{% elif fase.brecha_resultados > 0 %}+{{ fase.brecha_resultados }} adelantado{{'' if fase.brecha_resultados == 1 else 's'}}{% else %}al ritmo{% endif %}</small>
-        </article>
-        {% endfor %}
-    </div>
-    <p class="pl-note pl-phase-method"><strong>Cómo se calcula:</strong> un RAP cuenta como evaluado cuando el reporte registra un juicio emitido; las filas “POR EVALUAR” no cuentan. Cuenta como cerrado cuando llega al 80% de aprendices vigentes. El RAP esperado avanza proporcionalmente entre su inicio y fin planeados. La proyección usa los RAP evaluados con fecha en los últimos 180 días y se compara con el fin de la ficha.</p>
 </section>
-{% endif %}
 
 {# 1. Curva S de Avance con Pronóstico y Abanico de Incertidumbre #}
 {% if proyeccion.curva and curva_svg %}
@@ -210,41 +77,6 @@
     <div class="pl-card-head">
         <h2>Curva S: avance planeado vs. avance real aprobado</h2>
         <p>Monitoreo cronológico del avance de la ficha: la <strong>línea gris punteada</strong> representa las horas exigidas por la planeación curricular oficial (GFPI-F-134); la <strong>línea azul sólida</strong> muestra las horas efectivamente calificadas y aprobadas en SOFIA Plus.</p>
-    </div>
-
-    {# Hitos Cronológicos Clave de la Ficha con Fechas #}
-    <div class="pl-fechas-timeline" role="region" aria-label="Línea de hitos cronológicos de la ficha">
-        <div class="pl-fecha-node is-inicio">
-            <span class="pl-fecha-icon" aria-hidden="true">🚩</span>
-            <div class="pl-fecha-info">
-                <small>Inicio de Formación</small>
-                <strong>{{ calendario.inicio.strftime('%d/%m/%Y') if calendario.inicio else '—' }}</strong>
-            </div>
-        </div>
-        <div class="pl-fecha-arrow" aria-hidden="true">&rarr;</div>
-        <div class="pl-fecha-node is-hoy">
-            <span class="pl-fecha-icon" aria-hidden="true">📍</span>
-            <div class="pl-fecha-info">
-                <small>Hoy ({{ calendario.bloque_actual.etiqueta if calendario.bloque_actual else 'Trimestre actual' }} en curso)</small>
-                <strong>{{ curva_svg.hoy_str or hoy.strftime('%d/%m/%Y') }}</strong>
-            </div>
-        </div>
-        <div class="pl-fecha-arrow" aria-hidden="true">&rarr;</div>
-        <div class="pl-fecha-node is-fin-lectiva">
-            <span class="pl-fecha-icon" aria-hidden="true">🎯</span>
-            <div class="pl-fecha-info">
-                <small>Fin Etapa Lectiva (Oficial)</small>
-                <strong>{{ calendario.fin_lectiva.strftime('%d/%m/%Y') if calendario.fin_lectiva else '—' }}</strong>
-            </div>
-        </div>
-        <div class="pl-fecha-arrow" aria-hidden="true">&rarr;</div>
-        <div class="pl-fecha-node is-fin-ficha">
-            <span class="pl-fecha-icon" aria-hidden="true">🏁</span>
-            <div class="pl-fecha-info">
-                <small>Cierre Total (Productiva)</small>
-                <strong>{{ calendario.fin.strftime('%d/%m/%Y') if calendario.fin else '—' }}</strong>
-            </div>
-        </div>
     </div>
 
     {# Lectura ejecutiva clara y entendible en lenguaje natural con fechas #}
@@ -534,45 +366,6 @@
             <button type="button" class="pl-mode-btn" data-curve-mode="velocidad" title="Mostrar ritmo e incremento de horas por trimestre">📈 Velocidad Trimestral</button>
         </div>
     </details>
-</section>
-{% endif %}
-
-{# 2. Pipeline de Avance por Fases del Proyecto Formativo #}
-{% if fases_progreso %}
-<section class="pl-card" id="seccion-pipeline" data-collapse-default="cerrado" style="margin-top: 1rem;">
-    <div class="pl-card-head">
-        <h2>Progreso por Fases del Proyecto Formativo</h2>
-        <p>Monitoreo secuencial del avance pedagógico en cada etapa del diseño curricular (GFPI-F-134).</p>
-    </div>
-
-    <div class="pl-fases-pipeline">
-        {% for fase in fases_progreso %}
-        <div class="pl-fase-node pl-tone-{{ fase.estado_tono }}">
-            <div class="pl-fase-node-head">
-                <span class="pl-fase-node-icon">{{ fase.icono }}</span>
-                <div class="pl-fase-node-title">
-                    <strong>{{ fase.nombre }}</strong>
-                    <small>{{ fase.etiqueta_trimestre }} · {{ fase.horas|round|int }} horas</small>
-                </div>
-                <span class="pl-chip pl-tone-{{ fase.estado_tono }} is-tone" style="margin-left:auto;">{{ fase.porcentaje_avance }}%</span>
-            </div>
-
-            <div class="pl-bar pl-tone-{{ fase.estado_tono }}" style="margin: 0.5rem 0 0.35rem; height:6px;">
-                <i style="width: {{ fase.porcentaje_avance }}%;"></i>
-            </div>
-
-            <div class="pl-fase-node-meta">
-                <span><strong>{{ fase.resultados_total }}</strong> RAPs</span>
-                <span><strong>{{ fase.competencias_tecnicas }}</strong> Técnicas</span>
-                {% if fase.dias_desfase > 0 %}
-                <span class="pl-tone-danger"><strong>+{{ fase.dias_desfase }}d</strong> retraso</span>
-                {% else %}
-                <span class="pl-tone-success">Al día</span>
-                {% endif %}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
 </section>
 {% endif %}
 

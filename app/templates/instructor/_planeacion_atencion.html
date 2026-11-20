@@ -1,0 +1,104 @@
+{# Qué atender: competencias con retraso y competencias que ya debieron evaluarse. #}
+{% set criticas = (linea.competencias if linea else [])|selectattr('estado_tiempo', 'in', ['critico', 'atrasado'])|sort(attribute='dias_desfase', reverse=True)|list %}
+<section class="pl-card" id="seccion-riesgos">
+    <div class="pl-card-head">
+        <h2>Qué atender ahora</h2>
+        <p>Competencias técnicas cuyo trimestre planeado ya terminó sin alcanzar el 80 % de aprendices aprobados, de mayor a menor retraso, y competencias cuyo periodo de evaluación ya venció.</p>
+    </div>
+    {% if criticas %}
+    <div class="pl-risk-grid">
+        {% for competencia in criticas[:6] %}
+        <article class="pl-risk pl-tone-{{ competencia.estado_tono }} pl-clickable" data-pedagogico-target="{{ competencia.nombre }}" tabindex="0" role="button" aria-label="Abrir ficha pedagógica de {{ competencia.nombre }}" title="Haz clic para ver criterios y contenidos de esta competencia">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem;">
+                <h3>{{ competencia.nombre }}</h3>
+                <span class="pl-btn-pedagogico">📋 Ver datos competencia</span>
+            </div>
+            <span class="pl-gantt-meta">
+                <span class="pl-chip">{{ competencia.fase }}</span>
+                <span class="pl-chip">Planeada {{ competencia.etiqueta_trimestre }}</span>
+                <span class="pl-chip pl-tone-{{ competencia.estado_tono }} is-tone">{{ competencia.estado_label }}</span>
+            </span>
+            <div class="pl-bar"><i style="width: {{ competencia.porcentaje_avance }}%"></i></div>
+            <div class="pl-risk-facts">
+                <span><b>{{ competencia.porcentaje_avance }}%</b> aprendices aprobados</span>
+                <span><b>{{ competencia.dias_desfase }}</b> días de retraso</span>
+                <span><b>{{ competencia.resultados_atrasados }}/{{ competencia.resultados_total }}</b> RAPs vencidos</span>
+            </div>
+            {% if competencia.instructores %}
+            <p class="pl-note">Docentes asignados: {{ competencia.instructores|join(', ') }}.</p>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% if criticas|length > 6 %}
+    <p class="pl-note" style="margin-top:.7rem">Se muestran las 6 principales; el detalle completo está en «Detalle por fase» ({{ criticas|length }} con desfase en total).</p>
+    {% endif %}
+    {% else %}
+    <p class="pl-note">Ninguna competencia técnica presenta retraso frente al trimestre planificado. El cronograma formativo avanza según lo previsto.</p>
+    {% endif %}
+    {% set vencimiento = analisis_vencimiento or (linea.analisis_vencimiento if linea is defined else None) %}
+    {% if vencimiento and vencimiento.competencias %}
+    <div class="pl-vencidas-card" id="pl-analisis-vencidas">
+        <div class="pl-vencidas-head">
+            <div>
+                <span class="pl-eyebrow">Diagnóstico de tiempos de evaluación</span>
+                <h3>Competencias que ya deberían estar evaluadas</h3>
+                <p>Competencias cuyo periodo de ejecución planificado ya concluyó. Consulte la fecha límite en la que debieron ser evaluadas y seleccione cualquiera de ellas para abrir el modal con el detalle completo de la competencia, sus resultados de aprendizaje y los aprendices pendientes.</p>
+            </div>
+            <div class="pl-vencidas-chips">
+                <span class="pl-chip pl-tone-warning is-tone"><b>{{ vencimiento.con_pendientes }}</b> con pendientes</span>
+                <span class="pl-chip pl-tone-info is-tone"><b>{{ vencimiento.total_deberian_evaluarse }}</b> debieron finalizar</span>
+                {% if vencimiento.al_dia > 0 %}
+                <span class="pl-chip pl-tone-success is-tone"><b>{{ vencimiento.al_dia }}</b> evaluadas al 100%</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="pl-vencidas-grid">
+            {% for item in vencimiento.competencias %}
+            <article class="pl-vencida-item pl-clickable pl-tone-{{ item.tono_eval }}" data-vencida-target="{{ item.seguimiento_id }}" tabindex="0" role="button" aria-haspopup="dialog" aria-controls="pl-evaluaciones" aria-label="Ver resultados de aprendizaje y aprendices pendientes de {{ item.nombre }}. Debió evaluarse el {{ item.fecha_debio_evaluarse_str }}; se evaluó: {{ item.fecha_se_evaluo_str }}.">
+                <div class="pl-vencida-top">
+                    <h4>{{ item.nombre }}</h4>
+                    <span class="pl-chip pl-chip-sm pl-tone-{{ item.tono_eval }} is-tone">{{ item.estado_eval }}</span>
+                </div>
+                <div class="pl-vencida-meta">
+                    <span class="pl-chip pl-chip-sm">{{ item.fase }}</span>
+                    <span class="pl-chip pl-chip-sm">{{ item.etiqueta_trimestre }}</span>
+                    {% if item.dias_vencida > 0 %}
+                    <span class="pl-chip pl-chip-sm pl-tone-{{ 'danger' if item.dias_vencida > 30 else 'warning' }} is-tone">Hace {{ item.dias_vencida }} días</span>
+                    {% endif %}
+                </div>
+                <div class="pl-vencida-progreso">
+                    <div class="pl-gantt-progress-head">
+                        <small>{{ item.aprendices_evaluados }} de {{ item.total_aprendices }} aprendices evaluados</small>
+                        <small><b>{{ item.porcentaje_evaluado }}%</b></small>
+                    </div>
+                    <div class="pl-gantt-progress-bar" role="progressbar" aria-valuenow="{{ item.porcentaje_evaluado }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="pl-gantt-progress-fill pl-tone-{{ item.tono_eval }}" style="width: {{ item.porcentaje_evaluado }}%;"></div>
+                    </div>
+                </div>
+                <div class="pl-vencida-fecha-caja">
+                    <div class="pl-vencida-fecha-fila">
+                        <span class="pl-vencida-fecha-label">Debió evaluarse:</span>
+                        <strong class="pl-vencida-fecha-val"><time datetime="{{ item.fecha_debio_evaluarse.isoformat() if item.fecha_debio_evaluarse else '' }}">{{ item.fecha_debio_evaluarse_str }}</time></strong>
+                    </div>
+                    <div class="pl-vencida-fecha-fila">
+                        <span class="pl-vencida-fecha-label">Se evaluó:</span>
+                        <strong class="pl-vencida-fecha-val">{{ item.fecha_se_evaluo_str }}</strong>
+                    </div>
+                </div>
+                <div class="pl-vencida-footer">
+                    <span class="pl-vencida-raps-badge">📋 {{ item.resultados_total }} RAP</span>
+                    <span class="pl-btn-vencida-abrir" aria-hidden="true">
+                        Ver aprendices y RAP ↗
+                    </span>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+    {% elif vencimiento %}
+    <div class="pl-vencidas-card is-empty" id="pl-analisis-vencidas">
+        <p class="pl-note">Todas las competencias planificadas se encuentran dentro de sus fechas o aún no vence su periodo de evaluación programado.</p>
+    </div>
+    {% endif %}
+</section>

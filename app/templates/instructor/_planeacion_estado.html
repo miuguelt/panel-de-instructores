@@ -1,0 +1,167 @@
+{# Estado de la ficha: lo primero que busca un instructor o coordinador al abrirla.
+   Fechas clave, fase esperada frente a la real, avance en una sola escala y ritmo necesario.
+   Ningún valor se inventa: si falta un dato, se declara. #}
+{% macro fecha_txt(valor) -%}{{ valor.strftime('%d/%m/%Y') if valor else 'Sin fecha' }}{%- endmacro %}
+{% macro relativo(dias) -%}
+{%- if dias is none -%}
+{%- elif dias == 0 -%}hoy
+{%- elif dias == 1 -%}mañana
+{%- elif dias > 0 -%}en {{ dias }} días
+{%- elif dias == -1 -%}ayer
+{%- else -%}hace {{ -dias }} días
+{%- endif -%}
+{%- endmacro %}
+{% macro numero(valor) -%}{{ ('%g' % valor)|replace('.', ',') }}{%- endmacro %}
+
+{% set resultados = seguimiento_fases.resultados if seguimiento_fases else None %}
+<section class="pl-card pl-estado pl-tone-{{ veredicto.tono if veredicto else 'info' }}" id="seccion-resumen" aria-labelledby="pl-estado-titulo">
+    <header class="pl-estado-veredicto">
+        <span class="pl-verdict-icon" aria-hidden="true">{{ veredicto.icono if veredicto else '🧭' }}</span>
+        <div>
+            <p class="pl-eyebrow">Estado de la ficha al {{ fecha_txt(hoy) }}</p>
+            <h2 id="pl-estado-titulo">{{ veredicto.titulo if veredicto else 'Estado de la ficha' }}</h2>
+            {% if veredicto and veredicto.detalle %}<p class="pl-estado-detalle">{{ veredicto.detalle }}</p>{% endif %}
+        </div>
+    </header>
+
+    <div class="pl-estado-grid">
+        {# 1. Fechas clave #}
+        <div class="pl-estado-bloque pl-estado-fechas" aria-labelledby="pl-estado-fechas-titulo">
+            <h3 id="pl-estado-fechas-titulo">Fechas</h3>
+            {% if estado and estado.disponible %}
+            <ol class="pl-estado-linea">
+                {% for item in estado.fechas %}
+                <li class="pl-estado-hito is-{{ item.estado }}">
+                    <span class="pl-estado-hito-etiqueta">{{ item.etiqueta }}</span>
+                    <strong><time datetime="{{ item.fecha.isoformat() if item.fecha else '' }}">{{ fecha_txt(item.fecha) }}</time></strong>
+                    {% if item.dias is not none %}<small>{{ relativo(item.dias) }}</small>{% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+            {% if calendario.bloques %}
+            <div class="pl-estado-bloques" style="--pl-cols: {{ calendario.bloques|length }}" role="img" aria-label="Línea de tiempo de la ficha: hoy está en {{ calendario.bloque_actual.nombre if calendario.bloque_actual else 'fuera de los periodos de la ficha' }}">
+                {% for bloque in calendario.bloques %}
+                <span class="pl-estado-bloque-celda is-{{ bloque.estado }} {{ 'is-productiva' if bloque.etapa == 'productiva' }}" title="{{ bloque.nombre }}: {{ fecha_txt(bloque.inicio) }} – {{ fecha_txt(bloque.fin) }}">{{ bloque.etiqueta }}</span>
+                {% endfor %}
+                {% if 0 <= calendario.posicion_hoy <= 100 %}<i class="pl-estado-hoy" style="--pl-hoy: {{ calendario.posicion_hoy }}" aria-hidden="true"></i>{% endif %}
+            </div>
+            {% endif %}
+            <dl class="pl-estado-datos">
+                <div>
+                    <dt>Etapa lectiva</dt>
+                    <dd>{{ calendario.dias_transcurridos_lectiva }} de {{ calendario.dias_totales_lectiva }} días transcurridos · {% if calendario.dias_restantes_lectiva %}faltan {{ calendario.dias_restantes_lectiva }} días ({{ numero(estado.semanas_lectivas_restantes) }} semanas){% else %}terminada{% endif %}</dd>
+                </div>
+                <div>
+                    <dt>Periodo actual</dt>
+                    <dd>{% if calendario.bloque_actual %}{{ calendario.bloque_actual.nombre }}{% if calendario.bloque_actual.etapa == 'lectiva' %} de {{ calendario.trimestres_lectivos }}{% endif %} · {{ calendario.bloque_actual.porcentaje_transcurrido }} % transcurrido{% else %}Fuera de los periodos de la ficha{% endif %}</dd>
+                </div>
+                <div>
+                    <dt>Próximo hito</dt>
+                    <dd>{% if estado.proximo_hito %}{{ estado.proximo_hito.etiqueta }}: {{ fecha_txt(estado.proximo_hito.fecha) }} ({{ relativo(estado.proximo_hito.dias) }}){% else %}No quedan fechas por cumplir{% endif %}</dd>
+                </div>
+            </dl>
+            {% else %}
+            <p class="pl-note">{{ calendario.mensaje if calendario and calendario.mensaje else 'La ficha no tiene fechas registradas.' }} Sin datos de fechas para calcular el avance.</p>
+            {% endif %}
+        </div>
+
+        {# 2. Fase del proyecto formativo #}
+        <div class="pl-estado-bloque pl-estado-fase" aria-labelledby="pl-estado-fase-titulo">
+            <h3 id="pl-estado-fase-titulo">Fase</h3>
+            {% set esperada = estado.fase_esperada if estado else None %}
+            {% set real = estado.fase_real if estado else None %}
+            {% if esperada or real %}
+            <div class="pl-estado-fases-par">
+                <div class="pl-estado-fase-dato">
+                    <span>Por calendario debería estar en</span>
+                    <strong>{% if esperada %}{{ esperada.icono }} {{ esperada.nombre }}{% else %}Sin datos{% endif %}</strong>
+                    {% if esperada %}
+                    <small>
+                        {{ fecha_txt(esperada.inicio) }} – {{ fecha_txt(esperada.fin) }}
+                        {% if esperada.momento == 'en_curso' %}· termina {{ relativo(esperada.dias_restantes) }}
+                        {% elif esperada.momento == 'por_iniciar' %}· inicia {{ relativo(esperada.dias_para_inicio) }}
+                        {% elif esperada.momento == 'terminada' %}· terminó {{ relativo(-esperada.dias_desde_fin) }}
+                        {% endif %}
+                    </small>
+                    {% endif %}
+                </div>
+                <div class="pl-estado-fase-dato {{ 'is-desfase' if not estado.fases_coinciden }}">
+                    <span>Según los RAP cerrados va en</span>
+                    <strong>{% if real %}{{ real.icono }} {{ real.nombre }}{% else %}Sin datos{% endif %}</strong>
+                    <small>{% if estado.fases_coinciden %}Coincide con el calendario{% elif real and esperada %}No coincide con el calendario{% else %}Falta información para comparar{% endif %}</small>
+                </div>
+            </div>
+            {% else %}
+            <p class="pl-note">Sin datos de fase. La planeación GFPI-F-134 cargada no declara fechas por fase.</p>
+            {% endif %}
+
+            {% if seguimiento_fases and seguimiento_fases.fases %}
+            <div class="pl-phase-track" aria-label="Avance de cada fase del proyecto formativo">
+                {% for fase in seguimiento_fases.fases if fase.orden < 4 %}
+                {% set es_esperada = esperada and fase.nombre == esperada.nombre %}
+                {% set es_real = real and fase.nombre == real.nombre %}
+                {% set tono_fase = 'danger' if fase.estado_ritmo == 'atrasado' else ('success' if fase.estado_ritmo in ('al_dia', 'adelantado') else ('neutral' if fase.estado_ritmo == 'futura' else 'info')) %}
+                <article class="pl-phase-track-item pl-tone-{{ tono_fase }} {{ 'is-expected' if es_esperada }} {{ 'is-real' if es_real }}">
+                    <div class="pl-phase-track-head">
+                        <span class="pl-phase-track-icon" aria-hidden="true">{{ fase.icono }}</span>
+                        <div><strong>{{ fase.nombre }}</strong><small>{% if es_esperada %}Debería estar aquí{% elif es_real %}Fase real{% elif fase.estado_tiempo == 'cumplida' %}Cerrada{% elif fase.estado_tiempo == 'futura' %}Futura{% elif fase.estado_tiempo == 'no_planeada' %}Sin RAP planeados{% else %}En seguimiento{% endif %}</small></div>
+                    </div>
+                    {% if fase.inicio or fase.fin %}<small class="pl-phase-track-fechas">{{ fecha_txt(fase.inicio) }} – {{ fecha_txt(fase.fin) }}</small>{% endif %}
+                    <div class="pl-phase-track-count"><strong>{{ fase.resultados_evaluados }}/{{ fase.resultados_total }}</strong> RAP evaluados</div>
+                    <div class="pl-progress-wrap" role="progressbar" aria-label="RAP evaluados en {{ fase.nombre }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ fase.porcentaje_evaluados }}"><div class="pl-progress-bar" style="width: {{ fase.porcentaje_evaluados }}%;"></div></div>
+                    <small class="pl-phase-track-note">{{ fase.resultados_aprobados }} cerrado{{ '' if fase.resultados_aprobados == 1 else 's' }} · {{ fase.resultados_esperados }} esperado{{ '' if fase.resultados_esperados == 1 else 's' }} · {% if fase.brecha_resultados < 0 %}{{ -fase.brecha_resultados }} por debajo del ritmo{% elif fase.brecha_resultados > 0 %}{{ fase.brecha_resultados }} por encima del ritmo{% else %}al ritmo{% endif %}{% if fase.horas %} · {{ fase.horas|round|int }} h{% endif %}</small>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {# 3. Avance en una sola escala #}
+        <div class="pl-estado-bloque pl-estado-avance" aria-labelledby="pl-estado-avance-titulo">
+            <h3 id="pl-estado-avance-titulo">Avance</h3>
+            {% set avance = estado.avance if estado else None %}
+            {% if avance %}
+            {% set barras = [
+                ('Tiempo lectivo transcurrido', avance.tiempo, 'is-tiempo', calendario.dias_transcurridos_lectiva ~ ' de ' ~ calendario.dias_totales_lectiva ~ ' días'),
+                ('RAP evaluados', avance.evaluados, 'is-evaluados', (resultados.evaluados ~ ' de ' ~ resultados.total) if resultados and resultados.total else 'Sin reporte de juicios'),
+                ('RAP cerrados (80 % de aprendices aprobados)', avance.cerrados, 'is-cerrados', (resultados.aprobados ~ ' de ' ~ resultados.total) if resultados and resultados.total else 'Sin reporte de juicios'),
+            ] %}
+            <ul class="pl-estado-barras">
+                {% for etiqueta, valor, clase, detalle in barras %}
+                <li class="{{ clase }}">
+                    <div class="pl-estado-barra-cabeza"><span>{{ etiqueta }}</span><strong>{% if valor is not none %}{{ numero(valor) }} %{% else %}Sin datos{% endif %}</strong></div>
+                    <div class="pl-estado-barra" role="progressbar" aria-label="{{ etiqueta }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ valor if valor is not none else 0 }}"><i style="width: {{ [valor or 0, 100]|min }}%"></i></div>
+                    <small>{{ detalle }}</small>
+                </li>
+                {% endfor %}
+            </ul>
+            {% if avance.brecha_puntos is not none %}
+            <p class="pl-estado-lectura pl-tone-{{ avance.tono }}">
+                {% if avance.brecha_puntos > 0 %}Los RAP cerrados van <strong>{{ numero(avance.brecha_puntos) }} puntos detrás</strong> del tiempo transcurrido.
+                {% elif avance.brecha_puntos < 0 %}Los RAP cerrados van <strong>{{ numero(-avance.brecha_puntos) }} puntos delante</strong> del tiempo transcurrido.
+                {% else %}Los RAP cerrados avanzan a la par del tiempo transcurrido.{% endif %}
+                {% if resultados %}Por calendario deberían estar evaluados {{ resultados.esperados }} RAP y hay {{ resultados.evaluados }}.{% endif %}
+            </p>
+            {% endif %}
+            <dl class="pl-estado-datos">
+                <div>
+                    <dt>Ritmo necesario</dt>
+                    <dd>{% if estado.rap_por_semana is none %}Sin datos{% elif estado.rap_por_semana == 0 %}No quedan RAP por evaluar{% else %}{{ numero(estado.rap_por_semana) }} RAP por semana para evaluar los {{ estado.rap_sin_evaluar }} pendientes antes del fin lectivo{% endif %}</dd>
+                </div>
+                <div>
+                    <dt>Ritmo de los últimos 6 meses</dt>
+                    <dd>{% if estado.rap_por_semana_actual is none %}Sin datos{% else %}{{ numero(estado.rap_por_semana_actual) }} RAP evaluados por semana{% if estado.rap_por_semana and estado.rap_por_semana_actual < estado.rap_por_semana %}: <strong class="pl-estado-alerta">no alcanza para terminar en la etapa lectiva</strong>{% endif %}{% endif %}</dd>
+                </div>
+                {% set proy = seguimiento_fases.proyeccion if seguimiento_fases else None %}
+                <div>
+                    <dt>Todos los RAP evaluados</dt>
+                    <dd>{% if not proy or proy.estado == 'sin_datos' %}Sin ritmo medible todavía{% elif proy.estado == 'completado' %}Ya no hay RAP pendientes{% else %}{{ fecha_txt(proy.fecha_cierre) }} al ritmo actual{% if proy.dias_vs_fin is not none %} · {% if proy.dias_vs_fin > 0 %}{{ proy.dias_vs_fin }} días después del fin de la ficha{% else %}{{ -proy.dias_vs_fin }} días antes del fin de la ficha{% endif %}{% endif %}{% endif %}</dd>
+                </div>
+            </dl>
+            {% else %}
+            <p class="pl-note">Sin datos de avance. Se necesitan las fechas de la ficha y la planeación pedagógica.</p>
+            {% endif %}
+        </div>
+    </div>
+    <p class="pl-note pl-estado-metodo"><strong>Cómo se calcula:</strong> un RAP está evaluado cuando el reporte registra al menos un juicio emitido y cerrado cuando lo aprobó el 80 % de los aprendices vigentes. La fase esperada sale de las fechas de la planeación GFPI-F-134; la fase real es la primera con RAP sin cerrar. El ritmo actual cuenta los RAP evaluados en los últimos 180 días.</p>
+</section>

@@ -17,8 +17,6 @@
 <div class="pl-page" data-ficha-id="{{ ficha.id }}">
     {% include 'instructor/_planeacion_cabecera.html' %}
 
-    {{ render_alertas_contextuales(ficha.id, 'fases_cronograma') }}
-
     {% if importacion_id %}
     <div class="pl-verdict pl-tone-info" role="status" aria-live="polite" data-importacion-id="{{ importacion_id }}">
         <span class="pl-verdict-icon" aria-hidden="true">⏳</span>
@@ -40,10 +38,10 @@
     </div>
     {% endif %}
 
-    {# Centro de Carga y Análisis de los Tres Documentos #}
-    {% include 'instructor/_planeacion_carga_unificada.html' %}
-
     {% if not analisis %}
+    {# Sin planeación, cargar los archivos es lo único que se puede hacer: va primero. #}
+    {{ render_alertas_contextuales(ficha.id, 'fases_cronograma') }}
+    {% include 'instructor/_planeacion_carga_unificada.html' %}
     <div class="pl-empty">
         <div class="empty-icon">🧭</div>
         <h2>Comience con los archivos de la ficha</h2>
@@ -61,12 +59,17 @@
         </div>
         {% endif %}
 
-        {% include 'instructor/_planeacion_panorama.html' %}
+        {# Orden: estado (fechas, fase, avance) → qué atender → cronograma → ritmo → detalle → análisis → archivos #}
+        {% include 'instructor/_planeacion_estado.html' %}
+        {{ render_alertas_contextuales(ficha.id, 'fases_cronograma') }}
+        {% include 'instructor/_planeacion_atencion.html' %}
         {% include 'instructor/_planeacion_mapa.html' %}
         {% include 'instructor/_planeacion_gantt_detalle.html' %}
         {% include 'instructor/_planeacion_evaluaciones.html' %}
-        {% include 'instructor/_planeacion_programa.html' %}
+        {% include 'instructor/_planeacion_panorama.html' %}
         {% include 'instructor/_planeacion_detalle.html' %}
+        {% include 'instructor/_planeacion_programa.html' %}
+        {% include 'instructor/_planeacion_carga_unificada.html' %}
     {% endif %}
 
     {% include 'instructor/_planeacion_documentos.html' %}

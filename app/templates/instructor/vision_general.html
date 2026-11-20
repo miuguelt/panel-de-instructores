@@ -67,27 +67,182 @@
         </div>
     </header>
 
-    <!-- 1.1 CENTRO DE RECOMENDACIONES PEDAGÓGICAS Y ACCIONES SUGERIDAS -->
-    {% if resumen.recomendaciones %}
-    <section class="card vision-recommendations-center" id="centro-recomendaciones" aria-labelledby="rec-center-title">
-        <div class="vision-rec-header">
-            <div>
-                <span class="eyebrow">Diagnóstico Inteligente · Motor Pedagógico</span>
-                <h2 id="rec-center-title">Recomendaciones y Acciones Sugeridas</h2>
-            </div>
-            <span class="badge badge-primary">{{ resumen.recomendaciones|length }} acción(es) detectada(s)</span>
-        </div>
-        <p class="text-muted vision-rec-intro">
-            Sugerencias priorizadas generadas automáticamente cruzando el calendario lectivo, RAPs de SOFIA Plus, tareas activas y asistencia reglamentaria.
-        </p>
+    <!-- 1. TIEMPO, FASE Y AVANCE: LO PRIMERO QUE DEBE VER EL INSTRUCTOR -->
+    {% set crono = resumen.cronograma %}
+    {% set pct_tiempo = crono.porcentaje|default(0) %}
+    {% set pct_raps = resumen.pct_juicios %}
+    {% set desfase = resumen.fases_data.desfase_fases if (resumen.fases_data and resumen.fases_data.desfase_fases is defined) else 0 %}
+    {# Una fase sin fechas configuradas ni RAPs calificados no se muestra: el servicio usa nombres provisionales. #}
+    {% set fase_esperada = resumen.fases_data.fase_esperada if resumen.fases_data else none %}
+    {% set fase_real = resumen.fases_data.fase_real if resumen.fases_data else none %}
+    {% set tiene_fase_esperada = (fase_esperada and fase_esperada.nombre and fase_esperada.nombre not in ('Fechas pendientes', 'Sin definir')) %}
+    {% set tiene_fase_real = (fase_real and fase_real.nombre and fase_real.nombre != 'Sin definir' and not (fase_real.resultados_total is defined and fase_real.resultados_total == 0)) %}
+    <section class="ficha-time-hero ficha-formation-hero vision-hero-block" aria-label="Progreso formativo y fases del proyecto">
+        <div class="time-hero-grid">
+            <!-- Columna 1: Avance temporal -->
+            <div class="time-hero-col time-hero-col-progress">
+                <div class="time-hero-header">
+                    <div class="time-hero-eyebrow">
+                        <span class="time-hero-icon" aria-hidden="true">⏱️</span>
+                        <span>Tiempo Lectivo Transcurrido</span>
+                    </div>
+                    <span class="time-hero-badge {% if pct_tiempo >= 70 %}is-goal{% elif crono.configurado %}is-active{% else %}is-warning{% endif %}">
+                        {% if crono.configurado %}{{ crono.fase_label }}{% else %}Fechas pendientes{% endif %}
+                    </span>
+                </div>
 
-        <div class="vision-recommendations-grid">
-            {% for rec in resumen.recomendaciones %}
-                {{ render_card_recomendacion(rec) }}
-            {% endfor %}
+                <div class="time-hero-metric-group">
+                    <div class="time-hero-val-wrap">
+                        <strong class="time-hero-val">{{ pct_tiempo }}%</strong>
+                        <span class="time-hero-val-sub">del tiempo lectivo</span>
+                    </div>
+                    <p class="time-hero-detail">
+                        {% if crono.dias_totales > 0 %}
+                        <strong>{{ crono.dias_transcurridos }}</strong> de {{ crono.dias_totales }} días cursados
+                        (Faltan <strong>{{ crono.dias_restantes_lectiva }}</strong> días lectivos)
+                        {% else %}
+                        Configura las fechas de inicio y fin de la ficha.
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="time-hero-track" role="progressbar" aria-label="Tiempo lectivo transcurrido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_tiempo }}" title="Tiempo: {{ pct_tiempo }}%">
+                    <div class="time-hero-bar" style="width: {{ [pct_tiempo, 100]|min }}%;"></div>
+                    <div class="time-hero-marker" style="left: 70%;" title="Hito 70% (TyT)">
+                        <span class="time-hero-marker-label">Hito 70%</span>
+                    </div>
+                </div>
+
+                <div class="time-hero-meta-row">
+                    <span class="time-meta-item">
+                        <span class="time-meta-k">Inicio lectiva:</span>
+                        <strong>{% if crono.inicio_lectiva %}{{ crono.inicio_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
+                    </span>
+                    <span class="time-meta-divider" aria-hidden="true">·</span>
+                    <span class="time-meta-item">
+                        <span class="time-meta-k">Fin lectiva:</span>
+                        <strong>{% if crono.fin_lectiva %}{{ crono.fin_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
+                    </span>
+                    <span class="time-meta-divider" aria-hidden="true">·</span>
+                    <span class="time-meta-item">
+                        <span class="time-meta-k">Inicio productiva:</span>
+                        <strong>{% if crono.inicio_productiva %}{{ crono.inicio_productiva.strftime('%d/%m/%Y') }}{% else %}Sin datos{% endif %}</strong>
+                    </span>
+                    <span class="time-meta-divider" aria-hidden="true">·</span>
+                    <span class="time-meta-item">
+                        <span class="time-meta-k">Fin de la ficha:</span>
+                        <strong>{% if crono.fin_productiva %}{{ crono.fin_productiva.strftime('%d/%m/%Y') }}{% else %}Sin datos{% endif %}</strong>
+                    </span>
+                    <span class="time-meta-divider" aria-hidden="true">·</span>
+                    <span class="time-meta-item">
+                        <span class="time-meta-k">Etapa productiva:</span>
+                        <strong>{% if crono.meses_productiva %}{{ crono.meses_productiva }} meses{% else %}Sin datos{% endif %}</strong>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Columna 2: Avance Académico de Juicios / RAPs -->
+            <div class="time-hero-col time-hero-col-group group-average-progress">
+                <div class="time-hero-header">
+                    <div class="time-hero-eyebrow">
+                        <span class="time-hero-icon" aria-hidden="true">🎓</span>
+                        <span>Cobertura de RAPs (SOFIA Plus)</span>
+                    </div>
+                    {% if pct_raps >= 70 %}
+                    <span class="time-hero-tag is-milestone">✓ Meta 70% TyT lograda</span>
+                    {% elif resumen.juicios_totales > 0 %}
+                    <span class="time-hero-tag is-pending">Meta 70%: faltan {{ (70 - pct_raps)|round(1) }} pts</span>
+                    {% else %}
+                    <span class="time-hero-tag is-pending">Sin juicios cargados</span>
+                    {% endif %}
+                </div>
+
+                <div class="group-average-summary">
+                    <div class="time-hero-val-wrap">
+                        <strong class="time-hero-val text-accent">{{ pct_raps }}%</strong>
+                        <span class="time-hero-val-sub">aprobados</span>
+                    </div>
+                    <p class="time-hero-detail">
+                        <strong>{{ resumen.juicios_aprobados }}</strong> de {{ resumen.juicios_totales }} RAPs asentados
+                        · <strong>{{ resumen.aprendices_certificados }}</strong> aprendices al 100%
+                    </p>
+                </div>
+
+                <div class="group-average-track" role="progressbar" aria-label="RAPs aprobados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_raps }}" title="RAPs aprobados: {{ pct_raps }}%">
+                    <div class="group-average-bar" style="width: {{ [pct_raps, 100]|min }}%;"></div>
+                    <span class="group-average-target-line" style="left: 70%;" title="Meta institucional 70%"></span>
+                    <span class="group-average-target-label" style="left: 70%;">Meta 70%</span>
+                </div>
+
+                <div class="time-hero-meta-row">
+                    <span class="time-meta-item">
+                        <span class="time-meta-k">Fase esperada:</span>
+                        <strong>{% if tiene_fase_esperada %}{{ fase_esperada.icono }} {{ fase_esperada.nombre|title }}{% else %}Sin datos{% endif %}</strong>
+                    </span>
+                    <span class="time-meta-divider" aria-hidden="true">·</span>
+                    <span class="time-meta-item">
+                        <span class="time-meta-k">Fase real (RAPs):</span>
+                        <strong>{% if tiene_fase_real %}{{ fase_real.icono }} {{ fase_real.nombre|title }}{% else %}Sin datos{% endif %}</strong>
+                    </span>
+                    {% if not tiene_fase_esperada or not tiene_fase_real %}
+                    <span class="time-meta-divider" aria-hidden="true">·</span>
+                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="time-meta-link">Cargar planeación</a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
+
+        {% set fases_data = resumen.fases_data %}
+        {% if fases_data and fases_data.disponible and (tiene_fase_esperada or tiene_fase_real) %}
+        <details class="ficha-phase-details vision-phase-accordion" id="vision-phase-details">
+            <summary class="ficha-phase-summary">
+                <div class="ficha-phase-summary-main">
+                    <span class="ficha-phase-summary-icon" aria-hidden="true">🗺️</span>
+                    <div class="ficha-phase-summary-copy">
+                        <div class="ficha-phase-summary-header-line">
+                            <strong class="ficha-phase-title">Desglose de fases del proyecto formativo</strong>
+                            {% if fases_data.desfase_fases|default(0) > 0 %}
+                            <span class="fases-status-pill is-danger" title="El tiempo lectivo ha avanzado más rápido que los RAPs aprobados">
+                                <span class="fases-dot"></span> Retraso de {{ fases_data.desfase_fases }} {{ 'fase' if fases_data.desfase_fases == 1 else 'fases' }}
+                            </span>
+                            {% elif fases_data.desfase_fases|default(0) < 0 %}
+                            <span class="fases-status-pill is-info" title="Los RAPs aprobados van por delante del tiempo programado">
+                                <span class="fases-dot"></span> Adelantada
+                            </span>
+                            {% else %}
+                            <span class="fases-status-pill is-success" title="El avance de RAPs coincide con la fase esperada por tiempo">
+                                <span class="fases-dot"></span> Al día con el cronograma
+                            </span>
+                            {% endif %}
+                            {% if fases_data.planeacion_sincronizada %}
+                            <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">✓ GFPI-F-134</span>
+                            {% endif %}
+                        </div>
+                        <div class="ficha-phase-summary-meta">
+                            <span class="ficha-phase-subtitle">Avance según GFPI y reporte de juicios</span>
+                            {% if fases_data.resumen_raps and (fases_data.resumen_raps.raps_vencidos_pendientes|default(0)) > 0 %}
+                            <span class="ficha-phase-sep" aria-hidden="true">·</span>
+                            <button type="button" class="fases-chip-vencidos" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" title="Ver qué RAPs debieron calificarse y sus fechas límites">
+                                <span class="fases-chip-vencidos-icon" aria-hidden="true">⚠️</span>
+                                <span class="fases-chip-vencidos-text"><strong>{{ fases_data.resumen_raps.raps_vencidos_pendientes }} RAPs</strong> pendientes de fases culminadas</span>
+                                <span class="fases-chip-vencidos-action">Ver fechas 🔍</span>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="ficha-phase-summary-action">
+                    <span class="ficha-phase-action-text is-closed">Ver fases</span>
+                    <span class="ficha-phase-action-text is-opened">Ocultar fases</span>
+                    <span class="ficha-phase-action-icon" aria-hidden="true">＋</span>
+                </div>
+            </summary>
+            <div class="ficha-phase-details-content">
+                {% include 'instructor/_ficha_fases_tracker.html' with context %}
+            </div>
+        </details>
+        {% endif %}
     </section>
-    {% endif %}
 
     <!-- 2. FRANJA DE ATENCIÓN INMEDIATA (LO QUE EL INSTRUCTOR DEBE ATENDER HOY) -->
     <section class="urgent-panel" aria-label="Atención prioritaria de hoy">
@@ -269,163 +424,27 @@
         </div>
     </section>
 
-    <!-- 3. SECCIÓN HERO: CRONOGRAMA, CULMINACIÓN Y FASES FORMATIVAS -->
-    {% set crono = resumen.cronograma %}
-    {% set pct_tiempo = crono.porcentaje|default(0) %}
-    {% set pct_raps = resumen.pct_juicios %}
-    {% set desfase = resumen.fases_data.desfase_fases if (resumen.fases_data and resumen.fases_data.desfase_fases is defined) else 0 %}
-    <section class="ficha-time-hero ficha-formation-hero vision-hero-block" aria-label="Progreso formativo y fases del proyecto">
-        <div class="time-hero-grid">
-            <!-- Columna 1: Avance temporal -->
-            <div class="time-hero-col time-hero-col-progress">
-                <div class="time-hero-header">
-                    <div class="time-hero-eyebrow">
-                        <span class="time-hero-icon" aria-hidden="true">⏱️</span>
-                        <span>Tiempo Lectivo Transcurrido</span>
-                    </div>
-                    <span class="time-hero-badge {% if pct_tiempo >= 70 %}is-goal{% elif crono.configurado %}is-active{% else %}is-warning{% endif %}">
-                        {% if crono.configurado %}{{ crono.fase_label }}{% else %}Fechas pendientes{% endif %}
-                    </span>
-                </div>
-
-                <div class="time-hero-metric-group">
-                    <div class="time-hero-val-wrap">
-                        <strong class="time-hero-val">{{ pct_tiempo }}%</strong>
-                        <span class="time-hero-val-sub">del tiempo lectivo</span>
-                    </div>
-                    <p class="time-hero-detail">
-                        {% if crono.dias_totales > 0 %}
-                        <strong>{{ crono.dias_transcurridos }}</strong> de {{ crono.dias_totales }} días cursados
-                        (Faltan <strong>{{ crono.dias_restantes_lectiva }}</strong> días lectivos)
-                        {% else %}
-                        Configura las fechas de inicio y fin de la ficha.
-                        {% endif %}
-                    </p>
-                </div>
-
-                <div class="time-hero-track" role="progressbar" aria-label="Tiempo lectivo transcurrido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_tiempo }}" title="Tiempo: {{ pct_tiempo }}%">
-                    <div class="time-hero-bar" style="width: {{ [pct_tiempo, 100]|min }}%;"></div>
-                    <div class="time-hero-marker" style="left: 70%;" title="Hito 70% (TyT)">
-                        <span class="time-hero-marker-label">Hito 70%</span>
-                    </div>
-                </div>
-
-                <div class="time-hero-meta-row">
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Inicio lectiva:</span>
-                        <strong>{% if crono.inicio_lectiva %}{{ crono.inicio_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Fin lectiva:</span>
-                        <strong>{% if crono.fin_lectiva %}{{ crono.fin_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Etapa productiva:</span>
-                        <strong>{{ crono.meses_productiva|default('6') }} meses</strong>
-                    </span>
-                </div>
+    <!-- 3. CENTRO DE RECOMENDACIONES PEDAGÓGICAS Y ACCIONES SUGERIDAS -->
+    {% if resumen.recomendaciones %}
+    <section class="card vision-recommendations-center" id="centro-recomendaciones" aria-labelledby="rec-center-title">
+        <div class="vision-rec-header">
+            <div>
+                <span class="eyebrow">Diagnóstico Inteligente · Motor Pedagógico</span>
+                <h2 id="rec-center-title">Recomendaciones y Acciones Sugeridas</h2>
             </div>
-
-            <!-- Columna 2: Avance Académico de Juicios / RAPs -->
-            <div class="time-hero-col time-hero-col-group group-average-progress">
-                <div class="time-hero-header">
-                    <div class="time-hero-eyebrow">
-                        <span class="time-hero-icon" aria-hidden="true">🎓</span>
-                        <span>Cobertura de RAPs (SOFIA Plus)</span>
-                    </div>
-                    {% if pct_raps >= 70 %}
-                    <span class="time-hero-tag is-milestone">✓ Meta 70% TyT lograda</span>
-                    {% elif resumen.juicios_totales > 0 %}
-                    <span class="time-hero-tag is-pending">Meta 70%: faltan {{ (70 - pct_raps)|round(1) }} pts</span>
-                    {% else %}
-                    <span class="time-hero-tag is-pending">Sin juicios cargados</span>
-                    {% endif %}
-                </div>
-
-                <div class="group-average-summary">
-                    <div class="time-hero-val-wrap">
-                        <strong class="time-hero-val text-accent">{{ pct_raps }}%</strong>
-                        <span class="time-hero-val-sub">aprobados</span>
-                    </div>
-                    <p class="time-hero-detail">
-                        <strong>{{ resumen.juicios_aprobados }}</strong> de {{ resumen.juicios_totales }} RAPs asentados
-                        · <strong>{{ resumen.aprendices_certificados }}</strong> aprendices al 100%
-                    </p>
-                </div>
-
-                <div class="group-average-track" role="progressbar" aria-label="RAPs aprobados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_raps }}" title="RAPs aprobados: {{ pct_raps }}%">
-                    <div class="group-average-bar" style="width: {{ [pct_raps, 100]|min }}%;"></div>
-                    <span class="group-average-target-line" style="left: 70%;" title="Meta institucional 70%"></span>
-                    <span class="group-average-target-label" style="left: 70%;">Meta 70%</span>
-                </div>
-
-                <div class="time-hero-meta-row">
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Fase esperada:</span>
-                        <strong>{{ resumen.fases_data.fase_esperada.icono if resumen.fases_data and resumen.fases_data.fase_esperada else '⚙️' }} {{ resumen.fases_data.fase_esperada.nombre|title if resumen.fases_data and resumen.fases_data.fase_esperada else 'Ejecución' }}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Fase real (RAPs):</span>
-                        <strong>{{ resumen.fases_data.fase_real.icono if resumen.fases_data and resumen.fases_data.fase_real else '🔍' }} {{ resumen.fases_data.fase_real.nombre|title if resumen.fases_data and resumen.fases_data.fase_real else 'Análisis' }}</strong>
-                    </span>
-                </div>
-            </div>
+            <span class="badge badge-primary">{{ resumen.recomendaciones|length }} acción(es) detectada(s)</span>
         </div>
+        <p class="text-muted vision-rec-intro">
+            Sugerencias priorizadas generadas automáticamente cruzando el calendario lectivo, RAPs de SOFIA Plus, tareas activas y asistencia reglamentaria.
+        </p>
 
-        {% set fases_data = resumen.fases_data %}
-        {% if fases_data and fases_data.disponible %}
-        <details class="ficha-phase-details vision-phase-accordion" id="vision-phase-details">
-            <summary class="ficha-phase-summary">
-                <div class="ficha-phase-summary-main">
-                    <span class="ficha-phase-summary-icon" aria-hidden="true">🗺️</span>
-                    <div class="ficha-phase-summary-copy">
-                        <div class="ficha-phase-summary-header-line">
-                            <strong class="ficha-phase-title">Desglose de fases del proyecto formativo</strong>
-                            {% if fases_data.desfase_fases|default(0) > 0 %}
-                            <span class="fases-status-pill is-danger" title="El tiempo lectivo ha avanzado más rápido que los RAPs aprobados">
-                                <span class="fases-dot"></span> Retraso de {{ fases_data.desfase_fases }} {{ 'fase' if fases_data.desfase_fases == 1 else 'fases' }}
-                            </span>
-                            {% elif fases_data.desfase_fases|default(0) < 0 %}
-                            <span class="fases-status-pill is-info" title="Los RAPs aprobados van por delante del tiempo programado">
-                                <span class="fases-dot"></span> Adelantada
-                            </span>
-                            {% else %}
-                            <span class="fases-status-pill is-success" title="El avance de RAPs coincide con la fase esperada por tiempo">
-                                <span class="fases-dot"></span> Al día con el cronograma
-                            </span>
-                            {% endif %}
-                            {% if fases_data.planeacion_sincronizada %}
-                            <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">✓ GFPI-F-134</span>
-                            {% endif %}
-                        </div>
-                        <div class="ficha-phase-summary-meta">
-                            <span class="ficha-phase-subtitle">Avance según GFPI y reporte de juicios</span>
-                            {% if fases_data.resumen_raps and (fases_data.resumen_raps.raps_vencidos_pendientes|default(0)) > 0 %}
-                            <span class="ficha-phase-sep" aria-hidden="true">·</span>
-                            <button type="button" class="fases-chip-vencidos" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" title="Ver qué RAPs debieron calificarse y sus fechas límites">
-                                <span class="fases-chip-vencidos-icon" aria-hidden="true">⚠️</span>
-                                <span class="fases-chip-vencidos-text"><strong>{{ fases_data.resumen_raps.raps_vencidos_pendientes }} RAPs</strong> pendientes de fases culminadas</span>
-                                <span class="fases-chip-vencidos-action">Ver fechas 🔍</span>
-                            </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                <div class="ficha-phase-summary-action">
-                    <span class="ficha-phase-action-text is-closed">Ver fases</span>
-                    <span class="ficha-phase-action-text is-opened">Ocultar fases</span>
-                    <span class="ficha-phase-action-icon" aria-hidden="true">＋</span>
-                </div>
-            </summary>
-            <div class="ficha-phase-details-content">
-                {% include 'instructor/_ficha_fases_tracker.html' with context %}
-            </div>
-        </details>
-        {% endif %}
+        <div class="vision-recommendations-grid">
+            {% for rec in resumen.recomendaciones %}
+                {{ render_card_recomendacion(rec) }}
+            {% endfor %}
+        </div>
     </section>
+    {% endif %}
 
     <!-- 4. KPIS BENTO: ASISTENCIA, EVIDENCIAS Y ESTADOS -->
     <section class="vision-bento-section" aria-label="Indicadores operativos de la ficha">

@@ -2,10 +2,18 @@
     <a href="{{ url_for('instructor.fichas') }}" class="pl-back-link">&larr; Volver a fichas</a>
     <div class="pl-heading-row">
         <div class="pl-heading-copy">
-            <p class="pl-eyebrow">Seguimiento de la formación</p>
             <h1>Planeación de la ficha</h1>
             <p class="pl-heading-context"><span class="pl-ficha-code">Ficha {{ ficha.codigo }}</span> <span>{{ ficha.nombre_programa }}</span></p>
+            {% if analisis %}
+            <p class="pl-heading-fuentes">
+                <span>Datos al {{ hoy.strftime('%d/%m/%Y') if hoy else 'día de hoy' }}</span>
+                {% if version_planeacion %}<span>Planeación v{{ version_planeacion.version }}</span>{% endif %}
+                {% if version_reporte %}<span>Juicios v{{ version_reporte.version }}{% if fecha_carga_reporte %}, cargado el {{ fecha_carga_reporte.strftime('%d/%m/%Y') }}{% endif %}</span>{% else %}<span class="is-faltante">Sin reporte de juicios</span>{% endif %}
+                {% if version_programa %}<span>Programa v{{ version_programa.version }}</span>{% else %}<span class="is-faltante">Sin programa de formación</span>{% endif %}
+            </p>
+            {% else %}
             <p class="pl-heading-description">Línea de tiempo de la ficha: consulte el avance, identifique retrasos y mantenga las fuentes al día.</p>
+            {% endif %}
         </div>
         <div class="pl-heading-actions">
             <a href="#centro-carga" class="btn btn-primary">{{ 'Actualizar archivos' if analisis else 'Cargar archivos' }} <span aria-hidden="true">↗</span></a>
@@ -21,9 +29,10 @@
 {% if analisis %}
 <nav class="pl-subnav" aria-label="Secciones de esta página">
     <div class="pl-nav-primary">
-        <a href="#seccion-resumen" class="pl-subnav-link is-active" aria-current="location">Resumen</a>
+        <a href="#seccion-resumen" class="pl-subnav-link is-active" aria-current="location">Estado</a>
+        <a href="#seccion-riesgos" class="pl-subnav-link">Qué atender</a>
         <a href="#seccion-gantt" class="pl-subnav-link">Cronograma</a>
-        <a href="#seccion-riesgos" class="pl-subnav-link">Riesgos</a>
+        <a href="#seccion-ritmo" class="pl-subnav-link">Ritmo</a>
         <a href="#seccion-detalle" class="pl-subnav-link">Detalle por fase</a>
         <a href="#documentos" class="pl-subnav-link">Archivos</a>
     </div>
@@ -31,7 +40,6 @@
         <summary>Más análisis</summary>
         <div class="pl-nav-extra">
             {% if curva_svg %}<a href="#seccion-curva-s" class="pl-subnav-link">Curva S</a>{% endif %}
-            {% if seguimiento_fases %}<a href="#seccion-seguimiento-fases" class="pl-subnav-link">Fase actual</a>{% endif %}
             {% if proyeccion and proyeccion.cfd %}<a href="#seccion-cfd" class="pl-subnav-link">Flujo de RAP</a>{% endif %}
             {% if radar and radar.ejes %}<a href="#seccion-radar" class="pl-subnav-link">Radar curricular</a>{% endif %}
             {% if heatmap_docente and heatmap_docente.filas %}<a href="#heatmap-docente-section" class="pl-subnav-link">Carga docente</a>{% endif %}

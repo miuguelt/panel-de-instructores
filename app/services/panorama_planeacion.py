@@ -26,6 +26,7 @@ from app.services.linea_tiempo import construir_linea_tiempo
 from app.services.evaluacion_planeacion import construir_seguimiento, analizar_competencias_vencidas
 from app.services.proyeccion_ficha import construir_proyeccion
 from app.services.seguimiento_fases import construir_seguimiento_fases
+from app.services.estado_ficha import construir_estado_ficha
 
 
 def _texto_proyeccion(proyeccion, calendario):
@@ -35,7 +36,7 @@ def _texto_proyeccion(proyeccion, calendario):
     fin = calendario['fin_lectiva'].strftime('%d/%m/%Y')
     proyectada = proyeccion['fecha_proyectada'].strftime('%d/%m/%Y')
     diferencia = abs(proyeccion['dias_vs_fin_lectiva'])
-    ritmo = f"{proyeccion['ritmo_mensual']:g} aprobaciones por mes"
+    ritmo = f"{proyeccion['ritmo_mensual']:g}".replace('.', ',') + ' aprobaciones por mes'
     if proyeccion['estado'] == 'completado':
         return f'Los resultados de la etapa lectiva ya están cerrados. La etapa termina el {fin}.'
     if proyeccion['dias_vs_fin_lectiva'] > 0:
@@ -177,6 +178,7 @@ def construir_panorama(ficha, contenido_planeacion, version_planeacion=None,
         'calendario': calendario,
         'linea': linea,
         'seguimiento_fases': seguimiento_fases,
+        'estado': construir_estado_ficha(calendario, seguimiento_fases, hoy=hoy),
         'proyeccion': proyeccion,
         'diagnostico': diagnostico,
         'contraste': contraste,

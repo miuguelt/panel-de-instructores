@@ -19,6 +19,7 @@ from app.services.fases_dashboard import (
     obtener_seguimiento_fases_dashboard,
 )
 from app.models.resultado_calculado import ResultadoCalculadoFicha
+from app.services.resultados_persistidos import ALGORITMO_RESULTADOS
 
 
 class FasesDashboardTestCase(unittest.TestCase):
@@ -333,7 +334,7 @@ class FasesDashboardTestCase(unittest.TestCase):
             tipo='fases',
             fecha_corte=date(2025, 5, 1),
             revision_calculo=1,
-            version_algoritmo='resultados-v2',
+            version_algoritmo=ALGORITMO_RESULTADOS,
             huella_fuentes='huella123',
             payload_json={'disponible': True, 'estado': 'al_dia', 'fases': []},
         )

@@ -238,3 +238,8 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* En pantallas estrechas el estado de evaluación pasa debajo del nombre y se ajusta al ancho. */
+.pl-vencida-top { flex-wrap: wrap; }
+.pl-vencida-top h4 { min-width: min(100%, 12rem); }
+.pl-vencida-item .pl-chip { max-width: 100%; white-space: normal; overflow-wrap: break-word; }

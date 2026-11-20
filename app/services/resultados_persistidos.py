@@ -22,7 +22,7 @@ from app.models import (
 )
 
 
-ALGORITMO_RESULTADOS = 'resultados-v2'
+ALGORITMO_RESULTADOS = 'resultados-v3'
 
 
 def fecha_corte_bogota():

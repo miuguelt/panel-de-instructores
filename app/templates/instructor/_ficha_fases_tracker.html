@@ -1,6 +1,11 @@
 {# Componente visual del Tracker de Fases del Proyecto Formativo #}
 {% set fases_data = fases_data if (fases_data is defined and fases_data) else (resumen.fases_data if (resumen is defined and resumen.fases_data) else none) %}
 {% if fases_data and fases_data.disponible %}
+{# Una fase sin fechas configuradas ni RAPs calificados no se muestra: el servicio usa nombres provisionales. #}
+{% set tracker_fe = fases_data.fase_esperada %}
+{% set tracker_fr = fases_data.fase_real %}
+{% set tracker_tiene_fe = (tracker_fe and tracker_fe.nombre and tracker_fe.nombre not in ('Fechas pendientes', 'Sin definir')) %}
+{% set tracker_tiene_fr = (tracker_fr and tracker_fr.nombre and tracker_fr.nombre != 'Sin definir' and not (tracker_fr.resultados_total is defined and tracker_fr.resultados_total == 0)) %}
 <section class="ficha-fases-tracker" aria-label="Seguimiento de fases del proyecto formativo">
     <div class="fases-tracker-header">
         <div class="fases-tracker-title">
@@ -37,12 +42,12 @@
         <div class="fases-comparison-summary">
             <div class="fases-comparison-item">
                 <span class="fases-comparison-label">Tiempo</span>
-                <strong class="fases-comparison-val text-primary">{{ fases_data.fase_esperada.icono if fases_data.fase_esperada else '⏱️' }} {{ fases_data.fase_esperada.nombre|title if fases_data.fase_esperada else 'Ejecución' }}</strong>
+                <strong class="fases-comparison-val text-primary">{% if tracker_tiene_fe %}{{ tracker_fe.icono }} {{ tracker_fe.nombre|title }}{% else %}Sin datos{% endif %}</strong>
             </div>
             <span class="fases-comparison-divider" aria-hidden="true">vs</span>
             <div class="fases-comparison-item">
                 <span class="fases-comparison-label">Juicios RAPs</span>
-                <strong class="fases-comparison-val text-accent">{{ fases_data.fase_real.icono if fases_data.fase_real else '📚' }} {{ fases_data.fase_real.nombre|title if fases_data.fase_real else 'Análisis' }}</strong>
+                <strong class="fases-comparison-val text-accent">{% if tracker_tiene_fr %}{{ tracker_fr.icono }} {{ tracker_fr.nombre|title }}{% else %}Sin datos{% endif %}</strong>
             </div>
         </div>
     </div>
@@ -82,7 +87,7 @@
                     {% if f_vencidas %}
                     Por calendario del proyecto GFPI-F-134, las fases de {% for fv in f_vencidas %}<strong>{{ fv.nombre|title }}</strong> ({{ fv.resultados_total }} RAPs){% if not loop.last %}{% if loop.index == f_vencidas|length - 1 %} y {% else %}, {% endif %}{% endif %}{% endfor %} ya culminaron su ventana formativa.{% if f_en_curso %} En <strong>{{ f_en_curso.nombre|title }}</strong> deberían ir {{ f_en_curso.resultados_esperados|default(0) }} RAPs evaluados a la fecha.{% endif %}
                     {% else %}
-                    Según el calendario del proyecto GFPI-F-134, la ficha debería haber alcanzado {{ esperados_cnt }} RAPs evaluados en la fase de <strong>{{ fases_data.fase_esperada.nombre|title if fases_data.fase_esperada else 'Ejecución' }}</strong>.
+                    Según el calendario del proyecto GFPI-F-134, la ficha debería haber alcanzado {{ esperados_cnt }} RAPs evaluados{% if tracker_tiene_fe %} en la fase de <strong>{{ tracker_fe.nombre|title }}</strong>{% endif %}.
                     {% endif %}
                 {% else %}
                 Según el tiempo lectivo transcurrido, la ficha debería haber cubierto el {{ pct_esp }}% de los resultados de aprendizaje.
@@ -102,7 +107,7 @@
             <p class="fases-corte-detalle">
                 {% if vencidos_pend > 0 %}
                 <span class="fases-alerta-vencidas">⚠️ Rezago en fases culminadas:</span>
-                Hay <strong>{{ vencidos_pend }} RAPs pendientes</strong> en fases que ya terminaron ({% for fv in fases_venc_list %}{{ fv.nombre|title }}: {{ fv.pendientes }}{% if not loop.last %}, {% endif %}{% endfor %}), lo cual mantiene a la ficha anclada en {{ fases_data.fase_real.nombre|title if fases_data.fase_real else 'fases previas' }}.
+                Hay <strong>{{ vencidos_pend }} RAPs pendientes</strong> en fases que ya terminaron ({% for fv in fases_venc_list %}{{ fv.nombre|title }}: {{ fv.pendientes }}{% if not loop.last %}, {% endif %}{% endfor %}), lo cual mantiene a la ficha anclada en {{ tracker_fr.nombre|title if tracker_tiene_fr else 'fases previas' }}.
                 <br>
                 <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;">
                     <span>🔍</span> <span>Ver auditoría de RAPs y fechas límites</span>

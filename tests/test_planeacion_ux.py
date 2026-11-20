@@ -14,7 +14,9 @@ from app.models import ArchivoFichaVersion, ResultadoCalculadoFicha, TIPO_PLANEA
 from tests.apoyo_planeacion import crear_planeacion_xlsx
 
 
-class PlaneacionUXTestCase(unittest.TestCase):
+class PlaneacionBase(unittest.TestCase):
+    """Ficha, instructor autenticado y carga de planeación compartidos por las pruebas."""
+
     def setUp(self):
         self.archivos = TemporaryDirectory()
         self.app = create_app({
@@ -65,6 +67,8 @@ class PlaneacionUXTestCase(unittest.TestCase):
         self.assertEqual(respuesta.status_code, 200)
         return respuesta.get_data(as_text=True)
 
+
+class PlaneacionUXTestCase(PlaneacionBase):
     def test_la_cabecera_identifica_la_ficha_y_ofrece_cargar_fuentes(self):
         html = self.pagina()
         self.assertRegex(html, r'<h1[^>]*>Planeación de la ficha</h1>')
@@ -338,11 +342,9 @@ class PlaneacionUXTestCase(unittest.TestCase):
         }
         with self.app.test_request_context():
             html = render_template(
-                'instructor/_planeacion_mapa.html',
+                'instructor/_planeacion_atencion.html',
                 linea={'competencias': [], 'fases': [], 'resumen': {}},
-                calendario={'bloques': []},
                 analisis_vencimiento=analisis_vencimiento,
-                criticas=[],
             )
 
         self.assertIn('pl-vencidas-grid', html)
@@ -361,3 +363,177 @@ class PlaneacionUXTestCase(unittest.TestCase):
         self.assertIn('10/09/2026 (parcial)', html)
 
 
+
+
+class PlaneacionPrimeraPantallaTestCase(PlaneacionBase):
+    """La primera pantalla responde fechas, fase, avance y qué atender."""
+
+    HOY = date(2026, 6, 15)
+
+    def pagina_con_contexto(self):
+        from flask import template_rendered
+        contexto = {}
+
+        def capturar(sender, template, context, **extra):
+            if template.name == 'instructor/planeacion.html':
+                contexto.update(context)
+
+        with (
+            patch('app.routes.planeacion.fecha_corte_bogota', return_value=self.HOY),
+            template_rendered.connected_to(capturar, self.app),
+        ):
+            html = self.pagina(con_planeacion=True)
+        return html, contexto
+
+    @staticmethod
+    def seccion(html, ident):
+        inicio = html.find(f'id="{ident}"')
+        assert inicio >= 0, f'Falta la sección {ident}'
+        fin = html.find('</section>', inicio)
+        return html[inicio:fin]
+
+    def test_estado_atencion_cronograma_y_archivos_en_ese_orden(self):
+        html, _ = self.pagina_con_contexto()
+        posiciones = [html.find(f'id="{ident}"') for ident in (
+            'seccion-resumen', 'seccion-riesgos', 'seccion-gantt', 'seccion-detalle', 'centro-carga', 'documentos',
+        )]
+        self.assertNotIn(-1, posiciones)
+        self.assertEqual(posiciones, sorted(posiciones), 'El estado va primero y los archivos al final.')
+
+    def test_estado_muestra_las_fechas_clave_del_calendario(self):
+        html, contexto = self.pagina_con_contexto()
+        estado = self.seccion(html, 'seccion-resumen')
+        calendario = contexto['calendario']
+        for etiqueta, clave in [
+            ('Inicio de la formación', 'inicio'), ('Fin de la etapa lectiva', 'fin_lectiva'),
+            ('Inicio de la etapa productiva', 'inicio_productiva'), ('Fin de la ficha', 'fin'),
+        ]:
+            self.assertIn(etiqueta, estado)
+            self.assertIn(calendario[clave].strftime('%d/%m/%Y'), estado)
+        self.assertIn('15/06/2026', estado, 'El estado declara la fecha de corte.')
+        self.assertIn(f"{calendario['dias_restantes_lectiva']} días", estado)
+
+    def test_estado_muestra_fase_esperada_con_sus_fechas_y_el_avance(self):
+        html, contexto = self.pagina_con_contexto()
+        estado = self.seccion(html, 'seccion-resumen')
+        esperada = contexto['estado']['fase_esperada']
+        self.assertIsNotNone(esperada)
+        self.assertIn(esperada['nombre'], estado)
+        self.assertIn(esperada['inicio'].strftime('%d/%m/%Y'), estado)
+        self.assertIn(esperada['fin'].strftime('%d/%m/%Y'), estado)
+        for etiqueta in ['Tiempo lectivo transcurrido', 'RAP evaluados', 'RAP cerrados']:
+            self.assertIn(etiqueta, estado)
+        self.assertIn('class="pl-phase-track"', estado)
+        visible = re.sub(r'<(?:script|style)\b.*?</(?:script|style)>', '', estado, flags=re.S)
+        self.assertNotIn('None', visible)
+
+    def test_hay_un_solo_tablero_de_avance_por_fase(self):
+        html, _ = self.pagina_con_contexto()
+        self.assertEqual(html.count('class="pl-phase-track"'), 1)
+        self.assertNotIn('id="seccion-pipeline"', html)
+        self.assertNotIn('id="seccion-seguimiento-fases"', html)
+
+    def test_sin_planeacion_la_carga_es_lo_primero(self):
+        html = self.pagina()
+        self.assertNotIn('id="seccion-resumen"', html)
+        self.assertLess(html.find('id="centro-carga"'), html.find('class="pl-empty"'))
+
+
+class PlaneacionPartesTestCase(PlaneacionBase):
+    def render(self, plantilla, **contexto):
+        from flask import render_template
+        with self.app.test_request_context():
+            return render_template(plantilla, **contexto)
+
+    def test_atencion_lista_las_competencias_con_retraso(self):
+        competencias = [
+            {'nombre': 'Construir software', 'estado_tiempo': 'critico', 'dias_desfase': 120,
+             'estado_tono': 'danger', 'estado_label': 'Crítico', 'fase': 'EJECUCIÓN',
+             'etiqueta_trimestre': 'T3', 'porcentaje_avance': 20, 'resultados_atrasados': 3,
+             'resultados_total': 4, 'instructores': []},
+            {'nombre': 'Modelar datos', 'estado_tiempo': 'atrasado', 'dias_desfase': 30,
+             'estado_tono': 'warning', 'estado_label': 'Atrasado', 'fase': 'PLANEACIÓN',
+             'etiqueta_trimestre': 'T2', 'porcentaje_avance': 60, 'resultados_atrasados': 1,
+             'resultados_total': 2, 'instructores': ['Ana']},
+            {'nombre': 'Inducción', 'estado_tiempo': 'cumplido', 'dias_desfase': 0},
+        ]
+        html = self.render('instructor/_planeacion_atencion.html', linea={'competencias': competencias})
+        self.assertIn('Construir software', html)
+        self.assertIn('Modelar datos', html)
+        self.assertNotIn('Inducción', html)
+        self.assertLess(html.find('Construir software'), html.find('Modelar datos'), 'Primero la de mayor retraso.')
+        self.assertNotIn('Ninguna competencia técnica presenta retraso', html)
+
+    def test_atencion_sin_retrasos_lo_declara(self):
+        html = self.render('instructor/_planeacion_atencion.html', linea={'competencias': []})
+        self.assertIn('Ninguna competencia técnica presenta retraso', html)
+
+    def test_estado_sin_calendario_declara_lo_que_falta(self):
+        estado = {'disponible': False, 'fechas': [], 'fase_esperada': None, 'fase_real': None,
+                  'fases_coinciden': False, 'avance': None, 'proximo_hito': None,
+                  'rap_por_semana': None, 'semanas_lectivas_restantes': None,
+                  'dias_para_fin_ficha': None, 'dias_para_productiva': None}
+        html = self.render(
+            'instructor/_planeacion_estado.html',
+            ficha=self.ficha, estado=estado, hoy=date(2026, 6, 15),
+            calendario={'configurado': False, 'mensaje': 'La ficha no tiene fechas de inicio y fin.'},
+            veredicto={'tono': 'danger', 'icono': '📅', 'titulo': 'La ficha no tiene calendario',
+                       'detalle': 'La ficha no tiene fechas de inicio y fin.'},
+            seguimiento_fases=None, proyeccion=None,
+        )
+        self.assertIn('id="seccion-resumen"', html)
+        self.assertIn('La ficha no tiene fechas de inicio y fin.', html)
+        self.assertIn('Sin datos', html)
+        self.assertNotIn('None', html)
+        self.assertNotIn('undefined', html)
+
+
+class PlaneacionEstadoRitmoTestCase(PlaneacionBase):
+    def render_estado(self, ritmo_mensual):
+        from flask import render_template
+        from app.services.estado_ficha import construir_estado_ficha
+        hoy = date(2026, 6, 15)
+        calendario = {
+            'configurado': True, 'inicio': date(2026, 1, 1), 'fin_lectiva': date(2026, 12, 31),
+            'inicio_productiva': date(2027, 1, 1), 'fin': date(2027, 6, 30), 'dias_restantes_lectiva': 70,
+            'dias_transcurridos_lectiva': 166, 'dias_totales_lectiva': 365, 'porcentaje_lectiva': 45.5,
+            'trimestres_lectivos': 4, 'bloques': [], 'posicion_hoy': 40,
+            'bloque_actual': {'nombre': 'Trimestre 2', 'etiqueta': 'T2', 'etapa': 'lectiva',
+                              'fin': date(2026, 6, 30), 'porcentaje_transcurrido': 80},
+        }
+        seguimiento = {
+            'estado': 'atrasado', 'fases': [], 'fase_esperada': None, 'fase_real': None,
+            'resultados': {'total': 40, 'evaluados': 14, 'aprobados': 10, 'esperados': 18,
+                           'porcentaje_evaluados': 35, 'porcentaje_aprobados': 25},
+            'proyeccion': {'ritmo_mensual': ritmo_mensual, 'estado': 'sin_datos'},
+        }
+        with self.app.test_request_context():
+            return render_template(
+                'instructor/_planeacion_estado.html', hoy=hoy, calendario=calendario,
+                seguimiento_fases=seguimiento, estado=construir_estado_ficha(calendario, seguimiento, hoy),
+                veredicto={'tono': 'danger', 'icono': '⏰', 'titulo': 'Va con retraso', 'detalle': ''},
+            )
+
+    def test_avisa_cuando_el_ritmo_actual_no_alcanza(self):
+        html = self.render_estado(ritmo_mensual=4.35)
+        self.assertIn('2,6 RAP por semana para evaluar los 26 pendientes', html)
+        self.assertIn('1 RAP evaluados por semana', html)
+        self.assertIn('no alcanza para terminar en la etapa lectiva', html)
+        self.assertIn('Los RAP cerrados van <strong>20,5 puntos detrás</strong>', html)
+
+    def test_no_avisa_cuando_el_ritmo_alcanza(self):
+        html = self.render_estado(ritmo_mensual=21.75)
+        self.assertIn('5 RAP evaluados por semana', html)
+        self.assertNotIn('no alcanza', html)
+
+
+class VeredictoTestCase(unittest.TestCase):
+    def test_el_ritmo_del_veredicto_usa_coma_decimal(self):
+        from app.services.panorama_planeacion import _texto_proyeccion
+        texto = _texto_proyeccion(
+            {'estado': 'en_riesgo', 'ritmo_mensual': 14.9, 'fecha_proyectada': date(2028, 7, 29),
+             'dias_vs_fin_lectiva': 463},
+            {'fin_lectiva': date(2027, 4, 23)},
+        )
+        self.assertIn('14,9 aprobaciones por mes', texto)
+        self.assertIn('463 días después', texto)
