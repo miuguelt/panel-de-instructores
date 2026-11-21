@@ -112,6 +112,77 @@
         </div>
     </div>
 
+    <!-- Banner de Progreso en Tiempo y Competencias del Curso -->
+    <section class="card curso-progreso-banner" aria-label="Progreso general del curso">
+        <div class="curso-progreso-header">
+            <div class="curso-progreso-header-left">
+                <span class="curso-progreso-header-icon" aria-hidden="true">📈</span>
+                <div>
+                    <h3 class="curso-progreso-title">Progreso General del Curso</h3>
+                    <p class="curso-progreso-subtitle">Contraste entre el tiempo lectivo transcurrido y la cobertura de competencias del programa formativo</p>
+                </div>
+            </div>
+            <div>
+                <span class="badge badge-fase">
+                    {{ cronograma.fase_label if cronograma and cronograma.configurado else 'Fechas pendientes' }}
+                </span>
+            </div>
+        </div>
+
+        <div class="curso-progreso-grid">
+            <!-- Barra 1: Progreso en el tiempo -->
+            {% set pct_tiempo = cronograma.porcentaje if cronograma and cronograma.configurado else 0 %}
+            <div class="curso-progreso-col">
+                <div class="curso-progreso-col-top">
+                    <div>
+                        <span class="curso-progreso-col-label">
+                            ⏱️ Tiempo Lectivo Transcurrido
+                        </span>
+                        <small class="text-muted curso-progreso-col-sub">
+                            {% if cronograma and cronograma.dias_totales > 0 %}
+                                {{ cronograma.dias_transcurridos }} de {{ cronograma.dias_totales }} días lectivos
+                            {% else %}
+                                Fechas no configuradas
+                            {% endif %}
+                        </small>
+                    </div>
+                    <strong class="curso-progreso-val juicio-stat-val--accent">{{ '%.1f'|format(pct_tiempo) }}%</strong>
+                </div>
+                <div class="curso-progreso-track" role="progressbar" aria-label="Tiempo lectivo transcurrido" aria-valuenow="{{ pct_tiempo }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="curso-progreso-fill curso-progreso-fill--tiempo" style="--metric-value: {{ [pct_tiempo, 100]|min }}%; width: var(--metric-value);"></div>
+                </div>
+                <div class="curso-progreso-col-meta">
+                    <span>Inicio: {{ cronograma.inicio_lectiva.strftime('%d/%m/%Y') if cronograma and cronograma.inicio_lectiva else '--/--/----' }}</span>
+                    <span>Fin lectiva: {{ cronograma.fin_lectiva.strftime('%d/%m/%Y') if cronograma and cronograma.fin_lectiva else '--/--/----' }}</span>
+                </div>
+            </div>
+
+            <!-- Barra 2: Progreso en competencias del curso -->
+            <div class="curso-progreso-col">
+                <div class="curso-progreso-col-top">
+                    <div>
+                        <span class="curso-progreso-col-label">
+                            🎓 Competencias del Curso Aprobadas
+                        </span>
+                        <small class="text-muted curso-progreso-col-sub">
+                            {{ competencias_aprobadas_curso }} de {{ total_competencias_curso }} competencias completadas al 100%
+                        </small>
+                    </div>
+                    <strong class="curso-progreso-val {% if pct_competencias_curso >= 80 %}juicio-pct--success{% elif pct_competencias_curso >= 50 %}juicio-stat-val--warning{% else %}juicio-stat-val--danger{% endif %}">
+                        {{ pct_competencias_curso }}%
+                    </strong>
+                </div>
+                <div class="curso-progreso-track" role="progressbar" aria-label="Competencias aprobadas del curso" aria-valuenow="{{ pct_competencias_curso }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="curso-progreso-fill {% if pct_competencias_curso == 100 %}curso-progreso-fill--comps-success{% elif pct_competencias_curso >= 50 %}curso-progreso-fill--comps-warning{% else %}curso-progreso-fill--comps-accent{% endif %}" style="--metric-value: {{ [pct_competencias_curso, 100]|min }}%; width: var(--metric-value);"></div>
+                </div>
+                <div class="curso-progreso-col-meta">
+                    <span>{{ total_competencias_curso - competencias_aprobadas_curso }} competencias pendientes o en curso</span>
+                    <span>Progreso en juicios: {{ pct_global_juicios }}%</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Search and Quick Pills Bar -->
     <div class="card" style="margin:0; padding:1.25rem;" data-filter-region="comp-search-bar">
         <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom: 0.75rem;">
@@ -164,6 +235,7 @@
         {
             "nombre": {{ comp.nombre | tojson }},
             "tipo": {{ (comp.tipo or 'tecnica') | tojson }},
+            "fase": {{ (comp.fase or 'Análisis') | tojson }},
             "total": {{ comp.total }},
             "aprobados": {{ comp.aprobados }},
             "pendientes": {{ comp.pendientes }},
@@ -232,6 +304,9 @@
         </div>
         <div class="comp-card-meta">
             <span class="badge {{ badge_cls }}" style="font-size:.72rem; padding:2px 7px;">{{ tipo_label }}</span>
+            {% if comp.fase %}
+                <span class="badge badge-fase" title="Fase del proyecto formativo">📌 {{ comp.fase }}</span>
+            {% endif %}
             <span style="font-size:.82rem; color:var(--text-muted)">{{ comp.detalles | map(attribute='rap') | unique | list | length }} RAPs</span>
             {% if comp.horas %}
                 <span class="badge" style="font-size:.72rem; padding:2px 7px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;" title="Horas de formación">⏱️ {{ comp.horas | round(0) | int }} h</span>

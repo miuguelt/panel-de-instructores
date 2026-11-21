@@ -278,10 +278,12 @@ def calcular_fechas_competencias_y_raps(
     por_clave_juicios, por_codigo_juicios = indexar_juicios(juicios)
 
     fechas_planeacion_por_comp: dict[str, dict[str, Any]] = {}
+    fases_planeacion_por_comp: dict[str, list[str]] = {}
     for u in unidades_plan:
         rel = juicios_de(u, por_clave_juicios, por_codigo_juicios)
         ini, fin = u.get('fecha_inicio_estimada'), u.get('fecha_fin_estimada')
         horas = float(u.get('horas_total') or 0.0)
+        u_fase = str(u.get('fase') or '').strip()
         pares = [(j.competencia or '', j.resultado_aprendizaje or '') for j in rel if j.competencia]
         if not pares:
             c_u = u.get('competencia') or ''
@@ -308,6 +310,10 @@ def calcular_fechas_competencias_y_raps(
                     'horas_independientes': float(u.get('horas_independientes') or 0.0),
                 }
                 entry['horas_raps'][rap_n] = max(entry['horas_raps'].get(rap_n, 0.0), horas)
+            if u_fase:
+                f_lista = fases_planeacion_por_comp.setdefault(comp_n, [])
+                if u_fase not in f_lista:
+                    f_lista.append(u_fase)
 
     total_comps = len(competencias_summary)
     dias_lectivos = ((fin_lectiva - ini_lectiva).days + 1) if (ini_lectiva and fin_lectiva and fin_lectiva >= ini_lectiva) else 0
@@ -440,12 +446,52 @@ def calcular_fechas_competencias_y_raps(
             if suma_raps > 0:
                 horas_totales_comp = suma_raps
 
+        # ── 5. Determinar Fase de la Competencia ──
+        fases_gfpi = fases_planeacion_por_comp.get(nombre_comp) or []
+        es_induccion = bool('induccion' in nombre_lower or 'inducción' in nombre_lower)
+        if es_productiva:
+            fase_texto = 'Productiva'
+            fases_lista = ['Productiva']
+        elif es_induccion:
+            fase_texto = 'Inducción'
+            fases_lista = ['Inducción']
+        elif fases_gfpi:
+            fases_lista = [f.title() for f in fases_gfpi]
+            fase_texto = ' · '.join(fases_lista)
+        else:
+            # Estimación por ventana de tiempo en etapa lectiva
+            fase_est = 'Análisis'
+            if f_ini and ini_lectiva and fin_lectiva and fin_lectiva > ini_lectiva:
+                pct_momento = ((f_ini - ini_lectiva).days / (fin_lectiva - ini_lectiva).days) * 100
+                if pct_momento < 25.0:
+                    fase_est = 'Análisis'
+                elif pct_momento < 50.0:
+                    fase_est = 'Planeación'
+                elif pct_momento < 85.0:
+                    fase_est = 'Ejecución'
+                else:
+                    fase_est = 'Evaluación'
+            elif dias_lectivos > 0 and total_comps > 0:
+                pos = (idx / total_comps) * 100
+                if pos < 25.0:
+                    fase_est = 'Análisis'
+                elif pos < 50.0:
+                    fase_est = 'Planeación'
+                elif pos < 85.0:
+                    fase_est = 'Ejecución'
+                else:
+                    fase_est = 'Evaluación'
+            fase_texto = fase_est
+            fases_lista = [fase_est]
+
         comp.update({
             'horas': round(horas_totales_comp, 1) if horas_totales_comp is not None else None,
             'horas_programa': round(horas_oficial, 1) if horas_oficial is not None else None,
             'horas_planeadas': round(horas_plan, 1) if horas_plan is not None else None,
             'diferencia_horas': round(horas_plan - horas_oficial, 1) if (horas_plan is not None and horas_oficial is not None) else None,
             'es_productiva': es_productiva,
+            'fase': fase_texto,
+            'fases_lista': fases_lista,
             'fecha_inicio': f_ini.isoformat() if f_ini else None,
             'fecha_fin': f_fin.isoformat() if f_fin else None,
             'fecha_inicio_texto': f_ini.strftime('%d/%m/%Y') if f_ini else None,

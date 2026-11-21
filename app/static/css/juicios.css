@@ -235,6 +235,110 @@
     font-size: 0.78rem;
 }
 
+/* ── Banner de Progreso del Curso y Badge de Fase ── */
+.curso-progreso-banner {
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-card);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+}
+.curso-progreso-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 0.75rem;
+}
+.curso-progreso-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.curso-progreso-header-icon {
+    font-size: 1.3rem;
+}
+.curso-progreso-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-strong);
+}
+.curso-progreso-subtitle {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.curso-progreso-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 1.5rem;
+}
+.curso-progreso-col-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 0.45rem;
+}
+.curso-progreso-col-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-strong);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.curso-progreso-col-sub {
+    font-size: 0.76rem;
+}
+.curso-progreso-val {
+    font-size: 1.1rem;
+}
+.curso-progreso-track {
+    height: 10px;
+    background: var(--border-divider);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+.curso-progreso-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+.curso-progreso-fill--tiempo {
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover));
+}
+.curso-progreso-fill--comps-success {
+    background: var(--success);
+}
+.curso-progreso-fill--comps-warning {
+    background: var(--sena-yellow, #d97706);
+}
+.curso-progreso-fill--comps-accent {
+    background: var(--accent-primary);
+}
+.curso-progreso-col-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.35rem;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+.badge-fase {
+    font-size: 0.72rem;
+    padding: 2px 7px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    color: var(--accent-primary);
+    font-weight: 700;
+}
+
+
 /* devbrain-prose-contract:start */
 /* Contrato 7.4: cada región ocupa su espacio y conserva sus controles. */
 :where(p, dd, blockquote) {

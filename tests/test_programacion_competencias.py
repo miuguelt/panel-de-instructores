@@ -681,4 +681,98 @@ class ProgramacionCompetenciasTestCase(unittest.TestCase):
         self.assertIn('horas_programa', datos)
         self.assertIn('horas_planeadas', datos)
 
+    def test_calcular_fechas_competencias_asigna_fases(self):
+        """Verifica la asignación de fases desde GFPI-F-134, inducción, productiva y fallback temporal."""
+        from app.services.programacion_competencias import calcular_fechas_competencias_y_raps
+
+        # Caso con GFPI-F-134 activo
+        version_plan = ArchivoFichaVersion(
+            ficha_id=self.ficha.id,
+            instructor_id=self.inst1.id,
+            tipo=TIPO_PLANEACION,
+            version=1,
+            nombre_archivo='planeacion.xlsx',
+            ruta_archivo='/tmp/planeacion.xlsx',
+            estado='procesado',
+            contenido_extraido_json={
+                'unidades': [
+                    {
+                        'competencia': '220501092 - Especificar requisitos',
+                        'rap': 'RAP 1',
+                        'fase': 'Análisis',
+                        'horas_total': 40,
+                    },
+                    {
+                        'competencia': '220501092 - Especificar requisitos',
+                        'rap': 'RAP 2',
+                        'fase': 'Planeación',
+                        'horas_total': 50,
+                    },
+                ]
+            }
+        )
+        db.session.add(version_plan)
+        db.session.commit()
+
+        resumen = [
+            {
+                'nombre': '220501092 - Especificar requisitos',
+                'detalles': [{'rap': 'RAP 1'}, {'rap': 'RAP 2'}],
+            },
+            {
+                'nombre': 'Competencia de Inducción Institucional',
+                'detalles': [{'rap': 'RAP Inducción'}],
+            },
+            {
+                'nombre': 'Etapa Productiva Práctica',
+                'tipo': 'productiva',
+                'detalles': [{'rap': 'RAP Productiva'}],
+            },
+            {
+                'nombre': '220501093 - Diseñar base de datos',
+                'detalles': [{'rap': 'RAP Modelo'}],
+            },
+        ]
+
+        resultado = calcular_fechas_competencias_y_raps(self.ficha, resumen)
+        self.assertEqual(len(resultado), 4)
+
+        # 1. GFPI-F-134 con múltiples fases combinadas
+        comp_plan = resultado[0]
+        self.assertEqual(comp_plan['fase'], 'Análisis · Planeación')
+        self.assertIn('Análisis', comp_plan['fases_lista'])
+        self.assertIn('Planeación', comp_plan['fases_lista'])
+
+        # 2. Inducción
+        comp_ind = resultado[1]
+        self.assertEqual(comp_ind['fase'], 'Inducción')
+
+        # 3. Productiva
+        comp_prod = resultado[2]
+        self.assertEqual(comp_prod['fase'], 'Productiva')
+        self.assertTrue(comp_prod['es_productiva'])
+
+        # 4. Fallback temporal para competencia lectiva sin GFPI-F-134
+        comp_fallback = resultado[3]
+        self.assertIn(comp_fallback['fase'], ['Análisis', 'Planeación', 'Ejecución', 'Evaluación'])
+
+    def test_vista_juicios_incluye_banner_progreso_curso_y_fases(self):
+        """Verifica que la vista de juicios renderice las barras de progreso y los badges de fase."""
+        self._autenticar(self.inst1)
+
+        resp = self.client.get(f'/instructor/fichas/{self.ficha.id}/juicios')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+
+        # Verificar banner de progreso general del curso
+        self.assertIn('curso-progreso-banner', html)
+        self.assertIn('Progreso General del Curso', html)
+        self.assertIn('Tiempo Lectivo Transcurrido', html)
+        self.assertIn('Competencias del Curso Aprobadas', html)
+
+        # Verificar badge de fase de competencia
+        self.assertIn('badge-fase', html)
+        self.assertIn('📌', html)
+
+
 
