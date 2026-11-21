@@ -209,15 +209,15 @@ class VisionGeneralTestCase(unittest.TestCase):
         self.assertIn('Visión General', contenido)
         self.assertIn('2890123', contenido)
         self.assertIn('Análisis y Desarrollo de Software', contenido)
-        self.assertIn('Atención Inmediata de la Ficha', contenido)
-        self.assertIn('Entregas por Calificar', contenido)
-        self.assertIn('Turno de Aseo Hoy', contenido)
+        self.assertIn('Atención inmediata', contenido)
+        self.assertIn('Entregas por calificar', contenido)
+        self.assertIn('Aseo de hoy', contenido)
 
     def test_ruta_vision_general_alias_resumen(self):
         self._login()
         res = self.client.get(f'/instructor/fichas/{self.ficha.id}/resumen')
         self.assertEqual(res.status_code, 200)
-        self.assertIn('Atención Inmediata', res.get_data(as_text=True))
+        self.assertIn('Atención inmediata', res.get_data(as_text=True))
 
     def test_instructor_no_autorizado_es_bloqueado(self):
         self._login(correo='maria@sena.edu.co')

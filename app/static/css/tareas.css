@@ -370,3 +370,18 @@
         outline: none;
         box-shadow: 0 0 0 3px var(--accent-glow);
     }
+
+/* Cabecera del módulo: entregas por calificar, total y plazos. */
+.tareas-resumen {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.tareas-plazos {
+    grid-column: span 2;
+}
+
+@media (max-width: 40rem) {
+    .tareas-plazos {
+        grid-column: auto;
+    }
+}

@@ -21,6 +21,11 @@ ENDPOINTS_RESTAURADOS = {
     'evidencias_faltantes', 'gestionar_prorroga_tarea', 'guardar_config_alertas', 'juicios',
     'materiales', 'observador', 'programar_competencia', 'registrar_actividad_clase', 'tareas',
     'toggle_competencia_seleccionada', 'ver_entregas',
+    # Recuperadas del commit 80ecb74, que borró sus módulos sin retirar el import.
+    'dashboard', 'fichas', 'importar_reporte_ficha', 'vision_general', 'cargar_excel',
+    'estado_importacion', 'descargar_plantilla', 'aprendices', 'configuracion_aprendices',
+    'actualizar_rol_administrativo', 'alternar_estado_activo_aprendiz', 'historial_aprendiz',
+    'guardar_portafolio_instructor', 'asistencia', 'asistencia_aprendiz_modal', 'reporte_asistencia',
 }
 
 
@@ -48,8 +53,9 @@ class RutasInstructorRegistradasTestCase(unittest.TestCase):
         self.assertEqual(rotos, {}, 'Estos url_for apuntan a rutas que no existen.')
 
     def test_los_modulos_de_rutas_restaurados_no_superan_400_lineas(self):
-        modulos = ['actividades_evidencias', 'alertas_materiales', 'competencias', 'entregas',
-                   'estadisticas', 'juicios', 'observador', 'tareas']
+        modulos = ['__init__', 'actividades_evidencias', 'alertas_materiales', 'aprendices', 'asistencia',
+                   'asistencia_reporte', 'competencias', 'dashboard', 'entregas', 'estadisticas', 'fichas',
+                   'fichas_carga', 'historial_aprendiz', 'juicios', 'observador', 'tareas']
         largos = {}
         for nombre in modulos:
             ruta = RAIZ / 'app' / 'routes' / 'instructor' / f'{nombre}.py'

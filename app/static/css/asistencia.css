@@ -842,3 +842,8 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* Resumen visual del llamado a lista (tendencia y semáforo). */
+.asistencia-resumen {
+    margin-block: 1rem;
+}

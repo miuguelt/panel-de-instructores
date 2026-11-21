@@ -5,156 +5,71 @@
 {% endblock %}
 
 {% block content %}
+{% from 'components/_viz.html' import kpi, barra, dona, apilada %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-        <h1>Estadísticas de la Ficha {{ ficha.codigo }}</h1>
+        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
+        <h1>Estadísticas de la ficha {{ ficha.codigo }}</h1>
     </div>
 </div>
 
-{% include '_cronograma.html' %}
 
-<!-- Resumen General -->
-{% if resumen %}
-<section class="stats-overview-section" aria-label="Resumen general de métricas">
-    <div class="stats-overview-header">
-        <h2 class="stats-overview-title">Métricas Clave de la Ficha</h2>
-        <span class="stats-overview-badge">Consolidado general</span>
-    </div>
-    <div class="stats-overview-grid">
-        <div class="stat-summary-card stat-summary-card--primary">
-            <span class="stat-summary-num">{{ resumen.total_aprendices_con_juicios }}</span>
-            <span class="stat-summary-label">Aprendices evaluados</span>
+<!-- Resumen: aprobación global, distribución y comparación por tipo de competencia -->
+{% set juicios_transversales = (resumen.transversales_vistas if resumen else 0) %}
+{% set juicios_ingles = ((resumen.ingles_aprobados + resumen.ingles_faltantes) if resumen else 0) %}
+<section class="viz-panel estadisticas-resumen" aria-labelledby="estadisticas-resumen-title">
+    <h2 class="viz-panel-title" id="estadisticas-resumen-title"><i data-lucide="bar-chart-3" class="icon-md" aria-hidden="true"></i> Resumen de la ficha</h2>
+    <div class="estadisticas-resumen-grid">
+        {{ dona(pct_global if (resumen and resumen.total_resultados) else none, 'Juicios aprobados',
+                estado=viz_estado(pct_global, verde=80, amarillo=50),
+                detalle=((resumen.total_aprendices_con_juicios ~ ' aprendices evaluados') if resumen else none)) }}
+        <div class="estadisticas-resumen-bars">
+            {% if resumen %}
+            {{ barra(viz_porcentaje(resumen.transversales_vistas - resumen.transversales_faltantes, resumen.transversales_vistas),
+                     'Transversales aprobadas', detalle=(resumen.transversales_faltantes ~ ' por aprobar de ' ~ resumen.transversales_vistas)) }}
+            {{ barra(viz_porcentaje(resumen.ingles_aprobados, juicios_ingles), 'Inglés aprobado',
+                     detalle=(resumen.ingles_faltantes ~ ' por aprobar de ' ~ juicios_ingles)) }}
+            {{ apilada([('Con el 100%', resumen.aprendices_con_todos, 'success'),
+                        ('En curso', [resumen.total_aprendices_con_juicios - resumen.aprendices_con_todos - resumen.aprendices_sin_ninguno, 0]|max, 'info'),
+                        ('Sin aprobados', resumen.aprendices_sin_ninguno, 'danger')], 'Aprendices según sus juicios aprobados') }}
+            {% endif %}
         </div>
-        <div class="stat-summary-card stat-summary-card--info">
-            <span class="stat-summary-num">{{ resumen.total_competencias }}</span>
-            <span class="stat-summary-label">Competencias únicas</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--indigo">
-            <span class="stat-summary-num">{{ resumen.total_resultados }}</span>
-            <span class="stat-summary-label">Resultados de aprendizaje</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--success">
-            <span class="stat-summary-num">{{ resumen.aprendices_con_todos }}</span>
-            <span class="stat-summary-label">100% aprobados</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--danger">
-            <span class="stat-summary-num">{{ resumen.aprendices_sin_ninguno }}</span>
-            <span class="stat-summary-label">0% aprobados</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--warning">
-            <span class="stat-summary-num">{{ resumen.promedio_juicios_por_aprendiz }}</span>
-            <span class="stat-summary-label">Prom. juicios / aprendiz</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--indigo">
-            <span class="stat-summary-num">{{ resumen.transversales_vistas }}</span>
-            <span class="stat-summary-label">Transversales vistas</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--warning">
-            <span class="stat-summary-num">{{ resumen.transversales_faltantes }}</span>
-            <span class="stat-summary-label">Transversales faltantes</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--success">
-            <span class="stat-summary-num">{{ resumen.ingles_aprobados }}</span>
-            <span class="stat-summary-label">Inglés aprobados</span>
-        </div>
-        <div class="stat-summary-card stat-summary-card--danger">
-            <span class="stat-summary-num">{{ resumen.ingles_faltantes }}</span>
-            <span class="stat-summary-label">Inglés faltantes</span>
+        <div class="estadisticas-resumen-kpis">
+            {{ kpi('Competencias', resumen.total_competencias if resumen else none, estado='info',
+                   detalle=((resumen.total_resultados ~ ' resultados de aprendizaje') if resumen else none), icono='layers') }}
+            {{ kpi('Juicios por aprendiz', resumen.promedio_juicios_por_aprendiz if resumen else none, estado='neutral', detalle='promedio', icono='user-check') }}
         </div>
     </div>
+
+    {% set total_dist = (distribucion_aprobacion.values()|sum) if distribucion_aprobacion else 0 %}
+    {% if total_dist %}
+    {{ apilada([('100%', distribucion_aprobacion['100'], 'success'), ('76 a 99%', distribucion_aprobacion['76-99'], 'success'),
+                ('51 a 75%', distribucion_aprobacion['51-75'], 'warning'), ('26 a 50%', distribucion_aprobacion['26-50'], 'danger'),
+                ('0 a 25%', distribucion_aprobacion['0-25'], 'danger')], 'Aprendices por porcentaje de aprobación') }}
+    {% endif %}
+    {{ apilada(viz_estados_aprendiz(estados), 'Estado de los aprendices (' ~ total_aprendices ~ ')') }}
 </section>
+
+{% if mejores_competencias or peores_competencias %}
+<div class="viz-grid viz-grid--wide estadisticas-competencias">
+    <section class="viz-panel" aria-labelledby="peores-competencias-title">
+        <h2 class="viz-panel-title" id="peores-competencias-title"><i data-lucide="trending-down" class="icon-md" aria-hidden="true"></i> Competencias con menor aprobación</h2>
+        {% for comp in peores_competencias %}
+        {{ barra(comp.pct, comp.nombre, meta=VIZ_META_TYT, estado=viz_estado(comp.pct, verde=70, amarillo=50),
+                 detalle=(comp.aprobados ~ ' de ' ~ comp.total ~ ' juicios aprobados')) }}
+        {% endfor %}
+    </section>
+    <section class="viz-panel" aria-labelledby="mejores-competencias-title">
+        <h2 class="viz-panel-title" id="mejores-competencias-title"><i data-lucide="trending-up" class="icon-md" aria-hidden="true"></i> Competencias con mayor aprobación</h2>
+        {% for comp in mejores_competencias %}
+        {{ barra(comp.pct, comp.nombre, meta=VIZ_META_TYT, estado=viz_estado(comp.pct, verde=70, amarillo=50),
+                 detalle=(comp.aprobados ~ ' de ' ~ comp.total ~ ' juicios aprobados')) }}
+        {% endfor %}
+    </section>
+</div>
 {% endif %}
 
 <div class="dashboard-cards metricas-grid">
-
-    <!-- Tarjeta de Progreso Global (Donut Chart) -->
-    <article class="card">
-        <header class="card-header">
-            <h2>Progreso de Certificación Global</h2>
-            <p>Porcentaje de juicios aprobados en la ficha</p>
-        </header>
-        <div class="card-body chart-center-col">
-            <div class="donut-outer" style="background: conic-gradient(var(--success) {{ pct_global }}%, var(--border-divider) 0);">
-                <div class="donut-inner">
-                    <span class="donut-value">{{ pct_global }}%</span>
-                </div>
-            </div>
-            <div class="chart-legend-wrap">
-                <span class="legend-dot legend-dot--success"></span> Aprobados
-                <span class="legend-dot legend-dot--neutral legend-dot--spaced"></span> Aún no Aprobados
-            </div>
-        </div>
-    </article>
-
-    <!-- Distribución de aprobación entre aprendices -->
-    {% if distribucion_aprobacion %}
-    <article class="card">
-        <header class="card-header">
-            <h2>Distribución de Aprobación</h2>
-            <p>Aprendices por rango de juicios aprobados</p>
-        </header>
-        <div class="card-body">
-            {% set colores_rango = {'100': 'var(--success)', '76-99': 'var(--info)', '51-75': 'var(--warning)', '26-50': 'var(--danger)', '0-25': 'var(--danger)'} %}
-            {% set total_dist = distribucion_aprobacion.values()|sum %}
-            {% if total_dist > 0 %}
-            <div class="rango-track">
-                {% for rango, count in distribucion_aprobacion.items() %}
-                {% if count > 0 %}<div title="{{ rango }}%: {{ count }} aprendices" style="width: {{ (count / total_dist * 100) }}%; background-color: {{ colores_rango.get(rango, 'var(--gray-500)') }};"></div>{% endif %}
-                {% endfor %}
-            </div>
-            <div class="rango-grid">
-                {% for rango, count in distribucion_aprobacion.items() %}
-                <div class="rango-item">
-                    <span>{{ rango }}%</span>
-                    <span style="font-weight: 700; color: {{ colores_rango.get(rango, 'var(--gray-600)') }};">{{ count }}</span>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-muted text-center">Sin datos</p>
-            {% endif %}
-        </div>
-    </article>
-    {% endif %}
-
-    <!-- Tarjeta de Estados de Aprendices -->
-    <article class="card">
-        <header class="card-header">
-            <h2>Estados de Aprendices</h2>
-            <p>Distribución actual del estado formativo (Total: {{ total_aprendices }})</p>
-        </header>
-        <div class="card-body">
-            {% if total_aprendices > 0 %}
-            <div class="estadisticas-block">
-                <div class="estado-track">
-                    {% set bg_colors = {'EN_FORMACION': 'var(--info)', 'CERTIFICADO': 'var(--success)', 'CANCELADO': 'var(--danger)', 'RETIRO_VOLUNTARIO': 'var(--warning)', 'POR_CERTIFICAR': 'var(--primary)'} %}
-                    {% for estado, count in estados.items() %}
-                        {% set bg = bg_colors.get(estado, 'var(--gray-500)') %}
-                        {% if count > 0 %}<div title="{{ estado|replace('_', ' ')|title }}: {{ count }} ({{ (count / total_aprendices * 100)|round|int }}%)" style="width: {{ (count / total_aprendices * 100) }}%; background-color: {{ bg }};"></div>{% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="grid estado-grid">
-                {% for estado, count in estados.items() %}
-                <div class="estado-card">
-                    <div style="font-size: 24px; font-weight: 700; color: {{ bg_colors.get(estado, 'var(--gray-600)') }};">
-                        {{ (count / total_aprendices * 100)|round|int }}%
-                    </div>
-                    <div class="estado-card-label">{{ estado|replace('_', ' ')|title }}</div>
-                    <div class="estado-card-sub">{{ count }} aprendices</div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">
-                <p>No hay aprendices registrados en esta ficha.</p>
-            </div>
-            {% endif %}
-        </div>
-    </article>
-
 
     <!-- Timeline de Evaluaciones -->
     {% if timeline %}
@@ -397,6 +312,11 @@
   </div>
 </dialog>
 
+
+<details class="card cronograma-plegado">
+    <summary class="alertas-reglas-summary">Etapa lectiva, hito TyT y resultados del grupo</summary>
+    {% include '_cronograma.html' %}
+</details>
 
 <script>
 function abrirModalCompetencia(rowEl) {

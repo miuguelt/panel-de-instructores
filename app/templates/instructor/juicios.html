@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
+{% from 'components/_viz.html' import kpi, barra, dona, apilada %}
 {% block title %}Juicios Evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/juicios.css') }}">
@@ -8,7 +9,7 @@
 {% block nav_center %}
 <div class="nav-context-slot">
     <div class="nav-context-bar" role="region" aria-label="Contexto de la vista de Juicios">
-        <a href="{{ url_for('instructor.fichas') }}" class="nav-context-btn-back" title="Volver a Fichas">&larr; Volver</a>
+        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="nav-context-btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
         <span class="nav-context-divider" aria-hidden="true"></span>
         <h1 class="nav-context-title">
             <span class="nav-context-icon" aria-hidden="true">🎓</span>
@@ -71,116 +72,50 @@
 
     {{ render_alertas_contextuales(ficha.id, 'juicios_evaluativos', recomendaciones_juicios) }}
 
-    <!-- Stats Grid -->
-    <div class="juicios-stats-grid">
-        <div class="juicio-stat-card">
-            <h4>Total Juicios</h4>
-            <div class="juicio-stat-val">{{ estadisticas.total }}</div>
-            <small class="text-muted">Registros importados</small>
-        </div>
-        <div class="juicio-stat-card">
-            <h4>Aprobados</h4>
-            <div class="juicio-stat-val juicio-stat-val--success">{{ estadisticas.aprobados }}</div>
-            <small class="text-muted">Resultados logrados</small>
-        </div>
-        <div class="juicio-stat-card">
-            <h4>Por Evaluar</h4>
-            <div class="juicio-stat-val juicio-stat-val--warning">{{ estadisticas.por_evaluar }}</div>
-            <small class="text-muted">Pendientes</small>
-        </div>
-        <div class="juicio-stat-card">
-            <h4>% Aprobación</h4>
-            <div class="juicio-stat-val" style="color:{% if pct_global_juicios >= 80 %}var(--status-success-text){% elif pct_global_juicios >= 50 %}var(--status-warning-text){% else %}var(--status-danger-text){% endif %}">
-                {{ pct_global_juicios }}%
-            </div>
-            <small class="text-muted">Progreso global</small>
-        </div>
-        <div class="juicio-stat-card">
-            <h4>Técnicas</h4>
-            <div class="juicio-stat-val juicio-stat-val--accent">{{ estadisticas.tecnica }}</div>
-            <small class="text-muted">Juicios en ficha</small>
-        </div>
-        <div class="juicio-stat-card">
-            <h4>Transversales</h4>
-            <div class="juicio-stat-val juicio-stat-val--success">{{ estadisticas.transversal }}</div>
-            <small class="text-muted">Juicios en ficha</small>
-        </div>
-        <div class="juicio-stat-card">
-            <h4>Inglés</h4>
-            <div class="juicio-stat-val juicio-stat-val--info">{{ estadisticas.ingles }}</div>
-            <small class="text-muted">Juicios en ficha</small>
-        </div>
-    </div>
-
-    <!-- Banner de Progreso en Tiempo y Competencias del Curso -->
-    <section class="card curso-progreso-banner" aria-label="Progreso general del curso">
+    <!-- Resumen: avance del curso frente al tiempo, en una sola lectura -->
+    {% set pct_tiempo = cronograma.porcentaje if cronograma and cronograma.configurado else none %}
+    <section class="card curso-progreso-banner juicios-resumen" aria-labelledby="juicios-resumen-title">
         <div class="curso-progreso-header">
-            <div class="curso-progreso-header-left">
-                <span class="curso-progreso-header-icon" aria-hidden="true">📈</span>
-                <div>
-                    <h3 class="curso-progreso-title">Progreso General del Curso</h3>
-                    <p class="curso-progreso-subtitle">Contraste entre el tiempo lectivo transcurrido y la cobertura de competencias del programa formativo</p>
-                </div>
+            <h2 class="curso-progreso-title" id="juicios-resumen-title">Avance del curso</h2>
+            <span class="badge badge-fase">{{ cronograma.fase_label if cronograma and cronograma.configurado else 'Fechas pendientes' }}</span>
+        </div>
+        <div class="juicios-resumen-grid">
+            {{ dona(pct_global_juicios if estadisticas.total else none, 'Juicios aprobados',
+                    estado=viz_estado(pct_global_juicios, verde=80, amarillo=50),
+                    detalle=(estadisticas.aprobados ~ ' de ' ~ estadisticas.total ~ ' juicios')) }}
+            <div class="juicios-resumen-bars">
+                {{ barra(pct_competencias_curso if total_competencias_curso else none, 'Competencias completas al 100%',
+                         estado=viz_estado(pct_competencias_curso, verde=80, amarillo=50),
+                         comparar=pct_tiempo, comparar_label='Tiempo lectivo transcurrido',
+                         detalle=(competencias_aprobadas_curso ~ ' de ' ~ total_competencias_curso ~ ' competencias')) }}
+                {{ apilada([('Técnicas', estadisticas.tecnica, 'info'), ('Transversales', estadisticas.transversal, 'success'),
+                            ('Inglés', estadisticas.ingles, 'warning')], 'Juicios por tipo de competencia') }}
             </div>
-            <div>
-                <span class="badge badge-fase">
-                    {{ cronograma.fase_label if cronograma and cronograma.configurado else 'Fechas pendientes' }}
-                </span>
+            <div class="juicios-resumen-kpis">
+                {{ kpi('Por evaluar', estadisticas.por_evaluar, estado=('warning' if estadisticas.por_evaluar else 'success'),
+                       detalle='resultados pendientes', icono='hourglass') }}
+                {{ kpi('Juicios importados', estadisticas.total, estado='info',
+                       detalle=(('del ' ~ primera_evaluacion.strftime('%d/%m/%Y') ~ ' al ' ~ ultima_evaluacion.strftime('%d/%m/%Y')) if primera_evaluacion and ultima_evaluacion else 'sin fechas de evaluación'),
+                       icono='file-spreadsheet') }}
             </div>
         </div>
 
-        <div class="curso-progreso-grid">
-            <!-- Barra 1: Progreso en el tiempo -->
-            {% set pct_tiempo = cronograma.porcentaje if cronograma and cronograma.configurado else 0 %}
-            <div class="curso-progreso-col">
-                <div class="curso-progreso-col-top">
-                    <div>
-                        <span class="curso-progreso-col-label">
-                            ⏱️ Tiempo Lectivo Transcurrido
-                        </span>
-                        <small class="text-muted curso-progreso-col-sub">
-                            {% if cronograma and cronograma.dias_totales > 0 %}
-                                {{ cronograma.dias_transcurridos }} de {{ cronograma.dias_totales }} días lectivos
-                            {% else %}
-                                Fechas no configuradas
-                            {% endif %}
-                        </small>
-                    </div>
-                    <strong class="curso-progreso-val juicio-stat-val--accent">{{ '%.1f'|format(pct_tiempo) }}%</strong>
-                </div>
-                <div class="curso-progreso-track" role="progressbar" aria-label="Tiempo lectivo transcurrido" aria-valuenow="{{ pct_tiempo }}" aria-valuemin="0" aria-valuemax="100">
-                    <div class="curso-progreso-fill curso-progreso-fill--tiempo" style="--metric-value: {{ [pct_tiempo, 100]|min }}%; width: var(--metric-value);"></div>
-                </div>
-                <div class="curso-progreso-col-meta">
-                    <span>Inicio: {{ cronograma.inicio_lectiva.strftime('%d/%m/%Y') if cronograma and cronograma.inicio_lectiva else '--/--/----' }}</span>
-                    <span>Fin lectiva: {{ cronograma.fin_lectiva.strftime('%d/%m/%Y') if cronograma and cronograma.fin_lectiva else '--/--/----' }}</span>
-                </div>
-            </div>
+        {% if aprendices_stats %}
+        {{ apilada([('100%', rango_aprobacion['100%'], 'success'), ('75 a 99%', rango_aprobacion['75-99%'], 'success'),
+                    ('50 a 74%', rango_aprobacion['50-74%'], 'warning'), ('25 a 49%', rango_aprobacion['25-49%'], 'danger'),
+                    ('0 a 24%', rango_aprobacion['0-24%'], 'danger')], 'Aprendices por porcentaje de aprobación') }}
+        {% endif %}
 
-            <!-- Barra 2: Progreso en competencias del curso -->
-            <div class="curso-progreso-col">
-                <div class="curso-progreso-col-top">
-                    <div>
-                        <span class="curso-progreso-col-label">
-                            🎓 Competencias del Curso Aprobadas
-                        </span>
-                        <small class="text-muted curso-progreso-col-sub">
-                            {{ competencias_aprobadas_curso }} de {{ total_competencias_curso }} competencias completadas al 100%
-                        </small>
-                    </div>
-                    <strong class="curso-progreso-val {% if pct_competencias_curso >= 80 %}juicio-pct--success{% elif pct_competencias_curso >= 50 %}juicio-stat-val--warning{% else %}juicio-stat-val--danger{% endif %}">
-                        {{ pct_competencias_curso }}%
-                    </strong>
-                </div>
-                <div class="curso-progreso-track" role="progressbar" aria-label="Competencias aprobadas del curso" aria-valuenow="{{ pct_competencias_curso }}" aria-valuemin="0" aria-valuemax="100">
-                    <div class="curso-progreso-fill {% if pct_competencias_curso == 100 %}curso-progreso-fill--comps-success{% elif pct_competencias_curso >= 50 %}curso-progreso-fill--comps-warning{% else %}curso-progreso-fill--comps-accent{% endif %}" style="--metric-value: {{ [pct_competencias_curso, 100]|min }}%; width: var(--metric-value);"></div>
-                </div>
-                <div class="curso-progreso-col-meta">
-                    <span>{{ total_competencias_curso - competencias_aprobadas_curso }} competencias pendientes o en curso</span>
-                    <span>Progreso en juicios: {{ pct_global_juicios }}%</span>
-                </div>
+        {% if instructores_resumen %}
+        <details class="juicios-instructores">
+            <summary>Evaluaciones por instructor ({{ instructores_resumen|length }})</summary>
+            <div class="juicios-instructores-lista">
+                {% for nombre, datos in instructores_resumen %}
+                {{ apilada([('Aprobados', datos.aprobados, 'success'), ('Pendientes', datos.pendientes, 'warning')], nombre) }}
+                {% endfor %}
             </div>
-        </div>
+        </details>
+        {% endif %}
     </section>
 
     <!-- Search and Quick Pills Bar -->

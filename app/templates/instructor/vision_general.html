@@ -1,38 +1,45 @@
 {% extends "base.html" %}
-{% from 'components/_recomendacion_card.html' import render_card_recomendacion, render_banner_recomendacion %}
+{% from 'components/_recomendacion_card.html' import render_card_recomendacion %}
+{% from 'components/_viz.html' import barra, dona, apilada, semaforo, kpi, vacio %}
 {% block title %}Visión General - Ficha {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fichas_panel.css') }}">
 {% endblock %}
 
+{#- Orden de lectura: qué atender hoy → salud de la ficha → recomendaciones →
+    detalle académico y operativo. El menú de la ficha ya ofrece todos los
+    módulos, por eso esta página no los repite. -#}
 {% block content %}
+{% set crono = resumen.cronograma %}
+{% set pct_tiempo = crono.porcentaje if crono.configurado else none %}
+{% set pct_raps = resumen.pct_juicios if resumen.juicios_totales else none %}
+{% set brecha = viz_brecha(pct_raps, pct_tiempo) %}
+{% set fases_data = resumen.fases_data %}
+{% set desfase = (fases_data.desfase_fases if (fases_data and fases_data.desfase_fases is defined) else 0) or 0 %}
+{# Una fase sin fechas configuradas ni RAPs calificados no se muestra: el servicio usa nombres provisionales. #}
+{% set fase_esperada = fases_data.fase_esperada if fases_data else none %}
+{% set fase_real = fases_data.fase_real if fases_data else none %}
+{% set tiene_fase_esperada = (fase_esperada and fase_esperada.nombre and fase_esperada.nombre not in ('Fechas pendientes', 'Sin definir')) %}
+{% set tiene_fase_real = (fase_real and fase_real.nombre and fase_real.nombre != 'Sin definir' and not (fase_real.resultados_total is defined and fase_real.resultados_total == 0)) %}
+{% set hito = viz_hito(crono) %}
 <div class="vision-general">
-    <!-- 1. CABECERA PRINCIPAL Y CONTEXTO DE LA FICHA -->
+    <!-- 1. CABECERA: identidad, estado y una acción principal -->
     <header class="page-header vision-header">
         <div class="page-title-cluster">
-            <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al panel principal">&larr; Mis Fichas</a>
+            <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver a Mis fichas">&larr; Mis fichas</a>
             <div class="vision-title-wrap">
                 <div class="vision-badges-row">
                     <span class="card-badge">Ficha {{ ficha.codigo }}</span>
-                    {% if ficha.codigo_programa %}
-                    <span class="badge badge-secondary" title="Código del programa">Prog: {{ ficha.codigo_programa }}</span>
-                    {% endif %}
-                    {% if resumen.cronograma.configurado %}
-                    <span class="badge {% if resumen.cronograma.fase == 'lectiva' %}badge-info{% elif resumen.cronograma.fase == 'productiva' %}badge-success{% else %}badge-secondary{% endif %}">
-                        {{ resumen.cronograma.fase_label }}
-                    </span>
+                    {% if crono.configurado %}
+                    <span class="badge {% if crono.fase == 'lectiva' %}badge-info{% elif crono.fase == 'productiva' %}badge-success{% else %}badge-secondary{% endif %}">{{ crono.fase_label }}</span>
                     {% else %}
                     <span class="badge badge-warning">Fechas pendientes</span>
                     {% endif %}
+                    {% if hito %}{{ semaforo(hito.estado, hito.texto) }}{% endif %}
                     <span class="badge badge-secondary" title="Aprendices en formación">{{ resumen.total_aprendices }} activos</span>
-                    {% if resumen.fases_data and resumen.fases_data.desfase_fases is defined and resumen.fases_data.desfase_fases > 0 %}
-                    <span class="badge badge-warning" title="Desfase entre tiempo lectivo y RAPs evaluados">
-                        ⚠️ Retraso de {{ resumen.fases_data.desfase_fases }} {{ 'fase' if resumen.fases_data.desfase_fases == 1 else 'fases' }}
-                    </span>
-                    {% elif resumen.fases_data and resumen.fases_data.desfase_fases is defined and resumen.fases_data.desfase_fases == 0 and resumen.cronograma.configurado %}
-                    <span class="badge badge-success" title="Sincronizado con cronograma">✓ Al día con cronograma</span>
-                    {% endif %}
+                    {% if ficha.codigo_programa %}<span class="badge badge-secondary" title="Código del programa">Programa {{ ficha.codigo_programa }}</span>{% endif %}
                 </div>
                 <h1 class="vision-title">{{ ficha.nombre_programa|trim('.') }}</h1>
             </div>
@@ -55,177 +62,237 @@
             <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-primary btn-sm">
                 <i data-lucide="clipboard-check" class="icon-sm" aria-hidden="true"></i> Llamado a lista
             </a>
-            <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-secondary btn-sm">
+            <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">
                 <i data-lucide="plus-circle" class="icon-sm" aria-hidden="true"></i> Nueva tarea
             </a>
-            <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-info btn-sm text-white">
-                <i data-lucide="users-2" class="icon-sm" aria-hidden="true"></i> Grupos aleatorios
+            <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">
+                <i data-lucide="alert-triangle" class="icon-sm" aria-hidden="true"></i> Alertas
             </a>
-            <a href="{{ url_for('atencion.fila_atencion', ficha_id=ficha.id) }}" class="btn btn-warning btn-sm text-dark">
-                <i data-lucide="hand" class="icon-sm" aria-hidden="true"></i> Fila de atención
-            </a>
+            <button type="button" class="btn btn-ghost btn-sm btn-icon" popovertarget="vision-mas-acciones" aria-haspopup="true" aria-label="Más acciones" title="Más acciones">
+                <i data-lucide="more-horizontal" class="icon-sm" aria-hidden="true"></i>
+            </button>
+            <div id="vision-mas-acciones" popover class="app-popover acciones-mas-popover" aria-label="Más acciones">
+                <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="app-popover-item"><i data-lucide="users-2" class="icon-sm" aria-hidden="true"></i><span>Grupos aleatorios</span></a>
+                <a href="{{ url_for('atencion.fila_atencion', ficha_id=ficha.id) }}" class="app-popover-item"><i data-lucide="hand" class="icon-sm" aria-hidden="true"></i><span>Fila de atención</span></a>
+                <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="app-popover-item"><i data-lucide="bar-chart-3" class="icon-sm" aria-hidden="true"></i><span>Estadísticas</span></a>
+            </div>
         </div>
     </header>
 
-    <!-- 1. TIEMPO, FASE Y AVANCE: LO PRIMERO QUE DEBE VER EL INSTRUCTOR -->
-    {% set crono = resumen.cronograma %}
-    {% set pct_tiempo = crono.porcentaje|default(0) %}
-    {% set pct_raps = resumen.pct_juicios %}
-    {% set desfase = resumen.fases_data.desfase_fases if (resumen.fases_data and resumen.fases_data.desfase_fases is defined) else 0 %}
-    {# Una fase sin fechas configuradas ni RAPs calificados no se muestra: el servicio usa nombres provisionales. #}
-    {% set fase_esperada = resumen.fases_data.fase_esperada if resumen.fases_data else none %}
-    {% set fase_real = resumen.fases_data.fase_real if resumen.fases_data else none %}
-    {% set tiene_fase_esperada = (fase_esperada and fase_esperada.nombre and fase_esperada.nombre not in ('Fechas pendientes', 'Sin definir')) %}
-    {% set tiene_fase_real = (fase_real and fase_real.nombre and fase_real.nombre != 'Sin definir' and not (fase_real.resultados_total is defined and fase_real.resultados_total == 0)) %}
-    <section class="ficha-time-hero ficha-formation-hero vision-hero-block" aria-label="Progreso formativo y fases del proyecto">
-        <div class="time-hero-grid">
-            <!-- Columna 1: Avance temporal -->
-            <div class="time-hero-col time-hero-col-progress">
-                <div class="time-hero-header">
-                    <div class="time-hero-eyebrow">
-                        <span class="time-hero-icon" aria-hidden="true">⏱️</span>
-                        <span>Tiempo Lectivo Transcurrido</span>
-                    </div>
-                    <span class="time-hero-badge {% if pct_tiempo >= 70 %}is-goal{% elif crono.configurado %}is-active{% else %}is-warning{% endif %}">
-                        {% if crono.configurado %}{{ crono.fase_label }}{% else %}Fechas pendientes{% endif %}
-                    </span>
-                </div>
+    <!-- 2. ATENCIÓN INMEDIATA: lo que requiere acción hoy -->
+    {% set n_rojo = resumen.aprendices_riesgo_rojo|length %}
+    {% set n_amarillo = (resumen.aprendices_riesgo_amarillo or [])|length %}
+    {% set n_verde = (resumen.aprendices_riesgo_verde or [])|length %}
+    <section class="urgent-panel" aria-labelledby="urgent-title">
+        <h2 class="urgent-section-title" id="urgent-title">
+            <i data-lucide="siren" class="icon-md" aria-hidden="true"></i> Atención inmediata
+            <small class="text-muted">Lo que requiere tu acción o seguimiento hoy</small>
+        </h2>
 
-                <div class="time-hero-metric-group">
-                    <div class="time-hero-val-wrap">
-                        <strong class="time-hero-val">{{ pct_tiempo }}%</strong>
-                        <span class="time-hero-val-sub">del tiempo lectivo</span>
+        <div class="urgent-grid">
+            <!-- Riesgo de los aprendices -->
+            <div class="urgent-card {% if n_rojo %}is-danger{% elif n_amarillo %}is-warning{% else %}is-ok{% endif %}">
+                <div class="urgent-card-header">
+                    <div class="urgent-card-icon" aria-hidden="true"><i data-lucide="alert-octagon" class="icon-md"></i></div>
+                    <div>
+                        <strong class="urgent-card-title">Aprendices en riesgo alto</strong>
+                        <span class="urgent-card-count">{{ n_rojo }}</span>
                     </div>
-                    <p class="time-hero-detail">
-                        {% if crono.dias_totales > 0 %}
-                        <strong>{{ crono.dias_transcurridos }}</strong> de {{ crono.dias_totales }} días cursados
-                        (Faltan <strong>{{ crono.dias_restantes_lectiva }}</strong> días lectivos)
-                        {% else %}
-                        Configura las fechas de inicio y fin de la ficha.
+                </div>
+                <div class="urgent-card-body">
+                    {{ apilada([('Riesgo alto', n_rojo, 'danger'), ('En seguimiento', n_amarillo, 'warning'), ('Al día', n_verde, 'success')], 'Semáforo del grupo') }}
+                    {% if n_rojo %}
+                    <ul class="urgent-list">
+                        {% for item in resumen.aprendices_riesgo_rojo[:4] %}
+                        <li>
+                            <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=item.aprendiz.id) }}" class="urgent-link">
+                                <strong>{{ item.aprendiz.apellidos }}, {{ item.aprendiz.nombre }}</strong>
+                            </a>
+                            <small class="urgent-meta">{{ item.stats.faltas_no_justificadas }} fallas · {{ item.stats.tareas_pendientes }} tareas pendientes</small>
+                        </li>
+                        {% endfor %}
+                        {% if n_rojo > 4 %}
+                        <li class="urgent-more"><a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}">Ver {{ n_rojo - 4 }} aprendices más en riesgo</a></li>
                         {% endif %}
-                    </p>
+                    </ul>
+                    {% else %}
+                    <p class="urgent-desc text-success">Ningún aprendiz en riesgo alto por asistencia o entregas.</p>
+                    {% endif %}
                 </div>
-
-                <div class="time-hero-track" role="progressbar" aria-label="Tiempo lectivo transcurrido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_tiempo }}" title="Tiempo: {{ pct_tiempo }}%">
-                    <div class="time-hero-bar" style="width: {{ [pct_tiempo, 100]|min }}%;"></div>
-                    <div class="time-hero-marker" style="left: 70%;" title="Hito 70% (TyT)">
-                        <span class="time-hero-marker-label">Hito 70%</span>
-                    </div>
-                </div>
-
-                <div class="time-hero-meta-row">
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Inicio lectiva:</span>
-                        <strong>{% if crono.inicio_lectiva %}{{ crono.inicio_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Fin lectiva:</span>
-                        <strong>{% if crono.fin_lectiva %}{{ crono.fin_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Inicio productiva:</span>
-                        <strong>{% if crono.inicio_productiva %}{{ crono.inicio_productiva.strftime('%d/%m/%Y') }}{% else %}Sin datos{% endif %}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Fin de la ficha:</span>
-                        <strong>{% if crono.fin_productiva %}{{ crono.fin_productiva.strftime('%d/%m/%Y') }}{% else %}Sin datos{% endif %}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Etapa productiva:</span>
-                        <strong>{% if crono.meses_productiva %}{{ crono.meses_productiva }} meses{% else %}Sin datos{% endif %}</strong>
-                    </span>
+                <div class="urgent-card-footer">
+                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="urgent-action-btn">Ver semáforo completo &rarr;</a>
                 </div>
             </div>
 
-            <!-- Columna 2: Avance Académico de Juicios / RAPs -->
-            <div class="time-hero-col time-hero-col-group group-average-progress">
-                <div class="time-hero-header">
-                    <div class="time-hero-eyebrow">
-                        <span class="time-hero-icon" aria-hidden="true">🎓</span>
-                        <span>Cobertura de RAPs (SOFIA Plus)</span>
+            <!-- Entregas por calificar -->
+            <div class="urgent-card {% if resumen.num_entregas_pendientes > 0 %}is-warning{% else %}is-ok{% endif %}">
+                <div class="urgent-card-header">
+                    <div class="urgent-card-icon" aria-hidden="true"><i data-lucide="inbox" class="icon-md"></i></div>
+                    <div>
+                        <strong class="urgent-card-title">Entregas por calificar</strong>
+                        <span class="urgent-card-count">{{ resumen.num_entregas_pendientes }}</span>
                     </div>
-                    {% if pct_raps >= 70 %}
-                    <span class="time-hero-tag is-milestone">✓ Meta 70% TyT lograda</span>
-                    {% elif resumen.juicios_totales > 0 %}
-                    <span class="time-hero-tag is-pending">Meta 70%: faltan {{ (70 - pct_raps)|round(1) }} pts</span>
+                </div>
+                <div class="urgent-card-body">
+                    {% if resumen.num_entregas_pendientes > 0 %}
+                    <p class="urgent-desc">Las más antiguas primero:</p>
+                    <ul class="urgent-list">
+                        {% for ent in resumen.entregas_pendientes[:3] %}
+                        <li>
+                            <a href="{{ url_for('instructor.ver_entregas', tarea_id=ent.tarea_id) }}" class="urgent-link"><strong>{{ ent.tarea.titulo }}</strong></a>
+                            <small class="urgent-meta">{{ ent.aprendiz.nombre }} {{ ent.aprendiz.apellidos }}{% if ent.fecha_entrega %} · {{ ent.fecha_entrega.strftime('%d/%m') }}{% endif %}</small>
+                        </li>
+                        {% endfor %}
+                        {% if resumen.num_entregas_pendientes > 3 %}
+                        <li class="urgent-more"><a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}">Ver {{ resumen.num_entregas_pendientes - 3 }} entregas más</a></li>
+                        {% endif %}
+                    </ul>
                     {% else %}
-                    <span class="time-hero-tag is-pending">Sin juicios cargados</span>
+                    <p class="urgent-desc text-success">Todas las evidencias recibidas están calificadas.</p>
                     {% endif %}
                 </div>
+                <div class="urgent-card-footer">
+                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="urgent-action-btn">Calificar entregas &rarr;</a>
+                </div>
+            </div>
 
-                <div class="group-average-summary">
-                    <div class="time-hero-val-wrap">
-                        <strong class="time-hero-val text-accent">{{ pct_raps }}%</strong>
-                        <span class="time-hero-val-sub">aprobados</span>
+            <!-- Alertas y planes de mejoramiento -->
+            {% set n_alertas = resumen.alertas_activas|length %}
+            {% set n_planes = resumen.planes_pendientes|length %}
+            <div class="urgent-card {% if n_alertas or n_planes %}is-warning{% else %}is-ok{% endif %}">
+                <div class="urgent-card-header">
+                    <div class="urgent-card-icon" aria-hidden="true"><i data-lucide="compass" class="icon-md"></i></div>
+                    <div>
+                        <strong class="urgent-card-title">Alertas y planes abiertos</strong>
+                        <span class="urgent-card-count">{{ n_alertas + n_planes }}</span>
                     </div>
-                    <p class="time-hero-detail">
-                        <strong>{{ resumen.juicios_aprobados }}</strong> de {{ resumen.juicios_totales }} RAPs asentados
-                        · <strong>{{ resumen.aprendices_certificados }}</strong> aprendices al 100%
-                    </p>
                 </div>
-
-                <div class="group-average-track" role="progressbar" aria-label="RAPs aprobados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_raps }}" title="RAPs aprobados: {{ pct_raps }}%">
-                    <div class="group-average-bar" style="width: {{ [pct_raps, 100]|min }}%;"></div>
-                    <span class="group-average-target-line" style="left: 70%;" title="Meta institucional 70%"></span>
-                    <span class="group-average-target-label" style="left: 70%;">Meta 70%</span>
-                </div>
-
-                <div class="time-hero-meta-row">
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Fase esperada:</span>
-                        <strong>{% if tiene_fase_esperada %}{{ fase_esperada.icono }} {{ fase_esperada.nombre|title }}{% else %}Sin datos{% endif %}</strong>
-                    </span>
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <span class="time-meta-item">
-                        <span class="time-meta-k">Fase real (RAPs):</span>
-                        <strong>{% if tiene_fase_real %}{{ fase_real.icono }} {{ fase_real.nombre|title }}{% else %}Sin datos{% endif %}</strong>
-                    </span>
-                    {% if not tiene_fase_esperada or not tiene_fase_real %}
-                    <span class="time-meta-divider" aria-hidden="true">·</span>
-                    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="time-meta-link">Cargar planeación</a>
+                <div class="urgent-card-body">
+                    <p class="urgent-desc"><strong>{{ n_alertas }}</strong> alertas activas · <strong>{{ n_planes }}</strong> planes de mejoramiento abiertos</p>
+                    {% if n_planes %}
+                    <ul class="urgent-list">
+                        {% for plan in resumen.planes_pendientes[:2] %}
+                        <li>
+                            <strong>{{ plan.aprendiz.nombre_completo }}</strong>
+                            <small class="urgent-meta">{{ plan.actividades }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% elif n_alertas %}
+                    <ul class="urgent-list">
+                        {% for al in resumen.alertas_activas[:2] %}
+                        <li><small class="urgent-meta"><strong>{{ al.titulo }}</strong></small></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="urgent-desc text-success">Sin alertas ni planes pendientes de seguimiento.</p>
                     {% endif %}
+                </div>
+                <div class="urgent-card-footer urgent-card-footer--split">
+                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="urgent-action-btn">Alertas &rarr;</a>
+                    <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="urgent-action-btn">Planes &rarr;</a>
                 </div>
             </div>
         </div>
 
-        {% set fases_data = resumen.fases_data %}
+        <p class="vision-aseo-hoy">
+            <i data-lucide="sparkles" class="icon-sm" aria-hidden="true"></i>
+            <strong>Aseo de hoy:</strong>
+            {% if resumen.turno_aseo_hoy %}
+            {{ resumen.turno_aseo_hoy.aprendiz_1.nombre_completo }}{% if resumen.turno_aseo_hoy.completado_1 %} (cumplido){% endif %}
+            y {{ resumen.turno_aseo_hoy.aprendiz_2.nombre_completo }}{% if resumen.turno_aseo_hoy.completado_2 %} (cumplido){% endif %}.
+            {% else %}
+            sin turno programado.
+            {% endif %}
+            <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}">Ver rol de aseo</a>
+        </p>
+    </section>
+
+    <!-- 3. SALUD DE LA FICHA: avance académico frente al tiempo y estado del grupo -->
+    <section class="ficha-time-hero ficha-formation-hero vision-hero-block vision-health" aria-labelledby="salud-title">
+        <h2 class="vision-section-title" id="salud-title"><i data-lucide="activity" class="icon-md" aria-hidden="true"></i> Salud de la ficha</h2>
+
+        <div class="vision-health-main">
+            {{ barra(pct_raps, 'RAPs aprobados', meta=VIZ_META_TYT, estado=(brecha.estado if brecha else none),
+                     comparar=pct_tiempo, comparar_label='Tiempo transcurrido',
+                     detalle=((resumen.juicios_aprobados ~ ' de ' ~ resumen.juicios_totales ~ ' RAPs asentados · ' ~ resumen.aprendices_certificados ~ ' aprendices al 100%') if resumen.juicios_totales else 'Carga el reporte de juicios para medir el avance')) }}
+            <p class="ficha-card-insight">
+                {% if brecha %}{{ semaforo(brecha.estado, brecha.texto) }}{% endif %}
+                {% if desfase > 0 %}{{ semaforo('warning', 'Retraso de ' ~ desfase ~ (' fase' if desfase == 1 else ' fases')) }}{% elif desfase == 0 and crono.configurado and tiene_fase_real %}{{ semaforo('success', 'Al día con el cronograma') }}{% endif %}
+                {% if crono.dias_totales > 0 %}<span class="vision-health-note">{{ crono.dias_transcurridos }} de {{ crono.dias_totales }} días cursados · faltan {{ crono.dias_restantes_lectiva }} días lectivos</span>{% else %}<span class="vision-health-note">Configura las fechas de inicio y fin de la ficha.</span>{% endif %}
+            </p>
+        </div>
+
+        <div class="viz-grid vision-health-grid">
+            {{ dona(resumen.pct_asistencia_global, 'Asistencia', detalle=(resumen.sesiones_asistencia_total ~ ' sesiones · ' ~ resumen.total_faltas_injustificadas ~ ' fallas sin justificar')) }}
+            {{ dona(resumen.pct_entregas_global, 'Entregas recibidas', estado=viz_estado(resumen.pct_entregas_global, verde=70, amarillo=50), detalle=(resumen.total_entregas_recibidas ~ ' de ' ~ resumen.tareas_totales ~ ' tareas')) }}
+            {{ dona(resumen.pct_meta_tyt if resumen.total_aprendices else none, 'Aprendices con meta TyT', estado='info', detalle=(resumen.aprendices_meta_tyt ~ ' de ' ~ resumen.total_aprendices ~ ' aprendices')) }}
+            <div class="vision-health-stack">
+                {{ apilada(viz_estados_aprendiz(resumen.estados_distribucion), 'Estado de los aprendices') }}
+                <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="bento-sublink">Directorio completo &rarr;</a>
+            </div>
+        </div>
+
+        <div class="time-hero-meta-row">
+            <span class="time-meta-item">
+                <span class="time-meta-k">Inicio lectiva:</span>
+                <strong>{% if crono.inicio_lectiva %}{{ crono.inicio_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
+            </span>
+            <span class="time-meta-divider" aria-hidden="true">·</span>
+            <span class="time-meta-item">
+                <span class="time-meta-k">Fin lectiva:</span>
+                <strong>{% if crono.fin_lectiva %}{{ crono.fin_lectiva.strftime('%d/%m/%Y') }}{% else %}--/--/----{% endif %}</strong>
+            </span>
+            <span class="time-meta-divider" aria-hidden="true">·</span>
+            <span class="time-meta-item">
+                <span class="time-meta-k">Inicio productiva:</span>
+                <strong>{% if crono.inicio_productiva %}{{ crono.inicio_productiva.strftime('%d/%m/%Y') }}{% else %}Sin datos{% endif %}</strong>
+            </span>
+            <span class="time-meta-divider" aria-hidden="true">·</span>
+            <span class="time-meta-item">
+                <span class="time-meta-k">Fin de la ficha:</span>
+                <strong>{% if crono.fin_productiva %}{{ crono.fin_productiva.strftime('%d/%m/%Y') }}{% else %}Sin datos{% endif %}</strong>
+            </span>
+            <span class="time-meta-divider" aria-hidden="true">·</span>
+            <span class="time-meta-item">
+                <span class="time-meta-k">Etapa productiva:</span>
+                <strong>{% if crono.meses_productiva %}{{ crono.meses_productiva }} meses{% else %}Sin datos{% endif %}</strong>
+            </span>
+            <span class="time-meta-divider" aria-hidden="true">·</span>
+            <span class="time-meta-item">
+                <span class="time-meta-k">Fase esperada:</span>
+                <strong>{% if tiene_fase_esperada %}{{ fase_esperada.icono }} {{ fase_esperada.nombre|title }}{% else %}Sin datos{% endif %}</strong>
+            </span>
+            <span class="time-meta-divider" aria-hidden="true">·</span>
+            <span class="time-meta-item">
+                <span class="time-meta-k">Fase real (RAPs):</span>
+                <strong>{% if tiene_fase_real %}{{ fase_real.icono }} {{ fase_real.nombre|title }}{% else %}Sin datos{% endif %}</strong>
+            </span>
+            {% if not tiene_fase_esperada or not tiene_fase_real %}
+            <span class="time-meta-divider" aria-hidden="true">·</span>
+            <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="time-meta-link">Cargar planeación</a>
+            {% endif %}
+        </div>
+
         {% if fases_data and fases_data.disponible and (tiene_fase_esperada or tiene_fase_real) %}
         <details class="ficha-phase-details vision-phase-accordion" id="vision-phase-details">
             <summary class="ficha-phase-summary">
                 <div class="ficha-phase-summary-main">
-                    <span class="ficha-phase-summary-icon" aria-hidden="true">🗺️</span>
+                    <span class="ficha-phase-summary-icon" aria-hidden="true"><i data-lucide="map" class="icon-md"></i></span>
                     <div class="ficha-phase-summary-copy">
                         <div class="ficha-phase-summary-header-line">
                             <strong class="ficha-phase-title">Desglose de fases del proyecto formativo</strong>
-                            {% if fases_data.desfase_fases|default(0) > 0 %}
-                            <span class="fases-status-pill is-danger" title="El tiempo lectivo ha avanzado más rápido que los RAPs aprobados">
-                                <span class="fases-dot"></span> Retraso de {{ fases_data.desfase_fases }} {{ 'fase' if fases_data.desfase_fases == 1 else 'fases' }}
-                            </span>
-                            {% elif fases_data.desfase_fases|default(0) < 0 %}
-                            <span class="fases-status-pill is-info" title="Los RAPs aprobados van por delante del tiempo programado">
-                                <span class="fases-dot"></span> Adelantada
-                            </span>
-                            {% else %}
-                            <span class="fases-status-pill is-success" title="El avance de RAPs coincide con la fase esperada por tiempo">
-                                <span class="fases-dot"></span> Al día con el cronograma
-                            </span>
-                            {% endif %}
                             {% if fases_data.planeacion_sincronizada %}
-                            <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">✓ GFPI-F-134</span>
+                            <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">GFPI-F-134</span>
                             {% endif %}
                         </div>
                         <div class="ficha-phase-summary-meta">
-                            <span class="ficha-phase-subtitle">Avance según GFPI y reporte de juicios</span>
+                            <span class="ficha-phase-subtitle">Avance según la planeación y el reporte de juicios</span>
                             {% if fases_data.resumen_raps and (fases_data.resumen_raps.raps_vencidos_pendientes|default(0)) > 0 %}
                             <span class="ficha-phase-sep" aria-hidden="true">·</span>
-                            <button type="button" class="fases-chip-vencidos" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" title="Ver qué RAPs debieron calificarse y sus fechas límites">
-                                <span class="fases-chip-vencidos-icon" aria-hidden="true">⚠️</span>
+                            <button type="button" class="fases-chip-vencidos" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" title="Ver qué RAPs debieron calificarse y sus fechas límite">
                                 <span class="fases-chip-vencidos-text"><strong>{{ fases_data.resumen_raps.raps_vencidos_pendientes }} RAPs</strong> pendientes de fases culminadas</span>
-                                <span class="fases-chip-vencidos-action">Ver fechas 🔍</span>
+                                <span class="fases-chip-vencidos-action">Ver fechas</span>
                             </button>
                             {% endif %}
                         </div>
@@ -244,363 +311,84 @@
         {% endif %}
     </section>
 
-    <!-- 2. FRANJA DE ATENCIÓN INMEDIATA (LO QUE EL INSTRUCTOR DEBE ATENDER HOY) -->
-    <section class="urgent-panel" aria-label="Atención prioritaria de hoy">
-        <h2 class="urgent-section-title">
-            <span aria-hidden="true">🚨</span> Atención Inmediata de la Ficha
-            <small class="text-muted">Aspectos que requieren tu acción o seguimiento hoy</small>
-        </h2>
-
-        <div class="urgent-grid">
-            <!-- 2.1 Aprendices en Semáforo Rojo -->
-            <div class="urgent-card {% if resumen.aprendices_riesgo_rojo %}is-danger{% else %}is-ok{% endif %}">
-                <div class="urgent-card-header">
-                    <div class="urgent-card-icon" aria-hidden="true">⚠️</div>
-                    <div>
-                        <strong class="urgent-card-title">Aprendices en Riesgo Crítico</strong>
-                        <span class="urgent-card-count">{{ resumen.aprendices_riesgo_rojo|length }}</span>
-                    </div>
-                </div>
-                <div class="urgent-card-body">
-                    {% if resumen.aprendices_riesgo_rojo %}
-                    <p class="urgent-desc text-danger">Superaron el umbral de inasistencias o acumulan tareas pendientes:</p>
-                    <ul class="urgent-list">
-                        {% for item in resumen.aprendices_riesgo_rojo[:4] %}
-                        <li>
-                            <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=item.aprendiz.id) }}" class="urgent-link">
-                                <strong>{{ item.aprendiz.apellidos }}, {{ item.aprendiz.nombre }}</strong>
-                            </a>
-                            <small class="urgent-meta">
-                                ({{ item.stats.faltas_no_justificadas }} fallas · {{ item.stats.tareas_pendientes }} tareas)
-                            </small>
-                        </li>
-                        {% endfor %}
-                        {% if resumen.aprendices_riesgo_rojo|length > 4 %}
-                        <li class="urgent-more">
-                            <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}">
-                                +{{ resumen.aprendices_riesgo_rojo|length - 4 }} aprendices más en riesgo &rarr;
-                            </a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                    {% else %}
-                    <p class="urgent-desc text-success">✓ Ningún aprendiz en semáforo rojo. Buen comportamiento de asistencia y entregas.</p>
-                    {% endif %}
-                </div>
-                <div class="urgent-card-footer">
-                    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="urgent-action-btn">
-                        Ver panel de alertas &rarr;
-                    </a>
-                </div>
-            </div>
-
-            <!-- 2.2 Entregas Pendientes por Calificar -->
-            <div class="urgent-card {% if resumen.num_entregas_pendientes > 0 %}is-warning{% else %}is-ok{% endif %}">
-                <div class="urgent-card-header">
-                    <div class="urgent-card-icon" aria-hidden="true">📥</div>
-                    <div>
-                        <strong class="urgent-card-title">Entregas por Calificar</strong>
-                        <span class="urgent-card-count">{{ resumen.num_entregas_pendientes }}</span>
-                    </div>
-                </div>
-                <div class="urgent-card-body">
-                    {% if resumen.num_entregas_pendientes > 0 %}
-                    <p class="urgent-desc">Evidencias recibidas esperando evaluación del instructor:</p>
-                    <ul class="urgent-list">
-                        {% for ent in resumen.entregas_pendientes[:3] %}
-                        <li>
-                            <a href="{{ url_for('instructor.ver_entregas', tarea_id=ent.tarea_id) }}" class="urgent-link">
-                                <strong>{{ ent.tarea.titulo|truncate(26) }}</strong>
-                            </a>
-                            <small class="urgent-meta">
-                                {{ ent.aprendiz.nombre }} {{ ent.aprendiz.apellidos }}
-                                {% if ent.fecha_entrega %}· {{ ent.fecha_entrega.strftime('%d/%m') }}{% endif %}
-                            </small>
-                        </li>
-                        {% endfor %}
-                        {% if resumen.num_entregas_pendientes > 3 %}
-                        <li class="urgent-more">
-                            <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}">
-                                +{{ resumen.num_entregas_pendientes - 3 }} entregas más &rarr;
-                            </a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                    {% else %}
-                    <p class="urgent-desc text-success">✓ Todas las evidencias entregadas están al día y calificadas.</p>
-                    {% endif %}
-                </div>
-                <div class="urgent-card-footer">
-                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="urgent-action-btn">
-                        Gestionar tareas &rarr;
-                    </a>
-                </div>
-            </div>
-
-            <!-- 2.3 Turno de Aseo de Hoy -->
-            <div class="urgent-card is-info">
-                <div class="urgent-card-header">
-                    <div class="urgent-card-icon" aria-hidden="true">🧹</div>
-                    <div>
-                        <strong class="urgent-card-title">Turno de Aseo Hoy</strong>
-                        <span class="urgent-card-status">
-                            {% if resumen.turno_aseo_hoy %}
-                                {% if resumen.turno_aseo_hoy.completado_1 and resumen.turno_aseo_hoy.completado_2 %}
-                                <span class="badge badge-success">Cumplido</span>
-                                {% else %}
-                                <span class="badge badge-warning">Programado</span>
-                                {% endif %}
-                            {% else %}
-                                <span class="badge badge-secondary">Sin turno hoy</span>
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-                <div class="urgent-card-body">
-                    {% if resumen.turno_aseo_hoy %}
-                    <p class="urgent-desc">Aprendices asignados para el orden del ambiente:</p>
-                    <ul class="urgent-list">
-                        <li>
-                            <strong>1. {{ resumen.turno_aseo_hoy.aprendiz_1.nombre_completo }}</strong>
-                            {% if resumen.turno_aseo_hoy.completado_1 %}<span class="text-success">✓</span>{% endif %}
-                        </li>
-                        <li>
-                            <strong>2. {{ resumen.turno_aseo_hoy.aprendiz_2.nombre_completo }}</strong>
-                            {% if resumen.turno_aseo_hoy.completado_2 %}<span class="text-success">✓</span>{% endif %}
-                        </li>
-                    </ul>
-                    {% else %}
-                    <p class="urgent-desc text-muted">No hay turnos programados para hoy en el calendario de aseo.</p>
-                    {% endif %}
-                </div>
-                <div class="urgent-card-footer">
-                    <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="urgent-action-btn">
-                        Ver rol de aseo &rarr;
-                    </a>
-                </div>
-            </div>
-
-            <!-- 2.4 Alertas y Casos Abiertos -->
-            <div class="urgent-card {% if resumen.alertas_activas or resumen.planes_pendientes %}is-warning{% else %}is-ok{% endif %}">
-                <div class="urgent-card-header">
-                    <div class="urgent-card-icon" aria-hidden="true">🧭</div>
-                    <div>
-                        <strong class="urgent-card-title">Alertas & Planes</strong>
-                        <span class="urgent-card-count">{{ resumen.alertas_activas|length + resumen.planes_pendientes|length }}</span>
-                    </div>
-                </div>
-                <div class="urgent-card-body">
-                    <p class="urgent-desc">
-                        <strong>{{ resumen.alertas_activas|length }}</strong> alertas activas ·
-                        <strong>{{ resumen.planes_pendientes|length }}</strong> planes de mejoramiento abiertos.
-                    </p>
-                    {% if resumen.planes_pendientes %}
-                    <ul class="urgent-list">
-                        {% for plan in resumen.planes_pendientes[:2] %}
-                        <li>
-                            <small class="urgent-meta">Plan para: <strong>{{ plan.aprendiz.nombre_completo }}</strong></small>
-                            <br><small class="text-muted">{{ plan.actividades|truncate(40) }}</small>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% elif resumen.alertas_activas %}
-                    <ul class="urgent-list">
-                        {% for al in resumen.alertas_activas[:2] %}
-                        <li>
-                            <small class="urgent-meta"><strong>{{ al.titulo|truncate(45) }}</strong></small>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="urgent-desc text-success">✓ Sin casos disciplinarios ni planes pendientes de seguimiento.</p>
-                    {% endif %}
-                </div>
-                <div class="urgent-card-footer">
-                    <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="urgent-action-btn">
-                        Ver planes de mejora &rarr;
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 3. CENTRO DE RECOMENDACIONES PEDAGÓGICAS Y ACCIONES SUGERIDAS -->
+    <!-- 4. RECOMENDACIONES: las tres más importantes a la vista -->
     {% if resumen.recomendaciones %}
+    {% set recs = resumen.recomendaciones %}
     <section class="card vision-recommendations-center" id="centro-recomendaciones" aria-labelledby="rec-center-title">
         <div class="vision-rec-header">
-            <div>
-                <span class="eyebrow">Diagnóstico Inteligente · Motor Pedagógico</span>
-                <h2 id="rec-center-title">Recomendaciones y Acciones Sugeridas</h2>
-            </div>
-            <span class="badge badge-primary">{{ resumen.recomendaciones|length }} acción(es) detectada(s)</span>
+            <h2 id="rec-center-title">Recomendaciones</h2>
+            <span class="badge badge-primary">{{ recs|length }} {{ 'acción sugerida' if recs|length == 1 else 'acciones sugeridas' }}</span>
         </div>
-        <p class="text-muted vision-rec-intro">
-            Sugerencias priorizadas generadas automáticamente cruzando el calendario lectivo, RAPs de SOFIA Plus, tareas activas y asistencia reglamentaria.
-        </p>
-
         <div class="vision-recommendations-grid">
-            {% for rec in resumen.recomendaciones %}
-                {{ render_card_recomendacion(rec) }}
-            {% endfor %}
+            {% for rec in recs[:3] %}{{ render_card_recomendacion(rec) }}{% endfor %}
         </div>
+        {% if recs|length > 3 %}
+        <details class="vision-rec-more">
+            <summary>Ver {{ recs|length - 3 }} {{ 'recomendación más' if recs|length == 4 else 'recomendaciones más' }}</summary>
+            <div class="vision-recommendations-grid">
+                {% for rec in recs[3:] %}{{ render_card_recomendacion(rec) }}{% endfor %}
+            </div>
+        </details>
+        {% endif %}
     </section>
     {% endif %}
 
-    <!-- 4. KPIS BENTO: ASISTENCIA, EVIDENCIAS Y ESTADOS -->
-    <section class="vision-bento-section" aria-label="Indicadores operativos de la ficha">
-        <div class="ficha-bento-kpis">
-            <!-- KPI 1: Asistencia -->
-            <div class="bento-kpi-card {% if resumen.pct_asistencia_global >= 80 %}is-positive{% else %}is-warning{% endif %}">
-                <div class="bento-kpi-top">
-                    <span class="bento-kpi-label">Asistencia del Grupo</span>
-                    <span class="bento-kpi-tag">{{ resumen.sesiones_asistencia_total }} sesiones</span>
-                </div>
-                <div class="bento-kpi-center">
-                    <strong class="bento-kpi-val">{{ resumen.pct_asistencia_global }}%</strong>
-                    <small class="bento-kpi-sub">{{ resumen.total_faltas_injustificadas }} fallas injustificadas acumuladas</small>
-                </div>
-                <div class="bento-kpi-track" role="progressbar" aria-label="Asistencia promedio" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ resumen.pct_asistencia_global }}" title="Asistencia: {{ resumen.pct_asistencia_global }}%">
-                    <div class="bento-kpi-bar is-attendance" style="width: {{ [resumen.pct_asistencia_global, 100]|min }}%;"></div>
-                </div>
-                <div class="bento-kpi-footer">
-                    <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="bento-sublink">Tomar asistencia hoy &rarr;</a>
-                </div>
-            </div>
-
-            <!-- KPI 2: Tareas y Evidencias -->
-            <div class="bento-kpi-card {% if resumen.pct_entregas_global >= 70 %}is-positive{% else %}is-warning{% endif %}">
-                <div class="bento-kpi-top">
-                    <span class="bento-kpi-label">Tareas y Entregas</span>
-                    <span class="bento-kpi-tag">{{ resumen.tareas_totales }} asignaciones</span>
-                </div>
-                <div class="bento-kpi-center">
-                    <strong class="bento-kpi-val">{{ resumen.pct_entregas_global }}%</strong>
-                    <small class="bento-kpi-sub">{{ resumen.total_entregas_recibidas }} evidencias recibidas en total</small>
-                </div>
-                <div class="bento-kpi-track" role="progressbar" aria-label="Cumplimiento de tareas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ resumen.pct_entregas_global }}" title="Entregas: {{ resumen.pct_entregas_global }}%">
-                    <div class="bento-kpi-bar" style="width: {{ [resumen.pct_entregas_global, 100]|min }}%;"></div>
-                </div>
-                <div class="bento-kpi-footer">
-                    <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="bento-sublink">Gestionar asignaciones &rarr;</a>
-                </div>
-            </div>
-
-            <!-- KPI 3: Censo y Distribución de Aprendices -->
-            <div class="bento-kpi-card">
-                <div class="bento-kpi-top">
-                    <span class="bento-kpi-label">Censo de Aprendices</span>
-                    <span class="bento-kpi-tag">{{ resumen.total_aprendices_general }} inscritos</span>
-                </div>
-                <div class="bento-kpi-center">
-                    <strong class="bento-kpi-val">{{ resumen.total_aprendices }}</strong>
-                    <small class="bento-kpi-sub">activos en etapa lectiva</small>
-                </div>
-                {% if resumen.total_aprendices_general > 0 %}
-                <div class="estados-bar" role="img" aria-label="Distribución de aprendices" title="Distribución de aprendices">
-                    {% set bg_colors = {'EN_FORMACION': 'var(--info)', 'CERTIFICADO': 'var(--success)', 'CANCELADO': 'var(--danger)', 'RETIRO_VOLUNTARIO': 'var(--warning)', 'CONDICIONADO': 'var(--warning)', 'POR_CERTIFICAR': 'var(--primary)'} %}
-                    {% for est, count in resumen.estados_distribucion.items() %}
-                        {% set bg = bg_colors.get(est, 'var(--gray-500)') %}
-                        {% if count > 0 %}
-                        <div title="{{ est|replace('_', ' ')|title }}: {{ count }}" style="--state-color: {{ bg }}; width: {{ (count / resumen.total_aprendices_general * 100) }}%;"></div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                <div class="estados-legend bento-state-legend">
-                    {% for est, count in resumen.estados_distribucion.items() if count > 0 %}
-                    <span title="{{ est|replace('_', ' ')|title }}: {{ count }}">
-                        <span class="estados-dot" style="--state-color: {{ bg_colors.get(est, 'var(--gray-500)') }};"></span>
-                        {{ count }} {{ est|replace('_', ' ')|title }}
-                    </span>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                <div class="bento-kpi-footer">
-                    <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="bento-sublink">Directorio completo &rarr;</a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 5. DOS COLUMNAS OPERATIVAS: COMPETENCIAS CRÍTICAS Y PRÓXIMOS VENCIMIENTOS -->
+    <!-- 5. DETALLE: competencias que necesitan refuerzo y próximos vencimientos -->
     <div class="vision-two-col">
-        <!-- Columna Izquierda: Competencias con menor aprobación -->
         <div class="card vision-detail-card">
             <div class="vision-card-header">
                 <div class="vision-card-title-group">
-                    <span class="vision-card-icon" aria-hidden="true">📊</span>
+                    <span class="vision-card-icon" aria-hidden="true"><i data-lucide="bar-chart-3" class="icon-md"></i></span>
                     <div>
-                        <h3 class="card-title">Competencias que Requieren Refuerzo</h3>
-                        <small class="text-muted">Menor tasa de aprobación en el reporte de juicios</small>
+                        <h3 class="card-title">Competencias que requieren refuerzo</h3>
+                        <small class="text-muted">Menor aprobación en el reporte de juicios</small>
                     </div>
                 </div>
                 <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver juicios</a>
             </div>
-
-            <div class="vision-card-body">
-                {% if resumen.competencias_criticas %}
-                <div class="competencies-list-compact">
-                    {% for comp in resumen.competencias_criticas %}
-                    <div class="comp-item-row">
-                        <div class="comp-info">
-                            <strong class="comp-name" title="{{ comp.nombre }}">{{ comp.nombre|truncate(48) }}</strong>
-                            <span class="comp-meta">{{ comp.aprobados }} de {{ comp.total }} juicios aprobados ({{ comp.pendientes }} pendientes)</span>
-                        </div>
-                        <div class="comp-progress-wrap">
-                            <span class="comp-pct {% if comp.pct >= 70 %}text-success{% elif comp.pct >= 50 %}text-warning{% else %}text-danger{% endif %}">
-                                {{ comp.pct }}%
-                            </span>
-                            <div class="comp-mini-bar" role="progressbar" aria-valuenow="{{ comp.pct }}" aria-valuemin="0" aria-valuemax="100">
-                                <div style="width: {{ [comp.pct, 100]|min }}%;" class="{% if comp.pct >= 70 %}bg-success{% elif comp.pct >= 50 %}bg-warning{% else %}bg-danger{% endif %}"></div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
+            <div class="vision-card-body vision-bars">
+                {% for comp in resumen.competencias_criticas %}
+                {{ barra(comp.pct, comp.nombre, meta=VIZ_META_TYT, estado=viz_estado(comp.pct, verde=70, amarillo=50),
+                         detalle=(comp.aprobados ~ ' de ' ~ comp.total ~ ' juicios aprobados · ' ~ comp.pendientes ~ ' pendientes')) }}
                 {% else %}
-                <p class="text-muted empty-inline-note">No hay datos de juicios registrados para calcular competencias.</p>
-                {% endif %}
+                {{ vacio('Sin juicios registrados', 'Carga el reporte de juicios para ver qué competencias necesitan refuerzo.', url_for('instructor.juicios', ficha_id=ficha.id), 'Ir a juicios', 'graduation-cap') }}
+                {% endfor %}
             </div>
         </div>
 
-        <!-- Columna Derecha: Próximas Tareas y Notas Recientes -->
         <div class="card vision-detail-card">
             <div class="vision-card-header">
                 <div class="vision-card-title-group">
-                    <span class="vision-card-icon" aria-hidden="true">📅</span>
+                    <span class="vision-card-icon" aria-hidden="true"><i data-lucide="calendar-clock" class="icon-md"></i></span>
                     <div>
-                        <h3 class="card-title">Próximos Vencimientos y Bitácora</h3>
+                        <h3 class="card-title">Próximos vencimientos y bitácora</h3>
                         <small class="text-muted">Tareas por vencer y últimas notas del observador</small>
                     </div>
                 </div>
                 <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Observador</a>
             </div>
-
             <div class="vision-card-body">
                 {% if resumen.tareas_proximas_vencer %}
-                <strong class="sub-heading">Próximas tareas a vencer:</strong>
+                <strong class="sub-heading">Próximas tareas a vencer</strong>
                 <ul class="upcoming-tasks-list">
                     {% for t in resumen.tareas_proximas_vencer %}
                     <li>
-                        <a href="{{ url_for('instructor.ver_entregas', tarea_id=t.id) }}">
-                            <strong>{{ t.titulo|truncate(35) }}</strong>
-                        </a>
-                        <span class="badge badge-secondary">
-                            Vence: {{ t.fecha_limite.strftime('%d/%m/%Y %H:%M') if t.fecha_limite else 'Sin fecha' }}
-                        </span>
+                        <a href="{{ url_for('instructor.ver_entregas', tarea_id=t.id) }}"><strong>{{ t.titulo }}</strong></a>
+                        <span class="badge badge-secondary">Vence: {{ t.fecha_limite.strftime('%d/%m/%Y %H:%M') if t.fecha_limite else 'Sin fecha' }}</span>
                     </li>
                     {% endfor %}
                 </ul>
                 {% endif %}
 
                 {% if resumen.ultimas_notas_observador %}
-                <strong class="sub-heading mt-3">Últimas notas en observador:</strong>
+                <strong class="sub-heading mt-3">Últimas notas en el observador</strong>
                 <ul class="recent-notes-list">
                     {% for n in resumen.ultimas_notas_observador[:3] %}
                     <li>
                         <span class="note-type-indicator note-{{ n.tipo }}"></span>
                         <div>
                             <small class="text-muted">{{ n.fecha.strftime('%d/%m/%Y') }} · {{ n.aprendiz.nombre_completo if n.aprendiz else 'Ficha' }}</small>
-                            <p class="note-snippet">{{ n.descripcion|truncate(70) }}</p>
+                            <p class="note-snippet">{{ n.descripcion }}</p>
                         </div>
                     </li>
                     {% endfor %}
@@ -608,63 +396,11 @@
                 {% endif %}
 
                 {% if not resumen.tareas_proximas_vencer and not resumen.ultimas_notas_observador %}
-                <p class="text-muted empty-inline-note">Sin tareas próximas ni notas recientes registradas en la bitácora.</p>
+                {{ vacio('Sin vencimientos próximos', 'No hay tareas por vencer ni notas recientes en la bitácora.', url_for('instructor.tareas', ficha_id=ficha.id), 'Crear tarea', 'calendar-check') }}
                 {% endif %}
             </div>
         </div>
     </div>
-
-    <!-- 6. ACCESO DIRECTO A TODOS LOS MÓDULOS DE LA FICHA -->
-    <nav class="ficha-action-grid vision-action-nav" aria-label="Módulos de la ficha {{ ficha.codigo }}">
-        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="module-action module-action-primary">
-            <span class="module-icon" aria-hidden="true">📋</span>
-            <span><strong>Llamado a lista</strong><small>Asistencia y faltas</small></span>
-        </a>
-        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">📝</span>
-            <span><strong>Tareas y Evidencias</strong><small>{{ resumen.num_entregas_pendientes }} por calificar</small></span>
-        </a>
-        <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">👥</span>
-            <span><strong>Aprendices</strong><small>{{ resumen.total_aprendices }} en formación</small></span>
-        </a>
-        <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">🧭</span>
-            <span><strong>Planeación Pedagógica</strong><small>Contraste GFPI-F-134</small></span>
-        </a>
-        <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">🎓</span>
-            <span><strong>Juicios Evaluativos</strong><small>{{ resumen.pct_juicios }}% aprobados</small></span>
-        </a>
-        <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="module-action module-action-warning">
-            <span class="module-icon" aria-hidden="true">⚠️</span>
-            <span><strong>Alertas</strong><small>{{ resumen.alertas_activas|length }} activas</small></span>
-        </a>
-        <a href="{{ url_for('aseo.turnos', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">🧹</span>
-            <span><strong>Turnos de Aseo</strong><small>Ambiente formativo</small></span>
-        </a>
-        <a href="{{ url_for('instructor.observador', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">📓</span>
-            <span><strong>Observador</strong><small>Bitácora pedagógica</small></span>
-        </a>
-        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">🔍</span>
-            <span><strong>Seguimiento & Comités</strong><small>Casos y actas</small></span>
-        </a>
-        <a href="{{ url_for('instructor.materiales', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">📂</span>
-            <span><strong>Materiales</strong><small>Recursos de apoyo</small></span>
-        </a>
-        <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">🏆</span>
-            <span><strong>Ranking</strong><small>Participación activa</small></span>
-        </a>
-        <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="module-action">
-            <span class="module-icon" aria-hidden="true">📊</span>
-            <span><strong>Estadísticas</strong><small>Métricas avanzadas</small></span>
-        </a>
-    </nav>
 </div>
 
 {% include 'instructor/_modal_raps_vencidos.html' with context %}

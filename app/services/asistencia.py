@@ -165,6 +165,48 @@ def sesiones_registradas_query(ficha_id, corte_id=None):
     return consulta.distinct()
 
 
+ESTADOS_PRESENTE = ('ASISTE', 'TARDANZA')
+
+
+def resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas):
+    """Asistencia de un aprendiz: solo las faltas sin justificar restan.
+
+    El porcentaje y las sesiones cumplidas usan la misma fórmula para que la
+    cifra y el texto «X de Y sesiones» nunca se contradigan. Sin sesiones no
+    hay porcentaje (None), en lugar de un 100 % que no se ha medido.
+    """
+    cumplidas = max(total_sesiones - faltas_no_justificadas, 0)
+    pct = round(cumplidas / total_sesiones * 100, 1) if total_sesiones else None
+    return {'pct': pct, 'sesiones_cumplidas': cumplidas, 'total_sesiones': total_sesiones}
+
+
+def serie_asistencia(ficha_id, limite=10, corte_id=None):
+    """Porcentaje de presencia de las últimas sesiones, de la más antigua a la más reciente.
+
+    La tardanza cuenta como presencia; las faltas, justificadas o no, no.
+    Las sesiones sin registros se omiten porque no tienen dato.
+    """
+    presentes = db.func.sum(db.case((RegistroAsistencia.estado.in_(ESTADOS_PRESENTE), 1), else_=0))
+    consulta = (
+        db.session.query(SesionAsistencia.fecha, db.func.count(RegistroAsistencia.id), presentes)
+        .join(RegistroAsistencia, RegistroAsistencia.sesion_id == SesionAsistencia.id)
+        .filter(SesionAsistencia.ficha_id == ficha_id)
+    )
+    if corte_id is not None:
+        consulta = consulta.filter(SesionAsistencia.corte_id == corte_id)
+    filas = (
+        consulta.group_by(SesionAsistencia.id, SesionAsistencia.fecha)
+        .order_by(SesionAsistencia.fecha.desc(), SesionAsistencia.id.desc())
+        .limit(limite)
+        .all()
+    )
+    return [
+        {'fecha': fecha, 'registros': total, 'presentes': int(ok or 0),
+         'pct': round(int(ok or 0) / total * 100, 1)}
+        for fecha, total, ok in reversed(filas)
+    ]
+
+
 def contar_sesiones_registradas(ficha_id, corte_id=None):
     """Count real attendance sessions, excluding calendar placeholders."""
     return sesiones_registradas_query(ficha_id, corte_id=corte_id).count()

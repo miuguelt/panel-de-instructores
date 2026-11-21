@@ -357,3 +357,54 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* Resumen visual del avance del curso: dona, barras y dos indicadores. */
+.juicios-resumen {
+    display: grid;
+    gap: 1rem;
+}
+
+.juicios-resumen-grid {
+    display: grid;
+    grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: center;
+}
+
+.juicios-resumen-bars,
+.juicios-resumen-kpis,
+.juicios-instructores-lista {
+    display: grid;
+    gap: 0.875rem;
+    min-inline-size: 0;
+}
+
+.juicios-instructores > summary {
+    min-block-size: var(--control-h-sm);
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.juicios-instructores-lista {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    padding-block-start: 0.5rem;
+}
+
+@media (max-width: 60rem) {
+    .juicios-resumen-grid {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .juicios-resumen-kpis {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    }
+}
+
+@media (max-width: 30rem) {
+    .juicios-resumen-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

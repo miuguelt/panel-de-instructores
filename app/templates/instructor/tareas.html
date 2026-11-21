@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
+{% from 'components/_viz.html' import kpi, apilada %}
 {% block title %}Tareas y Evidencias - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block page_css %}
@@ -11,8 +12,8 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-        <h1>📝 Tareas y Evidencias</h1>
+        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
+        <h1><i data-lucide="file-check" class="icon-lg" aria-hidden="true"></i> Tareas y evidencias</h1>
     </div>
     <div class="page-actions" style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
         <a href="{{ url_for('instructor.evidencias_faltantes', ficha_id=ficha.id) }}" class="btn btn-outline" title="Ver evidencias que hacen falta por aprendiz">📋 Faltantes por Aprendiz</a>
@@ -26,44 +27,17 @@
 
 {{ render_alertas_contextuales(ficha.id, 'tareas_calificaciones', recomendaciones_tareas) }}
 
-{# Tarjetas Bento con Métricas de Resumen del Módulo #}
-<div class="metricas-bento-grid">
-    <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble kpi-icon-bubble--accent">📚</div>
-        <div class="kpi-data-wrap">
-            <span class="kpi-numero">{{ metricas_resumen.total_tareas }}</span>
-            <span class="kpi-etiqueta">Total Tareas</span>
-        </div>
+{# Resumen: primero lo que espera acción del instructor, luego el estado de los plazos. #}
+<section class="metricas-bento-grid tareas-resumen" aria-label="Resumen de tareas">
+    {{ kpi('Entregas por calificar', metricas_resumen.por_calificar,
+           estado=('warning' if metricas_resumen.por_calificar else 'success'),
+           detalle=('esperan tu revisión' if metricas_resumen.por_calificar else 'todo calificado'), icono='inbox') }}
+    {{ kpi('Tareas publicadas', metricas_resumen.total, estado='info',
+           detalle=(metricas_resumen.conteo.vencidas ~ ' vencidas'), icono='file-check') }}
+    <div class="viz-panel tareas-plazos">
+        {{ apilada(metricas_resumen.segmentos, 'Plazos de las tareas') }}
     </div>
-    <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble kpi-icon-bubble--success">🟢</div>
-        <div class="kpi-data-wrap">
-            <span class="kpi-numero">{{ metricas_resumen.tareas_activas }}</span>
-            <span class="kpi-etiqueta">En Plazo</span>
-        </div>
-    </div>
-    <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble kpi-icon-bubble--warning">⏳</div>
-        <div class="kpi-data-wrap">
-            <span class="kpi-numero">{{ metricas_resumen.tareas_urgentes }}</span>
-            <span class="kpi-etiqueta">Por Vencer (&lt; 24h)</span>
-        </div>
-    </div>
-    <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble kpi-icon-bubble--danger">🛑</div>
-        <div class="kpi-data-wrap">
-            <span class="kpi-numero">{{ metricas_resumen.tareas_vencidas }}</span>
-            <span class="kpi-etiqueta">Vencidas</span>
-        </div>
-    </div>
-    <div class="metrica-kpi-card">
-        <div class="kpi-icon-bubble kpi-icon-bubble--muted">♾️</div>
-        <div class="kpi-data-wrap">
-            <span class="kpi-numero">{{ metricas_resumen.tareas_sin_limite }}</span>
-            <span class="kpi-etiqueta">Sin Fecha Límite</span>
-        </div>
-    </div>
-</div>
+</section>
 
 <div class="page-control-panel">
     <div class="control-selectors-cluster">

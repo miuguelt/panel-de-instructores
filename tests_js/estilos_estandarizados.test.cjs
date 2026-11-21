@@ -60,6 +60,12 @@ const TOKENS_DINAMICOS = new Set([
     '--ga-bg',
     '--ga-text',
     '--ga-border',
+    '--viz-value',
+    '--viz-compare',
+    '--viz-meta',
+    '--viz-tone',
+    '--viz-tone-bg',
+    '--viz-tone-text',
 ]);
 
 // Presupuesto máximo de atributos style= en plantillas. Es un ratchet: solo

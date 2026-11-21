@@ -186,7 +186,7 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
     total_faltas_todas = sum(st.get('faltas_no_justificadas', 0) + st.get('faltas_justificadas', 0) for st in stats_map.values())
     pct_asistencia_global = (
         round(((posibles_asistencias - total_faltas_todas) / posibles_asistencias * 100), 1)
-        if posibles_asistencias > 0 else 100.0
+        if posibles_asistencias > 0 else None  # Sin sesiones no hay porcentaje que mostrar.
     )
 
     # 6. Tareas y Entregas pendientes de calificación
@@ -225,7 +225,7 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
     entregas_esperadas = len(todas_tareas) * total_activos
     pct_entregas_global = (
         round((total_entregas_recibidas / entregas_esperadas * 100))
-        if entregas_esperadas > 0 else 100
+        if entregas_esperadas > 0 else None  # Sin tareas no hay cumplimiento que medir.
     )
 
     # Tareas próximas a vencer (en los próximos 15 días o futuras más cercanas)

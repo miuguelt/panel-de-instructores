@@ -1,0 +1,138 @@
+{#- Tarjeta de una ficha en «Mis fichas».
+
+    Orden de lectura: identidad y hito más urgente → pendientes de hoy →
+    avance académico frente al tiempo → estado del grupo → detalle bajo demanda.
+    Variables: ficha, cronograma, extra, stats, fases_data, recs, archivada.
+-#}
+{% from "components/_viz.html" import barra, dona, apilada, semaforo %}
+{% from "components/_ui.html" import acciones %}
+{% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
+{% set crono = cronograma or {} %}
+{% set hito = viz_hito(crono) %}
+{% set resumen_raps = fases_data.resumen_raps if (fases_data and fases_data.resumen_raps) else none %}
+{% set raps_total = resumen_raps.total if resumen_raps else extra.get('juicios_totales', 0) %}
+{% set raps_ok = resumen_raps.aprobados if resumen_raps else extra.get('juicios_aprobados', 0) %}
+{% set pct_raps = ((resumen_raps.porcentaje_aprobados if resumen_raps else extra.get('pct_juicios')) if raps_total else none) %}
+{% set pct_tiempo = crono.porcentaje if crono.configurado else none %}
+{% set brecha = viz_brecha(pct_raps, pct_tiempo) %}
+{% set desfase = (fases_data.desfase_fases if (fases_data and fases_data.desfase_fases is defined) else 0) or 0 %}
+{% set activos = extra.get('total_aprendices', stats.activos if stats else 0) %}
+<article class="card card-ficha ficha-card-v2 ficha-{{ crono.fase or 'sin_fechas' }}" id="card-ficha-{{ ficha.codigo }}">
+    <header class="ficha-card-header">
+        <div class="ficha-card-identity">
+            <div class="ficha-card-labels">
+                <span class="card-badge">Ficha {{ ficha.codigo }}</span>
+                {% if crono.configurado %}
+                <span class="badge {% if crono.fase == 'productiva' %}badge-success{% elif crono.fase == 'lectiva' %}badge-info{% else %}badge-secondary{% endif %}">{{ crono.fase_label }}</span>
+                {% else %}
+                <span class="badge badge-warning">Fechas pendientes</span>
+                {% endif %}
+                {% if hito and not archivada %}{{ semaforo(hito.estado, hito.texto) }}{% endif %}
+            </div>
+            <h2 class="card-title">{{ ficha.nombre_programa|trim('.') }}</h2>
+            <p class="ficha-card-meta">{{ activos }} aprendices activos{% if ficha.codigo_programa %} · Programa {{ ficha.codigo_programa }}{% endif %}</p>
+        </div>
+        <div class="ficha-header-actions">
+            {{ acciones('ficha-acciones-' ~ ficha.id,
+                principal={'label': 'Abrir ficha', 'icon': 'layout-dashboard', 'url': url_for('instructor.vision_general', ficha_id=ficha.id)},
+                secundarias=[
+                    {'label': 'Llamado a lista', 'icon': 'clipboard-check', 'url': url_for('instructor.asistencia', ficha_id=ficha.id)},
+                    {'label': 'Tareas', 'icon': 'file-check', 'url': url_for('instructor.tareas', ficha_id=ficha.id)},
+                    {'label': 'Juicios', 'icon': 'graduation-cap', 'url': url_for('instructor.juicios', ficha_id=ficha.id)},
+                    {'label': 'Planeación', 'icon': 'compass', 'url': url_for('planeacion.analisis', ficha_id=ficha.id)},
+                    {'label': 'Aprendices', 'icon': 'users', 'url': url_for('instructor.aprendices', ficha_id=ficha.id)},
+                ]) }}
+        </div>
+    </header>
+
+    {% if not archivada %}
+    <ul class="ficha-today" aria-label="Pendientes de la ficha {{ ficha.codigo }}">
+        {% for p in viz_pendientes(extra) %}
+        <li><a class="viz-pill viz-pill--{{ p.estado }} ficha-today-link" href="{{ url_for(p.endpoint, ficha_id=ficha.id) }}">
+            <i data-lucide="{{ 'alert-octagon' if p.estado == 'danger' else ('inbox' if p.clave == 'por_calificar' else ('clock' if p.clave == 'pendientes' else 'compass')) }}" class="icon-sm" aria-hidden="true"></i>{{ p.texto }}
+        </a></li>
+        {% else %}
+        <li>{{ semaforo('success', 'Sin pendientes hoy') }}</li>
+        {% endfor %}
+    </ul>
+
+    <div class="ficha-card-progress">
+        {{ barra(pct_raps, 'RAPs aprobados', meta=VIZ_META_TYT, estado=(brecha.estado if brecha else none),
+                 comparar=pct_tiempo, comparar_label='Tiempo transcurrido',
+                 detalle=(raps_ok ~ ' de ' ~ raps_total ~ ' RAPs' if raps_total else 'Carga el reporte de juicios')) }}
+        {% if brecha or desfase > 0 %}
+        <p class="ficha-card-insight">
+            {% if brecha %}{{ semaforo(brecha.estado, brecha.texto) }}{% endif %}
+            {% if desfase > 0 %}{{ semaforo('warning', 'Retraso de ' ~ desfase ~ (' fase' if desfase == 1 else ' fases')) }}{% endif %}
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="ficha-card-group">
+        {{ dona(extra.get('pct_asistencia'), 'Asistencia', detalle=(extra.get('sesiones', 0) ~ ' sesiones')) }}
+        <div class="ficha-card-group-bars">
+            {% if not archivada %}
+            {{ barra(extra.get('pct_entregas'), 'Entregas recibidas', detalle=(extra.get('entregas_totales', 0) ~ ' recibidas de ' ~ extra.get('tareas_totales', 0) ~ ' tareas')) }}
+            {% endif %}
+            {{ apilada(viz_estados_aprendiz(stats.estados if stats else {}), 'Estado de los aprendices') }}
+        </div>
+    </div>
+
+    {% if not archivada %}
+    {% set top_rec = recs[0] if recs else none %}
+    {% if top_rec %}
+    <div class="ficha-card-rec">
+        {{ render_banner_recomendacion(top_rec) }}
+        {% if recs|length > 1 %}
+        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}#centro-recomendaciones" class="ficha-card-rec-more">
+            Ver {{ recs|length - 1 }} recomendación{{ 'es' if recs|length > 2 }} más
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <details class="ficha-card-more">
+        <summary><span>Fechas, fases e hitos</span><i data-lucide="chevron-down" class="icon-sm" aria-hidden="true"></i></summary>
+        <div class="ficha-card-more-body">
+            <dl class="ficha-dates">
+                <div><dt>Inicio etapa lectiva</dt><dd>{{ crono.inicio_lectiva.strftime('%d/%m/%Y') if crono.inicio_lectiva else 'Sin datos' }}</dd></div>
+                <div><dt>Fin etapa lectiva</dt><dd>{{ crono.fin_lectiva.strftime('%d/%m/%Y') if crono.fin_lectiva else 'Sin datos' }}</dd></div>
+                <div><dt>Inicio etapa productiva</dt><dd>{{ crono.inicio_productiva.strftime('%d/%m/%Y') if crono.inicio_productiva else 'Sin datos' }}</dd></div>
+                <div><dt>Fin de la ficha</dt><dd>{{ crono.fin_productiva.strftime('%d/%m/%Y') if crono.fin_productiva else 'Sin datos' }}</dd></div>
+                <div><dt>Etapa productiva</dt><dd>{{ (crono.meses_productiva ~ ' meses') if crono.meses_productiva else 'Sin datos' }}</dd></div>
+            </dl>
+
+            <div class="viz-grid viz-grid--wide">
+                {% set tyt = (tyt_fichas.get(ficha.id) if tyt_fichas is defined and tyt_fichas else none) or progreso_tyt(ficha, none) %}
+                {% if tyt and not tyt.error and tyt.total_resultados %}
+                {{ barra(viz_porcentaje(tyt.meta_resultados, tyt.total_resultados), 'Hito Saber TyT', meta=VIZ_META_TYT,
+                         detalle=(tyt.pendientes_evaluacion ~ ' aprendices por llegar al 70%')) }}
+                {% endif %}
+                {% if activos %}
+                {{ barra(viz_porcentaje(extra.get('aprendices_certificados', 0), activos), 'Aprendices con todos los RAPs aprobados', estado='info',
+                         detalle=(extra.get('aprendices_certificados', 0) ~ ' de ' ~ activos ~ ' aprendices')) }}
+                {% endif %}
+                {{ apilada([('Reconocimientos', extra.get('notas_positivas', 0), 'success'),
+                            ('Llamados de atención', extra.get('notas_negativas', 0), 'danger')], 'Formación integral') }}
+            </div>
+
+            {% if extra.top_competencias %}
+            <div class="ficha-card-competencias">
+                <h3 class="viz-panel-title">Competencias con menor aprobación</h3>
+                {% for comp_name, comp_data in extra.top_competencias %}
+                {{ barra(viz_porcentaje(comp_data.aprobados, comp_data.total), comp_name, meta=VIZ_META_TYT,
+                         detalle=(comp_data.aprobados ~ ' de ' ~ comp_data.total ~ ' juicios aprobados')) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if fases_data and fases_data.disponible and fases_data.fase_esperada and fases_data.fase_real %}
+            {% include 'instructor/_ficha_fases_tracker.html' %}
+            {% endif %}
+
+            <a href="{{ url_for('tyt.detalle', ficha_id=ficha.id) }}" class="btn btn-ghost btn-sm">Ver el avance de cada aprendiz hacia el hito TyT</a>
+        </div>
+    </details>
+</article>

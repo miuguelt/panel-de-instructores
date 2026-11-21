@@ -104,7 +104,9 @@ def modulos_ficha(ficha, endpoint, blueprint, corte_id=None, alertas=None):
 
 
 def registrar(app):
-    """Expone `modulos_ficha` a las plantillas."""
+    """Expone `modulos_ficha` y las ayudas visuales (`viz_*`) a las plantillas."""
+    from app.services.visualizacion import registrar as registrar_visualizacion
+    registrar_visualizacion(app)
 
     @app.context_processor
     def inyectar_navegacion():

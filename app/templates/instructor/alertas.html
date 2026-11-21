@@ -5,10 +5,11 @@
 {% endblock %}
 
 {% block content %}
+{% from 'components/_viz.html' import apilada %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-        <h1>⚠️ Rendimiento y Alertas</h1>
+        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
+        <h1><i data-lucide="alert-triangle" class="icon-lg" aria-hidden="true"></i> Rendimiento y alertas</h1>
     </div>
     <div class="page-header-actions">
         <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn btn-warning">⚖️ Casos a seguimiento</a>
@@ -17,7 +18,6 @@
 </div>
 
 {% set cronograma = cronograma %}
-{% include '_cronograma.html' %}
 
 {% if alertas_cronograma %}
 <div class="timeline-alert-list">
@@ -30,135 +30,13 @@
 {% set al_dia = datos_alertas|selectattr('nivel', 'equalto', 'verde')|list|length %}
 {% set en_riesgo = datos_alertas|selectattr('nivel', 'equalto', 'amarillo')|list|length %}
 {% set en_alerta = datos_alertas|selectattr('nivel', 'equalto', 'rojo')|list|length %}
-<div class="alert-summary-grid" aria-label="Resumen del estado de aprendices">
-    <div class="alert-summary-item is-green"><strong>{{ al_dia }}</strong><span>Al día</span></div>
-    <div class="alert-summary-item is-yellow"><strong>{{ en_riesgo }}</strong><span>En riesgo</span></div>
-    <div class="alert-summary-item is-red"><strong>{{ en_alerta }}</strong><span>En alerta</span></div>
-</div>
-
-<div class="card reglamento-card alertas-hero">
-    <div class="alertas-hero-head">
-        <span class="alertas-hero-icon">⚖️</span>
-        <div>
-            <h3 class="alertas-hero-title">Reglas automáticas — Acuerdo 009 de 2024</h3>
-            <p class="text-muted alertas-hero-text">Reglamento del Aprendiz SENA. Estas reglas se evalúan automáticamente y no requieren configuración.</p>
-        </div>
-    </div>
-    <div class="table-responsive" tabindex="0" role="region" aria-label="Tabla de reglas automáticas de resolución">
-        <table class="table alertas-table">
-            <thead><tr>
-                <th>Regla</th>
-                <th>Umbral</th>
-                <th>Acción</th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td>Inasistencias consecutivas</td>
-                    <td><strong>{{ config_comite.umbral_fallas_consecutivas }}</strong> sesiones</td>
-                    <td>Alerta roja → preparar comité</td>
-                </tr>
-                <tr>
-                    <td>% de asistencia preventivo (el Acuerdo no fija un mínimo)</td>
-                    <td><strong>{{ config_comite.porcentaje_minimo_asistencia }}%</strong></td>
-                    <td>Alerta amarilla → conversar con el aprendiz</td>
-                </tr>
-                <tr>
-                    <td>Faltas no continuas en todo el proceso</td>
-                    <td><strong>{{ config_comite.umbral_fallas_acumuladas }}</strong> faltas</td>
-                    <td>Alerta roja → preparar comité</td>
-                </tr>
-                <tr>
-                    <td>Tareas incumplidas</td>
-                    <td><strong>{{ config_comite.umbral_tareas_incumplidas }}</strong> tareas</td>
-                    <td>Alerta roja → plan de mejoramiento</td>
-                </tr>
-                <tr>
-                    <td>Llamados de atención del observador en {{ config_comite.periodo_dias_notas }} días</td>
-                    <td>
-                        {% if config_comite.umbral_notas_negativas %}<strong>{{ config_comite.umbral_notas_negativas }}</strong> notas{% else %}Regla desactivada{% endif %}
-                    </td>
-                    <td>Alerta amarilla → plan de mejoramiento</td>
-                </tr>
-                <tr>
-                    <td>Recordatorio de casos abiertos</td>
-                    <td><strong>{{ config_comite.auto_escalar_dias }}</strong> días sin resolver</td>
-                    <td>Aviso al instructor; él decide si remite a comité</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="alertas-hero-actions">
-        <form method="POST" action="{{ url_for('seguimiento.auto_evaluar_ficha', ficha_id=ficha.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-primary btn-sm">🔄 Ejecutar revisión automática ahora</button>
-        </form>
-        <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">📋 Planes de mejoramiento</a>
-    </div>
-</div>
-
-<details class="card form-card settings-card">
-    <summary>
-        <span>Configurar alertas de asistencia</span>
-        <small>Umbrales amarillo y rojo</small>
-    </summary>
-    <p class="text-muted">Define los umbrales de fallas para activar alertas. Estos valores son ajustables según el criterio del Centro.</p>
-    <form method="POST" action="{{ url_for('instructor.guardar_config_alertas', ficha_id=ficha.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-row">
-            <div class="form-group">
-                <label for="umbral_amarillo">Alerta amarilla (fallas no justificadas)</label>
-                <input type="number" id="umbral_amarillo" name="umbral_amarillo" value="{{ config.umbral_amarillo }}" min="1">
-            </div>
-            <div class="form-group">
-                <label for="umbral_rojo">Alerta roja (fallas no justificadas)</label>
-                <input type="number" id="umbral_rojo" name="umbral_rojo" value="{{ config.umbral_rojo }}" min="1">
-            </div>
-            <div class="form-group">
-                <label for="max_fallas_trimestre">Máx. fallas laborales/trimestre</label>
-                <input type="number" id="max_fallas_trimestre" name="max_fallas_trimestre" value="{{ config.max_fallas_trimestre_laboral }}" min="1">
-            </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Guardar configuración</button>
-    </form>
-</details>
-
-<details class="card form-card settings-card">
-    <summary>
-        <span>Parámetros de seguimiento normativo</span>
-        <small>Basados en el Acuerdo 009 de 2024</small>
-    </summary>
-    <p class="text-muted">Estos valores toman como referencia el Reglamento del Aprendiz SENA (Acuerdo 009 de 2024); el porcentaje mínimo de asistencia es un umbral preventivo del panel. Se muestran como referencia informativa.</p>
-    <div class="form-row">
-        <div class="form-group">
-            <label>Sesiones consecutivas sin justificar</label>
-            <input type="number" value="{{ config_comite.umbral_fallas_consecutivas }}" disabled>
-        </div>
-        <div class="form-group">
-            <label>% mínimo de asistencia</label>
-            <input type="number" value="{{ config_comite.porcentaje_minimo_asistencia }}" disabled>
-        </div>
-        <div class="form-group">
-            <label>Fallas acumuladas (seguimiento)</label>
-            <input type="number" value="{{ config_comite.umbral_fallas_acumuladas }}" disabled>
-        </div>
-        <div class="form-group">
-            <label>Tareas incumplidas</label>
-            <input type="number" value="{{ config_comite.umbral_tareas_incumplidas }}" disabled>
-        </div>
-        <div class="form-group">
-            <label>Días para recordar casos abiertos</label>
-            <input type="number" value="{{ config_comite.auto_escalar_dias }}" disabled>
-        </div>
-        <div class="form-group">
-            <label>Llamados de atención en {{ config_comite.periodo_dias_notas }} días</label>
-            <input type="number" value="{{ config_comite.umbral_notas_negativas }}" disabled>
-        </div>
-    </div>
-    <label class="checkbox-label privacy-checkbox"><input type="checkbox" disabled {% if config_comite.correo_habilitado %}checked{% endif %}> Permitir avisos por correo (configuración opcional del Centro)</label>
-</details>
+<section class="viz-panel alertas-resumen" aria-label="Resumen del estado de los aprendices">
+    {{ apilada([('En alerta', en_alerta, 'danger'), ('En riesgo', en_riesgo, 'warning'), ('Al día', al_dia, 'success')], 'Semáforo del grupo') }}
+    <p class="alertas-resumen-nota">Los aprendices en alerta aparecen primero. El semáforo combina faltas sin justificar y tareas pendientes.</p>
+</section>
 
 <div class="section-header panorama-header">
-    <h2>Panorama por Aprendiz</h2>
+    <h2>Panorama por aprendiz</h2>
     <div class="panorama-tools">
         <span class="legend-item"><span class="dot dot-green"></span> Al día</span>
         <span class="legend-item"><span class="dot dot-yellow"></span> Riesgo</span>
@@ -229,4 +107,132 @@
     <p>Carga los aprendices para ver el panorama general y su estado de rendimiento.</p>
 </div>
 {% endif %}
+
+<div class="alertas-configuracion">
+<details class="card cronograma-plegado">
+    <summary class="alertas-reglas-summary">Etapa lectiva, hito TyT y resultados del grupo</summary>
+    {% include '_cronograma.html' %}
+</details>
+<details class="card reglamento-card alertas-hero">
+    <summary class="alertas-reglas-summary">Reglas automáticas del Acuerdo 009 de 2024</summary>
+    <div class="alertas-hero-head">
+        <span class="alertas-hero-icon">⚖️</span>
+        <div>
+            <h3 class="alertas-hero-title">Reglas automáticas — Acuerdo 009 de 2024</h3>
+            <p class="text-muted alertas-hero-text">Reglamento del Aprendiz SENA. Estas reglas se evalúan automáticamente y no requieren configuración.</p>
+        </div>
+    </div>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Tabla de reglas automáticas de resolución">
+        <table class="table alertas-table">
+            <thead><tr>
+                <th>Regla</th>
+                <th>Umbral</th>
+                <th>Acción</th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td>Inasistencias consecutivas</td>
+                    <td><strong>{{ config_comite.umbral_fallas_consecutivas }}</strong> sesiones</td>
+                    <td>Alerta roja → preparar comité</td>
+                </tr>
+                <tr>
+                    <td>% de asistencia preventivo (el Acuerdo no fija un mínimo)</td>
+                    <td><strong>{{ config_comite.porcentaje_minimo_asistencia }}%</strong></td>
+                    <td>Alerta amarilla → conversar con el aprendiz</td>
+                </tr>
+                <tr>
+                    <td>Faltas no continuas en todo el proceso</td>
+                    <td><strong>{{ config_comite.umbral_fallas_acumuladas }}</strong> faltas</td>
+                    <td>Alerta roja → preparar comité</td>
+                </tr>
+                <tr>
+                    <td>Tareas incumplidas</td>
+                    <td><strong>{{ config_comite.umbral_tareas_incumplidas }}</strong> tareas</td>
+                    <td>Alerta roja → plan de mejoramiento</td>
+                </tr>
+                <tr>
+                    <td>Llamados de atención del observador en {{ config_comite.periodo_dias_notas }} días</td>
+                    <td>
+                        {% if config_comite.umbral_notas_negativas %}<strong>{{ config_comite.umbral_notas_negativas }}</strong> notas{% else %}Regla desactivada{% endif %}
+                    </td>
+                    <td>Alerta amarilla → plan de mejoramiento</td>
+                </tr>
+                <tr>
+                    <td>Recordatorio de casos abiertos</td>
+                    <td><strong>{{ config_comite.auto_escalar_dias }}</strong> días sin resolver</td>
+                    <td>Aviso al instructor; él decide si remite a comité</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="alertas-hero-actions">
+        <form method="POST" action="{{ url_for('seguimiento.auto_evaluar_ficha', ficha_id=ficha.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary btn-sm">🔄 Ejecutar revisión automática ahora</button>
+        </form>
+        <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">📋 Planes de mejoramiento</a>
+    </div>
+</details>
+
+<details class="card form-card settings-card">
+    <summary>
+        <span>Configurar alertas de asistencia</span>
+        <small>Umbrales amarillo y rojo</small>
+    </summary>
+    <p class="text-muted">Define los umbrales de fallas para activar alertas. Estos valores son ajustables según el criterio del Centro.</p>
+    <form method="POST" action="{{ url_for('instructor.guardar_config_alertas', ficha_id=ficha.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="umbral_amarillo">Alerta amarilla (fallas no justificadas)</label>
+                <input type="number" id="umbral_amarillo" name="umbral_amarillo" value="{{ config.umbral_amarillo }}" min="1">
+            </div>
+            <div class="form-group">
+                <label for="umbral_rojo">Alerta roja (fallas no justificadas)</label>
+                <input type="number" id="umbral_rojo" name="umbral_rojo" value="{{ config.umbral_rojo }}" min="1">
+            </div>
+            <div class="form-group">
+                <label for="max_fallas_trimestre">Máx. fallas laborales/trimestre</label>
+                <input type="number" id="max_fallas_trimestre" name="max_fallas_trimestre" value="{{ config.max_fallas_trimestre_laboral }}" min="1">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar configuración</button>
+    </form>
+</details>
+
+<details class="card form-card settings-card">
+    <summary>
+        <span>Parámetros de seguimiento normativo</span>
+        <small>Basados en el Acuerdo 009 de 2024</small>
+    </summary>
+    <p class="text-muted">Estos valores toman como referencia el Reglamento del Aprendiz SENA (Acuerdo 009 de 2024); el porcentaje mínimo de asistencia es un umbral preventivo del panel. Se muestran como referencia informativa.</p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Sesiones consecutivas sin justificar</label>
+            <input type="number" value="{{ config_comite.umbral_fallas_consecutivas }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>% mínimo de asistencia</label>
+            <input type="number" value="{{ config_comite.porcentaje_minimo_asistencia }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Fallas acumuladas (seguimiento)</label>
+            <input type="number" value="{{ config_comite.umbral_fallas_acumuladas }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Tareas incumplidas</label>
+            <input type="number" value="{{ config_comite.umbral_tareas_incumplidas }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Días para recordar casos abiertos</label>
+            <input type="number" value="{{ config_comite.auto_escalar_dias }}" disabled>
+        </div>
+        <div class="form-group">
+            <label>Llamados de atención en {{ config_comite.periodo_dias_notas }} días</label>
+            <input type="number" value="{{ config_comite.umbral_notas_negativas }}" disabled>
+        </div>
+    </div>
+    <label class="checkbox-label privacy-checkbox"><input type="checkbox" disabled {% if config_comite.correo_habilitado %}checked{% endif %}> Permitir avisos por correo (configuración opcional del Centro)</label>
+</details>
+</div>
 {% endblock %}

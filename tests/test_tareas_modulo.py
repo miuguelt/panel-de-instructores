@@ -333,8 +333,9 @@ class TareasWebRutaTestCase(unittest.TestCase):
 
         # 1. Comprobar métricas Bento
         self.assertIn('metricas-bento-grid', cuerpo)
-        self.assertIn('Total Tareas', cuerpo)
-        self.assertIn('En Plazo', cuerpo)
+        self.assertIn('Entregas por calificar', cuerpo)
+        self.assertIn('Tareas publicadas', cuerpo)
+        self.assertIn('Plazos de las tareas: En plazo 2', cuerpo)
 
         # 2. Comprobar agrupación por instructor
         self.assertIn('Instructor Docente', cuerpo)

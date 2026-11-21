@@ -1,0 +1,124 @@
+{#- Ayudas visuales reutilizables (SVG y CSS, sin librerías).
+
+    Uso:
+      {% from "components/_viz.html" import kpi, barra, dona, apilada, semaforo, sparkline, vacio %}
+
+    Reglas:
+    - Cada gráfico tiene nombre accesible y texto visible con el valor: el color
+      nunca es la única señal.
+    - Sin dato se muestra «Sin datos»; nunca se inventa un 0 % ni un 100 %.
+    - Estados: success, warning, danger, info y neutral (tokens --status-*).
+    - Los cálculos viven en app/services/visualizacion.py (viz_*).
+-#}
+
+{% macro kpi(label, valor, unidad='', estado='neutral', detalle=None, url=None, icono=None) -%}
+{% set tag = 'a' if url else 'div' %}
+<{{ tag }} class="viz-kpi viz-kpi--{{ estado }}"{% if url %} href="{{ url }}"{% endif %}>
+    <span class="viz-kpi-label">
+        {% if icono %}<i data-lucide="{{ icono }}" class="icon-sm" aria-hidden="true"></i>{% endif %}
+        {{ label }}
+    </span>
+    <strong class="viz-kpi-value">{% if valor is none %}—{% else %}{{ valor }}{% if unidad %}<small>{{ unidad }}</small>{% endif %}{% endif %}</strong>
+    {% if detalle %}<span class="viz-kpi-detail">{{ detalle }}</span>{% endif %}
+</{{ tag }}>
+{%- endmacro %}
+
+{#- Barra de progreso con meta opcional y una segunda serie para comparar. -#}
+{% macro barra(pct, label, meta=None, estado=None, comparar=None, comparar_label='Referencia', detalle=None) -%}
+{% set v = viz_pct(pct) %}
+{% set est = estado or viz_estado(v) %}
+<div class="viz-bar viz-bar--{{ est }}">
+    <div class="viz-bar-head">
+        <span class="viz-bar-label">{{ label }}</span>
+        <strong class="viz-bar-value">{% if v is none %}Sin datos{% else %}{{ v }}%{% endif %}</strong>
+    </div>
+    {% if v is none %}
+    <div class="viz-bar-track" aria-hidden="true"></div>
+    {% else %}
+    <div class="viz-bar-track" role="progressbar" aria-label="{{ label }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ v }}"
+         aria-valuetext="{{ v }}%{% if meta is not none %}, meta {{ meta }}%{% endif %}{% if comparar is not none %}, {{ comparar_label }} {{ viz_pct(comparar) }}%{% endif %}">
+        {% if comparar is not none %}<span class="viz-bar-compare" style="--viz-compare: {{ viz_pct(comparar) }}%"></span>{% endif %}
+        <span class="viz-bar-fill" style="--viz-value: {{ v }}%"></span>
+        {% if meta is not none %}<span class="viz-bar-meta" style="--viz-meta: {{ meta }}%"></span>{% endif %}
+    </div>
+    {% endif %}
+    {% if meta is not none or comparar is not none or detalle %}
+    <div class="viz-bar-foot">
+        {% if detalle %}<span>{{ detalle }}</span>{% endif %}
+        {% if comparar is not none %}<span class="viz-bar-compare-key">{{ comparar_label }} {{ viz_pct(comparar) }}%</span>{% endif %}
+        {% if meta is not none %}<span class="viz-bar-meta-key">Meta {{ meta }}%</span>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{#- Anillo con el porcentaje en el centro. -#}
+{% macro dona(pct, label, estado=None, detalle=None) -%}
+{% set v = viz_pct(pct) %}
+{% set est = estado or viz_estado(v) %}
+{% set arco = viz_arco(v) %}
+<figure class="viz-donut viz-donut--{{ est }}">
+    <svg viewBox="0 0 100 100" class="viz-donut-svg" role="img" aria-label="{{ label }}: {% if v is none %}sin datos{% else %}{{ v }}%{% endif %}">
+        <circle class="viz-donut-track" cx="50" cy="50" r="40"></circle>
+        {% if v %}
+        <circle class="viz-donut-arc" cx="50" cy="50" r="40" stroke-dasharray="{{ arco.longitud }} {{ arco.circunferencia }}"></circle>
+        {% endif %}
+    </svg>
+    <span class="viz-donut-value" aria-hidden="true">{% if v is none %}—{% else %}{{ v|round|int }}%{% endif %}</span>
+    <figcaption class="viz-donut-label">{{ label }}{% if v is none %}<small>Sin datos</small>{% elif detalle %}<small>{{ detalle }}</small>{% endif %}</figcaption>
+</figure>
+{%- endmacro %}
+
+{#- Barra apilada con leyenda. `items` = [(etiqueta, valor, estado), ...] -#}
+{% macro apilada(items, label, url=None) -%}
+{% set segs = viz_segmentos(items) %}
+<div class="viz-stack">
+    <span class="viz-stack-label">{{ label }}</span>
+    {% if segs %}
+    <div class="viz-stack-track" role="img" aria-label="{{ label }}: {% for s in segs %}{{ s.etiqueta }} {{ s.valor }}{{ ', ' if not loop.last }}{% endfor %}">
+        {% for s in segs %}<span class="viz-stack-seg viz-tone--{{ s.estado }}" style="--viz-value: {{ s.pct }}%" title="{{ s.etiqueta }}: {{ s.valor }}"></span>{% endfor %}
+    </div>
+    <ul class="viz-legend">
+        {% for s in segs %}
+        <li class="viz-legend-item"><span class="viz-legend-dot viz-tone--{{ s.estado }}" aria-hidden="true"></span><strong>{{ s.valor }}</strong> {{ s.etiqueta }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="viz-stack-track" aria-hidden="true"></div>
+    <span class="viz-empty-note">Sin datos</span>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{#- Píldora de estado con ícono y texto (nunca solo color). -#}
+{% macro semaforo(nivel, texto) -%}
+{% set iconos = {'success': 'check-circle-2', 'warning': 'alert-triangle', 'danger': 'alert-octagon'} %}
+<span class="viz-pill viz-pill--{{ nivel }}"><i data-lucide="{{ iconos.get(nivel, 'info') }}" class="icon-sm" aria-hidden="true"></i>{{ texto }}</span>
+{%- endmacro %}
+
+{#- Tendencia mínima. Escala fija 0-100 por defecto para porcentajes. -#}
+{% macro sparkline(serie, label, minimo=0, maximo=100, unidad='%') -%}
+{% set sp = viz_sparkline(serie, 120, 32, minimo, maximo) %}
+<figure class="viz-spark">
+    <figcaption class="viz-spark-label">{{ label }}</figcaption>
+    {% if sp %}
+    <svg viewBox="-3 -3 126 38" class="viz-spark-svg" role="img" aria-label="{{ label }}: de {{ sp.primero }} a {{ sp.ultimo.valor }}">
+        <polyline class="viz-spark-line" points="{{ sp.puntos }}"></polyline>
+        <circle class="viz-spark-dot" cx="{{ sp.ultimo.x }}" cy="{{ sp.ultimo.y }}" r="3"></circle>
+    </svg>
+    <span class="viz-spark-value">{{ sp.ultimo.valor }}{{ unidad }}</span>
+    {% else %}
+    <span class="viz-empty-note">Sin datos</span>
+    {% endif %}
+</figure>
+{%- endmacro %}
+
+{#- Estado vacío con una acción concreta. -#}
+{% macro vacio(titulo, texto=None, url=None, accion=None, icono='inbox') -%}
+<div class="viz-empty">
+    <i data-lucide="{{ icono }}" class="icon-lg" aria-hidden="true"></i>
+    <strong>{{ titulo }}</strong>
+    {% if texto %}<p>{{ texto }}</p>{% endif %}
+    {% if url and accion %}<a href="{{ url }}" class="btn btn-outline btn-sm">{{ accion }}</a>{% endif %}
+</div>
+{%- endmacro %}

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
+{% from "components/_viz.html" import sparkline, apilada %}
 {% block title %}Llamado a Lista - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asistencia.css') }}">
@@ -8,8 +9,8 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.fichas') }}" class="btn-back" title="Volver a Fichas">&larr; Volver</a>
-        <h1>📋 Llamado a Lista</h1>
+        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
+        <h1><i data-lucide="clipboard-check" class="icon-lg" aria-hidden="true"></i> Llamado a lista</h1>
     </div>
 </div>
 
@@ -51,6 +52,17 @@
     {% endif %}
     {% endif %}
 </div>
+
+{% set niveles = stats_map.values()|map(attribute='nivel')|list %}
+<section class="viz-panel asistencia-resumen" aria-label="Resumen de asistencia del grupo">
+    <div class="viz-grid viz-grid--wide">
+        {{ sparkline(serie_asistencia|map(attribute='pct')|list,
+                     ('Asistencia en las últimas ' ~ serie_asistencia|length ~ ' sesiones') if serie_asistencia|length > 1 else 'Asistencia por sesión') }}
+        {{ apilada([('Riesgo alto', niveles|select('equalto', 'rojo')|list|length, 'danger'),
+                    ('En seguimiento', niveles|select('equalto', 'amarillo')|list|length, 'warning'),
+                    ('Al día', niveles|select('equalto', 'verde')|list|length, 'success')], 'Semáforo del grupo') }}
+    </div>
+</section>
 
 <div class="card form-card">
     <form method="POST">
@@ -97,7 +109,7 @@
                             aria-label="Ver detalles y novedades de {{ ap.nombre }} {{ ap.apellidos }}">{{ ap.nombre }} {{ ap.apellidos }}</button>
                     <span class="badge badge-{{ ap.estado|tono_estado }} estado-mini">{{ ap.estado|etiqueta_estado }}</span>
                     {% if stats.faltas_no_justificadas >= 3 %}
-                    <span class="racha-alerta" title="Atención: acumula {{ stats.faltas_no_justificadas }} faltas no justificadas">⚠️ {{ stats.faltas_no_justificadas }}F</span>
+                    <span class="racha-alerta" title="Atención: acumula {{ stats.faltas_no_justificadas }} faltas no justificadas">⚠️ {{ stats.faltas_no_justificadas }} faltas</span>
                     {% endif %}
                 </div>
 
@@ -108,9 +120,9 @@
                             <div class="stat-progress-bar" style="width: {{ stats.pct_asistencia }}%;"></div>
                         </div>
                         <strong class="stat-pct">{{ stats.pct_asistencia }}%</strong>
-                        <span class="stat-badge-nj mini-badge {% if stats.faltas_no_justificadas > 0 %}badge-nj-active{% endif %}">{{ stats.faltas_no_justificadas }}F</span>
-                        <span class="stat-badge-j mini-badge badge-j-active" style="display:{% if stats.faltas_justificadas > 0 %}inline-flex{% else %}none{% endif %};">{{ stats.faltas_justificadas }}J</span>
-                        <span class="stat-badge-tareas mini-badge badge-t-active" style="display:{% if stats.tareas_pendientes > 0 %}inline-flex{% else %}none{% endif %};">{{ stats.tareas_pendientes }}T</span>
+                        <span class="stat-badge-nj mini-badge {% if stats.faltas_no_justificadas > 0 %}badge-nj-active{% endif %}" title="Faltas sin justificar">{{ stats.faltas_no_justificadas }} {{ 'falta' if stats.faltas_no_justificadas == 1 else 'faltas' }}</span>
+                        <span class="stat-badge-j mini-badge badge-j-active" style="display:{% if stats.faltas_justificadas > 0 %}inline-flex{% else %}none{% endif %};" title="Faltas justificadas">{{ stats.faltas_justificadas }} {{ 'justificada' if stats.faltas_justificadas == 1 else 'justificadas' }}</span>
+                        <span class="stat-badge-tareas mini-badge badge-t-active" style="display:{% if stats.tareas_pendientes > 0 %}inline-flex{% else %}none{% endif %};" title="Tareas pendientes">{{ stats.tareas_pendientes }} {{ 'tarea' if stats.tareas_pendientes == 1 else 'tareas' }}</span>
                     </div>
                 </div>
 
@@ -263,13 +275,13 @@ function updateRowStats(row, selectedValue) {
 
     const njBadge = row.querySelector('.stat-badge-nj');
     if (njBadge) {
-        njBadge.textContent = currentNj + 'F';
+        njBadge.textContent = currentNj + (currentNj === 1 ? ' falta' : ' faltas');
         njBadge.classList.toggle('badge-nj-active', currentNj > 0);
     }
 
     const jBadge = row.querySelector('.stat-badge-j');
     if (jBadge) {
-        jBadge.textContent = currentJ + 'J';
+        jBadge.textContent = currentJ + (currentJ === 1 ? ' justificada' : ' justificadas');
         jBadge.style.display = currentJ > 0 ? 'inline-flex' : 'none';
     }
 }

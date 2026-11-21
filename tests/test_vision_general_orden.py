@@ -69,27 +69,57 @@ class VisionGeneralOrdenTestCase(unittest.TestCase):
         assert bloque, 'No se encontró el bloque de tiempo y fase'
         return bloque.group(1)
 
-    def test_tiempo_y_fase_van_despues_de_la_cabecera_y_antes_de_la_atencion(self):
+    def test_la_atencion_inmediata_va_primero_y_luego_la_salud_de_la_ficha(self):
         ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
         html = self.pagina(ficha, recomendaciones=[RECOMENDACION])
 
         cabecera = html.index('</header>')
-        tiempo = html.index('class="ficha-time-hero')
         urgente = html.index('class="urgent-panel"')
+        salud = html.index('class="ficha-time-hero')
         recomendaciones = html.index('id="centro-recomendaciones"')
-        indicadores = html.index('class="vision-bento-section"')
+        detalle = html.index('class="vision-two-col"')
 
-        self.assertLess(cabecera, tiempo)
-        self.assertLess(tiempo, urgente)
-        self.assertLess(urgente, recomendaciones)
-        self.assertLess(recomendaciones, indicadores)
+        self.assertLess(cabecera, urgente)
+        self.assertLess(urgente, salud)
+        self.assertLess(salud, recomendaciones)
+        self.assertLess(recomendaciones, detalle)
 
-    def test_sin_recomendaciones_el_tiempo_sigue_antes_de_la_atencion(self):
+    def test_sin_recomendaciones_la_atencion_sigue_primero(self):
         ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
         html = self.pagina(ficha)
 
         self.assertNotIn('id="centro-recomendaciones"', html)
-        self.assertLess(html.index('class="ficha-time-hero'), html.index('class="urgent-panel"'))
+        self.assertLess(html.index('class="urgent-panel"'), html.index('class="ficha-time-hero'))
+
+    def test_recomendaciones_muestran_tres_y_el_resto_bajo_demanda(self):
+        ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
+        recs = [dict(RECOMENDACION, id=i, titulo=f'Recomendación {i}') for i in range(5)]
+        html = self.pagina(ficha, recomendaciones=recs)
+        centro = html[html.index('id="centro-recomendaciones"'):]
+        visibles = centro[:centro.index('<details class="vision-rec-more"')]
+        self.assertEqual(sum(f'Recomendación {i}' in visibles for i in range(5)), 3)
+        self.assertIn('Ver 2 recomendaciones más', centro)
+
+    def test_cabecera_con_una_accion_principal_y_dos_secundarias(self):
+        ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
+        html = self.pagina(ficha)
+        cabecera = html[html.index('class="page-header vision-header"'):html.index('</header>', html.index('vision-header'))]
+        self.assertEqual(cabecera.count('btn-primary'), 1)
+        self.assertEqual(cabecera.count('btn btn-outline btn-sm"'), 2)
+        self.assertIn('popovertarget="vision-mas-acciones"', cabecera)
+
+    def test_no_repite_la_rejilla_de_modulos_del_menu(self):
+        ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
+        html = self.pagina(ficha)
+        self.assertNotIn('vision-action-nav', html)
+        self.assertNotIn('module-action', html)
+
+    def test_salud_de_la_ficha_usa_graficos_con_datos_reales(self):
+        ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
+        bloque = self.bloque_tiempo(self.pagina(ficha))
+        self.assertIn('RAPs aprobados', bloque)
+        self.assertIn('Tiempo transcurrido', bloque)
+        self.assertIn('Asistencia: sin datos', bloque)
 
     def test_el_bloque_de_tiempo_muestra_inicio_productiva_y_fin_de_ficha(self):
         ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))

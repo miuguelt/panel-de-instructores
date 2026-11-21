@@ -1,27 +1,7 @@
 """Creación, edición y eliminación de tareas de la ficha."""
 
-from app import db
-from app.models.corte import Corte
-from app.models.ficha import Ficha
-from app.models.ficha_instructor import FichaInstructor
-from app.models.grupo import Grupo
-from app.models.tarea import MODALIDAD_EVIDENCIA, Tarea
-from app.services.alertas import actualizar_alertas_ficha
-from app.services.archivos import ArchivoService, ErrorArchivo
-from app.services.cortes import corte_actual, cortes_visibles
-from app.services.permisos import puede_crear_tarea_en_corte, puede_gestionar_ficha, tareas_visibles
-from app.services.ranking import actualizar_participacion_ficha
-from app.services.tareas import (
-    DatosTareaInvalidos,
-    agrupar_tareas_por_corte_e_instructor,
-    agrupar_tareas_por_instructor,
-    eliminar_tarea_con_archivos,
-    guardar_material_apoyo,
-    leer_datos_tarea,
-    obtener_tarea_gestionable,
-)
-from app.services.trabajos_grupales import DatosAsignacionTareaInvalidos, validar_destinatarios_tarea
 from datetime import datetime
+
 from flask import (
     current_app,
     flash,
@@ -33,6 +13,36 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
+
+from app import db
+from app.models.corte import Corte
+from app.models.ficha import Ficha
+from app.models.ficha_instructor import FichaInstructor
+from app.models.grupo import Grupo
+from app.models.tarea import MODALIDAD_EVIDENCIA, Tarea
+from app.services.alertas import actualizar_alertas_ficha
+from app.services.archivos import ArchivoService, ErrorArchivo
+from app.services.cortes import corte_actual, cortes_visibles
+from app.services.metricas_tareas import contar_por_calificar, resumir_plazos
+from app.services.permisos import (
+    puede_crear_tarea_en_corte,
+    puede_gestionar_ficha,
+    tareas_visibles,
+)
+from app.services.ranking import actualizar_participacion_ficha
+from app.services.tareas import (
+    DatosTareaInvalidos,
+    agrupar_tareas_por_corte_e_instructor,
+    agrupar_tareas_por_instructor,
+    eliminar_tarea_con_archivos,
+    guardar_material_apoyo,
+    leer_datos_tarea,
+    obtener_tarea_gestionable,
+)
+from app.services.trabajos_grupales import (
+    DatosAsignacionTareaInvalidos,
+    validar_destinatarios_tarea,
+)
 
 from . import (  # noqa: E402
     _actualizar_indicadores_carga,
@@ -168,30 +178,13 @@ def tareas(ficha_id):
 
     cortes_editables = [c for c in cortes_lista if puede_crear_tarea_en_corte(c, ficha)] if modo_todos else []
 
-    from app.services.recomendaciones import obtener_recomendaciones_ficha, CAT_TAREAS
+    from app.services.recomendaciones import CAT_TAREAS, obtener_recomendaciones_ficha
     recomendaciones_tareas = obtener_recomendaciones_ficha(
         ficha_id, instructor_id=current_user.id, categorias={CAT_TAREAS},
     )
 
-    metricas_resumen = {
-        'total_tareas': len(lista_tareas),
-        'tareas_activas': sum(
-            1 for t in lista_tareas
-            if t.progreso_tiempo['estado'] in ('normal', 'atencion', 'urgente')
-        ),
-        'tareas_urgentes': sum(
-            1 for t in lista_tareas
-            if t.progreso_tiempo['estado'] == 'urgente'
-        ),
-        'tareas_vencidas': sum(
-            1 for t in lista_tareas
-            if t.progreso_tiempo['estado'] == 'vencida'
-        ),
-        'tareas_sin_limite': sum(
-            1 for t in lista_tareas
-            if t.progreso_tiempo['estado'] == 'sin_limite'
-        ),
-    }
+    metricas_resumen = resumir_plazos(lista_tareas)
+    metricas_resumen['por_calificar'] = contar_por_calificar([t.id for t in lista_tareas])
 
     return render_template(
         'tareas.html',

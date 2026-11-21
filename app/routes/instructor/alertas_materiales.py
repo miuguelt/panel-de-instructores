@@ -1,14 +1,5 @@
 """Alertas de la ficha y materiales de apoyo."""
 
-from app import db
-from app.models.alertas import Alerta, ConfiguracionAlertas
-from app.models.aprendiz import Aprendiz
-from app.models.ficha import Ficha
-from app.models.material import MaterialFicha
-from app.services.alertas import actualizar_alertas_ficha
-from app.services.archivos import ArchivoService, ErrorArchivo, TiposCarpeta
-from app.services.cronograma import obtener_cronograma
-from app.services.permisos import puede_gestionar_ficha
 from flask import (
     current_app,
     flash,
@@ -19,6 +10,17 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
+
+from app import db
+from app.models.alertas import Alerta, ConfiguracionAlertas
+from app.models.aprendiz import Aprendiz
+from app.models.ficha import Ficha
+from app.models.material import MaterialFicha
+from app.services.alertas import actualizar_alertas_ficha
+from app.services.archivos import ArchivoService, ErrorArchivo, TiposCarpeta
+from app.services.cronograma import obtener_cronograma
+from app.services.permisos import puede_gestionar_ficha
+from app.services.prioridad_fichas import ordenar_por_riesgo
 
 from . import (  # noqa: E402
     calcular_semaforo,
@@ -58,6 +60,8 @@ def alertas(ficha_id):
             'justificadas': stats['faltas_justificadas'],
             'nivel': stats['nivel'],
         })
+
+    datos_alertas = ordenar_por_riesgo(datos_alertas)
 
     from app.services.alertas import obtener_config_comite
     alertas_cronograma = Alerta.query.filter_by(

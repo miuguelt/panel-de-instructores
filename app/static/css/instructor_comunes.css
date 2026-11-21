@@ -711,3 +711,70 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* Alertas: semáforo del grupo arriba y reglas/configuración plegadas al final. */
+.alertas-resumen {
+    margin-block: 1rem;
+}
+
+.alertas-resumen-nota {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.alertas-configuracion {
+    display: grid;
+    gap: 0.75rem;
+    margin-block-start: 1.5rem;
+}
+
+.alertas-reglas-summary {
+    min-block-size: var(--control-h-sm);
+    display: flex;
+    align-items: center;
+    font-weight: 700;
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+/* Estadísticas: resumen visual y comparación de competencias. */
+.estadisticas-resumen,
+.estadisticas-competencias {
+    margin-block: 1rem;
+}
+
+.estadisticas-resumen-grid {
+    display: grid;
+    grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: center;
+}
+
+.estadisticas-resumen-bars,
+.estadisticas-resumen-kpis {
+    display: grid;
+    gap: 0.875rem;
+    min-inline-size: 0;
+}
+
+@media (max-width: 60rem) {
+    .estadisticas-resumen-grid {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .estadisticas-resumen-kpis {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    }
+}
+
+@media (max-width: 30rem) {
+    .estadisticas-resumen-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.cronograma-plegado {
+    margin-block-start: 1rem;
+}

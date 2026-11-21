@@ -766,9 +766,11 @@ class ProgramacionCompetenciasTestCase(unittest.TestCase):
 
         # Verificar banner de progreso general del curso
         self.assertIn('curso-progreso-banner', html)
-        self.assertIn('Progreso General del Curso', html)
-        self.assertIn('Tiempo Lectivo Transcurrido', html)
-        self.assertIn('Competencias del Curso Aprobadas', html)
+        self.assertIn('Avance del curso', html)
+        self.assertIn('Tiempo lectivo transcurrido', html)
+        self.assertIn('Competencias completas al 100%', html)
+        self.assertIn('Juicios por tipo de competencia', html)
+        self.assertIn('Evaluaciones por instructor', html)
 
         # Verificar badge de fase de competencia
         self.assertIn('badge-fase', html)

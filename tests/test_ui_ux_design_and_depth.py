@@ -330,6 +330,7 @@ class DesignSystemAndDepthTestCase(unittest.TestCase):
                 'tareas_totales': 5,
                 'entregas_totales': 16,
                 'pendientes': 2,
+                'por_calificar': 3,
                 'planes_pendientes': 1,
                 'aprendices_certificados': 0,
                 'alertas_activas': 0,
@@ -350,6 +351,6 @@ class DesignSystemAndDepthTestCase(unittest.TestCase):
             self.assertIn('data-lucide="search"', html)
             self.assertIn('data-lucide="layout-grid"', html)
             self.assertIn('data-lucide="list"', html)
-            self.assertIn('data-lucide="file-text"', html)
+            self.assertIn('data-lucide="file-check"', html)
             self.assertIn('data-lucide="inbox"', html)
             self.assertIn('data-lucide="clipboard-check"', html)

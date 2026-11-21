@@ -1484,3 +1484,23 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* Resumen del directorio: avance global, avance por aprendiz y matrícula. */
+.aprendices-resumen {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    align-items: start;
+    padding: 1rem;
+    background: var(--surface-data);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-lg);
+}
+
+.aprendices-resumen-estados {
+    display: grid;
+    gap: 0.5rem;
+}
+
+#selector-aprendiz {
+    margin-block-start: 1.5rem;
+    scroll-margin-block-start: 6rem;
+}

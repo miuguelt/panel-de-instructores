@@ -80,7 +80,8 @@ class CargaPaginasTestCase(BaseRendimiento):
         grupos = [sql for sql in consultas if 'FROM grupos' in sql]
         entregas = [sql for sql in consultas if 'FROM entregas' in sql]
         self.assertLessEqual(len(grupos), 2, '\n'.join(grupos))
-        self.assertLessEqual(len(entregas), 2, '\n'.join(entregas))
+        # Dos consultas de las tarjetas y una fija para «Entregas por calificar» de la cabecera.
+        self.assertLessEqual(len(entregas), 3, '\n'.join(entregas))
 
     def test_alertas_de_tareas_conservan_resultados_y_evitan_modulos_ajenos(self):
         ahora = datetime.utcnow()
