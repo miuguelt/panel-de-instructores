@@ -1,0 +1,131 @@
+{#- Mi progreso y calendario de asistencia. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <section class="section-container" id="seccion-progreso" data-learner-tab="resumen">
+        <div class="section-title-row">
+            <h2 class="section-title">Mi Progreso</h2>
+            <span class="badge badge-secondary">Panorama general</span>
+        </div>
+
+        <div class="progress-dashboard">
+            {# ── Juicios Global ── #}
+            <div class="progress-card">
+                {% set c_jui = 'var(--success)' if stats_juicios.pct_total >= 80 else ('var(--warning)' if stats_juicios.pct_total >= 50 else 'var(--danger)') %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">🎓 Juicios Evaluativos</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_jui }};">{{ stats_juicios.pct_total }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if stats_juicios.pct_total > 0 %}<div class="progress-card-fill" style="--progress-value: {{ stats_juicios.pct_total }}%; --metric-color: var(--accent-primary);"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    <span>{{ stats_juicios.aprobados }} de {{ stats_juicios.total }} aprobados</span>
+                    <span>{{ stats_juicios.total - stats_juicios.aprobados }} pendientes</span>
+                </div>
+                {% if stats_juicios.total > 0 %}
+                <div class="progress-detail">
+                    <div class="progress-detail-row">
+                        <span class="progress-detail-label">Técnicas</span>
+                        <div class="progress-detail-bar">{% if stats_juicios.pct_tecnica > 0 %}<span style="--progress-value: {{ stats_juicios.pct_tecnica }}%; --metric-color: var(--accent-primary);"></span>{% endif %}</div>
+                        <span class="progress-detail-value">{{ stats_juicios.pct_tecnica }}%</span>
+                    </div>
+                    <div class="progress-detail-row">
+                        <span class="progress-detail-label">Transversales</span>
+                        <div class="progress-detail-bar">{% if stats_juicios.pct_transversal > 0 %}<span style="--progress-value: {{ stats_juicios.pct_transversal }}%; --metric-color: var(--success);"></span>{% endif %}</div>
+                        <span class="progress-detail-value">{{ stats_juicios.pct_transversal }}%</span>
+                    </div>
+                    <div class="progress-detail-row">
+                        <span class="progress-detail-label">Inglés</span>
+                        <div class="progress-detail-bar">{% if stats_juicios.pct_ingles > 0 %}<span style="--progress-value: {{ stats_juicios.pct_ingles }}%; --metric-color: var(--info);"></span>{% endif %}</div>
+                        <span class="progress-detail-value">{{ stats_juicios.pct_ingles }}%</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            {# ── Evidencias ── #}
+            <div class="progress-card">
+                {% set pct_ev = pct_evidencias if tareas_individuales else 0 %}
+                {% set c_ev = 'var(--success)' if pct_ev >= 80 else ('var(--warning)' if pct_ev >= 50 else 'var(--danger)') %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">📋 Evidencias</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_ev }};">{{ pct_ev }}%</span>
+                </div>
+                <div class="progress-card-track" role="progressbar"
+                     aria-label="Evidencias entregadas"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_ev }}"
+                     aria-valuetext="{{ _entregadas|default([])|length }} de {{ tareas_individuales|length }} evidencias entregadas, {{ pct_ev }} por ciento">
+                    {% if pct_ev > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_ev }}%; --metric-color: {{ c_ev }};"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    {% if tareas_individuales %}
+                    <span>{{ _entregadas|length }} de {{ total_tareas }} entregadas</span>
+                    <span>{{ total_tareas - _entregadas|length }} pendientes</span>
+                    {% else %}
+                    <span>Sin tareas asignadas</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# ── Ranking ── #}
+            <div class="progress-card" data-experience-ranking>
+                {% set pct_rank = fila_propia.barra_puntaje if fila_propia else 0 %}
+                {% set c_rank = 'var(--success)' if pct_rank >= 80 else ('var(--warning)' if pct_rank >= 50 else 'var(--danger)') %}
+                <div class="progress-card-header">
+                    <span class="progress-card-label">🏆 Ranking</span>
+                    <span class="progress-card-value" style="--metric-color: {{ c_rank }};">{{ '%.1f'|format(pct_rank) }}%</span>
+                </div>
+                <div class="progress-card-track">
+                    {% if pct_rank > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_rank }}%; --metric-color: {{ c_rank }};"></div>{% endif %}
+                </div>
+                <div class="progress-card-footer">
+                    {% if fila_propia %}
+                    <span>Puesto #{{ fila_propia.posicion }} de {{ total_ranking }}</span>
+                    <span>{{ '%.1f'|format(fila_propia.puntaje_total) }} pts</span>
+                    {% else %}
+                    <span>Participación</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% include 'aprendiz/_avance_lectivo.html' %}
+
+            {# ── Asistencia por sesión: cumplidas, justificadas y sin justificar ── #}
+            <div class="progress-card progress-card--viz">
+                {{ apilada([('Sin falta injustificada', [sesiones_cumplidas - faltas_justificadas, 0]|max, 'success'),
+                            ('Justificadas', faltas_justificadas, 'info'),
+                            ('Sin justificar', faltas_no_justificadas, 'danger')], 'Tus sesiones') }}
+            </div>
+        </div>
+    </section>
+
+    <section class="learner-attendance-calendar card" aria-labelledby="learner-attendance-title" data-learner-tab="resumen">
+        <div class="learner-attendance-heading">
+            <div>
+                <span class="eyebrow">Consulta personal</span>
+                <h2 id="learner-attendance-title">Mi calendario de asistencia</h2>
+                <p class="text-muted">Revisa cómo quedó registrada tu asistencia en cada sesión de formación.</p>
+            </div>
+            <span class="badge badge-secondary">{{ asistencia_calendario|length }} días marcados</span>
+        </div>
+
+        <div class="learner-calendar-toolbar">
+            <button type="button" class="btn btn-sm btn-outline" data-learner-calendar-prev aria-label="Mes anterior">&larr; Anterior</button>
+            <h3 data-learner-calendar-month>Calendario</h3>
+            <button type="button" class="btn btn-sm btn-outline" data-learner-calendar-next aria-label="Mes siguiente">Siguiente &rarr;</button>
+        </div>
+
+        <div class="learner-calendar-grid" data-learner-calendar-grid role="grid" aria-label="Calendario de asistencia">
+            <!-- Se genera para el mes visible. -->
+        </div>
+
+        <div class="learner-calendar-footer">
+            <div class="learner-calendar-legend" aria-label="Leyenda de estados">
+                <span><i class="learner-legend-dot learner-legend-dot--asiste"></i>Asistió</span>
+                <span><i class="learner-legend-dot learner-legend-dot--falta-nj"></i>Falta injustificada</span>
+                <span><i class="learner-legend-dot learner-legend-dot--falta-j"></i>Falta justificada / excusa</span>
+                <span><i class="learner-legend-dot learner-legend-dot--tardanza"></i>Tardanza</span>
+            </div>
+            <div class="learner-calendar-detail" data-learner-calendar-detail role="status" aria-live="polite">
+                Selecciona un día marcado para ver su detalle.
+            </div>
+        </div>
+    </section>

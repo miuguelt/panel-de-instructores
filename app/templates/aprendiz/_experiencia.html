@@ -29,17 +29,13 @@
         <button type="button" id="experience-retry" class="btn btn-outline" hidden>Reintentar guardado</button>
         <button type="button" id="experience-reload" class="btn btn-outline" hidden>Recargar ajustes guardados</button>
     </div>
+    {# El avance oficial ya está en la cabecera; aquí solo el estado de las evidencias entregadas. #}
+    {% from 'components/_viz.html' import apilada %}
     <div class="experience-evidence-summary">
-        <div class="experience-official-progress">
-            <strong>{{ experiencia_data.progress.approved }} de {{ experiencia_data.progress.total }}</strong>
-            <span>Resultados de aprendizaje aprobados</span>
-            <span class="experience-percent">{{ experiencia_data.progress.pct }} % de avance</span>
-        </div>
-        <div class="experience-evidence-pipeline" role="group" aria-label="Evidencias por estado">
-            {% for key, label in [('submitted', 'Entregadas'), ('review', 'En revisión'), ('changes', 'Con cambios solicitados'), ('approved', 'Revisión aprobada')] %}
-            <div class="experience-evidence-status"><strong>{{ experiencia_data.evidence[key] }}</strong><span>{{ label }}</span></div>
-            {% endfor %}
-        </div>
+        {{ apilada([('En revisión', experiencia_data.evidence.review, 'info'),
+                    ('Con cambios solicitados', experiencia_data.evidence.changes, 'warning'),
+                    ('Revisión aprobada', experiencia_data.evidence.approved, 'success')],
+                   'Tus ' ~ experiencia_data.evidence.submitted ~ ' evidencias entregadas') }}
     </div>
     <details class="experience-insights">
         <summary>Ver competencias, avance del grupo e hitos</summary>

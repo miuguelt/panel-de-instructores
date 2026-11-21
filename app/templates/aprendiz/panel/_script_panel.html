@@ -1,0 +1,422 @@
+{#- Pestañas, filtros, saltos e inspector de la curva (script). Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <script>
+    (function () {
+        'use strict';
+
+        const LEARNER_ID = {{ aprendiz.id|tojson }};
+        const ACTIVE_TAB_KEY = 'sena_learner_active_tab_' + LEARNER_ID;
+        const rootEl = document.getElementById('panel-aprendiz-root');
+        const viewModeIcon = document.getElementById('view-mode-icon');
+        const viewModeText = document.getElementById('view-mode-text');
+
+        // -------------------------------------------------------------
+        // GESTIÓN DE PORTAFOLIO DIGITAL (GITHUB Y NOTION)
+        // -------------------------------------------------------------
+        const portafolioModal = document.getElementById('portafolio-modal');
+        const btnOpenPortafolio = document.getElementById('btn-open-portafolio-modal');
+        const btnEditPortafolioCards = document.querySelectorAll('.btn-open-portafolio-modal');
+        const closePortafolioBtns = document.querySelectorAll('[data-close-portafolio-modal]');
+        const formPortafolio = document.getElementById('form-portafolio-aprendiz');
+        const portafolioFeedback = document.getElementById('portafolio-feedback-msg');
+
+        function openPortafolioModal(prefocus) {
+            if (!portafolioModal) return;
+            if (portafolioFeedback) portafolioFeedback.style.display = 'none';
+            window.abrirModal(portafolioModal);
+            if (prefocus === 'github') {
+                const ig = document.getElementById('input-enlace-github');
+                if (ig) ig.focus();
+            } else if (prefocus === 'notion') {
+                const inot = document.getElementById('input-enlace-notion');
+                if (inot) inot.focus();
+            }
+        }
+
+        function closePortafolioModal() {
+            if (!portafolioModal) return;
+            window.cerrarModal(portafolioModal);
+        }
+
+        if (btnOpenPortafolio) {
+            btnOpenPortafolio.addEventListener('click', () => openPortafolioModal());
+        }
+        btnEditPortafolioCards.forEach(b => {
+            b.addEventListener('click', () => {
+                const target = b.getAttribute('data-target-input');
+                openPortafolioModal(target);
+            });
+        });
+        closePortafolioBtns.forEach(b => b.addEventListener('click', closePortafolioModal));
+        if (portafolioModal) {
+            portafolioModal.addEventListener('click', e => {
+                if (e.target === portafolioModal) closePortafolioModal();
+            });
+        }
+
+        if (formPortafolio) {
+            formPortafolio.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btnSave = document.getElementById('btn-save-portafolio');
+                const btnText = document.getElementById('btn-save-portafolio-text');
+                const githubVal = document.getElementById('input-enlace-github').value.trim();
+                const notionVal = document.getElementById('input-enlace-notion').value.trim();
+                const csrfToken = formPortafolio.querySelector('input[name="csrf_token"]').value;
+
+                if (btnSave) btnSave.disabled = true;
+                if (btnText) btnText.textContent = 'Guardando...';
+                if (portafolioFeedback) portafolioFeedback.style.display = 'none';
+
+                try {
+                    const resp = await fetch(formPortafolio.action, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            enlace_github: githubVal,
+                            enlace_notion: notionVal,
+                            csrf_token: csrfToken
+                        })
+                    });
+                    const resJson = await resp.json();
+                    if (!resp.ok || !resJson.ok) {
+                        throw new Error(resJson.error || 'Error al guardar los enlaces.');
+                    }
+                    window.location.reload();
+                } catch (err) {
+                    if (portafolioFeedback) {
+                        portafolioFeedback.textContent = err.message || 'Error inesperado.';
+                        portafolioFeedback.style.display = 'block';
+                    }
+                    if (btnSave) btnSave.disabled = false;
+                    if (btnText) btnText.textContent = 'Guardar enlaces';
+                }
+            });
+        }
+
+        // -------------------------------------------------------------
+        // 3. NAVEGACIÓN MODULAR POR PESTAÑAS Y MODO CASCADA
+        // -------------------------------------------------------------
+        const tabBtns = document.querySelectorAll('.learner-tab-btn');
+        const tabPanes = document.querySelectorAll('[data-learner-tab]');
+
+        function activateTab(tabTarget, updateHash = true) {
+            const isCascade = rootEl && rootEl.classList.contains('is-cascade-mode');
+
+            tabBtns.forEach(btn => {
+                const isActive = btn.dataset.tabTarget === tabTarget;
+                btn.classList.toggle('is-active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            tabPanes.forEach(pane => {
+                const matches = pane.getAttribute('data-learner-tab') === tabTarget;
+                pane.classList.toggle('tab-pane-active', matches);
+            });
+
+            if (updateHash && window.history.replaceState) {
+                window.history.replaceState(null, null, '#tab-' + tabTarget);
+            }
+
+            try {
+                localStorage.setItem(ACTIVE_TAB_KEY, tabTarget);
+            } catch (e) {}
+
+            // Si está en cascada, hacer scroll suave al primer elemento de la pestaña
+            if (isCascade) {
+                const firstEl = document.querySelector(`[data-learner-tab="${tabTarget}"]`);
+                if (firstEl) {
+                    firstEl.scrollIntoView({ behavior: rootEl.classList.contains('experience-reduced-motion') ? 'auto' : 'smooth', block: 'start' });
+                }
+            }
+        }
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                activateTab(btn.dataset.tabTarget, true);
+            });
+        });
+
+        // Jump buttons desde Action Center "Mi Día"
+        document.querySelectorAll('[data-jump-tab]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.jumpTab;
+                activateTab(target, true);
+                window.dispatchEvent(new CustomEvent('learner:location', { detail: { tab: target, taskId: null } }));
+                const firstEl = btn.dataset.jumpTargetId
+                    ? document.getElementById(btn.dataset.jumpTargetId)
+                    : document.querySelector(`[data-learner-tab="${target}"]`);
+                if (firstEl) {
+                    firstEl.scrollIntoView({ behavior: rootEl.classList.contains('experience-reduced-motion') ? 'auto' : 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Toggle Modo Vista: Pestañas vs Cascada
+        function setCascadeMode(enabled) {
+            if (!rootEl) return;
+            rootEl.classList.toggle('is-cascade-mode', enabled);
+            if (enabled) {
+                if (viewModeIcon) viewModeIcon.textContent = '📑';
+                if (viewModeText) viewModeText.textContent = 'Vista continua · Configurar';
+            } else {
+                if (viewModeIcon) viewModeIcon.textContent = '📜';
+                if (viewModeText) viewModeText.textContent = 'Por pestañas · Configurar';
+            }
+        }
+
+        window.addEventListener('learner:preferences-applied', function (event) {
+            setCascadeMode(event.detail.preferences.viewMode === 'cascade');
+        });
+
+        // Enlaces de la barra móvil inferior
+        document.querySelectorAll('.learner-bottom-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const href = link.getAttribute('href');
+                let targetTab = null;
+                if (href === '#seccion-progreso') targetTab = 'resumen';
+                else if (href === '#seccion-grupo-trabajo') targetTab = 'grupo';
+                else if (href === '#seccion-juicios') targetTab = 'juicios';
+                else if (href === '#seccion-tareas') targetTab = 'evidencias';
+                else if (href === '#seccion-ranking') targetTab = 'rendimiento';
+                else if (href === '#seccion-aseo') targetTab = 'convivencia';
+
+                if (targetTab) {
+                    activateTab(targetTab, false);
+                    window.dispatchEvent(new CustomEvent('learner:location', { detail: { tab: targetTab, taskId: null } }));
+                }
+            });
+        });
+
+        // -------------------------------------------------------------
+        // 4. BÚSQUEDA Y FILTRADO EN TIEMPO REAL DE EVIDENCIAS
+        // -------------------------------------------------------------
+        const searchInput = document.getElementById('task-search-input');
+        const clearSearchBtn = document.getElementById('task-search-clear');
+        const filterChips = document.querySelectorAll('.task-chip');
+        const taskItems = document.querySelectorAll('[data-task-item]');
+        const emptyStateFilter = document.getElementById('tasks-empty-filter-state');
+        const btnResetFilters = document.getElementById('btn-reset-task-filters');
+        const entregadasDetails = document.querySelector('.entregadas-details');
+        const headingPendientes = document.getElementById('heading-tareas-pendientes');
+
+        let activeFilter = 'all';
+        let searchQuery = '';
+
+        function applyTaskFilters() {
+            if (!taskItems.length) return;
+
+            let visibleCount = 0;
+            let visiblePendientes = 0;
+            let visibleEntregadas = 0;
+
+            taskItems.forEach(item => {
+                const title = item.getAttribute('data-task-title') || '';
+                const desc = item.getAttribute('data-task-desc') || '';
+                const status = item.getAttribute('data-task-status') || '';
+                const isUrgent = item.getAttribute('data-task-urgent') === 'true';
+                const isExtemp = item.getAttribute('data-task-extemp') === 'true';
+                const isPlan = item.getAttribute('data-task-plan') === 'true';
+
+                // Coincidencia de texto
+                const matchesSearch = !searchQuery || title.includes(searchQuery) || desc.includes(searchQuery);
+
+                // Coincidencia de chip
+                let matchesFilter = true;
+                if (activeFilter === 'pending') {
+                    matchesFilter = (status === 'pending');
+                } else if (activeFilter === 'urgent') {
+                    matchesFilter = isUrgent && (status === 'pending');
+                } else if (activeFilter === 'extemporaneous') {
+                    matchesFilter = isExtemp && (status === 'pending');
+                } else if (activeFilter === 'plan') {
+                    matchesFilter = isPlan;
+                } else if (activeFilter === 'delivered') {
+                    matchesFilter = (status === 'delivered');
+                }
+
+                const shouldShow = matchesSearch && matchesFilter;
+                item.style.display = shouldShow ? '' : 'none';
+
+                if (shouldShow) {
+                    visibleCount++;
+                    if (status === 'delivered') visibleEntregadas++;
+                    else visiblePendientes++;
+                }
+            });
+
+            // Abrir automáticamente el details de entregadas si el filtro es "delivered" o si hay búsqueda activa con resultados entregados
+            if (entregadasDetails) {
+                if (activeFilter === 'delivered' || (searchQuery && visibleEntregadas > 0)) {
+                    entregadasDetails.open = true;
+                }
+            }
+
+            // Ocultar encabezado de pendientes si no hay pendientes visibles
+            if (headingPendientes) {
+                headingPendientes.style.display = (visiblePendientes > 0 || activeFilter === 'all') ? '' : 'none';
+            }
+
+            // Mostrar estado vacío de filtro
+            if (emptyStateFilter) {
+                emptyStateFilter.style.display = (visibleCount === 0) ? 'block' : 'none';
+            }
+        }
+
+        // Calcular conteos dinámicos en los chips
+        function updateChipCounts() {
+            let countAll = 0, countPending = 0, countUrgent = 0, countExtemp = 0, countPlan = 0, countDelivered = 0;
+
+            taskItems.forEach(item => {
+                countAll++;
+                const status = item.getAttribute('data-task-status');
+                const isUrgent = item.getAttribute('data-task-urgent') === 'true';
+                const isExtemp = item.getAttribute('data-task-extemp') === 'true';
+                const isPlan = item.getAttribute('data-task-plan') === 'true';
+
+                if (status === 'delivered') countDelivered++;
+                else {
+                    countPending++;
+                    if (isUrgent) countUrgent++;
+                    if (isExtemp) countExtemp++;
+                }
+                if (isPlan) countPlan++;
+            });
+
+            const elAll = document.getElementById('chip-count-all');
+            const elPending = document.getElementById('chip-count-pending');
+            const elUrgent = document.getElementById('chip-count-urgent');
+            const elExtemp = document.getElementById('chip-count-extemp');
+            const elPlan = document.getElementById('chip-count-plan');
+            const elDelivered = document.getElementById('chip-count-delivered');
+
+            if (elAll) elAll.textContent = countAll;
+            if (elPending) elPending.textContent = countPending;
+            if (elUrgent) elUrgent.textContent = countUrgent;
+            if (elExtemp) elExtemp.textContent = countExtemp;
+            if (elPlan) elPlan.textContent = countPlan;
+            if (elDelivered) elDelivered.textContent = countDelivered;
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value.toLowerCase().trim();
+                if (clearSearchBtn) clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
+                applyTaskFilters();
+            });
+        }
+
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                searchQuery = '';
+                clearSearchBtn.style.display = 'none';
+                applyTaskFilters();
+            });
+        }
+
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                filterChips.forEach(c => c.classList.remove('is-active'));
+                chip.classList.add('is-active');
+                activeFilter = chip.dataset.taskFilter;
+                applyTaskFilters();
+            });
+        });
+
+        if (btnResetFilters) {
+            btnResetFilters.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                searchQuery = '';
+                if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+                filterChips.forEach(c => c.classList.remove('is-active'));
+                const allChip = document.querySelector('.task-chip[data-task-filter="all"]');
+                if (allChip) allChip.classList.add('is-active');
+                activeFilter = 'all';
+                applyTaskFilters();
+            });
+        }
+
+        // Los accesos del inicio revelan la evidencia aunque haya filtros o un acordeón cerrado.
+        window.addEventListener('learner:navigate', function (event) {
+            const destination = event.detail;
+            activateTab(destination.tab, true);
+            let target = document.querySelector(`[data-learner-tab="${destination.tab}"]`);
+            if (destination.taskId) {
+                if (searchInput) searchInput.value = '';
+                searchQuery = '';
+                activeFilter = 'all';
+                if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+                filterChips.forEach(chip => chip.classList.toggle('is-active', chip.dataset.taskFilter === 'all'));
+                applyTaskFilters();
+                target = document.getElementById('experiencia-tarea-' + destination.taskId) || target;
+                if (target) {
+                    let parent = target.parentElement;
+                    while (parent && parent !== rootEl) {
+                        if (parent.tagName === 'DETAILS') parent.open = true;
+                        parent = parent.parentElement;
+                    }
+                    target.focus({ preventScroll: true });
+                }
+            }
+            if (target) target.scrollIntoView({ behavior: rootEl.classList.contains('experience-reduced-motion') ? 'auto' : 'smooth', block: 'start' });
+        });
+
+        // -------------------------------------------------------------
+        // 5. INICIALIZACIÓN GENERAL
+        // -------------------------------------------------------------
+        updateChipCounts();
+
+        // -------------------------------------------------------------
+        // 4.1 INSPECTOR INTERACTIVO DE LA CURVA DE RENDIMIENTO
+        // -------------------------------------------------------------
+        const curvePoints = document.querySelectorAll('.curve-point-item');
+        const inspFecha = document.getElementById('inspector-fecha');
+        const inspPuntaje = document.getElementById('inspector-puntaje');
+        const inspAsist = document.getElementById('inspector-asistencia');
+        const inspEvid = document.getElementById('inspector-evidencias');
+        const inspEstado = document.getElementById('inspector-estado');
+
+        function updateInspector(pt) {
+            if (!pt) return;
+            const f = pt.getAttribute('data-fecha');
+            const p = pt.getAttribute('data-puntaje');
+            const a = pt.getAttribute('data-asistencia');
+            const e = pt.getAttribute('data-evidencias');
+            const est = pt.getAttribute('data-estado');
+            if (inspFecha && f) inspFecha.textContent = f;
+            if (inspPuntaje && p) inspPuntaje.textContent = p + ' pts';
+            if (inspAsist && a) inspAsist.textContent = a + '%';
+            if (inspEvid && e) inspEvid.textContent = e + '%';
+            if (inspEstado && est) inspEstado.textContent = est;
+        }
+
+        curvePoints.forEach(pt => {
+            pt.addEventListener('mouseenter', () => updateInspector(pt));
+            pt.addEventListener('focus', () => updateInspector(pt));
+            pt.addEventListener('click', () => updateInspector(pt));
+        });
+
+        // Determinar pestaña inicial según hash de URL o pestaña guardada
+        let initialTab = 'resumen';
+        const hash = window.location.hash;
+        if (hash === '#tab-evidencias' || hash === '#seccion-tareas') initialTab = 'evidencias';
+        else if (hash === '#tab-grupo' || hash === '#seccion-grupo-trabajo') initialTab = 'grupo';
+        else if (hash === '#tab-juicios' || hash === '#seccion-juicios') initialTab = 'juicios';
+        else if (hash === '#tab-rendimiento' || hash === '#seccion-ranking') initialTab = 'rendimiento';
+        else if (hash === '#tab-convivencia' || hash === '#seccion-aseo') initialTab = 'convivencia';
+        else if (hash === '#tab-resumen' || hash === '#seccion-progreso') initialTab = 'resumen';
+        else {
+            try {
+                const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+                if (saved && ['resumen', 'evidencias', 'grupo', 'juicios', 'rendimiento', 'convivencia'].includes(saved)) {
+                    initialTab = saved;
+                }
+            } catch (e) {}
+        }
+
+        activateTab(initialTab, false);
+    })();
+    </script>

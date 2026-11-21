@@ -1,0 +1,459 @@
+{#- Pestaña «Mis evidencias»: filtros, pendientes y entregadas. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <section class="tasks-section-wrapper" data-learner-tab="evidencias">
+        <div class="tasks-section-header" id="seccion-tareas">
+            <div>
+                <span class="eyebrow">Espacio de Evidencias</span>
+                <h2 class="tasks-section-title">Mis Tareas Programadas</h2>
+            </div>
+            
+            {% if tareas_individuales %}
+            {% set total_tareas = tareas_individuales|length %}
+            {% set entregadas = [] %}
+            {% set pendientes = [] %}
+            {% for item in tareas_individuales %}
+                {% if item.estado in ['entregada', 'retraso'] %}
+                    {% set _ = entregadas.append(item) %}
+                {% else %}
+                    {% set _ = pendientes.append(item) %}
+                {% endif %}
+            {% endfor %}
+            {% set pct = (entregadas|length / total_tareas * 100)|round|int if total_tareas > 0 else 0 %}
+            
+            <div class="evidence-progress-mini">
+                <div class="evidence-progress-row">
+                    <span>Progreso de Evidencias</span>
+                    <span class="evidence-progress-value">{{ pct }}%</span>
+                </div>
+                <div class="progress-card-track" role="progressbar"
+                     aria-label="Evidencias entregadas"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct }}"
+                     aria-valuetext="{{ entregadas|length }} de {{ total_tareas }} evidencias entregadas, {{ pct }} por ciento">
+                    {% if pct > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct }}%; --metric-color: var(--success);"></div>{% endif %}
+                </div>
+                <small class="text-muted evidence-progress-caption">{{ entregadas|length }} de {{ total_tareas }} entregadas</small>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if tareas_individuales %}
+        <!-- Barra de herramientas: Búsqueda y Filtros Rápidos de Evidencias -->
+        <div class="task-filter-toolbar card-subtle">
+            <div class="task-search-box">
+                <span class="task-search-icon" aria-hidden="true">🔍</span>
+                <input type="search" id="task-search-input" class="form-control task-search-field"
+                       placeholder="Buscar evidencia por título, descripción o tema..."
+                       aria-label="Buscar evidencia">
+                <button type="button" id="task-search-clear" class="btn btn-sm btn-ghost btn-clear-search" title="Limpiar búsqueda" style="display:none;">✕</button>
+            </div>
+            <div class="task-filter-chips" role="group" aria-label="Filtrar evidencias por estado">
+                <button type="button" class="task-chip is-active" data-task-filter="all">
+                    <span>Todas</span>
+                    <span class="chip-count" id="chip-count-all">{{ tareas_individuales|length }}</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="pending">
+                    <span>⚠️ Por Entregar</span>
+                    <span class="chip-count" id="chip-count-pending">{{ pendientes|length }}</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="extemporaneous">
+                    <span>📤 Extemporáneas</span>
+                    <span class="chip-count" id="chip-count-extemp">0</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="plan">
+                    <span>📋 En Plan</span>
+                    <span class="chip-count" id="chip-count-plan">0</span>
+                </button>
+                <button type="button" class="task-chip" data-task-filter="delivered">
+                    <span>✅ Entregadas</span>
+                    <span class="chip-count" id="chip-count-delivered">{{ entregadas|length }}</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="tasks-empty-filter-state" class="empty-state" style="display:none; padding: 2.5rem 1rem;">
+            <div class="empty-icon">🔍</div>
+            <h3>No se encontraron evidencias</h3>
+            <p class="text-muted">Ninguna evidencia coincide con el término de búsqueda o filtro seleccionado.</p>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-reset-task-filters">Ver todas las evidencias</button>
+        </div>
+
+        <!-- TAREAS PENDIENTES (VISIBLES) -->
+        {% if pendientes %}
+        <h3 class="tasks-pending-title" id="heading-tareas-pendientes">
+            ⚠️ Por Entregar ({{ pendientes|length }})
+        </h3>
+        <div class="tasks-list-aprendiz">
+            {% for item in pendientes %}
+            <div class="task-item task-{{ item.estado }}"
+                 id="experiencia-tarea-{{ item.tarea.id }}" tabindex="-1" data-experience-task-id="{{ item.tarea.id }}"
+                 data-task-item
+                 data-task-title="{{ item.tarea.titulo|lower }}"
+                 data-task-desc="{{ item.tarea.descripcion|lower if item.tarea.descripcion else '' }}"
+                 data-task-status="pending"
+                 data-task-extemp="{{ 'true' if item.estado == 'vencida' else 'false' }}"
+                 data-task-plan="{{ 'true' if item.plan else 'false' }}">
+            <div class="task-item-header">
+                <div class="task-info">
+                    <h3 class="task-title">{{ item.tarea.titulo }}</h3>
+                    {% if item.experience_status %}
+                    <p class="experience-evidence-status"><strong>{{ item.experience_status.title }}</strong><span>{{ item.experience_status.help }}</span></p>
+                    {% endif %}
+                    <p class="task-deadline">
+                        <span aria-hidden="true">🕒</span>
+                        {% if item.limite_efectivo %}
+                        Límite: <time datetime="{{ item.limite_efectivo.isoformat() }}">{{ item.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}</time>
+                        {% else %}
+                        Sin fecha límite
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="task-status">
+                    {% if item.prorroga and item.estado != 'vencida' %}
+                    <span class="badge badge-info">Prórroga concedida</span>
+                    {% endif %}
+                    {% if item.plan %}
+                    <span class="badge badge-warning">En Plan de Mejoramiento</span>
+                    {% endif %}
+                    {% if item.estado == 'pendiente' %}
+                    <span class="badge badge-warning">Pendiente</span>
+                    {% elif item.estado == 'vencida' %}
+                    <span class="badge badge-secondary">Vencida</span>
+                    {% elif item.estado == 'correccion' %}
+                    <span class="badge badge-warning">Requiere corrección</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if item.progreso_plazo is not none %}
+            <div class="task-deadline-meter is-{{ item.clase_plazo }}"
+                 role="progressbar"
+                 aria-label="Tiempo transcurrido del plazo para {{ item.tarea.titulo }}"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ item.progreso_plazo }}"
+                 aria-valuetext="{{ item.progreso_plazo }} % del plazo. {{ item.texto_tiempo_plazo }}"
+                 style="--deadline-progress: {{ item.progreso_plazo }}%;">
+                <div class="task-deadline-meter-header">
+                    <span>{% if item.clase_plazo == 'complete' %}Plazo completado{% elif item.clase_plazo == 'overdue' %}Plazo vencido{% else %}Tiempo transcurrido{% endif %}</span>
+                    <span>{{ item.progreso_plazo }}%</span>
+                </div>
+                <div class="task-deadline-meter-track" aria-hidden="true">
+                    <span class="task-deadline-meter-fill"></span>
+                </div>
+                <div class="task-deadline-meter-meta">
+                    <span>{{ item.texto_tiempo_plazo }}</span>
+                </div>
+            </div>
+            {% elif item.texto_tiempo_plazo %}
+            <p class="task-deadline-countdown">{{ item.texto_tiempo_plazo }}</p>
+            {% endif %}
+
+            {% if item.tarea.descripcion %}
+            <p class="task-desc">{{ item.tarea.descripcion }}</p>
+            {% endif %}
+            {% if item.plan %}
+            <div class="task-alert is-warning" role="status">
+                <span class="task-alert-icon" aria-hidden="true">📋</span>
+                <div class="task-alert-content">
+                <strong>Asignada a Plan de Mejoramiento</strong>
+                <p>
+                    Esta evidencia hace parte de tu plan de mejoramiento académico. Plazo límite: {{ item.plan.fecha_limite.strftime('%d/%m/%Y') if item.plan.fecha_limite else 'Concertado' }}.
+                </p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if item.clase_plazo == 'urgent' %}
+            <div class="task-alert is-danger" role="alert">
+                <span class="task-alert-icon" aria-hidden="true">⚠️</span>
+                <div class="task-alert-content">
+                <strong>El plazo vence pronto</strong>
+                <p> {{ item.texto_tiempo_plazo }}. Envía la evidencia antes de la fecha límite.</p>
+                </div>
+            </div>
+            {% elif item.clase_plazo == 'soon' %}
+            <div class="task-alert is-warning" role="status">
+                <span class="task-alert-icon" aria-hidden="true">⏳</span>
+                <div class="task-alert-content">
+                <strong>Tu plazo se acerca</strong>
+                <p>{{ item.texto_tiempo_plazo }} para enviar esta evidencia.</p>
+                </div>
+            </div>
+            {% elif item.clase_plazo == 'overdue' %}
+            <div class="task-alert is-danger" role="alert">
+                <span class="task-alert-icon" aria-hidden="true">⚠️</span>
+                <div class="task-alert-content">
+                <strong>Entrega extemporánea permitida</strong>
+                <p>
+                    El plazo inicial ha vencido. Según el Reglamento del Aprendiz SENA, puedes subir tu evidencia de forma extemporánea adjuntando tu justificación para valoración del instructor.
+                </p>
+                </div>
+            </div>
+            {% elif item.prorroga %}
+            <div class="task-alert is-info" role="status">
+                <span class="task-alert-icon" aria-hidden="true">⏱️</span>
+                <div class="task-alert-content">
+                <strong>Prórroga concedida</strong>
+                <p>El nuevo plazo es {{ item.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if item.entrega and item.entrega.calificada %}
+            <div class="task-feedback">
+                <strong>Nota: {{ item.entrega.calificacion }}</strong>
+                {% if item.entrega.feedback %}
+                <p>{{ item.entrega.feedback }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="task-actions task-evidence-actions">
+                {% if item.tarea.enlace_externo %}
+                <a href="{{ item.tarea.enlace_externo }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🔗 Enlace externo</a>
+                {% endif %}
+                {% if item.tarea.material_apoyo_url %}
+                <a href="{{ url_for('aprendiz.descargar_archivo', filename=item.tarea.material_apoyo_url, ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">⬇️ Material de apoyo</a>
+                {% endif %}
+                {% if item.entrega and item.entrega.archivo_url %}
+                <a href="{{ url_for('aprendiz.descargar_evidencia', entrega_id=item.entrega.id) }}" class="btn btn-outline btn-sm download-evidence-link">📄 Descargar mi evidencia</a>
+                {% endif %}
+                {% if item.entrega and item.entrega.enlace_repositorio %}
+                <a href="{{ item.entrega.enlace_repositorio }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🌐 Abrir enlace entregado</a>
+                {% endif %}
+            </div>
+
+            {% if item.tarea.es_actividad_clase %}
+            <div class="task-feedback">
+                <strong>🧑‍🏫 Esta actividad se revisa en clase</strong>
+                <p>No tienes que subir nada. Tu instructor registra el cumplimiento en el sistema.</p>
+            </div>
+            {% else %}
+            <details class="entrega-form">
+                <summary class="entrega-summary">
+                    {% if item.entrega %}
+                        ✏️ Editar evidencia entregada
+                    {% elif item.estado == 'correccion' %}
+                        📝 Corregir y reenviar evidencia
+                    {% else %}
+                        📤 Subir evidencia de la tarea
+                    {% endif %}
+                </summary>
+                <form method="POST" action="{{ url_for('aprendiz.subir_evidencia', ficha_id=ficha.id, tarea_id=item.tarea.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    {% if item.tarea.requiere_archivo %}
+                    <div class="form-group">
+                        <label for="evidencia-{{ item.tarea.id }}">
+                            Archivo de evidencia {% if item.entrega and item.entrega.archivo_url %}(opcional para reemplazar archivo existente){% else %}(obligatorio){% endif %}
+                        </label>
+                        <input type="file" id="evidencia-{{ item.tarea.id }}" name="archivo_evidencia"
+                               accept="{{ extensiones_carga }}" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                        {% if item.entrega and item.entrega.archivo_url %}
+                        <small class="uploaded-note">Tiene un archivo subido previamente.</small>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="form-group">
+                        <label for="evidencia-{{ item.tarea.id }}">Archivo de evidencia (opcional)</label>
+                        <input type="file" id="evidencia-{{ item.tarea.id }}" name="archivo_evidencia"
+                               accept="{{ extensiones_carga }}" class="form-file-input">
+                    </div>
+                    {% endif %}
+
+                    <small class="text-muted">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Si necesitas enviar varios archivos, comprime la carpeta en ZIP y adjunta el archivo generado. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
+                    <div class="form-group">
+                        <label for="repositorio-{{ item.tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
+                        <input type="url" id="repositorio-{{ item.tarea.id }}" name="enlace_repositorio"
+                               value="{{ item.entrega.enlace_repositorio or '' if item.entrega else '' }}"
+                               placeholder="https://github.com/..." class="form-control">
+                    </div>
+
+                    {% if item.estado == 'vencida' %}
+                    <div class="form-group">
+                        <label for="justificacion-{{ item.tarea.id }}" style="font-weight: 600; color: var(--status-danger-text);">
+                            Justificación o motivo de la entrega extemporánea (requerido por reglamento)
+                        </label>
+                        <textarea id="justificacion-{{ item.tarea.id }}" name="justificacion_retraso" rows="2"
+                                  class="form-control" placeholder="Indica el motivo por el cual entregas fuera de fecha..." required>{{ item.entrega.justificacion_retraso or '' if item.entrega else '' }}</textarea>
+                    </div>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary full-width">
+                        {% if item.estado == 'vencida' %}
+                            📤 Enviar evidencia extemporánea
+                        {% elif item.entrega %}
+                            Guardar cambios en evidencia
+                        {% else %}
+                            Enviar evidencia
+                        {% endif %}
+                    </button>
+                </form>
+            </details>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- TAREAS ENTREGADAS (COLAPSADAS) -->
+    {% if entregadas %}
+    <details class="entregadas-details">
+        <summary class="entregadas-summary">
+            ✅ Evidencias Entregadas ({{ entregadas|length }})
+            <span class="badge badge-success details-badge">Ver detalle</span>
+        </summary>
+        
+        <div class="tasks-list-aprendiz tasks-inner">
+            {% for item in entregadas %}
+            <div class="task-item task-{{ item.estado }}"
+                 id="experiencia-tarea-{{ item.tarea.id }}" tabindex="-1" data-experience-task-id="{{ item.tarea.id }}"
+                 data-task-item
+                 data-task-title="{{ item.tarea.titulo|lower }}"
+                 data-task-desc="{{ item.tarea.descripcion|lower if item.tarea.descripcion else '' }}"
+                 data-task-status="delivered"
+                 data-task-extemp="false"
+                 data-task-plan="false">
+                <div class="task-item-header">
+                    <div class="task-info">
+                        <h3 class="task-title">{{ item.tarea.titulo }}</h3>
+                        {% if item.experience_status %}
+                        <p class="experience-evidence-status"><strong>{{ item.experience_status.title }}</strong><span>{{ item.experience_status.help }}</span></p>
+                        {% endif %}
+                        <p class="task-deadline">
+                            <span aria-hidden="true">🕒</span>
+                            {% if item.limite_efectivo %}
+                            Límite: <time datetime="{{ item.limite_efectivo.isoformat() }}">{{ item.limite_efectivo.strftime('%d/%m/%Y %H:%M') }}</time>
+                            {% else %}
+                            Sin fecha límite
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="task-status">
+                        {% if item.estado == 'entregada' %}
+                        <span class="badge badge-success">Entregada</span>
+                        {% elif item.estado == 'retraso' %}
+                        <span class="badge badge-danger">Entregada con retraso</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if item.progreso_plazo is not none %}
+                <div class="task-deadline-meter is-{{ item.clase_plazo }}"
+                     role="progressbar"
+                     aria-label="Tiempo transcurrido del plazo para {{ item.tarea.titulo }}"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ item.progreso_plazo }}"
+                     aria-valuetext="{{ item.progreso_plazo }} % del plazo. {{ item.texto_tiempo_plazo }}"
+                     style="--deadline-progress: {{ item.progreso_plazo }}%;">
+                    <div class="task-deadline-meter-header">
+                        <span>Plazo completado</span>
+                        <span>{{ item.progreso_plazo }}%</span>
+                    </div>
+                    <div class="task-deadline-meter-track" aria-hidden="true">
+                        <span class="task-deadline-meter-fill"></span>
+                    </div>
+                    <div class="task-deadline-meter-meta">
+                        <span>{{ item.texto_tiempo_plazo }}</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if item.tarea.descripcion %}
+                <p class="task-desc">{{ item.tarea.descripcion }}</p>
+                {% endif %}
+
+                {% if item.entrega and item.entrega.calificada %}
+                <div class="task-feedback task-feedback-success">
+                    <strong>Nota: {{ item.entrega.calificacion }}</strong>
+                    {% if item.entrega.feedback %}
+                    <p>{{ item.entrega.feedback }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if item.entrega and item.entrega.justificacion_retraso %}
+                <div class="task-alert is-warning" role="note">
+                    <span class="task-alert-icon" aria-hidden="true">💬</span>
+                    <div class="task-alert-content">
+                    <strong>Justificación de entrega extemporánea</strong>
+                    <p>{{ item.entrega.justificacion_retraso }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="task-actions task-evidence-actions">
+                    {% if item.tarea.enlace_externo %}
+                    <a href="{{ item.tarea.enlace_externo }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🔗 Enlace tarea</a>
+                    {% endif %}
+                    {% if item.tarea.material_apoyo_url %}
+                    <a href="{{ url_for('aprendiz.descargar_archivo', filename=item.tarea.material_apoyo_url, ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">⬇️ Material de apoyo</a>
+                    {% endif %}
+                    {% if item.entrega and item.entrega.archivo_url %}
+                    <a href="{{ url_for('aprendiz.descargar_evidencia', entrega_id=item.entrega.id) }}" class="btn btn-outline btn-sm download-evidence-link">📄 Descargar mi evidencia</a>
+                    {% endif %}
+                    {% if item.entrega and item.entrega.enlace_repositorio %}
+                    <a href="{{ item.entrega.enlace_repositorio }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🌐 Abrir enlace entregado</a>
+                    {% endif %}
+                </div>
+
+                {% if item.tarea.es_actividad_clase %}
+                <div class="task-feedback task-feedback-success">
+                    <strong>🧑‍🏫 Cumplimiento aprobado en clase</strong>
+                    <p>Tu instructor registró esta actividad como cumplida. No requiere evidencia digital.</p>
+                </div>
+                {% else %}
+                <details class="entrega-form">
+                    <summary class="entrega-summary">
+                        ✏️ Editar evidencia entregada
+                    </summary>
+                    <form method="POST" action="{{ url_for('aprendiz.subir_evidencia', ficha_id=ficha.id, tarea_id=item.tarea.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        {% if item.tarea.requiere_archivo %}
+                        <div class="form-group">
+                            <label for="evidencia-entregada-{{ item.tarea.id }}">
+                                Archivo de evidencia {% if item.entrega and item.entrega.archivo_url %}(opcional para reemplazar archivo existente){% else %}(obligatorio){% endif %}
+                            </label>
+                            <input type="file" id="evidencia-entregada-{{ item.tarea.id }}" name="archivo_evidencia"
+                                   accept="{{ extensiones_carga }}" {% if not (item.entrega and item.entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                            {% if item.entrega and item.entrega.archivo_url %}
+                            <small class="uploaded-note">Tiene un archivo subido previamente.</small>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="form-group">
+                            <label for="evidencia-entregada-{{ item.tarea.id }}">Archivo de evidencia (opcional)</label>
+                            <input type="file" id="evidencia-entregada-{{ item.tarea.id }}" name="archivo_evidencia"
+                                   accept="{{ extensiones_carga }}" class="form-file-input">
+                        </div>
+                        {% endif %}
+
+                        <small class="text-muted">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Si necesitas enviar varios archivos, comprime la carpeta en ZIP y adjunta el archivo generado. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
+                        <div class="form-group">
+                            <label for="repositorio-entregada-{{ item.tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
+                            <input type="url" id="repositorio-entregada-{{ item.tarea.id }}" name="enlace_repositorio"
+                                   value="{{ item.entrega.enlace_repositorio or '' if item.entrega else '' }}"
+                                   placeholder="https://github.com/..." class="form-control">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary full-width">Guardar cambios en evidencia</button>
+                    </form>
+                </details>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+
+    {% if not pendientes and not entregadas %}
+    <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h3>Todavía no hay tareas asignadas</h3>
+        <p>Tu instructor aún no ha creado tareas para esta ficha.</p>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h3>Todavía no hay tareas asignadas</h3>
+        <p>Tu instructor aún no ha creado tareas para esta ficha.</p>
+    </div>
+    {% endif %}
+    </section>

@@ -1,0 +1,177 @@
+{#- Siguiente paso, prioridades del día y turno con el instructor. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <!-- ============================================================ -->
+    <!-- RESUMEN PRIORIZADO: ASEO, RENDIMIENTO Y ALERTAS              -->
+    <!-- ============================================================ -->
+    {% if experiencia_data %}{% include 'aprendiz/_experiencia.html' %}{% endif %}
+
+    {% if solo_lectura %}
+    <div class="alert alert-warning" role="status">
+        Tu matrícula ya no está en formación. Puedes consultar tu historial y descargar tu reporte, pero no enviar soportes, evidencias ni solicitudes.
+    </div>
+    {% endif %}
+    <section class="learner-priority-dashboard" aria-labelledby="priority-dashboard-title">
+        <div class="priority-dashboard-heading">
+            <div>
+                <span class="eyebrow">Lectura rápida de tu ficha</span>
+                <h2 id="priority-dashboard-title">Lo más importante para hoy</h2>
+                <p class="text-muted">Primero las novedades que requieren tu atención; luego tu turno de aseo.</p>
+            </div>
+            <span class="priority-dashboard-note">Alertas · Aseo</span>
+        </div>
+
+        <div class="priority-dashboard-grid">
+            <article class="priority-card priority-card-alerts {% if alertas_activas %}has-alerts{% endif %}" aria-labelledby="priority-alerts-title">
+                <div class="priority-card-topline">
+                    <span class="priority-kicker"><span class="priority-index">01</span> Alertas y atención</span>
+                    <span class="priority-status {% if alertas_activas %}priority-status-warning{% else %}priority-status-success{% endif %}">{{ alertas_activas|length }} activa{{ '' if alertas_activas|length == 1 else 's' }}</span>
+                </div>
+                <h3 id="priority-alerts-title">{% if alertas_activas %}Tienes novedades para revisar{% else %}Sin alertas activas{% endif %}</h3>
+                {% if alertas_activas %}
+                    <div class="priority-alert-detail">
+                        <strong>{{ alertas_activas[0].titulo }}</strong>
+                        <p>{{ alertas_activas[0].mensaje }}</p>
+                    </div>
+                    {% if alertas_activas|length > 1 %}<p class="priority-card-meta">Además tienes {{ alertas_activas|length - 1 }} alerta{{ '' if alertas_activas|length == 2 else 's' }} activa{{ '' if alertas_activas|length == 2 else 's' }}.</p>{% endif %}
+                    <button type="button" class="btn btn-sm btn-primary priority-action" data-jump-tab="resumen" data-jump-target-id="seccion-alertas">Revisar alertas</button>
+                {% else %}
+                    <p class="priority-card-copy">No hay novedades académicas o de asistencia que requieran tu atención.</p>
+                    <p class="priority-card-meta">Tu estado actual es <strong>{{ resumen_rapido.estado_academico|lower }}</strong>.</p>
+                    <button type="button" class="btn btn-sm btn-outline priority-action" data-jump-tab="resumen">Ver resumen de la ficha</button>
+                {% endif %}
+            </article>
+            <article class="priority-card priority-card-cleaning" aria-labelledby="priority-cleaning-title">
+                <div class="priority-card-topline">
+                    <span class="priority-kicker"><span class="priority-index">02</span> Turnos de aseo</span>
+                    <span class="priority-status priority-status-success">{{ aseo.contador.veces_aseo }} cumplido{{ '' if aseo.contador.veces_aseo == 1 else 's' }}</span>
+                </div>
+                <h3 id="priority-cleaning-title">{% if aseo.turno_propio %}Tu próximo turno{% else %}Estado de tu turno{% endif %}</h3>
+                {% if aseo.turno_propio %}
+                    <div class="priority-date">{% if aseo.turno_propio.fecha == aseo.hoy %}Hoy{% else %}{{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}{% endif %}</div>
+                    <p class="priority-card-copy">Con <strong>{{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</strong></p>
+                    <p class="priority-card-meta">Estado: <strong>{{ 'Intercambiado' if aseo.turno_propio.estado == 'intercambiado' else 'Programado' }}</strong>. Revisa la fecha antes de iniciar la jornada.</p>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-sm btn-primary priority-action action-jump-btn" data-jump-tab="convivencia">Ver detalle del turno</button>
+                        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline priority-action" title="{% if aprendiz.rol_administrativo %}Programar y organizar los turnos de aseo de la ficha{% else %}Consultar el calendario de turnos de aseo{% endif %}">🧹 {{ 'Programar aseo' if aprendiz.rol_administrativo else 'Ver turnos de aseo' }}</a>
+                        {% if aseo.turno_propio.fecha <= aseo.hoy and aseo.turno_propio.estado != 'cumplido' %}
+                        {% if aprendiz.rol_administrativo %}
+                        <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=aseo.turno_propio.id) }}" style="margin: 0; display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="origen" value="panel">
+                            <button type="submit" class="btn btn-sm btn-success" title="Marcar tu turno de aseo como cumplido">✓ Marcar cumplido</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="priority-date priority-date-neutral">Sin turno asignado</div>
+                    <p class="priority-card-copy">No tienes un turno pendiente en las próximas fechas disponibles.</p>
+                    {% if aseo.siguientes %}
+                    <div class="priority-mini-list" aria-label="Próximos turnos del grupo">
+                        {% for turno in aseo.siguientes[:2] %}
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                            <div>
+                                <time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time>
+                                <span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span>
+                            </div>
+                            {% if aprendiz.rol_administrativo and turno.fecha <= aseo.hoy and turno.estado != 'cumplido' %}
+                            <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0; display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="origen" value="panel">
+                                <button type="submit" class="btn btn-xs btn-outline-success" style="font-size: 0.72rem; padding: 2px 6px;" title="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como cumplido">✓ Marcar hecho</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                        <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline priority-action">Ver calendario de turnos</a>
+                        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary priority-action" title="{% if aprendiz.rol_administrativo %}Programar y generar turnos con cola justa{% else %}Consultar el calendario de turnos de aseo{% endif %}">🧹 {{ 'Programar aseo' if aprendiz.rol_administrativo else 'Ver turnos de aseo' }}</a>
+                    </div>
+                {% endif %}
+            </article>
+
+        </div>
+    </section>
+
+    <!-- FILA DE ATENCION -->
+    <div class="card mb-4" style="background-color: var(--card-bg);" id="seccion-turno-atencion">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title m-0">🙋‍♂️ Pedir turno con el instructor</h3>
+        </div>
+        <div class="card-body">
+            {% if turno_actual %}
+                <div class="alert {% if turno_actual.estado == 'esperando' %}alert-warning{% else %}alert-success border-success{% endif %} mb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge {% if turno_actual.estado == 'esperando' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                {% if turno_actual.estado == 'esperando' %}⏳ En espera{% else %}📢 ¡Llamado ahora!{% endif %}
+                            </span>
+                            <strong>
+                                {% if turno_actual.estado == 'esperando' %}
+                                    Estás en la fila. Espera a que el instructor te llame.
+                                {% else %}
+                                    ¡Es tu turno! El instructor te está atendiendo.
+                                {% endif %}
+                            </strong>
+                        </div>
+                        {% if turno_actual.motivo %}<div class="text-muted small"><strong>Motivo:</strong> {{ turno_actual.motivo }}</div>{% endif %}
+                    </div>
+                    {% if turno_actual.estado == 'esperando' %}
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted" title="Comprobando cada 10s">🔄 Actualizando...</small>
+                        <form action="{{ url_for('aprendiz.cancelar_turno', ficha_id=ficha.id) }}" method="POST" style="margin:0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar turno</button>
+                        </form>
+                    </div>
+                    <script>
+                        (function() {
+                            let temporizadorTurno = null;
+                            function verificarEstadoTurno() {
+                                if (document.hidden) {
+                                    temporizadorTurno = setTimeout(verificarEstadoTurno, 10000);
+                                    return;
+                                }
+                                fetch(window.location.href, {
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                                })
+                                .then(function(res) { return res.ok ? res.text() : null; })
+                                .then(function(html) {
+                                    if (!html) {
+                                        temporizadorTurno = setTimeout(verificarEstadoTurno, 12000);
+                                        return;
+                                    }
+                                    const parser = new DOMParser();
+                                    const doc = parser.parseFromString(html, 'text/html');
+                                    const nuevaSeccion = doc.getElementById('seccion-turno-atencion');
+                                    const seccionActual = document.getElementById('seccion-turno-atencion');
+                                    if (nuevaSeccion && seccionActual && nuevaSeccion.innerHTML !== seccionActual.innerHTML) {
+                                        seccionActual.innerHTML = nuevaSeccion.innerHTML;
+                                        return;
+                                    }
+                                    temporizadorTurno = setTimeout(verificarEstadoTurno, 10000);
+                                })
+                                .catch(function() {
+                                    temporizadorTurno = setTimeout(verificarEstadoTurno, 15000);
+                                });
+                            }
+                            temporizadorTurno = setTimeout(verificarEstadoTurno, 10000);
+                            document.addEventListener('visibilitychange', function() {
+                                if (!document.hidden && !temporizadorTurno) {
+                                    verificarEstadoTurno();
+                                }
+                            });
+                        })();
+                    </script>
+                    {% endif %}
+                </div>
+            {% else %}
+                <form action="{{ url_for('aprendiz.pedir_turno', ficha_id=ficha.id) }}" method="POST" class="d-flex align-items-center flex-wrap" style="gap: 1rem;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="text" name="motivo" class="form-control" placeholder="¿Sobre qué necesitas ayuda? (Opcional)" maxlength="200" style="flex: 1 1 14rem; min-width: 0;">
+                    <button type="submit" class="btn btn-primary">Pedir Turno</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>

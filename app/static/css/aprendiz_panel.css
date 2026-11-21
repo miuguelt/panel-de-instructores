@@ -572,8 +572,9 @@
         display: none !important;
     }
 
+    /* En cascada cada sección conserva su propio display (grid, flex o block):
+       basta con no ocultarla. Forzar display:block rompía las rejillas internas. */
     #panel-aprendiz-root.is-cascade-mode [data-learner-tab] {
-        display: block !important;
         margin-bottom: 1.5rem;
     }
 
@@ -1461,3 +1462,36 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* Tarjeta de «Mi progreso» que aloja un gráfico de barras apiladas. */
+.progress-card--viz {
+    display: grid;
+    align-content: center;
+}
+
+/* Indicadores clave de la cabecera: dos anillos y las evidencias pendientes. */
+.learner-quick-ribbon.learner-indicadores {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+    gap: 1rem;
+    align-items: center;
+}
+
+.learner-indicadores-acciones {
+    display: grid;
+    gap: 0.5rem;
+    grid-column: span 2;
+    min-inline-size: 0;
+}
+
+.learner-indicadores-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+@media (max-width: 36rem) {
+    .learner-indicadores-acciones {
+        grid-column: 1 / -1;
+    }
+}

@@ -1,0 +1,182 @@
+{#- Pestaña «Juicios»: juicios oficiales por competencia. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <section class="metrics-grid" id="seccion-juicios" data-learner-tab="juicios">
+        <div class="metric-card">
+            <div class="metric-card-header">
+                <div>
+                    <h2 class="metric-card-title">Juicios de Evaluación Oficiales</h2>
+                    <p class="metric-card-subtitle">Progreso académico certificado</p>
+                </div>
+                <span class="badge badge-success metric-card-score">{{ stats_juicios.pct_total }}% Global</span>
+            </div>
+            
+            <div class="juicio-tabs" role="tablist" aria-label="Vistas de juicios">
+                <button onclick="openJuicioTab('competencias')" id="btn-tab-competencias" class="juicio-tab-active">Por Competencia ({{ competencias_aprendiz|length }})</button>
+                <button onclick="openJuicioTab('resumen')" id="btn-tab-resumen" class="juicio-tab-inactive">Resumen</button>
+                <button onclick="openJuicioTab('pendientes')" id="btn-tab-pendientes" class="juicio-tab-inactive">Por Aprobar ({{ juicios_pendientes|length }})</button>
+                <button onclick="openJuicioTab('aprobados')" id="btn-tab-aprobados" class="juicio-tab-inactive">Aprobados ({{ juicios_aprobados|length }})</button>
+            </div>
+            
+            <!-- Tab Desplegable por Competencia (Acordeones 1-Clic) -->
+            <div id="tab-competencias" class="juicio-tab-content">
+                <div class="juicio-competencias-list">
+                    {% if competencias_aprendiz %}
+                        {% for comp in competencias_aprendiz %}
+                        {% set tipo_label = 'Inglés' if comp.tipo == 'ingles' else ('Transversal' if comp.tipo == 'transversal' else 'Técnica') %}
+                        {% set badge_cls = 'badge-solid-ingles' if comp.tipo == 'ingles' else ('badge-solid-transversal' if comp.tipo == 'transversal' else 'badge-solid-tech') %}
+                        <details class="competencia-accordion">
+                            <summary class="competencia-summary">
+                                <div class="competencia-summary-main">
+                                    <div class="competencia-name">{{ comp.nombre }}</div>
+                                    <div class="competencia-meta">
+                                        <span class="badge {{ badge_cls }}">{{ tipo_label }}</span>
+                                        <span>📊 {{ comp.aprobados }}/{{ comp.total }} RAPs aprobados</span>
+                                    </div>
+                                </div>
+                                <div class="competencia-summary-stats">
+                                    <div class="competencia-progress">
+                                        <div class="competencia-progress-fill {% if comp.pct == 100 %}is-complete{% elif comp.pct > 0 %}is-partial{% else %}is-empty{% endif %}" style="--progress-value: {{ comp.pct }}%;"></div>
+                                    </div>
+                                    <span class="badge {% if comp.pct == 100 %}badge-solid-success{% elif comp.pct > 0 %}badge-solid-warning{% else %}badge-solid-secondary{% endif %}">
+                                        {{ comp.pct }}%
+                                    </span>
+                                    <span class="competencia-chevron" aria-hidden="true">▼</span>
+                                </div>
+                            </summary>
+                            <div class="competencia-rap-list">
+                                {% for r in comp.raps %}
+                                <div class="rap-item">
+                                    <div class="rap-item-content">
+                                        <p class="rap-item-title">{{ r.rap }}</p>
+                                        <div class="rap-item-meta">
+                                            👨‍🏫 <strong>Instructor:</strong> {{ r.evaluador|strip_document_id }} {% if r.fecha != 'Pendiente' %}• 📅 {{ r.fecha }}{% endif %}
+                                        </div>
+                                    </div>
+                                    {% if r.es_aprobado %}
+                                        <span class="badge badge-solid-success">APROBADO</span>
+                                    {% else %}
+                                        <span class="badge badge-solid-warning">POR EVALUAR</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% endfor %}
+                    {% else %}
+                        <div class="panel-empty-message">No hay competencias registradas para esta ficha.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div id="tab-resumen" class="juicio-tab-content" hidden>
+                <div class="juicio-summary-grid">
+                    <div class="juicio-donut-wrap">
+                        <div class="juicio-donut" style="--summary-value: {{ stats_juicios.pct_total }}%;">
+                            <div class="juicio-donut-hole">
+                                <span>{{ stats_juicios.pct_total }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="juicio-summary-bars">
+                        <div class="juicio-summary-bar">
+                            <div class="juicio-summary-bar-label"><span>Técnicas</span><strong>{{ stats_juicios.tecnica_aprobada }}/{{ stats_juicios.tecnica }}</strong></div>
+                            <progress value="{{ stats_juicios.pct_tecnica }}" max="100" class="progress-tech"></progress>
+                        </div>
+                        <div class="juicio-summary-bar">
+                            <div class="juicio-summary-bar-label"><span>Transversales</span><strong>{{ stats_juicios.transversal_aprobada }}/{{ stats_juicios.transversal }}</strong></div>
+                            <progress value="{{ stats_juicios.pct_transversal }}" max="100" class="progress-transversal"></progress>
+                        </div>
+                        <div class="juicio-summary-bar">
+                            <div class="juicio-summary-bar-label"><span>Inglés</span><strong>{{ stats_juicios.ingles_aprobada }}/{{ stats_juicios.ingles }}</strong></div>
+                            <progress value="{{ stats_juicios.pct_ingles }}" max="100" class="progress-ingles"></progress>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-pendientes" class="juicio-tab-content" hidden>
+                <div class="juicio-status-list">
+                    {% if juicios_pendientes %}
+                        {% for j in juicios_pendientes %}
+                        <div class="juicio-status-item is-pending">
+                            <p class="juicio-status-title">{{ j.resultado_aprendizaje }}</p>
+                            <div class="juicio-status-meta">
+                                <div class="juicio-status-row">
+                                    <span>{{ j.competencia[:40] }}...</span>
+                                    <span class="juicio-status-value">{{ j.juicio or 'Por Evaluar' }}</span>
+                                </div>
+                                {% if j.funcionario_registro %}
+                                <div class="juicio-status-detail">
+                                    <span>👨‍🏫 {{ j.funcionario_registro|strip_document_id }}</span>
+                                    {% if j.fecha_juicio %}<span>📅 {{ j.fecha_juicio.strftime('%d/%m/%Y') }}</span>{% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="panel-empty-message is-success">
+                            ¡Felicidades! Tienes todos tus resultados de aprendizaje aprobados.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div id="tab-aprobados" class="juicio-tab-content" hidden>
+                <div class="juicio-status-list">
+                    {% if juicios_aprobados %}
+                        {% for j in juicios_aprobados %}
+                        <div class="juicio-status-item is-approved">
+                            <p class="juicio-status-title">{{ j.resultado_aprendizaje }}</p>
+                            <div class="juicio-status-meta">
+                                <div class="juicio-status-row">
+                                    <span>{{ j.competencia[:40] }}...</span>
+                                    <span class="juicio-status-value">{{ j.juicio or 'Aprobado' }}</span>
+                                </div>
+                                {% if j.funcionario_registro %}
+                                <div class="juicio-status-detail">
+                                    <span>👨‍🏫 {{ j.funcionario_registro|strip_document_id }}</span>
+                                    {% if j.fecha_juicio %}<span>📅 {{ j.fecha_juicio.strftime('%d/%m/%Y') }}</span>{% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="panel-empty-message is-warning">
+                            Aún no tienes resultados aprobados registrados en el sistema.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <script>
+                function openJuicioTab(tabName) {
+                    document.querySelectorAll('.juicio-tab-content').forEach(el => el.hidden = true);
+                    document.getElementById('tab-' + tabName).hidden = false;
+                    
+                    document.querySelectorAll('[id^="btn-tab-"]:not([id$="-main"])').forEach(btn => {
+                        btn.className = 'juicio-tab-inactive';
+                    });
+                    
+                    const activeBtn = document.getElementById('btn-tab-' + tabName);
+                    activeBtn.className = 'juicio-tab-active';
+                }
+            </script>
+        </div>
+
+        {% if evaluadores %}
+        <div class="evaluators-block">
+            <p class="evaluators-title">
+                <span>👨‍🏫</span> Instructores que te han evaluado ({{ evaluadores|length }})
+            </p>
+            <div class="evaluators-list">
+                {% for eval in evaluadores %}
+                <span class="evaluator-chip">
+                    {{ eval|strip_document_id }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>

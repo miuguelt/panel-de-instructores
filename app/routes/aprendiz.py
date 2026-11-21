@@ -33,7 +33,7 @@ from app.services.alertas import (
     vencer_planes_pendientes,
 )
 from app.services.cronograma import obtener_cronograma
-from app.services.asistencia import guardar_asistencia, mapa_asistencia_por_fecha
+from app.services.asistencia import guardar_asistencia, mapa_asistencia_por_fecha, resumen_asistencia_aprendiz
 from app.services.aseo import ajustar_turno_por_asistencia, resumen_aprendiz
 from app.services.cortes import corte_actual
 from app.services.trabajos_grupales import obtener_trabajos_grupales
@@ -150,8 +150,9 @@ def panel(ficha_id):
     else:
         nivel_alerta = 'verde'
 
-    # Las excusas no restan: solo las faltas sin justificar bajan el porcentaje.
-    pct_asistencia = ((total_sesiones - faltas_no_justificadas) / total_sesiones * 100) if total_sesiones else 100
+    # Las excusas no restan: misma fórmula para el porcentaje y el texto «X de Y».
+    asistencia_resumen = resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas)
+    pct_asistencia = asistencia_resumen['pct']
 
     # El panel solo lee el ranking: recalcularlo y guardar instantáneas en cada
     # visita distorsionaba la posición anterior de todo el grupo.
@@ -622,7 +623,7 @@ def panel(ficha_id):
         'tareas_entregadas_count': len(tareas_entregadas),
         'proxima_tarea': proxima_tarea_urgente,
         'dias_proximo_aseo': dias_proximo_aseo,
-        'estado_academico': 'Excelente' if pct_asistencia >= 85 and nivel_alerta == 'verde' else ('En Riesgo' if nivel_alerta == 'amarillo' else ('Crítico' if nivel_alerta == 'rojo' else 'Al Día')),
+        'estado_academico': 'Excelente' if (pct_asistencia or 0) >= 85 and nivel_alerta == 'verde' else ('En Riesgo' if nivel_alerta == 'amarillo' else ('Crítico' if nivel_alerta == 'rojo' else 'Al Día')),
         'estado_badge_class': 'badge-success' if nivel_alerta == 'verde' else ('badge-warning' if nivel_alerta == 'amarillo' else 'badge-danger'),
     }
 
@@ -659,6 +660,7 @@ def panel(ficha_id):
                            faltas_no_justificadas=faltas_no_justificadas,
                            faltas_justificadas=faltas_justificadas,
                            pct_asistencia=pct_asistencia,
+                           sesiones_cumplidas=asistencia_resumen['sesiones_cumplidas'],
                            nivel_alerta=nivel_alerta,
                            config_alertas=config,
                            tareas_estado=tareas_estado,
@@ -831,7 +833,7 @@ def descargar_reporte(ficha_id):
         RegistroAsistencia.estado == 'FALTA',
     ).count()
     faltas_justificadas = total_faltas - faltas_no_justificadas
-    pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones > 0 else 100
+    pct_asistencia = resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas)['pct'] or 0
     
     config = ConfiguracionAlertas.query.filter_by(ficha_id=ficha_id).first()
     if config:

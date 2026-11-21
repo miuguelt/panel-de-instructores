@@ -1,5 +1,28 @@
 # Diseño de SENA Control
 
+## Contrato de diseño — primero lo importante y biblioteca de visualización (21 de noviembre de 2026)
+
+- Principio rector: pirámide invertida. Cada pantalla responde en este orden: ¿qué requiere mi acción hoy?, ¿cómo va la ficha o mi proceso?, y el detalle bajo demanda (`<details>`).
+- Una cifra, un lugar: un mismo dato (asistencia, % de RAPs, días para el cierre) aparece una sola vez por pantalla. Las pestañas y las páginas de detalle amplían, no repiten.
+- Una acción principal por cabecera, como máximo dos secundarias; el resto va en «Más acciones».
+- Sin datos inventados: si no hay sesiones, tareas o juicios, la interfaz muestra «Sin datos» y nunca un 0 % o un 100 % que no se midió. Los servicios devuelven `None` y las macros lo respetan.
+- Umbrales únicos (`app/services/visualizacion.py`): verde desde 80 %, amarillo desde 60 %, rojo por debajo; meta institucional TyT del 70 %. Los módulos académicos que ya usaban 70/50 lo declaran explícitamente al llamar a `viz_estado`.
+- Biblioteca de visualización (`components/_viz.html` + `static/css/viz.css`), sin librerías externas y funcional sin red:
+  - `kpi`: cifra con estado y enlace opcional.
+  - `barra`: progreso con marcador de meta y segunda serie comparada (por ejemplo, RAPs frente al tiempo transcurrido).
+  - `dona`: anillo SVG con el porcentaje en el centro.
+  - `apilada`: distribución con leyenda (semáforo, estados, plazos, evidencias).
+  - `semaforo`: píldora con ícono y texto; el color nunca es la única señal.
+  - `sparkline`: tendencia por sesión con escala fija de 0 a 100.
+  - `vacio`: estado vacío con una acción concreta.
+- Cada gráfico tiene nombre accesible (`role="img"` o `progressbar` con `aria-valuetext`) y texto visible con el valor.
+- Jerarquía por pantalla:
+  - «Mis fichas»: «Hoy en tus fichas» → tarjetas ordenadas por urgencia (`prioridad_fichas.ordenar_por_urgencia`) → en cada tarjeta, identidad con un solo hito de calendario, pendientes con enlace directo, RAPs frente al tiempo, grupo y detalle plegado.
+  - Visión general: atención inmediata → salud de la ficha → tres recomendaciones (el resto plegado) → competencias y vencimientos. La barra de la ficha ya ofrece los módulos; la página no los repite.
+  - Páginas de la ficha: «Visión general» como enlace de regreso, resumen visual arriba, configuración y reglamento plegados al final, y alertas ordenadas por riesgo.
+  - Panel del aprendiz: indicadores clave (asistencia, RAPs y evidencias) → siguiente paso → alertas → aseo → turno con el instructor. El porcentaje de asistencia y el texto «X de Y sesiones» salen de la misma fórmula (`resumen_asistencia_aprendiz`).
+- Verificación: `tests/test_visualizacion.py` (100 % de líneas y ramas del servicio), `test_prioridad_fichas.py`, `test_dashboard_render.py`, `test_vision_general_orden.py`, `test_panel_aprendiz_inicio.py`, `test_serie_asistencia.py`, `test_metricas_tareas.py`, `test_estadisticas_render.py`, `test_volver_a_la_ficha.py` y `test_semaforo_unico.py`; revisión en navegador sin desbordamiento horizontal a 320, 390, 768, 1440, 1920 y 2560 px.
+
 ## Contrato de diseño — sistema visual de superficies translúcidas, botones y bordes (23 de octubre de 2026)
 
 - Dirección visual: un mismo sistema de capas para toda la aplicación. Las superficies de vidrio se calibran por tema para que el texto conserve contraste AA sobre el color compuesto, los datos tabulares viven en superficie sólida y los controles comparten una sola escala de radios, alturas y bordes. La identidad SENA (verde, naranja y neutros) se expresa con tokens, no con colores escritos en las plantillas.

@@ -1,0 +1,45 @@
+{#- Barra de pestañas y selector de vista. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <!-- ============================================================ -->
+    <!-- BARRA DE PESTAÑAS MODULARES CON SELECTOR DE VISTA            -->
+    <!-- ============================================================ -->
+    <div class="learner-navigation-sticky">
+        <div class="learner-tab-navigation-bar">
+            <div class="learner-tabs-track" role="tablist" aria-label="Pestañas principales del panel">
+                <button type="button" class="learner-tab-btn is-active" data-tab-target="resumen" role="tab" aria-selected="true" id="btn-tab-resumen-main">
+                    <i data-lucide="layout-dashboard" class="tab-icon" aria-hidden="true"></i>
+                    <span class="tab-label">Resumen</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="evidencias" role="tab" aria-selected="false" id="btn-tab-evidencias-main">
+                    <i data-lucide="file-check" class="tab-icon" aria-hidden="true"></i>
+                    <span class="tab-label">Mis evidencias</span>
+                    <span class="tab-pill-badge" id="tab-evidencias-counter">{{ tareas_individuales|length }}</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="grupo" role="tab" aria-selected="false" id="btn-tab-grupo-main">
+                    <i data-lucide="users-2" class="tab-icon" aria-hidden="true"></i>
+                    <span class="tab-label">Mi grupo</span>
+                    {% if trabajos_grupo %}<span class="tab-pill-badge">{{ trabajos_grupo|length }}</span>{% endif %}
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="juicios" role="tab" aria-selected="false" id="btn-tab-juicios-main">
+                    <i data-lucide="graduation-cap" class="tab-icon" aria-hidden="true"></i>
+                    <span class="tab-label">Juicios</span>
+                    <span class="tab-pill-badge">{{ stats_juicios.pct_total }}%</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="rendimiento" role="tab" aria-selected="false" id="btn-tab-rendimiento-main">
+                    <i data-lucide="trophy" class="tab-icon" aria-hidden="true"></i>
+                    <span class="tab-label">Rendimiento y logros</span>
+                </button>
+                <button type="button" class="learner-tab-btn" data-tab-target="convivencia" role="tab" aria-selected="false" id="btn-tab-convivencia-main">
+                    <i data-lucide="sparkles" class="tab-icon" aria-hidden="true"></i>
+                    <span class="tab-label">Aseo y convivencia</span>
+                </button>
+            </div>
+
+            <!-- Botón para alternar entre pestañas y vista continua (cascada) -->
+            <div class="learner-view-mode-toggle">
+                <button type="button" id="btn-toggle-view-mode" class="btn btn-sm btn-ghost view-toggle-button" title="Configurar y guardar el modo de vista" aria-haspopup="dialog" aria-controls="personalizacion-modal">
+                    <span id="view-mode-icon">📜</span>
+                    <span id="view-mode-text">Configurar vista</span>
+                </button>
+            </div>
+        </div>
+    </div>

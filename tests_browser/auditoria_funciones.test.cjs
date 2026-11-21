@@ -7,8 +7,14 @@ const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright');
 const raiz = path.resolve(__dirname, '..');
 const leer = nombre => fs.readFileSync(path.join(raiz, nombre), 'utf8');
+// El panel del aprendiz se divide en parciales: se audita la plantilla y todos sus parciales.
+const PANEL_APRENDIZ = 'app/templates/aprendiz/panel.html';
+const leerPlantilla = nombre => nombre === PANEL_APRENDIZ
+    ? [leer(nombre), ...fs.readdirSync(path.join(raiz, 'app/templates/aprendiz/panel')).sort()
+        .map(parcial => leer(`app/templates/aprendiz/panel/${parcial}`))].join(String.fromCharCode(10))
+    : leer(nombre);
 function bloque(nombre, marcador) {
-    return [...leer(nombre).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(texto => texto.includes(marcador)) || '';
+    return [...leerPlantilla(nombre).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(texto => texto.includes(marcador)) || '';
 }
 function pagina(cuerpo, scripts = '') { return `<!doctype html><html lang="es-CO"><meta charset="utf-8"><title>Prueba del panel</title><body>${cuerpo}<script>${scripts}</script></body></html>`; }
 function atributo(valor) { return String(valor).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
@@ -116,7 +122,7 @@ test('los argumentos de botones conservan apóstrofes y nunca se interpretan com
     const nombre = "D'Ávila <img src=x>.png";
     const enlace = "https://github.com/example/repo?q=';window.inyeccion=true;//";
     const materiales = leer('app/templates/instructor/materiales.html').split('\n').filter(linea => linea.includes('<button') && (linea.includes('vistaPrevia(') || linea.includes('confirmarEliminar('))).join('\n');
-    const botonesPanel = leer('app/templates/aprendiz/panel.html').split('\n').filter(linea => linea.includes('<button') && linea.includes('enlace_github')).map(linea => linea + 'Copiar</button>').join('\n');
+    const botonesPanel = leerPlantilla(PANEL_APRENDIZ).split('\n').filter(linea => linea.includes('<button') && linea.includes('enlace_github')).map(linea => linea + 'Copiar</button>').join('\n');
     const botonesHistorial = leer('app/templates/instructor/historial_aprendiz.html').split('\n').filter(linea => linea.includes('<button') && linea.includes('enlace_github')).join('\n');
     const html = render(materiales + botonesPanel + botonesHistorial, { m: { id: 9, nombre_archivo: nombre, url_archivo: 'material.png' }, aprendiz: { enlace_github: enlace } });
     paginas.set('/argumentos', pagina(html, 'window.vistaPrevia=(url,nombre)=>window.recibido=nombre;window.confirmarEliminar=(id,nombre)=>window.recibido=nombre;window.copiarTexto=valor=>window.enlace=valor;'));
@@ -220,7 +226,7 @@ test('la cobertura de horas no presenta cien por ciento cuando falta una referen
 });
 
 test('un solo registro de rendimiento no se presenta como una tendencia estable', async () => {
-    const fuente = leer('app/templates/aprendiz/panel.html');
+    const fuente = leerPlantilla(PANEL_APRENDIZ);
     const inicio = fuente.indexOf('<div class="learner-curve-badges">');
     const fragmento = fuente.slice(inicio, fuente.indexOf('</div>', inicio) + 6);
     const curva = { badge_class: 'badge-info', nivel_desempeno: 'Básico', puntos: [{}], tendencia_clase: 'neutral', tendencia_icono: '→', tendencia: 'estable', diferencia_ultimo: 0 };

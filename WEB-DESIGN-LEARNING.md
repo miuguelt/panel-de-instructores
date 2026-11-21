@@ -1,5 +1,35 @@
 # Aprendizajes de diseño web
 
+## 21 de noviembre de 2026 — primero lo importante y biblioteca de visualización
+
+- Alcance observado:
+  - En «Mis fichas», cada tarjeta mostraba seis bloques de fechas antes de los pendientes; la cuenta regresiva aparecía tres veces y las fechas, cuatro o más.
+  - En la Visión general, la atención inmediata quedaba en el tercer bloque y una rejilla de 12 módulos repetía la barra de la ficha.
+  - En el panel del aprendiz, la asistencia aparecía en cinco sitios y el % de juicios en siete, con fórmulas y umbrales distintos.
+- Patrón aplicado:
+  - Pirámide invertida: acción de hoy, luego estado y después el detalle plegado.
+  - Una cifra por pantalla y un umbral por concepto (`viz_estado`).
+  - Macros SVG/CSS accesibles en lugar de gráficos hechos a mano en cada plantilla.
+- Decisión de datos: los servicios devuelven `None` cuando no hay sesiones, tareas o juicios, y la interfaz dice «Sin datos». Antes, una ficha sin asistencia registrada aparecía con un 100 % en verde.
+- Hallazgos corregidos de paso:
+  - `main` no arrancaba: el commit 80ecb74 borró tres módulos de rutas sin retirar su import. Se recuperaron del punto de control Entire 1a89457 y se dividieron en módulos de menos de 400 líneas.
+  - La ruta de juicios había perdido las variables del avance del curso.
+  - El semáforo de riesgo estaba duplicado y contaba tareas distintas en Alertas y en la Visión general.
+  - El selector de las pestañas de Juicios del aprendiz reescribía la clase de las pestañas principales.
+  - La vista continua forzaba `display: block` y rompía las rejillas.
+  - Una regla genérica de inputs tapaba la primera letra del buscador de fichas.
+- Patrón candidato: «Hoy en tus fichas» con indicadores agregados y fichas ordenadas por urgencia. Estado: `candidate` hasta observar su uso con instructores reales.
+- Evidencia obtenida:
+  - Revisión en el navegador integrado con datos de práctica en SQLite (sin tocar la base real).
+  - Cero desbordamiento horizontal en ocho páginas del instructor a 320, 390, 768, 1440, 1920 y 2560 px.
+  - Capturas a 390 y 1440 px de «Mis fichas», Visión general, Juicios, Tareas, Alertas, Estadísticas, Asistencia, Aprendices y el panel del aprendiz.
+  - `npm test`: 189/189.
+  - `tests_browser/auditoria_funciones.test.cjs`: 11/11.
+- Evidencia pendiente:
+  - `tests_browser/diseno_visual.test.cjs` ya se puede ejecutar en este equipo, pero falla en 3 de sus aserciones sobre `backdrop-filter` y fondos de botón. Esa prueba solo lee `styles.css` y `modal-system.css`, que este cambio no modificó; queda como deuda previa.
+  - El JS en línea del panel del aprendiz sigue dentro de sus parciales (`_script_panel.html`, `_script_calendario.html`). Extraerlo a un archivo exige reescribir la auditoría que lo prueba por inyección.
+  - En `styles.css` quedan reglas huérfanas de los bloques retirados (cuenta regresiva doble, hitos y tarjetas de detalle del dashboard anterior).
+
 ## 23 de octubre de 2026 — sistema visual de superficies translúcidas, botones y bordes
 
 - Alcance observado: la interfaz acumulaba superficies de vidrio con alfas distintas, botones con radios y alturas propios en cada módulo, iconos dimensionados con `style` en línea y colores literales repetidos en plantillas. El resultado era un sistema que se veía coherente de lejos y se rompía de cerca: contraste irregular, objetivos táctiles menores de 42 px y CSS incrustado imposible de auditar.

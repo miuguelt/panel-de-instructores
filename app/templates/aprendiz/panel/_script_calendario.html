@@ -1,0 +1,98 @@
+{#- Calendario de asistencia (script). Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+<script>
+(function () {
+    const calendar = document.querySelector('.learner-attendance-calendar');
+    if (!calendar) return;
+
+    const records = {{ asistencia_calendario|tojson|safe }};
+    const grid = calendar.querySelector('[data-learner-calendar-grid]');
+    const title = calendar.querySelector('[data-learner-calendar-month]');
+    const detail = calendar.querySelector('[data-learner-calendar-detail]');
+    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const dayNames = ['lu', 'ma', 'mi', 'ju', 'vi', 'sá', 'do'];
+    let visibleMonth = new Date();
+    visibleMonth.setDate(1);
+
+    function toIso(year, month, day) {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    function formatDate(iso) {
+        const [year, month, day] = iso.split('-');
+        return `${day}/${month}/${year}`;
+    }
+
+    function showDetail(iso, record) {
+        if (!record) {
+            detail.textContent = 'No hay una marcación registrada para este día.';
+            return;
+        }
+        const causal = record.causal ? ` · ${record.causal}` : '';
+        const fecha = document.createElement('strong');
+        fecha.textContent = formatDate(iso);
+        detail.replaceChildren(fecha, document.createTextNode(` · ${record.etiqueta || record.estado}${causal}`));
+    }
+
+    function render() {
+        const year = visibleMonth.getFullYear();
+        const month = visibleMonth.getMonth();
+        title.textContent = `${monthNames[month]} ${year}`;
+        grid.replaceChildren();
+
+        dayNames.forEach((name) => {
+            const heading = document.createElement('div');
+            heading.className = 'learner-calendar-weekday';
+            heading.setAttribute('role', 'columnheader');
+            heading.textContent = name;
+            grid.appendChild(heading);
+        });
+
+        const firstDay = new Date(year, month, 1);
+        const offset = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let i = 0; i < offset; i += 1) {
+            const empty = document.createElement('div');
+            empty.className = 'learner-calendar-day is-outside';
+            empty.setAttribute('aria-hidden', 'true');
+            grid.appendChild(empty);
+        }
+
+        const today = new Date();
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            const iso = toIso(year, month, day);
+            const record = records[iso];
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'learner-calendar-day';
+            if (record?.clase) button.classList.add(`is-${record.clase}`);
+            if (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day) {
+                button.classList.add('is-today');
+            }
+            button.setAttribute('role', 'gridcell');
+            button.setAttribute('aria-label', record ? `${formatDate(iso)}: ${record.etiqueta || record.estado}` : `${formatDate(iso)}: sin marcación`);
+            const numero = document.createElement('span');
+            numero.className = 'learner-calendar-day-number';
+            numero.textContent = String(day);
+            button.appendChild(numero);
+            if (record) {
+                const estado = document.createElement('span');
+                estado.className = 'learner-calendar-day-state';
+                estado.textContent = record.etiqueta || record.estado;
+                button.appendChild(estado);
+            }
+            button.addEventListener('click', () => showDetail(iso, record));
+            grid.appendChild(button);
+        }
+    }
+
+    calendar.querySelector('[data-learner-calendar-prev]').addEventListener('click', () => {
+        visibleMonth.setMonth(visibleMonth.getMonth() - 1);
+        render();
+    });
+    calendar.querySelector('[data-learner-calendar-next]').addEventListener('click', () => {
+        visibleMonth.setMonth(visibleMonth.getMonth() + 1);
+        render();
+    });
+    render();
+})();
+</script>

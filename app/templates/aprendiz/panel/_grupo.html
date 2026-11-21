@@ -1,0 +1,170 @@
+{#- Pestaña «Mi grupo»: integrantes, trabajos y chat. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <section class="section-container learner-group-workspace" id="seccion-grupo-trabajo" data-learner-tab="grupo" aria-labelledby="learner-group-title">
+        {% if grupo_actual %}
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">Trabajo colaborativo</span>
+                <h2 class="section-title" id="learner-group-title">Mi grupo: {{ grupo_actual.nombre }}</h2>
+            </div>
+            <span class="badge badge-info">{{ grupo_actual.aprendices|length }} integrantes</span>
+        </div>
+
+        <div class="learner-group-layout">
+            <section class="card learner-group-card" aria-labelledby="learner-group-members-title">
+                <div class="learner-group-card-heading">
+                    <div>
+                        <span class="eyebrow">Equipo de trabajo</span>
+                        <h3 id="learner-group-members-title">Integrantes</h3>
+                    </div>
+                    <span class="learner-group-icon" aria-hidden="true">👥</span>
+                </div>
+                <p class="text-muted">Aquí puedes consultar quiénes comparten las tareas y la conversación de este equipo.</p>
+                <ul class="learner-group-members">
+                    {% for comp in grupo_actual.aprendices %}
+                    <li>
+                        <span class="learner-group-avatar" aria-hidden="true">{{ comp.nombre[0] }}{{ comp.apellidos[0] if comp.apellidos else '' }}</span>
+                        <span>{{ comp.nombre_completo }}</span>
+                        {% if comp.id == aprendiz.id %}<strong class="learner-group-you">Tú</strong>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if grupo_actual.creado_en %}
+                <small class="learner-group-created">Grupo activo desde {{ grupo_actual.creado_en.strftime('%d/%m/%Y') }}</small>
+                {% endif %}
+            </section>
+
+            <section class="card learner-group-tasks" aria-labelledby="learner-group-tasks-title">
+                <div class="learner-group-card-heading">
+                    <div>
+                        <span class="eyebrow">Evidencias compartidas</span>
+                        <h3 id="learner-group-tasks-title">Trabajos del grupo</h3>
+                    </div>
+                    <span class="badge badge-secondary">{{ trabajos_grupo|length if trabajos_grupo else 0 }}</span>
+                </div>
+                {% if trabajos_grupo %}
+                <div class="learner-group-task-list">
+                    {% for item in trabajos_grupo %}
+                    {% set tarea = item.tarea %}
+                    {% set entrega = item.entrega %}
+                    <article class="learner-group-task-card">
+                        <div class="learner-group-task-header">
+                            <div>
+                                <h4>{{ tarea.titulo }}</h4>
+                                <p class="task-deadline">
+                                    <span aria-hidden="true">🕒</span>
+                                    {% if tarea.fecha_limite %}
+                                    Fecha límite: <time datetime="{{ tarea.fecha_limite.isoformat() }}">{{ tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') }}</time>
+                                    {% else %}Sin fecha límite{% endif %}
+                                </p>
+                            </div>
+                            {% if entrega and entrega.calificada %}
+                                {% if entrega.estado_revision == 'rechazada' %}
+                                <span class="badge badge-warning">Requiere ajustes</span>
+                                {% else %}
+                                <span class="badge badge-success">Aprobada</span>
+                                {% endif %}
+                            {% elif entrega %}
+                            <span class="badge badge-info">Entregada por el grupo</span>
+                            {% else %}
+                            <span class="badge badge-warning">{{ item.estado|default('pendiente')|replace('_', ' ')|capitalize }}</span>
+                            {% endif %}
+                        </div>
+
+                        {% if tarea.descripcion %}<p class="task-desc">{{ tarea.descripcion }}</p>{% endif %}
+                        <div class="task-actions task-evidence-actions">
+                            {% if tarea.enlace_externo %}<a href="{{ tarea.enlace_externo }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🔗 Enlace externo</a>{% endif %}
+                            {% if tarea.material_apoyo_url %}<a href="{{ url_for('aprendiz.descargar_archivo', filename=tarea.material_apoyo_url, ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">⬇️ Material de apoyo</a>{% endif %}
+                            {% if entrega and entrega.archivo_url %}<a href="{{ url_for('aprendiz.descargar_evidencia', entrega_id=entrega.id) }}" class="btn btn-outline btn-sm">📄 Descargar evidencia del grupo</a>{% endif %}
+                            {% if entrega and entrega.enlace_repositorio %}<a href="{{ entrega.enlace_repositorio }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">🌐 Abrir enlace entregado</a>{% endif %}
+                        </div>
+
+                        {% if entrega and entrega.feedback %}
+                        <div class="task-feedback" role="status">
+                            <strong>Retroalimentación del instructor{% if entrega.calificacion %} · {{ entrega.calificacion }}{% endif %}</strong>
+                            <p>{{ entrega.feedback }}</p>
+                        </div>
+                        {% endif %}
+
+                        {% if not tarea.es_actividad_clase %}
+                        <details class="entrega-form learner-group-evidence-form">
+                            <summary class="entrega-summary">📤 {{ 'Reemplazar evidencia del grupo' if entrega else 'Enviar evidencia del grupo' }}</summary>
+                            <form method="POST" action="{{ url_for('aprendiz.subir_evidencia', ficha_id=ficha.id, tarea_id=tarea.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                {% if tarea.requiere_archivo %}
+                                <div class="form-group">
+                                    <label for="evidencia-grupo-{{ tarea.id }}">Archivo de evidencia{% if entrega and entrega.archivo_url %} (opcional para reemplazar el archivo){% else %} (obligatorio){% endif %}</label>
+                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept="{{ extensiones_carga }}" {% if not (entrega and entrega.archivo_url) %}required{% endif %} class="form-file-input">
+                                    <small class="learner-form-help">Para enviar varios archivos, comprime la carpeta en ZIP. Tamaño máximo: {{ '%.1f'|format(max_upload_bytes / (1024 * 1024)) }} MiB por archivo.</small>
+                                </div>
+                                {% else %}
+                                <div class="form-group">
+                                    <label for="evidencia-grupo-{{ tarea.id }}">Archivo de evidencia (opcional)</label>
+                                    <input type="file" id="evidencia-grupo-{{ tarea.id }}" name="archivo_evidencia" accept="{{ extensiones_carga }}" class="form-file-input">
+                                </div>
+                                {% endif %}
+                                <div class="form-group">
+                                    <label for="repositorio-grupo-{{ tarea.id }}">Enlace de repositorio o documento web (opcional)</label>
+                                    <input type="url" id="repositorio-grupo-{{ tarea.id }}" name="enlace_repositorio" value="{{ entrega.enlace_repositorio or '' if entrega else '' }}" placeholder="https://..." class="form-control">
+                                </div>
+                                {% if item.estado == 'vencida' %}
+                                <div class="form-group">
+                                    <label for="justificacion-grupo-{{ tarea.id }}">Justificación de la entrega extemporánea</label>
+                                    <textarea id="justificacion-grupo-{{ tarea.id }}" name="justificacion_retraso" rows="2" required placeholder="Indiquen el motivo de la entrega fuera de plazo.">{{ entrega.justificacion_retraso or '' if entrega else '' }}</textarea>
+                                </div>
+                                {% endif %}
+                                <button type="submit" class="btn btn-primary full-width">{{ 'Guardar cambios en la evidencia del grupo' if entrega else 'Enviar evidencia del grupo' }}</button>
+                            </form>
+                        </details>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state learner-group-empty-state">
+                    <div class="empty-icon">📝</div>
+                    <h4>No hay trabajos grupales por entregar</h4>
+                    <p>Cuando tu instructor asigne una tarea a este equipo, aparecerá aquí.</p>
+                </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <section class="card learner-group-chat" data-grupo-chat data-chat-url="{{ url_for('grupo_aprendiz.mensajes', ficha_id=ficha.id) }}" aria-labelledby="learner-group-chat-title">
+            <div class="learner-group-chat-heading">
+                <div>
+                    <span class="eyebrow">Conversación asíncrona</span>
+                    <h3 id="learner-group-chat-title">Chat del grupo</h3>
+                    <p class="text-muted">Comparte avances y acuerdos. Los mensajes quedan disponibles para el equipo.</p>
+                </div>
+                <span class="learner-group-chat-live"><i aria-hidden="true"></i> Se actualiza automáticamente</span>
+            </div>
+            <div class="learner-group-chat-messages" data-chat-messages role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensajes del grupo">
+                <p class="learner-group-chat-empty" data-chat-empty>Cargando conversación…</p>
+            </div>
+            <p class="learner-group-chat-status" data-chat-status role="status" aria-live="polite"></p>
+            <form class="learner-group-chat-form" data-chat-form>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="sr-only" for="mensaje-grupo">Escribe un mensaje para tu grupo</label>
+                <textarea id="mensaje-grupo" name="contenido" rows="2" maxlength="1200" required placeholder="Escribe un mensaje para tu grupo…" data-chat-input></textarea>
+                <div class="learner-group-chat-compose-footer">
+                    <small><span data-chat-count>0</span>/1200 caracteres</small>
+                    <button type="submit" class="btn btn-primary" data-chat-submit>Enviar mensaje</button>
+                </div>
+            </form>
+        </section>
+        {% else %}
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">Trabajo colaborativo</span>
+                <h2 class="section-title" id="learner-group-title">Mi grupo</h2>
+            </div>
+        </div>
+        <div class="card learner-group-unassigned" role="status">
+            <span class="learner-group-icon" aria-hidden="true">👥</span>
+            <div>
+                <h3>Aún no tienes un grupo activo</h3>
+                <p>Cuando tu instructor te asigne a un grupo, podrás ver aquí a tus compañeros, las tareas compartidas y su conversación.</p>
+            </div>
+        </div>
+        {% endif %}
+    </section>

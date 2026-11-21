@@ -1,0 +1,236 @@
+{#- Insignias, recomendaciones, alertas, observador, planes y soportes. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    {% if nuevas_insignias %}
+    <div class="unlock-banner" role="status" data-learner-tab="rendimiento">
+        <span class="unlock-icon">{{ nuevas_insignias[0].insignia.icono }}</span>
+        <div>
+            <strong>¡Nueva insignia desbloqueada: {{ nuevas_insignias[0].insignia.nombre }}!</strong>
+            <p>{{ nuevas_insignias[0].insignia.descripcion }}</p>
+            {% if nuevas_insignias|length > 1 %}
+            <small>Además desbloqueaste {{ nuevas_insignias|length - 1 }} reconocimiento(s) más.</small>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RECOMENDACIONES DE ACCIÓN PERSONALIZADAS PARA EL APRENDIZ -->
+    {% if recomendaciones_aprendiz %}
+    <section class="learner-recommendations-cluster" aria-label="Recomendaciones y próximos pasos" data-learner-tab="resumen">
+        <div class="learner-rec-header">
+            <span class="eyebrow">Orientación y Próximos Pasos</span>
+            <span class="badge badge-info">{{ recomendaciones_aprendiz|length }} sugerencia{{ 's' if recomendaciones_aprendiz|length > 1 else '' }}</span>
+        </div>
+        <div class="learner-rec-list">
+            {% for rec in recomendaciones_aprendiz %}
+                <div {% if rec.severidad in ('sugerencia', 'positiva') %}data-experience-notice="optional"{% endif %}>
+                    {{ render_banner_recomendacion(rec) }}
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if alertas_activas %}
+    <div id="seccion-alertas" data-learner-tab="resumen">
+        <div class="active-alerts-label">
+            <span class="badge badge-solid-danger">{{ alertas_activas|length }} alerta{% if alertas_activas|length != 1 %}s{% endif %} activa{% if alertas_activas|length != 1 %}s{% endif %}</span>
+        </div>
+        {% for alerta in alertas_activas %}
+        <div class="alert alert-{% if alerta.nivel == 'roja' %}error{% else %}warning{% endif %}">
+            <strong>{{ alerta.titulo }}</strong>
+            <p class="alert-message">{{ alerta.mensaje }}</p>
+            <small class="alert-note">Este aviso es informativo; conversa con tu instructor para revisar tu situación.</small>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if notas_observador %}
+    <section class="card learner-observer-card" aria-labelledby="learner-observer-title" data-learner-tab="convivencia">
+        <div class="learner-observer-heading">
+            <div>
+                <span class="eyebrow">Observador</span>
+                <h2 id="learner-observer-title">Constancias de tu formación integral</h2>
+            </div>
+            <span class="badge badge-secondary">{{ notas_observador|length }} registro{% if notas_observador|length != 1 %}s{% endif %}</span>
+        </div>
+        <p class="text-muted">
+            Estos hechos fechados sustentan cualquier plan de mejoramiento o comité.
+            Si no estás de acuerdo con alguno, habla con el instructor que lo registró.
+        </p>
+        <ul class="learner-observer-list">
+            {% for nota in notas_observador %}
+            <li class="learner-observer-item learner-observer-{{ nota.tipo }}">
+                <div class="learner-observer-item-head">
+                    <strong>{{ nota.etiqueta_categoria }}</strong>
+                    <span class="badge badge-{{ 'success' if nota.tipo == 'positiva' else ('danger' if nota.tipo == 'negativa' else 'info') }}">{{ nota.etiqueta_tipo }}</span>
+                </div>
+                <small>{{ nota.fecha.strftime('%d/%m/%Y') }}{% if nota.autor %} · {{ nota.autor.nombre }}{% endif %}</small>
+                <p>{{ nota.descripcion }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {% if llamados_atencion %}
+    <section class="card learner-observer-card" id="seccion-llamados" aria-labelledby="learner-llamados-title" data-learner-tab="convivencia">
+        <div class="learner-observer-heading">
+            <div>
+                <span class="eyebrow">Debido proceso</span>
+                <h2 id="learner-llamados-title">Llamados de atención</h2>
+            </div>
+        </div>
+        <p class="text-muted">Tienes derecho a dar tu versión de los hechos. Lo que escribas queda en tu expediente y lo leen tu instructor y el comité.</p>
+        <ul class="learner-observer-list">
+            {% for llamado in llamados_atencion %}
+            <li class="learner-observer-item">
+                <div class="learner-observer-item-head">
+                    <strong>{{ 'Académico' if llamado.tipo == 'academico' else 'Disciplinario' }} n.º {{ llamado.numero }}</strong>
+                    {% if not llamado.vigente %}<span class="badge badge-secondary">Anulado</span>{% endif %}
+                </div>
+                <small>{{ llamado.fecha.strftime('%d/%m/%Y') }}</small>
+                <p>{{ llamado.descripcion }}</p>
+                {% if llamado.orientaciones %}<p><strong>Orientaciones:</strong> {{ llamado.orientaciones }}</p>{% endif %}
+                {% if llamado.descargos %}
+                <p><strong>Tus descargos ({{ llamado.descargos_en.strftime('%d/%m/%Y') }}):</strong> {{ llamado.descargos }}</p>
+                {% elif llamado.vigente and not solo_lectura %}
+                <form method="POST" action="{{ url_for('aprendiz.presentar_descargos', ficha_id=ficha.id, llamado_id=llamado.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label for="descargos-{{ llamado.id }}">Tus descargos</label>
+                    <textarea id="descargos-{{ llamado.id }}" name="descargos" rows="3" maxlength="3000" required></textarea>
+                    <button type="submit" class="btn btn-sm btn-primary">Enviar descargos</button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <section class="card learner-plan-card" aria-labelledby="learner-plan-title" data-learner-tab="convivencia">
+        <div class="learner-observer-heading">
+            <div>
+                <span class="eyebrow">Debido proceso · Art. 46</span>
+                <h2 id="learner-plan-title">Mis planes de mejoramiento</h2>
+            </div>
+            <span class="badge badge-secondary">{{ planes_mejoramiento|length }} plan{% if planes_mejoramiento|length != 1 %}es{% endif %}</span>
+        </div>
+        <p class="text-muted">Aquí puedes leer las actividades acordadas, consultar la fecha límite y enviar la evidencia para que tu instructor la revise.</p>
+
+        {% if planes_mejoramiento %}
+        <div class="learner-plan-list">
+            {% for plan in planes_mejoramiento %}
+            <article class="learner-plan-item learner-plan-state-{{ plan.estado }}">
+                <div class="learner-plan-item-header">
+                    <div>
+                        <h3>Plan del {{ plan.fecha_creacion.strftime('%d/%m/%Y') }}</h3>
+                        {% if plan.fecha_limite %}
+                        <p class="task-deadline learner-plan-deadline">Fecha límite: <time datetime="{{ plan.fecha_limite.date().isoformat() }}">{{ plan.fecha_limite.strftime('%d/%m/%Y') }}</time></p>
+                        {% else %}
+                        <p class="text-muted">Sin fecha límite registrada</p>
+                        {% endif %}
+                    </div>
+                    <span class="badge badge-{{ 'success' if plan.estado == 'cumplido' else 'danger' if plan.estado == 'vencido' else 'warning' }}">
+                        {{ {'pendiente': 'Pendiente', 'cumplido': 'Cumplido', 'vencido': 'Vencido'}[plan.estado] }}
+                    </span>
+                </div>
+                {% if plan.estado == 'vencido' %}
+                <div class="learner-plan-notice learner-plan-notice-overdue" role="status">
+                    <strong>La fecha límite ya pasó</strong>
+                    <p>Habla con tu instructor para revisar los pasos que siguen.</p>
+                </div>
+                {% elif plan.estado == 'pendiente' and not plan.evidencia_url %}
+                <div class="learner-plan-notice learner-plan-notice-pending" role="status">
+                    <strong>Evidencia pendiente</strong>
+                    <p>Aún no has enviado evidencia. Cuando completes las actividades, adjunta aquí el archivo para que tu instructor lo revise.</p>
+                </div>
+                {% endif %}
+                <div class="learner-plan-activities">
+                    <strong>Actividades y compromisos acordados</strong>
+                    <p>{{ plan.actividades }}</p>
+                </div>
+
+                {% if plan.evidencia_url %}
+                <div class="task-feedback learner-plan-evidence-sent" role="status">
+                    <strong>📎 Evidencia enviada el {{ plan.evidencia_enviada_en.strftime('%d/%m/%Y %H:%M') if plan.evidencia_enviada_en else 'fecha no disponible' }}</strong>
+                    {% if plan.estado in ('pendiente', 'vencido') %}
+                    <p class="learner-plan-review-note">Tu instructor revisará la evidencia antes de cerrar el plan.</p>
+                    {% endif %}
+                    {% if plan.observaciones_aprendiz %}<p>{{ plan.observaciones_aprendiz }}</p>{% endif %}
+                    <a class="btn btn-outline btn-sm" href="{{ url_for('aprendiz.descargar_evidencia_plan', plan_id=plan.id) }}">📄 Descargar mi evidencia</a>
+                </div>
+                {% endif %}
+
+                {% if plan.fecha_cumplimiento %}
+                <p class="text-muted">Cumplido el {{ plan.fecha_cumplimiento.strftime('%d/%m/%Y') }}.</p>
+                {% elif plan.estado == 'pendiente' %}
+                <details class="entrega-form learner-plan-evidence-form">
+                    <summary class="entrega-summary">📤 {{ 'Reemplazar evidencia' if plan.evidencia_url else 'Enviar evidencia' }}</summary>
+                    <form method="POST" action="{{ url_for('aprendiz.subir_evidencia_plan', ficha_id=ficha.id, plan_id=plan.id) }}" enctype="multipart/form-data" class="entrega-form-inner">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="plan-evidencia-{{ plan.id }}">Archivo de evidencia (obligatorio)</label>
+                            <input type="file" id="plan-evidencia-{{ plan.id }}" name="archivo_evidencia_plan" accept="{{ extensiones_carga }}" aria-describedby="plan-evidencia-ayuda-{{ plan.id }}" required class="form-file-input">
+                            <small class="learner-form-help" id="plan-evidencia-ayuda-{{ plan.id }}">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Para enviar una carpeta, comprímela en ZIP.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="plan-nota-{{ plan.id }}">Nota para tu instructor (opcional)</label>
+                            <textarea id="plan-nota-{{ plan.id }}" name="observaciones_aprendiz" rows="3" aria-describedby="plan-nota-ayuda-{{ plan.id }}" placeholder="Explica brevemente cómo cumpliste las actividades.">{{ plan.observaciones_aprendiz or '' }}</textarea>
+                            <small class="learner-form-help" id="plan-nota-ayuda-{{ plan.id }}">Puedes agregar un comentario breve para orientar la revisión.</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary full-width">Enviar evidencia para revisión</button>
+                    </form>
+                </details>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state learner-plan-empty">
+            <div class="empty-icon">✅</div>
+            <h3>No tienes planes de mejoramiento activos</h3>
+            <p>Si tu instructor acuerda un plan contigo, aparecerá aquí con sus actividades y fecha límite.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if inasistencias_pendientes %}
+    <section class="card support-card" data-learner-tab="convivencia">
+        <h2>Presentar soporte de una inasistencia</h2>
+        <p class="text-muted">Adjunta tu soporte o deja una nota para que el instructor pueda revisar el contexto.</p>
+        {% for registro in inasistencias_pendientes[:3] %}
+        <form method="POST" action="{{ url_for('aprendiz.adjuntar_soporte_inasistencia', ficha_id=ficha.id, registro_id=registro.id) }}" enctype="multipart/form-data" class="support-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <strong>Sesión del {{ registro.sesion.fecha.strftime('%d/%m/%Y') }}</strong>
+            {% if registro.soporte_url %}<a href="{{ url_for('aprendiz.descargar_soporte', registro_id=registro.id) }}" class="link-download">Ver soporte enviado</a>{% endif %}
+            <p class="learner-support-guidance" id="guia-inasistencia-{{ registro.id }}" role="note">Adjunta un soporte o escribe una nota; completa al menos una opción para que tu instructor pueda revisar la inasistencia.</p>
+            <div class="support-form-field">
+                <label for="soporte-inasistencia-{{ registro.id }}">Soporte de inasistencia (opcional)</label>
+                <input type="file" id="soporte-inasistencia-{{ registro.id }}" name="soporte" accept="{{ extensiones_carga }}" aria-describedby="guia-inasistencia-{{ registro.id }} formatos-inasistencia-{{ registro.id }}">
+                <small class="learner-form-help" id="formatos-inasistencia-{{ registro.id }}">Formatos admitidos: {{ extensiones_carga | upper | replace('.', '') | replace(',', ', ') }}. Para enviar una carpeta, comprímela en ZIP.</small>
+            </div>
+            <div class="support-form-field">
+                <label for="nota-inasistencia-{{ registro.id }}">Nota para tu instructor (opcional)</label>
+                <textarea id="nota-inasistencia-{{ registro.id }}" name="nota" rows="2" aria-describedby="guia-inasistencia-{{ registro.id }}" placeholder="Explica brevemente el motivo o el contexto de la inasistencia.">{{ registro.nota or '' }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Enviar para revisión</button>
+        </form>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <div data-learner-tab="resumen">
+        {% if nivel_alerta == 'rojo' %}
+        <div class="alert alert-error">
+            <strong class="alert-lead">🚨 Estás en zona de alerta.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Habla con tu instructor para definir tu situación.
+        </div>
+        {% elif nivel_alerta == 'amarillo' %}
+        <div class="alert alert-warning">
+            <strong class="alert-lead">⚠️ Estás en riesgo.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Cuida tu asistencia para no afectar tu proceso.
+        </div>
+        {% elif not (tareas_individuales|selectattr('estado', 'equalto', 'vencida')|list) %}
+        <div class="alert alert-success">
+            <strong class="alert-lead">🌟 ¡Excelente desempeño!</strong> Tu asistencia es constante y estás al día. ¡Sigue así!
+        </div>
+        {% endif %}
+    </div>

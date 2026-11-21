@@ -1,0 +1,129 @@
+{#- Liga de escuadrones y logros. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <!-- ============================================================ -->
+    <!-- LIGA DE ESCUADRONES Y RETOS EN EQUIPO                       -->
+    <!-- ============================================================ -->
+    <section class="card learner-squad-league" data-learner-tab="rendimiento" id="seccion-liga-grupos" data-experience-ranking>
+        <div class="section-header compact">
+            <div>
+                <span class="eyebrow">Cooperación y Desafíos Colectivos</span>
+                <h2>🛡️ Liga de Escuadrones Formativos</h2>
+                <p class="text-muted"><small>El éxito se construye colaborando. Cada reto cumplido y medalla grupal impulsa a tu equipo en la tabla.</small></p>
+            </div>
+            {% if mi_escuadron %}
+            <span class="badge badge-primary">Tu escuadrón: {{ mi_escuadron.nombre }} {{ mi_escuadron.podio or '' }}</span>
+            {% endif %}
+        </div>
+
+        {% if mi_escuadron %}
+        <!-- Resumen de Mi Escuadrón -->
+        <div class="my-squad-spotlight">
+            <div class="my-squad-banner">
+                <div class="squad-badge-large">{{ mi_escuadron.podio or '🛡️' }}</div>
+                <div class="squad-info">
+                    <h3>{{ mi_escuadron.nombre }}</h3>
+                    <p class="text-muted"><small>Puesto #{{ mi_escuadron.posicion }} en la ficha · {{ mi_escuadron.puntaje_grupo }} pts acumulados</small></p>
+                    <div class="squad-members-chips">
+                        {% for comp in mi_escuadron.companeros %}
+                        <span class="squad-member-pill">{{ comp }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="squad-stats-pills">
+                    <div class="squad-pill-stat">
+                        <span class="stat-number">🏅 {{ mi_escuadron.medallas_count }}</span>
+                        <span class="stat-label">Medallas</span>
+                    </div>
+                    <div class="squad-pill-stat">
+                        <span class="stat-number">📋 {{ mi_escuadron.tareas_entregadas }}</span>
+                        <span class="stat-label">Retos superados</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if otorgamientos_grupo %}
+            <div class="squad-earned-badges">
+                <span class="eyebrow">Condecoraciones del Escuadrón</span>
+                <div class="squad-badges-list">
+                    {% for ot in otorgamientos_grupo %}
+                    <span class="badge badge-gold" title="{{ ot.motivo or 'Reconocimiento grupal' }}">
+                        {{ ot.insignia.icono or '🎖️' }} {{ ot.insignia.nombre }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Tabla de la Liga de Equipos -->
+        <div class="squad-league-table">
+            <div class="squad-league-header-row">
+                <span class="col-pos">Puesto</span>
+                <span class="col-name">Escuadrón</span>
+                <span class="col-stats">Retos y Medallas</span>
+                <span class="col-score">Puntaje</span>
+            </div>
+            {% for g in liga_grupos %}
+            <div class="squad-league-row {% if g.es_mi_grupo %}is-my-squad{% endif %}">
+                <span class="col-pos">
+                    {% if g.podio %}
+                    <span class="podium-medal">{{ g.podio }}</span>
+                    {% else %}
+                    <span class="pos-num">#{{ g.posicion }}</span>
+                    {% endif %}
+                </span>
+                <div class="col-name">
+                    <strong>{{ g.nombre }}</strong>
+                    {% if g.es_mi_grupo %}
+                    <span class="badge badge-accent badge-sm">Mi equipo</span>
+                    {% endif %}
+                    <small class="text-muted d-block">{{ g.miembros_count }} integrantes</small>
+                </div>
+                <div class="col-stats">
+                    <span class="badge badge-ghost" title="Retos grupales entregados">📋 {{ g.tareas_entregadas }}</span>
+                    <span class="badge badge-ghost" title="Medallas colectivas">🏅 {{ g.medallas_count }}</span>
+                    {% if g.insignias %}
+                    <div class="group-mini-medals" aria-label="Medallas ganadas">
+                        {% for ins in g.insignias[:3] %}
+                        <span title="{{ ins.nombre }}">{{ ins.icono }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-score">
+                    <strong class="score-number">{{ g.puntaje_grupo }} pts</strong>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted p-3 text-center">Aún no se han configurado escuadrones o actividades grupales en esta ficha.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% if resumen_logros %}
+        <div data-learner-tab="rendimiento">
+            {% include 'components/_logros_grid.html' %}
+        </div>
+    {% else %}
+    <section class="achievements-section" data-learner-tab="rendimiento">
+        <div class="section-header">
+            <div>
+                <span class="eyebrow">Reconocimiento de participación</span>
+                <h2>Mis logros</h2>
+            </div>
+            <span class="badge badge-success">{{ otorgamientos|length }} obtenida(s)</span>
+        </div>
+        <div class="achievement-grid">
+            {% for insignia in catalogo_insignias %}
+            {% set obtenida = insignia.id in ids_insignias_obtenidas %}
+            <article class="achievement-card {% if not obtenida %}locked{% endif %}">
+                <span class="achievement-icon">{{ insignia.icono }}</span>
+                <h3>{{ insignia.nombre }}</h3>
+                <p>{{ insignia.descripcion }}</p>
+                <span class="achievement-status">{{ 'Obtenida' if obtenida else 'Por desbloquear' }}</span>
+            </article>
+            {% endfor %}
+        </div>
+        <p class="ranking-disclaimer">Estos reconocimientos son motivacionales y no hacen parte de tu evaluación oficial.</p>
+    </section>
+    {% endif %}

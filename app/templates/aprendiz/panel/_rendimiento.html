@@ -1,0 +1,274 @@
+{#- Curva de rendimiento, ranking y tabla de posiciones. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <!-- ============================================================ -->
+    <!-- CURVA DE RENDIMIENTO Y PLAN DE MEJORA DEL APRENDIZ           -->
+    <!-- ============================================================ -->
+    {% if curva_rendimiento and curva_rendimiento.tiene_datos %}
+    <section class="card learner-curve-card" id="seccion-curva-rendimiento" data-learner-tab="rendimiento">
+        <div class="learner-curve-top">
+            <div>
+                <span class="eyebrow">Trayectoria Formativa</span>
+                <h2>Curva de Rendimiento Académico</h2>
+                <p class="text-muted curve-subtitle">Evolución histórica de tu puntaje integral basada en asistencia, evidencias calificadas y resultados aprobados.</p>
+            </div>
+            <div class="learner-curve-badges">
+                <span class="badge {{ curva_rendimiento.badge_class }}">{{ curva_rendimiento.nivel_desempeno }}</span>
+                {% if curva_rendimiento.puntos|length > 1 %}
+                <span class="badge badge-secondary trend-chip {{ curva_rendimiento.tendencia_clase }}">
+                    {{ curva_rendimiento.tendencia_icono }} {{ curva_rendimiento.tendencia|capitalize }}
+                    {% if curva_rendimiento.diferencia_ultimo != 0 %}
+                    ({{ '+' if curva_rendimiento.diferencia_ultimo > 0 else '' }}{{ curva_rendimiento.diferencia_ultimo }} pts)
+                    {% endif %}
+                </span>
+                {% else %}
+                <span class="badge badge-secondary trend-chip">Primer registro</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Indicadores clave de la curva -->
+        <div class="learner-curve-kpis">
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Puntaje Actual</span>
+                <strong class="curve-kpi-val">{{ '%.1f'|format(curva_rendimiento.puntaje_actual) }} <small>/ 100</small></strong>
+                <span data-experience-ranking class="curve-kpi-sub">Puesto #{{ curva_rendimiento.posicion_actual }} en la ficha</span>
+            </div>
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Meta Mínima Aprobatoria</span>
+                <strong class="curve-kpi-val">{{ '%.0f'|format(curva_rendimiento.svg.meta_pct) }}%</strong>
+                <span class="curve-kpi-sub {% if curva_rendimiento.supera_meta %}text-success{% else %}text-danger{% endif %}">
+                    {% if curva_rendimiento.supera_meta %}
+                    ✓ Superas la meta (+{{ curva_rendimiento.distancia_meta }} pts)
+                    {% else %}
+                    ⚠️ Faltan {{ curva_rendimiento.distancia_meta|abs }} pts para aprobar
+                    {% endif %}
+                </span>
+            </div>
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Mejor Puntaje Histórico</span>
+                <strong class="curve-kpi-val">{{ '%.1f'|format(curva_rendimiento.mejor_puntaje) }}</strong>
+                <span class="curve-kpi-sub">Pico de rendimiento</span>
+            </div>
+            <div class="curve-kpi-item">
+                <span class="curve-kpi-label">Cortes Registrados</span>
+                <strong class="curve-kpi-val">{{ curva_rendimiento.puntos|length }}</strong>
+                <span class="curve-kpi-sub">Mediciones evaluadas</span>
+            </div>
+        </div>
+
+        <!-- Gráfico SVG Interactivo de la Curva -->
+        <div class="learner-curve-chart-box" role="region" aria-label="Gráfico de evolución temporal del puntaje">
+            <svg class="learner-curve-svg" viewBox="{{ curva_rendimiento.svg.viewbox }}" role="img" aria-label="Curva de rendimiento del aprendiz">
+                <defs>
+                    <linearGradient id="learner-curve-gradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="var(--accent-primary, #39a900)" stop-opacity="0.32"/>
+                        <stop offset="100%" stop-color="var(--accent-primary, #39a900)" stop-opacity="0.02"/>
+                    </linearGradient>
+                </defs>
+
+                <!-- Líneas horizontales de referencia -->
+                {% for m in curva_rendimiento.svg.marcas_y %}
+                <line class="curve-grid-line" x1="{{ curva_rendimiento.svg.x_start }}" y1="{{ m.y }}" x2="{{ curva_rendimiento.svg.x_end }}" y2="{{ m.y }}"></line>
+                <text class="curve-axis-label" x="{{ curva_rendimiento.svg.x_start - 8 }}" y="{{ m.y + 4 }}" text-anchor="end">{{ m.valor }}%</text>
+                {% endfor %}
+
+                <!-- Línea de meta de aprobación (70%) -->
+                <line class="curve-meta-line" x1="{{ curva_rendimiento.svg.x_start }}" y1="{{ curva_rendimiento.svg.y_meta }}" x2="{{ curva_rendimiento.svg.x_end }}" y2="{{ curva_rendimiento.svg.y_meta }}" stroke-dasharray="5 4"></line>
+                <text class="curve-meta-text" x="{{ curva_rendimiento.svg.x_end }}" y="{{ curva_rendimiento.svg.y_meta - 6 }}" text-anchor="end">Meta aprobatoria ({{ '%.0f'|format(curva_rendimiento.svg.meta_pct) }}%)</text>
+
+                <!-- Polígono de área -->
+                {% if curva_rendimiento.svg.poligono_area %}
+                <polygon class="curve-area-poly" points="{{ curva_rendimiento.svg.poligono_area }}" fill="url(#learner-curve-gradient)"></polygon>
+                {% endif %}
+
+                <!-- Polilínea del puntaje -->
+                {% if curva_rendimiento.svg.linea_puntaje %}
+                <polyline class="curve-line-poly" points="{{ curva_rendimiento.svg.linea_puntaje }}"></polyline>
+                {% endif %}
+
+                <!-- Marcas de fecha en el eje X (distribuidas limpiamente sin solapamiento) -->
+                {% if curva_rendimiento.svg.marcas_x %}
+                <g class="curve-x-axis-marks" aria-hidden="true">
+                    {% for m in curva_rendimiento.svg.marcas_x %}
+                    <line x1="{{ m.x }}" y1="{{ curva_rendimiento.svg.y_zero }}" x2="{{ m.x }}" y2="{{ curva_rendimiento.svg.y_zero + 5 }}" stroke="rgba(148, 163, 184, 0.4)" stroke-width="1"></line>
+                    <text class="curve-date-txt" x="{{ m.x }}" y="{{ curva_rendimiento.svg.y_zero + 18 }}" text-anchor="middle">{{ m.fecha_str }}</text>
+                    {% endfor %}
+                </g>
+                {% endif %}
+
+                <!-- Puntos en la curva interactivos con control de etiquetas de puntaje -->
+                {% for pt in curva_rendimiento.puntos %}
+                <g class="curve-point-item" tabindex="0" role="graphics-symbol"
+                   data-fecha="{{ pt.fecha_str }}"
+                   data-puntaje="{{ '%.1f'|format(pt.puntaje) }}"
+                   data-asistencia="{{ '%.0f'|format(pt.asistencia) }}"
+                   data-evidencias="{{ '%.0f'|format(pt.evidencias) }}"
+                   data-estado="{{ pt.estado }}"
+                   aria-label="Corte {{ pt.fecha_str }}: {{ '%.1f'|format(pt.puntaje) }} puntos (Asistencia: {{ '%.0f'|format(pt.asistencia) }}%, Evidencias: {{ '%.0f'|format(pt.evidencias) }}%)">
+                    <circle class="curve-dot {% if pt.es_ultimo %}curve-dot--current{% endif %}" cx="{{ pt.x }}" cy="{{ pt.y }}" r="{{ 6 if pt.es_ultimo else 4 }}"></circle>
+                    {% if pt.mostrar_etiqueta_puntaje %}
+                    <text class="curve-score-txt" x="{{ pt.x }}" y="{{ pt.y - 10 }}" text-anchor="middle">{{ '%.1f'|format(pt.puntaje) }}</text>
+                    {% endif %}
+                </g>
+                {% endfor %}
+            </svg>
+        </div>
+
+        <!-- HUD interactivo de inspección de corte -->
+        <div class="learner-curve-inspector" id="curve-inspector-box" aria-live="polite">
+            <div class="inspector-badge-row">
+                <span class="badge badge-accent">📍 Detalle del Corte</span>
+                <span class="inspector-hint text-muted"><small>Pasa el cursor o selecciona cualquier punto en la curva para inspeccionarlo</small></span>
+            </div>
+            <div class="inspector-data-grid">
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Fecha del corte</span>
+                    <strong class="cell-val" id="inspector-fecha">{{ curva_rendimiento.puntos[-1].fecha_str if curva_rendimiento.puntos else '--' }}</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Puntaje global</span>
+                    <strong class="cell-val text-primary" id="inspector-puntaje">{{ '%.1f'|format(curva_rendimiento.puntaje_actual) }} pts</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Asistencia</span>
+                    <strong class="cell-val" id="inspector-asistencia">{{ '%.0f'|format(curva_rendimiento.puntos[-1].asistencia) if curva_rendimiento.puntos else '--' }}%</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Evidencias</span>
+                    <strong class="cell-val" id="inspector-evidencias">{{ '%.0f'|format(curva_rendimiento.puntos[-1].evidencias) if curva_rendimiento.puntos else '--' }}%</strong>
+                </div>
+                <div class="inspector-data-cell">
+                    <span class="cell-label">Estado</span>
+                    <span class="badge badge-info" id="inspector-estado">{{ curva_rendimiento.puntos[-1].estado if curva_rendimiento.puntos else 'Normal' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnóstico Pedagógico y Ruta de Recuperación Empática -->
+        {% if curva_rendimiento.diagnostico %}
+        <div class="learner-curve-diagnosis-card diagnosis--{{ curva_rendimiento.diagnostico.nivel }}">
+            <div class="diagnosis-header">
+                <span class="diagnosis-icon" aria-hidden="true">{{ curva_rendimiento.diagnostico.icono }}</span>
+                <div class="diagnosis-heading">
+                    <span class="eyebrow">{{ curva_rendimiento.diagnostico.titulo }}</span>
+                    <h3 class="diagnosis-title">{{ curva_rendimiento.diagnostico.mensaje }}</h3>
+                </div>
+            </div>
+            <p class="diagnosis-desc">{{ curva_rendimiento.diagnostico.detalle }}</p>
+            <div class="diagnosis-action-pill">
+                <strong>🎯 Recomendación clave:</strong> {{ curva_rendimiento.diagnostico.accion }}
+            </div>
+
+            {% if curva_rendimiento.ruta_recuperacion and curva_rendimiento.ruta_recuperacion.pasos %}
+            <div class="rescue-roadmap-block">
+                <h4 class="rescue-roadmap-title">🗺️ {{ curva_rendimiento.ruta_recuperacion.titulo }}</h4>
+                <p class="rescue-roadmap-desc text-muted"><small>{{ curva_rendimiento.ruta_recuperacion.proposito }}</small></p>
+                <div class="rescue-steps-grid">
+                    {% for paso in curva_rendimiento.ruta_recuperacion.pasos %}
+                    <div class="rescue-step-card">
+                        <div class="rescue-step-badge">Paso {{ paso.paso }}</div>
+                        <h5 class="rescue-step-title">{{ paso.titulo }}</h5>
+                        <p class="rescue-step-desc">{{ paso.descripcion }}</p>
+                        <span class="rescue-step-impact">✨ {{ paso.impacto }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Advertencias sobre el Rendimiento Académico -->
+        {% if advertencias_rendimiento %}
+        <div class="learner-perf-alerts-container" id="advertencias-rendimiento-box">
+            <div class="perf-block-title">
+                <span class="eyebrow text-danger">⚠️ Atención y Advertencias</span>
+                <h3>Aspectos que requieren tu atención inmediata</h3>
+                <p class="text-muted">Situaciones que pueden comprometer tu rendimiento o permanencia si no tomas acción oportunamente.</p>
+            </div>
+            <div class="perf-alerts-stack">
+                {% for adv in advertencias_rendimiento %}
+                    {{ render_banner_recomendacion(adv) }}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recomendaciones para Impulsar el Rendimiento -->
+        {% if recomendaciones_mejora %}
+        <div class="learner-perf-recs-container" id="recomendaciones-rendimiento-box">
+            <div class="perf-block-title">
+                <span class="eyebrow text-success">💡 Plan de Impulso y Recomendaciones</span>
+                <h3>Acciones recomendadas para subir tu rendimiento</h3>
+                <p class="text-muted">Pautas prácticas para elevar tu curva, mejorar tu promedio y avanzar con paso firme en tu formación SENA.</p>
+            </div>
+            <div class="perf-recs-grid">
+                {% for rec in recomendaciones_mejora %}
+                    {{ render_card_recomendacion(rec) }}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if ranking %}
+    <section class="card my-ranking-card" id="seccion-ranking" data-learner-tab="rendimiento" data-experience-ranking>
+        <div class="my-ranking-top">
+            <div>
+                <span class="eyebrow">Mi participación</span>
+                <h2>Vas en el puesto {{ ranking.posicion }} de {{ total_ranking }}</h2>
+            </div>
+            <span class="my-position">{{ ranking.medalla or ('#' ~ ranking.posicion) }}</span>
+        </div>
+        <div class="score-row">
+            <span>Puntaje Total</span>
+            <strong>{{ '%.1f'|format(ranking.puntaje_total) }}</strong>
+        </div>
+        <div class="progress-track progress-large ranking-progress" role="progressbar"
+             aria-valuenow="{{ ranking.barra_puntaje }}" aria-valuemin="0" aria-valuemax="100">
+            {% if ranking.barra_puntaje > 0 %}<span style="--progress-value: {{ ranking.barra_puntaje }}%;"></span>{% endif %}
+        </div>
+        <div class="score-sources">
+            <span class="badge badge-secondary">📅 Asistencia <strong>{{ '%.1f'|format(ranking.porcentaje_asistencia) }}%</strong></span>
+            <span class="badge badge-secondary">🗂️ Evidencias <strong>{{ '%.1f'|format(ranking.porcentaje_evidencias) }}%</strong></span>
+            <span class="badge badge-secondary trend trend-{{ ranking.tendencia }}">{{ ranking.tendencia_icono }} {{ ranking.tendencia|capitalize }}</span>
+        </div>
+        {% if punto_siguiente %}
+        <p class="next-position">
+            ⚡ Te faltan <strong>{{ '%.1f'|format(punto_siguiente) }}</strong> puntos para alcanzar el puesto {{ ranking.posicion - 1 }}.
+        </p>
+        {% endif %}
+        <p class="motivational-message">"{{ mensaje_ranking }}"</p>
+        <p class="ranking-disclaimer">Este es un indicador de participación; no es una nota oficial.</p>
+    </section>
+
+    <section class="card learner-leaderboard" data-learner-tab="rendimiento" data-experience-ranking>
+        <div class="section-header compact">
+            <div>
+                <span class="eyebrow">Para inspirarte</span>
+                <h2>{% if config_ranking.modo_visibilidad == 'publico' %}Ranking de la ficha{% else %}Top 5 y tu posición{% endif %}</h2>
+            </div>
+            {% if config_ranking.modo_anonimo_parcial %}
+            <span class="badge badge-info">Alias activados</span>
+            {% endif %}
+        </div>
+        <div class="learner-ranking-list">
+            {% for fila in ranking_visible %}
+            <div class="learner-ranking-row {% if fila.aprendiz.id == aprendiz.id %}is-me{% endif %}">
+                <span class="learner-position">{{ fila.medalla or fila.posicion }}</span>
+                <div class="learner-rank-info">
+                    <strong>
+                        {% if fila.aprendiz.id == aprendiz.id %}
+                        Tú · {{ aprendiz.nombre }}
+                        {% else %}
+                        {{ fila.alias }}
+                        {% endif %}
+                    </strong>
+                    <div class="progress-track">{% if fila.barra_puntaje > 0 %}<span style="--progress-value: {{ fila.barra_puntaje }}%;"></span>{% endif %}</div>
+                </div>
+                <strong>{{ '%.1f'|format(fila.puntaje_total) }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}

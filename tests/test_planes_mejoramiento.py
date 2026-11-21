@@ -628,8 +628,13 @@ class PlanesMejoramientoWebTestCase(unittest.TestCase):
             for tarjeta in parser.tarjetas
         }
 
+        # La asistencia vive una sola vez, en el anillo de la cabecera.
+        html = panel.get_data(as_text=True)
+        self.assertIn('aria-label="Asistencia: 100%"', html)
+        self.assertIn('1 de 1 sesiones', html)
+        self.assertNotIn('📅 Asistencia', tarjetas)
+
         for metrica, nombre_aria, valor, texto in (
-            ('📅 Asistencia', 'Asistencia', '100', '1 de 1 sesiones'),
             ('📋 Evidencias', 'Evidencias entregadas', '0', '0 de 1 evidencias entregadas'),
         ):
             with self.subTest(metrica=metrica):

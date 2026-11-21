@@ -1,0 +1,196 @@
+{#- Herramientas del delegado, aseo de hoy, portafolio y cronograma. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    {% if aprendiz.rol_administrativo %}
+    <section class="card" aria-labelledby="herramientas-administrador" data-learner-tab="resumen">
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">Rol delegado por el instructor</span>
+                <h2 id="herramientas-administrador">Herramientas del aprendiz administrador</h2>
+            </div>
+            <span class="badge badge-success">Activo</span>
+        </div>
+        <p class="text-muted">Puedes operar el aseo y registrar el llamado a lista de esta ficha. Tus acciones quedan auditadas.</p>
+        <div class="header-actions">
+            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-primary">Gestionar turnos de aseo</a>
+            <a href="{{ url_for('aprendiz.asistencia_admin', ficha_id=ficha.id) }}" class="btn btn-outline">Hacer llamado a lista</a>
+        </div>
+        {% if turno_hoy %}
+        <div class="cleaning-today-banner" style="margin-top: 1rem; padding: 0.85rem 1rem; background: var(--surface-secondary); border: 1px solid var(--border-data); border-radius: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🧹 Turno de aseo de hoy ({{ turno_hoy.fecha.strftime('%d/%m/%Y') }})</div>
+                <div style="font-weight: 600; margin-top: 2px;">
+                    {{ turno_hoy.aprendiz_1.nombre_completo }} y {{ turno_hoy.aprendiz_2.nombre_completo }}
+                    <span class="badge badge-{{ 'success' if turno_hoy.estado == 'cumplido' else 'warning' }}" style="margin-left: 6px;">{{ turno_hoy.estado|capitalize }}</span>
+                </div>
+            </div>
+            {% if turno_hoy.estado != 'cumplido' %}
+            <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno_hoy.id) }}" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="origen" value="panel">
+                <button type="submit" class="btn btn-sm btn-primary">✓ Marcar aseo de hoy hecho</button>
+            </form>
+            {% else %}
+            <span class="text-muted" style="font-size: 0.88rem; font-weight: 500;">✓ Aseo cumplido hoy</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if not aprendiz.rol_administrativo and turno_hoy %}
+    <section class="card" aria-label="Turno de aseo de hoy" data-learner-tab="resumen" style="margin-bottom: 1rem;">
+        <div class="cleaning-today-banner" style="padding: 0.85rem 1rem; background: var(--surface-secondary); border: 1px solid var(--border-data); border-radius: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🧹 Turno de aseo de hoy ({{ turno_hoy.fecha.strftime('%d/%m/%Y') }})</div>
+                <div style="font-weight: 600; margin-top: 2px;">
+                    {{ turno_hoy.aprendiz_1.nombre_completo }} y {{ turno_hoy.aprendiz_2.nombre_completo }}
+                    <span class="badge badge-{{ 'success' if turno_hoy.estado == 'cumplido' else 'warning' }}" style="margin-left: 6px;">{{ turno_hoy.estado|capitalize }}</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                {% if turno_hoy.estado != 'cumplido' %}
+                <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno_hoy.id) }}" style="margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="origen" value="panel">
+                    <button type="submit" class="btn btn-sm btn-primary">✓ Marcar aseo de hoy hecho</button>
+                </form>
+                {% else %}
+                <span class="text-muted" style="font-size: 0.88rem; font-weight: 500;">✓ Aseo cumplido hoy</span>
+                {% endif %}
+                <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver turnos de aseo</a>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- ============================================================ -->
+    <!-- SECCIÓN DE PORTAFOLIO DIGITAL: GITHUB Y NOTION               -->
+    <!-- ============================================================ -->
+    <section class="card portafolio-bento-card" id="seccion-portafolio-digital" data-learner-tab="resumen" aria-labelledby="portafolio-section-title">
+        <div class="portafolio-bento-header">
+            <div class="portafolio-header-titles">
+                <span class="eyebrow">Evidencias en la nube &middot; Repositorios y Bitácora</span>
+                <h2 id="portafolio-section-title" class="portafolio-title">
+                    <span class="portafolio-title-icon" aria-hidden="true">💼</span>
+                    <span>Mi Portafolio Digital de Evidencias</span>
+                </h2>
+                <p class="text-muted portafolio-subtitle">
+                    Vincula tu repositorio de GitHub y tu bitácora de Notion. Tus instructores consultarán estos enlaces directamente para revisar tus desarrollos, código fuente y documentación de proyectos.
+                </p>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary btn-edit-portafolio btn-open-portafolio-modal" id="btn-trigger-portafolio-edit">
+                ✏️ Gestionar Enlaces
+            </button>
+        </div>
+
+        <div class="portafolio-cards-grid">
+            <!-- Tarjeta GitHub -->
+            <article class="portafolio-tile portafolio-tile--github {% if aprendiz.enlace_github %}is-connected{% else %}is-empty{% endif %}" id="tile-portafolio-github">
+                <div class="portafolio-tile-top">
+                    <div class="portafolio-tile-brand">
+                        <div class="portafolio-brand-badge brand-github">
+                            <svg class="brand-svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="portafolio-brand-name">GitHub</h3>
+                            <span class="portafolio-brand-type">Código fuente &middot; Repositorios</span>
+                        </div>
+                    </div>
+                    <div class="portafolio-tile-status">
+                        {% if aprendiz.enlace_github %}
+                        <span class="badge badge-success portafolio-status-pill">
+                            <span class="status-indicator-dot"></span> Conectado
+                        </span>
+                        {% else %}
+                        <span class="badge badge-secondary portafolio-status-pill">Sin registrar</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="portafolio-tile-body">
+                    {% if aprendiz.enlace_github %}
+                    <p class="portafolio-url-preview text-truncate" title="{{ aprendiz.enlace_github }}">
+                        <span class="url-protocol">https://</span>{{ aprendiz.enlace_github|replace('https://', '')|replace('http://', '') }}
+                    </p>
+                    <div class="portafolio-actions-cluster">
+                        <a href="{{ aprendiz.enlace_github }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-outline-github" title="Abrir tu perfil o repositorio de GitHub en una nueva pestaña">
+                            <span>Visitar repositorio</span>
+                            <svg class="external-link-icon" viewBox="0 0 20 20" width="13" height="13" fill="currentColor">
+                                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                            </svg>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" data-copy-value="{{ aprendiz.enlace_github }}" onclick="copiarTexto(this.dataset.copyValue)" title="Copiar enlace al portapapeles">
+                            📋 Copiar
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="portafolio-empty-description">
+                        Añade el enlace de tu perfil o repositorio principal en GitHub para que los instructores evalúen tus proyectos de software y control de versiones.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-primary-github btn-open-portafolio-modal" data-target-input="github">
+                        ➕ Vincular GitHub
+                    </button>
+                    {% endif %}
+                </div>
+            </article>
+
+            <!-- Tarjeta Notion -->
+            <article class="portafolio-tile portafolio-tile--notion {% if aprendiz.enlace_notion %}is-connected{% else %}is-empty{% endif %}" id="tile-portafolio-notion">
+                <div class="portafolio-tile-top">
+                    <div class="portafolio-tile-brand">
+                        <div class="portafolio-brand-badge brand-notion">
+                            <svg class="brand-svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                <path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.64c-.467-.373-.98-.606-1.913-.56L3.432 2.062c-.373.047-.466.28-.326.467zm.84 3.732v13.623c0 .84.42 1.12 1.306 1.073l14.288-.84c.887-.046.98-.606.98-1.26V7.054c0-.653-.28-.933-.887-.887l-14.754.887c-.606.046-.933.327-.933.886zm13.355.933c.093.42.093.84-.28.887l-.98.14v10.124c-.466.28-.98.42-1.493.42-.84 0-1.213-.28-1.96-1.12l-4.993-7.886v7.747l1.727.373c.093.42-.14.793-.56.84l-3.826.233c-.094-.42 0-.84.373-.887l1.167-.233V9.854l-1.4-.14c-.094-.42.093-.793.513-.84l4.013-.233 5.367 8.26V9.667l-1.54-.186c-.093-.42.14-.793.56-.84z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="portafolio-brand-name">Notion</h3>
+                            <span class="portafolio-brand-type">Bitácora formativa &middot; Documentación</span>
+                        </div>
+                    </div>
+                    <div class="portafolio-tile-status">
+                        {% if aprendiz.enlace_notion %}
+                        <span class="badge badge-success portafolio-status-pill">
+                            <span class="status-indicator-dot"></span> Conectado
+                        </span>
+                        {% else %}
+                        <span class="badge badge-secondary portafolio-status-pill">Sin registrar</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="portafolio-tile-body">
+                    {% if aprendiz.enlace_notion %}
+                    <p class="portafolio-url-preview text-truncate" title="{{ aprendiz.enlace_notion }}">
+                        <span class="url-protocol">https://</span>{{ aprendiz.enlace_notion|replace('https://', '')|replace('http://', '') }}
+                    </p>
+                    <div class="portafolio-actions-cluster">
+                        <a href="{{ aprendiz.enlace_notion }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-outline-notion" title="Abrir tu bitácora de Notion en una nueva pestaña">
+                            <span>Visitar bitácora</span>
+                            <svg class="external-link-icon" viewBox="0 0 20 20" width="13" height="13" fill="currentColor">
+                                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                            </svg>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-ghost btn-copy-link" data-copy-value="{{ aprendiz.enlace_notion }}" onclick="copiarTexto(this.dataset.copyValue)" title="Copiar enlace al portapapeles">
+                            📋 Copiar
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="portafolio-empty-description">
+                        Vincula tu espacio o página pública de Notion con la bitácora de aprendizaje, apuntes y reflexiones pedagógicas del proceso de formación.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-primary-notion btn-open-portafolio-modal" data-target-input="notion">
+                        ➕ Vincular Notion
+                    </button>
+                    {% endif %}
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <div data-learner-tab="resumen">
+        {% include '_cronograma.html' %}
+    </div>

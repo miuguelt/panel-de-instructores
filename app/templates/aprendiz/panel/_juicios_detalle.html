@@ -1,0 +1,230 @@
+{#- Detalle de juicios y modal de competencia. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    {% if juicios and resumen_aprendiz %}
+    <section class="card juicio-detail-card" data-learner-tab="juicios">
+        <div class="juicio-detail-header">
+            <div>
+                <span class="eyebrow">Detalle de Evaluación</span>
+                <h2 class="juicio-detail-title">{{ resumen_aprendiz.total_competencias }} competencias · {{ stats_juicios.total }} juicios</h2>
+            </div>
+            <div class="juicio-detail-badges">
+                <span class="badge badge-secondary">{{ resumen_aprendiz.total_instructores }} instructores</span>
+                {% if resumen_aprendiz is defined and resumen_aprendiz and resumen_aprendiz.primera_evaluacion and resumen_aprendiz.ultima_evaluacion %}
+                <span class="badge badge-secondary">
+                    {{ resumen_aprendiz.primera_evaluacion.strftime('%d/%m/%Y') }} → {{ resumen_aprendiz.ultima_evaluacion.strftime('%d/%m/%Y') }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Competencias detalladas -->
+        {% if competencias_aprendiz %}
+        <h3 class="juicio-sub-title">Estado por Competencia</h3>
+        <div class="table-container">
+            <div class="table-responsive" tabindex="0" aria-label="Estado por competencia">
+                <table class="table table-sena">
+                    <thead>
+                        <tr>
+                            <th scope="col">Competencia</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Progreso</th>
+                            <th scope="col" class="text-center">Aprobados</th>
+                            <th scope="col" class="text-center">Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for comp in competencias_aprendiz %}
+                        {% set tipo_label = 'Inglés' if comp.tipo == 'ingles' else ('Transversal' if comp.tipo == 'transversal' else 'Técnica') %}
+                        <tr class="{% if comp.pct == 100 %}row-success{% elif comp.pct > 0 %}row-warning{% endif %}">
+                            <td data-label="Competencia"><strong>{{ comp.nombre }}</strong></td>
+                            <td data-label="Tipo">
+                                <span class="badge badge-solid-secondary">{{ tipo_label }}</span>
+                            </td>
+                            <td data-label="Progreso">
+                                <div class="table-progress">
+                                    <div class="table-progress-track">
+                                        <div class="table-progress-fill {% if comp.pct == 100 %}is-complete{% elif comp.pct > 0 %}is-partial{% else %}is-empty{% endif %}" style="--progress-value: {{ comp.pct }}%;"></div>
+                                    </div>
+                                    <span class="badge {% if comp.pct == 100 %}badge-solid-success{% elif comp.pct > 0 %}badge-solid-warning{% else %}badge-solid-secondary{% endif %}">{{ comp.pct }}%</span>
+                                </div>
+                            </td>
+                            <td data-label="Aprobados" class="text-center">{{ comp.aprobados }}/{{ comp.total }}</td>
+                            <td data-label="Detalle" class="text-center">
+                                <button type="button" class="competencia-detail-button" data-competencia-source="competencia-detail-source-{{ loop.index }}" aria-haspopup="dialog">
+                                    Ver detalle
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Timeline del aprendiz -->
+        {% if timeline_aprendiz %}
+        <h3 class="juicio-sub-title">Línea de tiempo</h3>
+        <div class="timeline-grid">
+            {% set max_tl = timeline_aprendiz|map(attribute='1.total')|max %}
+            {% for mes, data in timeline_aprendiz %}
+            <div class="timeline-row">
+                <span class="timeline-label">{{ mes }}</span>
+                <div class="timeline-bars">
+                    {% if data.aprobados > 0 %}
+                    <div class="timeline-bar-approved" style="--progress-value: {{ (data.aprobados / data.total * 100)|round|int }}%;"></div>
+                    {% endif %}
+                    {% if data.total - data.aprobados > 0 %}
+                    <div class="timeline-bar-pending" style="--progress-value: {{ ((data.total - data.aprobados) / data.total * 100)|round|int }}%;"></div>
+                    {% endif %}
+                </div>
+                <div class="timeline-count">{{ data.total }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="timeline-legend">
+            <span><span class="legend-dot legend-approved"></span> Aprobados</span>
+            <span><span class="legend-dot legend-pending"></span> Pendientes</span>
+        </div>
+        {% endif %}
+
+        <!-- Instructores que evaluaron a este aprendiz -->
+        {% if instructores_aprendiz %}
+        <h3 class="juicio-sub-title instructor-distribution-title">Distribución por Instructor</h3>
+        <div class="table-container">
+            <div class="table-responsive" tabindex="0" aria-label="Distribución por instructor">
+                <table class="table table-sena">
+                    <thead>
+                        <tr>
+                            <th scope="col">Instructor</th>
+                            <th scope="col" class="text-center">Aprobados</th>
+                            <th scope="col" class="text-center">Pendientes</th>
+                            <th scope="col" class="text-center">Efectividad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for func, stats in instructores_aprendiz.items() %}
+                        <tr class="{% if stats.pct >= 80 %}row-success{% elif stats.pct >= 50 %}row-warning{% endif %}">
+                            <td data-label="Instructor"><strong>{{ func|strip_document_id }}</strong></td>
+                            <td data-label="Aprobados" class="text-center cell-success">{{ stats.aprobados }}</td>
+                            <td data-label="Pendientes" class="text-center cell-danger">{{ stats.pendientes }}</td>
+                            <td data-label="Efectividad" class="text-center">
+                                <span class="badge {% if stats.pct >= 80 %}badge-solid-success{% elif stats.pct >= 50 %}badge-solid-warning{% else %}badge-solid-danger{% endif %}">{{ stats.pct }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if competencias_aprendiz %}
+    <dialog id="competencia-detail-modal" class="app-modal-overlay" aria-modal="true" aria-labelledby="competencia-modal-title">
+        <div class="competencia-modal-shell app-modal-content app-modal-content--wide">
+            <header class="competencia-modal-header app-modal-header">
+                <div>
+                    <span class="eyebrow">Detalle para el aprendiz</span>
+                    <h2 id="competencia-modal-title">Detalle de la competencia</h2>
+                </div>
+                <button type="button" class="competencia-modal-close app-modal-close" data-close-competencia-modal aria-label="Cerrar detalle">&times;</button>
+            </header>
+
+            <div id="competencia-modal-body" class="competencia-modal-body app-modal-body"></div>
+            <footer class="competencia-modal-footer app-modal-footer">
+                <form method="dialog">
+                    <button type="submit" class="btn btn-primary">Cerrar</button>
+                </form>
+            </footer>
+        </div>
+    </dialog>
+
+    {% for comp in competencias_aprendiz %}
+    {% set tipo_label = 'Inglés' if comp.tipo == 'ingles' else ('Transversal' if comp.tipo == 'transversal' else 'Técnica') %}
+    <div id="competencia-detail-source-{{ loop.index }}" class="competencia-detail-source" hidden>
+        <div class="competencia-modal-overview">
+            <div class="competencia-modal-stat">
+                <span>Tipo de competencia</span>
+                <strong>{{ tipo_label }}</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Progreso</span>
+                <strong>{{ comp.pct }}%</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Resultados aprobados</span>
+                <strong>{{ comp.aprobados }} de {{ comp.total }}</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Resultados pendientes</span>
+                <strong>{{ comp.pendientes }}</strong>
+            </div>
+            <div class="competencia-modal-stat">
+                <span>Última evaluación</span>
+                <strong>{{ comp.fecha_ultima.strftime('%d/%m/%Y') if comp.fecha_ultima else 'Sin evaluar' }}</strong>
+            </div>
+        </div>
+
+        <section class="competencia-modal-section">
+            <div class="competencia-modal-section-heading">
+                <h3>Resultados de aprendizaje</h3>
+                <span class="badge {% if comp.pct == 100 %}badge-solid-success{% elif comp.pct > 0 %}badge-solid-warning{% else %}badge-solid-secondary{% endif %}">
+                    {% if comp.pct == 100 %}Competencia completada{% elif comp.pct > 0 %}En progreso{% else %}Pendiente{% endif %}
+                </span>
+            </div>
+            <div class="competencia-modal-rap-list">
+                {% for r in comp.raps %}
+                <article class="competencia-modal-rap {% if r.es_aprobado %}is-approved{% else %}is-pending{% endif %}">
+                    <div class="competencia-modal-rap-main">
+                        <h4>{{ r.rap }}</h4>
+                        <p>
+                            {% if r.es_aprobado %}Aprobado{% else %}Pendiente de evaluación{% endif %}
+                            {% if r.evaluador %} · Instructor: {{ r.evaluador|strip_document_id }}{% endif %}
+                            {% if r.fecha and r.fecha != 'Pendiente' %} · Fecha: {{ r.fecha }}{% endif %}
+                        </p>
+                        <p class="competencia-modal-rap-judgement"><strong>Juicio registrado:</strong> {{ r.juicio }}</p>
+                    </div>
+                    <span class="badge {% if r.es_aprobado %}badge-solid-success{% else %}badge-solid-warning{% endif %}">
+                        {% if r.es_aprobado %}APROBADO{% else %}POR EVALUAR{% endif %}
+                    </span>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+    {% endfor %}
+
+    <script>
+        (function () {
+            const modal = document.getElementById('competencia-detail-modal');
+            const modalBody = document.getElementById('competencia-modal-body');
+            const modalTitle = document.getElementById('competencia-modal-title');
+            if (!modal || !modalBody || !modalTitle) return;
+
+            const closeModal = () => {
+                window.cerrarModal(modal);
+            };
+
+            document.querySelectorAll('[data-competencia-source]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const source = document.getElementById(button.dataset.competenciaSource);
+                    if (!source) return;
+                    const row = button.closest('tr');
+                    const competenceName = row?.querySelector('[data-label="Competencia"]')?.innerText?.trim();
+                    modalTitle.textContent = competenceName || 'Detalle de la competencia';
+                    modalBody.replaceChildren(...Array.from(source.children).map((child) => child.cloneNode(true)));
+                    window.abrirModal(modal);
+                });
+            });
+
+            document.querySelectorAll('[data-close-competencia-modal]').forEach((button) => {
+                button.addEventListener('click', closeModal);
+            });
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeModal();
+            });
+        })();
+    </script>
+    {% endif %}

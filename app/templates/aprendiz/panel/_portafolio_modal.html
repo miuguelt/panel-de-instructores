@@ -1,0 +1,68 @@
+{#- Modal del portafolio digital. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <!-- ============================================================ -->
+    <!-- MODAL DE GESTIÓN DE PORTAFOLIO DIGITAL (GITHUB Y NOTION)     -->
+    <!-- ============================================================ -->
+    <dialog id="portafolio-modal" class="app-modal-overlay" aria-modal="true" aria-labelledby="portafolio-modal-title">
+        <div class="portafolio-modal-shell app-modal-content">
+            <header class="app-modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="font-size: 1.4rem;" aria-hidden="true">💼</span>
+                    <div>
+                        <h2 id="portafolio-modal-title" style="margin: 0; font-size: 1.25rem;">Mi Portafolio Digital</h2>
+                        <p class="text-muted small" style="margin: 0;">Enlaces oficiales para revisión académica de los instructores</p>
+                    </div>
+                </div>
+                <button type="button" class="app-modal-close" data-close-portafolio-modal aria-label="Cerrar ventana">&times;</button>
+            </header>
+
+            <form id="form-portafolio-aprendiz" method="POST" action="{{ url_for('aprendiz.guardar_portafolio', ficha_id=ficha.id) }}" class="app-modal-body">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div id="portafolio-feedback-msg" class="alert alert-danger" style="display: none; margin-bottom: 1rem;" role="alert"></div>
+
+                <div class="form-group mb-3">
+                    <label for="input-enlace-github" class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                        <span>🐱 Repositorio o Perfil en GitHub</span>
+                        <span class="badge badge-secondary" style="font-size: 0.72rem;">Código y Proyectos</span>
+                    </label>
+                    <div class="input-with-icon" style="position: relative;">
+                        <input type="url" id="input-enlace-github" name="enlace_github" class="form-control"
+                               placeholder="https://github.com/tu-usuario"
+                               value="{{ aprendiz.enlace_github or '' }}" maxlength="500">
+                    </div>
+                    <small class="text-muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">
+                        Ingresa el enlace público de tu perfil de GitHub o del repositorio de tu proyecto formativo.
+                    </small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="input-enlace-notion" class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                        <span>📓 Bitácora o Portafolio en Notion</span>
+                        <span class="badge badge-secondary" style="font-size: 0.72rem;">Bitácora de Evidencias</span>
+                    </label>
+                    <div class="input-with-icon" style="position: relative;">
+                        <input type="url" id="input-enlace-notion" name="enlace_notion" class="form-control"
+                               placeholder="https://tu-bitacora.notion.site/..."
+                               value="{{ aprendiz.enlace_notion or '' }}" maxlength="500">
+                    </div>
+                    <small class="text-muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">
+                        Verifica que en Notion tu página tenga activada la opción <em>«Compartir en la web»</em> para que tus instructores puedan visualizarla sin requerir inicio de sesión.
+                    </small>
+                </div>
+
+                <div class="portafolio-modal-notice" style="background: var(--surface-2); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-top: 1rem; border-left: 3px solid var(--accent-primary);">
+                    <strong style="font-size: 0.82rem; display: block; margin-bottom: 2px;">📌 Importante para tu evaluación:</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-muted);">
+                        Los instructores revisan estos enlaces al verificar juicios evaluativos y avances de etapa práctica. Mantén tus repositorios y notas organizados.
+                    </span>
+                </div>
+
+                <footer class="app-modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-data);">
+                    <button type="button" class="btn btn-ghost" data-close-portafolio-modal>Cancelar</button>
+                    <button type="submit" id="btn-save-portafolio" class="btn btn-primary">
+                        <span id="btn-save-portafolio-text">Guardar enlaces</span>
+                    </button>
+                </footer>
+            </form>
+        </div>
+    </dialog>

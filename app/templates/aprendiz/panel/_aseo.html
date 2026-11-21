@@ -1,0 +1,181 @@
+{#- Pestaña «Aseo y convivencia»: turnos de aseo. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+    <section class="learner-cleaning-card {% if aseo.aviso_visible %}is-upcoming{% endif %}" id="seccion-aseo" data-learner-tab="convivencia">
+        <div class="learner-cleaning-heading">
+            <div>
+                <span class="eyebrow">Responsabilidad compartida</span>
+                <h2>Turno de aseo</h2>
+            </div>
+            <span class="cleaning-balance-pill">{{ aseo.contador.veces_aseo }} turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }} cumplido{{ '' if aseo.contador.veces_aseo == 1 else 's' }}</span>
+        </div>
+        <p class="text-muted cleaning-card-link" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <a href="{{ url_for('aseo_aprendiz.transparencia', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver calendario completo y tabla de equidad</a>
+            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-primary">{% if aprendiz.rol_administrativo %}🧹 Programar aseo: Gestionar y asignar turnos de aseo{% else %}Ver turnos de aseo{% endif %}</a>
+        </p>
+
+        {% if aseo.turno_propio and aseo.aviso_visible %}
+        <div class="own-cleaning-alert" role="status">
+            <span>Tu próximo turno</span>
+            <strong>{% if aseo.turno_propio.fecha == aseo.hoy %}¡Te toca hoy!{% else %}¡Te toca el {{ aseo.turno_propio.fecha.strftime('%d/%m/%Y') }}!{% endif %}</strong>
+            <p>Con {{ aseo.turno_propio.aprendiz_2.nombre_completo if aseo.turno_propio.aprendiz_1_id == aprendiz.id else aseo.turno_propio.aprendiz_1.nombre_completo }}</p>
+        </div>
+        {% endif %}
+
+        <div class="cleaning-card-block">
+            <h3>Hoy / próximo turno</h3>
+            {% if aseo.siguientes %}
+            {% set proximo = aseo.siguientes[0] %}
+            <div class="next-cleaning-feature" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <time datetime="{{ proximo.fecha.isoformat() }}">{{ proximo.fecha.strftime('%d/%m') }}</time>
+                    <div>
+                        <strong>{{ proximo.aprendiz_1.nombre_completo }}</strong>
+                        <span>y {{ proximo.aprendiz_2.nombre_completo }}</span>
+                    </div>
+                </div>
+                {% if aprendiz.rol_administrativo and proximo.estado != 'cumplido' and proximo.fecha <= aseo.hoy %}
+                <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=proximo.id) }}" style="margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="origen" value="panel">
+                    <button type="submit" class="btn btn-sm btn-primary" title="Marcar este turno como cumplido">✓ Marcar como cumplido</button>
+                </form>
+                {% elif proximo.estado == 'cumplido' %}
+                <span class="badge badge-success">✓ Cumplido</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-muted">No hay turnos de aseo asignados para las próximas fechas.{% if aprendiz.rol_administrativo %} Puedes generar nuevos turnos para tu grupo.{% else %} Consulta más adelante cuando se programe el calendario.{% endif %}</p>
+            <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm {% if aprendiz.rol_administrativo %}btn-primary{% else %}btn-outline{% endif %}">{% if aprendiz.rol_administrativo %}Generar nuevos turnos{% else %}Ver calendario de aseo{% endif %}</a>
+            {% endif %}
+        </div>
+
+        <div class="cleaning-card-block">
+            <h3>Últimos en hacerlo</h3>
+            {% if aseo.ultimos %}
+            <div class="cleaning-timeline">
+                {% for turno in aseo.ultimos|reverse %}
+                <div class="cleaning-timeline-item">
+                    <span class="timeline-check">✓</span>
+                    <strong>{{ turno.aprendiz_1.nombre }} + {{ turno.aprendiz_2.nombre }}</strong>
+                    <small>{{ turno.fecha.strftime('%d/%m') }}</small>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted">El grupo todavía no ha marcado turnos cumplidos.</p>
+            {% endif %}
+        </div>
+
+        <div class="cleaning-card-block">
+            <h3>Siguientes en la fila</h3>
+            <div class="upcoming-cleaning-list">
+                {% for turno in aseo.siguientes %}
+                <div class="upcoming-cleaning-row {% if turno.incluye(aprendiz.id) %}is-me{% endif %}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <time datetime="{{ turno.fecha.isoformat() }}">{{ turno.fecha.strftime('%d/%m') }}</time>
+                        <span>{{ turno.aprendiz_1.nombre }} y {{ turno.aprendiz_2.nombre }}</span>
+                        {% if turno.incluye(aprendiz.id) %}<strong>(Tú)</strong>{% endif %}
+                    </div>
+                    {% if aprendiz.rol_administrativo and turno.estado != 'cumplido' and turno.fecha <= aseo.hoy %}
+                    <form method="POST" action="{{ url_for('aseo_aprendiz.cumplir_como_aprendiz', ficha_id=ficha.id, turno_id=turno.id) }}" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="origen" value="panel">
+                        <button type="submit" class="btn btn-xs btn-outline-success" style="font-size: 0.75rem; padding: 2px 8px;" title="Marcar turno del {{ turno.fecha.strftime('%d/%m/%Y') }} como cumplido">✓ Cumplido</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p class="text-muted">Sin fechas próximas.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="cleaning-balance">
+            <strong>Has cumplido {{ aseo.contador.veces_aseo }} turno{{ '' if aseo.contador.veces_aseo == 1 else 's' }} de aseo</strong>
+            <span>El promedio del grupo es {{ '%.1f'|format(aseo.promedio) }}.</span>
+        </div>
+
+        {% if aprendiz.rol_administrativo %}
+        <details class="learner-generate-inline" style="margin-top: 1rem; padding: 0.85rem 1rem; background: var(--surface-secondary); border: 1px solid var(--border-data); border-radius: 8px;">
+            <summary style="font-weight: 600; cursor: pointer; color: var(--accent);">✨ Generar nuevos turnos por periodo</summary>
+            <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}" style="margin-top: 0.75rem;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="origen" value="panel">
+                <p class="text-muted small">El sistema reparte los turnos empezando por quien menos suma en total (cumplidos + programados), sin repetir en días consecutivos y evitando los festivos de Colombia.</p>
+                <div class="form-row" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="panel-gen-inicio" class="small text-muted">Fecha inicial</label>
+                        <input id="panel-gen-inicio" name="fecha_inicio" type="date" value="{{ fecha_inicio_default.isoformat() if fecha_inicio_default else aseo.hoy.isoformat() }}" required style="font-size: 0.88rem; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="panel-gen-fin" class="small text-muted">Fecha final</label>
+                        <input id="panel-gen-fin" name="fecha_fin" type="date" value="{{ fecha_fin_default.isoformat() if fecha_fin_default else aseo.hoy.isoformat() }}" required style="font-size: 0.88rem; padding: 4px 8px;">
+                    </div>
+                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
+                        <input type="checkbox" name="recalcular" checked>
+                        Recalcular pendientes
+                    </label>
+                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
+                        <input type="checkbox" name="respetar_manuales" checked>
+                        Conservar manuales
+                    </label>
+                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
+                        <input type="checkbox" name="equilibrar_calendario" checked>
+                        Equilibrar todo el calendario
+                    </label>
+                    <button type="submit" class="btn btn-sm btn-primary">Generar turnos</button>
+                </div>
+            </form>
+        </details>
+        {% endif %}
+
+        {% if aseo.turno_propio %}
+        <details class="learner-audit">
+            <summary>¿Por qué me eligió el sistema?</summary>
+            <p>{{ aseo.auditoria or 'Este turno fue ajustado manualmente o mediante un intercambio confirmado.' }}</p>
+        </details>
+        {% if aseo.candidatos_intercambio %}
+        <details class="learner-swap">
+            <summary>Proponer un intercambio</summary>
+            <form method="POST" action="{{ url_for('aseo_aprendiz.proponer_intercambio', ficha_id=ficha.id, turno_id=aseo.turno_propio.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label for="aprendiz_recibe_id">¿Con quién quieres cambiar?</label>
+                <select id="aprendiz_recibe_id" name="aprendiz_recibe_id" required>
+                    <option value="">Selecciona un aprendiz</option>
+                    {% for candidato in aseo.candidatos_intercambio %}
+                    <option value="{{ candidato.id }}">{{ candidato.nombre_completo }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline">Enviar solicitud</button>
+            </form>
+            <small>El cambio solo se aplica cuando la otra persona lo confirma.</small>
+        </details>
+        {% endif %}
+        {% endif %}
+
+        {% for intercambio in aseo.intercambios_salientes %}
+        <div class="swap-request outgoing-swap-request" style="border-left: 3px solid var(--accent); background: var(--surface-secondary); padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 0.75rem;">
+            <p style="margin: 0;">
+                📤 <strong>Solicitud de intercambio enviada:</strong> Le propusiste a <strong>{{ intercambio.aprendiz_recibe.nombre_completo }}</strong> cambiar tu turno del {{ intercambio.turno.fecha.strftime('%d/%m/%Y') }}.
+                <span class="badge badge-warning" style="margin-left: 0.5rem;">Pendiente de su respuesta</span>
+            </p>
+        </div>
+        {% endfor %}
+
+        {% for intercambio in aseo.intercambios_entrantes %}
+        <div class="swap-request">
+            <p><strong>{{ intercambio.aprendiz_solicita.nombre_completo }}</strong> te propone cambiar su turno del {{ intercambio.turno.fecha.strftime('%d/%m/%Y') }}.</p>
+            <div class="swap-actions">
+                <form method="POST" action="{{ url_for('aseo_aprendiz.responder_intercambio', ficha_id=ficha.id, intercambio_id=intercambio.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="accion" value="aceptar">
+                    <button class="btn btn-sm btn-primary" type="submit">Aceptar</button>
+                </form>
+                <form method="POST" action="{{ url_for('aseo_aprendiz.responder_intercambio', ficha_id=ficha.id, intercambio_id=intercambio.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="accion" value="rechazar">
+                    <button class="btn btn-sm btn-outline" type="submit">Rechazar</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </section>
