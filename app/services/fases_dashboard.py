@@ -32,6 +32,7 @@ from app.services.resultados_persistidos import (
 )
 from app.services.seguimiento_fases import FASES_PROYECTO, construir_seguimiento_fases
 from app.services.versiones_archivos import ultima_version
+from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado, es_evaluado as juicio_evaluado
 
 _VERSION_NO_PROVISTA = object()
 
@@ -353,9 +354,8 @@ def _calcular_estimado_por_juicios(
         rap_limpio = (rap_val or '').strip()
         if rap_limpio:
             raps_unicos.add(rap_limpio)
-        j_upper = (juicio_val or '').upper()
-        es_aprobado = bool(juicio_val and 'APROBADO' in j_upper and 'AUN NO' not in j_upper)
-        es_evaluado = bool(juicio_val and ('APROBADO' in j_upper or 'NO APROBADO' in j_upper or j_upper in ('A', 'NA')))
+        es_aprobado = juicio_aprobado(juicio_val)
+        es_evaluado = juicio_evaluado(juicio_val)
         if es_aprobado:
             total_aprobados += 1
             if rap_limpio:

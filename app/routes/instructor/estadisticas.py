@@ -6,6 +6,7 @@ from app.models.ficha import Ficha
 from app.models.juicio import JuicioEvaluativo
 from app.services.cronograma import obtener_cronograma
 from app.services.permisos import puede_gestionar_ficha
+from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado
 from flask import (
     flash,
     redirect,
@@ -68,7 +69,7 @@ def estadisticas(ficha_id):
         
         instructores_stats[func]['total'] += 1
         instructores_stats[func]['aprendices_evaluados'].add(j.aprendiz_id)
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             instructores_stats[func]['aprobados'] += 1
             instructores_stats[func]['aprendices_aprobados'].add(j.aprendiz_id)
@@ -133,7 +134,7 @@ def estadisticas(ficha_id):
         if j.resultado_aprendizaje:
             competencias_stats[comp]['resultados'].add(j.resultado_aprendizaje)
             
-        if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper():
+        if juicio_aprobado(j.juicio):
             competencias_stats[comp]['aprobados'] += 1
             competencias_stats[comp]['aprendices_aprobados_ids'].add(j.aprendiz_id)
 
@@ -169,7 +170,7 @@ def estadisticas(ficha_id):
             if mes not in timeline:
                 timeline[mes] = {'total': 0, 'aprobados': 0}
             timeline[mes]['total'] += 1
-            if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper():
+            if juicio_aprobado(j.juicio):
                 timeline[mes]['aprobados'] += 1
     timeline_ordenado = sorted(timeline.items())
 
@@ -180,18 +181,18 @@ def estadisticas(ficha_id):
     for a_id in aprendices_ids:
         juicios_ap = [j for j in juicios if j.aprendiz_id == a_id]
         total_ap = len(juicios_ap)
-        aprobados_ap = sum(1 for j in juicios_ap if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+        aprobados_ap = sum(1 for j in juicios_ap if juicio_aprobado(j.juicio))
         if aprobados_ap == total_ap:
             aprendices_con_todos += 1
         elif aprobados_ap == 0:
             aprendices_sin_ninguno += 1
 
     juicios_transversales = [j for j in juicios if j.tipo_competencia == 'transversal']
-    transversales_aprobados = sum(1 for j in juicios_transversales if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+    transversales_aprobados = sum(1 for j in juicios_transversales if juicio_aprobado(j.juicio))
     transversales_faltantes = len(juicios_transversales) - transversales_aprobados
 
     juicios_ingles = [j for j in juicios if j.tipo_competencia == 'ingles']
-    ingles_aprobados = sum(1 for j in juicios_ingles if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+    ingles_aprobados = sum(1 for j in juicios_ingles if juicio_aprobado(j.juicio))
     ingles_faltantes = len(juicios_ingles) - ingles_aprobados
 
     resumen = {
@@ -214,7 +215,7 @@ def estadisticas(ficha_id):
         total_ap = len(juicios_ap)
         if total_ap == 0:
             continue
-        aprobados_ap = sum(1 for j in juicios_ap if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+        aprobados_ap = sum(1 for j in juicios_ap if juicio_aprobado(j.juicio))
         pct_ap = round(aprobados_ap / total_ap * 100)
         if pct_ap == 100:
             distribucion_aprobacion['100'] += 1

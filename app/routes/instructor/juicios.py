@@ -6,6 +6,7 @@ from app.models.ficha import Ficha
 from app.models.juicio import FichaCompetenciaSeleccionada, JuicioEvaluativo
 from app.services.cronograma import obtener_cronograma
 from app.services.permisos import puede_gestionar_ficha
+from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado
 from flask import (
     flash,
     redirect,
@@ -55,9 +56,9 @@ def juicios(ficha_id):
     ultima_evaluacion = None
 
     for j in todos:
+        # Una sola regla para el conteo global y el de cada competencia.
+        es_aprobado_global = es_aprobado_comp = juicio_aprobado(j.juicio)
         juicio_upper = j.juicio.upper() if j.juicio else ''
-        es_aprobado_global = bool(j.juicio and 'APROBADO' in juicio_upper)
-        es_aprobado_comp = es_aprobado_global and 'AUN NO' not in juicio_upper
         tipo = j.tipo_competencia or 'tecnica'
         func = j.funcionario_registro or 'Sin registro'
 

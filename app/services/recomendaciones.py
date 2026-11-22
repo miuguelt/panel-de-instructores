@@ -31,6 +31,7 @@ from app.models.juicio import JuicioEvaluativo
 from app.models.tarea import Entrega, MODALIDAD_EVIDENCIA, Tarea
 from app.services.cronograma import obtener_cronograma
 from app.services.fases_dashboard import obtener_seguimiento_fases_dashboard
+from app.services.emparejamiento_juicios import condicion_aprobado_sql, es_aprobado as juicio_aprobado
 
 
 # Categorías de recomendaciones
@@ -254,10 +255,10 @@ def _evaluar_juicios_instructor(
         .filter(
             JuicioEvaluativo.ficha_id == ficha.id,
             JuicioEvaluativo.aprendiz_id.in_([a.id for a in aprendices_activos]),
+            # Pendiente es todo juicio que no sea una aprobación explícita.
             or_(
                 JuicioEvaluativo.juicio.is_(None),
-                JuicioEvaluativo.juicio.ilike('%POR EVALUAR%'),
-                JuicioEvaluativo.juicio.ilike('%AUN NO%'),
+                ~condicion_aprobado_sql(JuicioEvaluativo.juicio),
             ),
         )
         .group_by(JuicioEvaluativo.aprendiz_id)
@@ -694,7 +695,7 @@ def obtener_recomendaciones_aprendiz(
         total_j = len(juicios)
         aprobados_j = sum(
             1 for j in juicios
-            if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper()
+            if juicio_aprobado(j.juicio)
         )
         pendientes_j = total_j - aprobados_j
         if 0 < pendientes_j <= 3:
@@ -930,7 +931,7 @@ def obtener_logros_aprendiz(
     total_juicios = len(juicios)
     aprobados_juicios = sum(
         1 for j in juicios
-        if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper()
+        if juicio_aprobado(j.juicio)
     )
     meta_juicios = max(total_juicios, 1)
     desbloqueado_fase = (total_juicios > 0) and (aprobados_juicios == total_juicios)

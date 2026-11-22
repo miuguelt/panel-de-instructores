@@ -54,6 +54,21 @@ def es_aprobado(juicio):
     return clave_resultado(juicio) in {'aprobado', 'aprobada'}
 
 
+def es_evaluado(juicio):
+    """Hay decisión del instructor: aprobado o no aprobado (también sus códigos A y NA)."""
+    clave = clave_resultado(juicio)
+    return 'aprobad' in clave or clave in {'a', 'na'}
+
+
+JUICIOS_APROBADOS_SQL = ('APROBADO', 'APROBADA')
+
+
+def condicion_aprobado_sql(columna):
+    """Misma regla que :func:`es_aprobado` para filtrar en la base de datos."""
+    from sqlalchemy import func
+    return func.upper(func.trim(columna)).in_(JUICIOS_APROBADOS_SQL)
+
+
 def indexar_juicios(juicios):
     """Arma los índices por texto normalizado y por código de resultado."""
     por_clave = defaultdict(list)

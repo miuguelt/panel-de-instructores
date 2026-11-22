@@ -52,6 +52,7 @@ from app.services.permisos import (
     puede_gestionar_ficha,
     puede_gestionar_tarea,
 )
+from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado
 from datetime import date, datetime, timedelta
 
 aprendiz_bp = Blueprint('aprendiz', __name__, template_folder='../templates/aprendiz')
@@ -425,8 +426,8 @@ def panel(ficha_id):
             juicios_dedup[key] = j
         else:
             existing = juicios_dedup[key]
-            es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
-            existing_aprobado = bool(existing.juicio and 'APROBADO' in existing.juicio.upper() and 'AUN NO' not in existing.juicio.upper())
+            es_aprobado = juicio_aprobado(j.juicio)
+            existing_aprobado = juicio_aprobado(existing.juicio)
             if es_aprobado and not existing_aprobado:
                 juicios_dedup[key] = j
             elif es_aprobado == existing_aprobado and j.funcionario_registro and not existing.funcionario_registro:
@@ -445,7 +446,7 @@ def panel(ficha_id):
 
     for j in juicios:
         stats_juicios['total'] += 1
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             stats_juicios['aprobados'] += 1
             juicios_aprobados.append(j)
@@ -486,7 +487,7 @@ def panel(ficha_id):
 
         datos_comp = competencias_aprendiz[comp]
         datos_comp['total'] += 1
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             datos_comp['aprobados'] += 1
         else:
@@ -522,7 +523,7 @@ def panel(ficha_id):
             if mes not in timeline_aprendiz:
                 timeline_aprendiz[mes] = {'total': 0, 'aprobados': 0}
             timeline_aprendiz[mes]['total'] += 1
-            es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+            es_aprobado = juicio_aprobado(j.juicio)
             if es_aprobado:
                 timeline_aprendiz[mes]['aprobados'] += 1
     timeline_aprendiz_orden = sorted(timeline_aprendiz.items())
@@ -534,7 +535,7 @@ def panel(ficha_id):
         if func not in instructores_aprendiz:
             instructores_aprendiz[func] = {'total': 0, 'aprobados': 0, 'pendientes': 0}
         instructores_aprendiz[func]['total'] += 1
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             instructores_aprendiz[func]['aprobados'] += 1
         else:
@@ -880,7 +881,7 @@ def descargar_reporte(ficha_id):
     competencias_agrupadas = {}
     for j in juicios:
         stats_juicios['total'] += 1
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             stats_juicios['aprobados'] += 1
         tipo = j.tipo_competencia or 'tecnica'

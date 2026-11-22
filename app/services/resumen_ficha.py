@@ -25,6 +25,7 @@ from app.services.fases_dashboard import obtener_seguimiento_fases_dashboard
 from app.services.permisos import tareas_visibles
 from app.services.asistencia import contar_sesiones_registradas
 from app.services.trabajos_grupales import obtener_destinatarios_y_entregas_grupales
+from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado
 
 
 ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
@@ -277,7 +278,7 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
     juicios_totales = len(juicios)
     juicios_aprobados = sum(
         1 for j in juicios
-        if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper()
+        if juicio_aprobado(j.juicio)
     )
     pct_juicios = round(juicios_aprobados / juicios_totales * 100) if juicios_totales > 0 else 0
 
@@ -288,7 +289,7 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
         if aid not in juicios_por_aprendiz:
             juicios_por_aprendiz[aid] = {'total': 0, 'aprobados': 0}
         juicios_por_aprendiz[aid]['total'] += 1
-        if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper():
+        if juicio_aprobado(j.juicio):
             juicios_por_aprendiz[aid]['aprobados'] += 1
 
     aprendices_certificados = 0
@@ -315,7 +316,7 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
                 'aprobados': 0,
             }
         comps_map[nombre_c]['total'] += 1
-        if j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper():
+        if juicio_aprobado(j.juicio):
             comps_map[nombre_c]['aprobados'] += 1
 
     for cdata in comps_map.values():

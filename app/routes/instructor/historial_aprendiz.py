@@ -31,6 +31,7 @@ from app.services.permisos import (
     tareas_visibles,
 )
 from app.services.ranking import calcular_ranking
+from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado
 
 from . import instructor_bp
 
@@ -58,7 +59,7 @@ def historial_aprendiz(ficha_id, aprendiz_id):
     }
     for j in juicios:
         stats_juicios['total'] += 1
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper() and 'POR EVALUAR' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             stats_juicios['aprobados'] += 1
         tipo = j.tipo_competencia or clasificar_competencia(j.competencia)
@@ -148,7 +149,7 @@ def historial_aprendiz(ficha_id, aprendiz_id):
         c_data = competencias_map[comp_nombre]
         c_data['total_raps'] += 1
 
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper() and 'POR EVALUAR' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             c_data['aprobados_raps'] += 1
 
@@ -210,7 +211,7 @@ def historial_aprendiz(ficha_id, aprendiz_id):
             if mes not in timeline_aprendiz_hist:
                 timeline_aprendiz_hist[mes] = {'total': 0, 'aprobados': 0}
             timeline_aprendiz_hist[mes]['total'] += 1
-            es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper() and 'POR EVALUAR' not in j.juicio.upper())
+            es_aprobado = juicio_aprobado(j.juicio)
             if es_aprobado:
                 timeline_aprendiz_hist[mes]['aprobados'] += 1
     timeline_aprendiz_hist_ord = sorted(timeline_aprendiz_hist.items())
@@ -222,7 +223,7 @@ def historial_aprendiz(ficha_id, aprendiz_id):
         if func_reg not in instructores_aprendiz_hist:
             instructores_aprendiz_hist[func_reg] = {'total': 0, 'aprobados': 0, 'pendientes': 0}
         instructores_aprendiz_hist[func_reg]['total'] += 1
-        es_aprobado = bool(j.juicio and 'APROBADO' in j.juicio.upper() and 'AUN NO' not in j.juicio.upper() and 'POR EVALUAR' not in j.juicio.upper())
+        es_aprobado = juicio_aprobado(j.juicio)
         if es_aprobado:
             instructores_aprendiz_hist[func_reg]['aprobados'] += 1
         else:

@@ -26,6 +26,7 @@ from app.models.tarea import MODALIDAD_EVIDENCIA, Entrega, Tarea
 from app.services.cronograma import obtener_cronograma
 from app.services.fases_dashboard import obtener_seguimiento_fases_dashboard
 from app.services.prioridad_fichas import ordenar_por_urgencia, resumen_global
+from app.services.emparejamiento_juicios import condicion_aprobado_sql
 from app.services.versiones_archivos import (
     ultimas_versiones_por_fichas,
 )
@@ -154,10 +155,7 @@ def _dashboard_inner():
         # Un solo agregado por aprendiz alimenta el resumen global y el conteo
         # de certificados, evitando recorrer de nuevo toda la tabla de juicios.
         juicios_por_ficha = {}
-        es_aprobado_sql = (
-            func.upper(JuicioEvaluativo.juicio).like('%APROBADO%') &
-            ~func.upper(JuicioEvaluativo.juicio).like('%AUN NO%')
-        )
+        es_aprobado_sql = condicion_aprobado_sql(JuicioEvaluativo.juicio)
         juicios_aprendices_data = db.session.query(
             JuicioEvaluativo.ficha_id,
             JuicioEvaluativo.aprendiz_id,
