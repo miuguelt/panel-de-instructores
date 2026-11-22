@@ -371,15 +371,6 @@
         line-height: 1.1;
     }
 
-    .ribbon-label {
-        display: block;
-        font-size: 0.72rem;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        margin-top: 2px;
-    }
-
     /* Centro de Acción: Mi Día */
     .learner-action-center {
         display: flex;
@@ -798,7 +789,7 @@
     }
 
     .priority-status-success { color: var(--success, #15803d); background: var(--sena-green-light, #eaf7e5); }
-    .priority-status-info { color: var(--info, #1d4ed8); background: var(--status-info-bg); }
+
     .priority-status-warning { color: var(--warning-text, #92400e); background: var(--sena-yellow-light, #fff4d6); }
 
     .priority-card h3 {
@@ -852,35 +843,6 @@
 
     .priority-mini-list time { color: var(--text-strong, #172033); font-weight: 800; }
     .priority-mini-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-    .priority-metric-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.45rem;
-        margin-bottom: 0.9rem;
-    }
-
-    .priority-metric-grid > div {
-        padding: 0.55rem 0.45rem;
-        border: 1px solid var(--border-color, #e2e8f0);
-        border-radius: var(--radius-sm);
-        text-align: center;
-    }
-
-    .priority-metric-grid strong,
-    .priority-metric-grid span { display: block; }
-    .priority-metric-grid strong { color: var(--text-strong, #172033); font-size: 1.2rem; line-height: 1.1; }
-    .priority-metric-grid span { margin-top: 0.25rem; color: var(--text-muted, #64748b); font-size: 0.67rem; line-height: 1.15; }
-
-    .priority-progress {
-        height: 0.5rem;
-        margin-bottom: 0.65rem;
-        overflow: hidden;
-        border-radius: var(--radius-pill);
-        background: var(--bg-surface-secondary, #e2e8f0);
-    }
-
-    .priority-progress span { display: block; height: 100%; border-radius: inherit; background: var(--info, #2563eb); }
 
     .priority-alert-detail {
         padding: 0.75rem;
@@ -1493,5 +1455,19 @@
 @media (max-width: 36rem) {
     .learner-indicadores-acciones {
         grid-column: 1 / -1;
+    }
+}
+
+/* Barra inferior móvil: seis destinos caben desde 320 px sin ampliar la página. */
+@media (max-width: 640px) {
+    .learner-bottom-link {
+        min-inline-size: 0;
+        padding-inline: 2px;
+    }
+}
+
+@media (max-width: 22rem) {
+    .learner-bottom-link {
+        font-size: 9.5px;
     }
 }

@@ -82,10 +82,12 @@ test('el detalle RAP muestra contenido importado como texto y conserva apertura 
 
 test('el calendario conserva etiquetas y causales como texto sin ejecutar HTML', async () => {
     const hoy = new Date(); const iso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`;
-    const payload = '<img src=x onerror=window.inyeccion=true>';
+    const payload = '</script><img src=x onerror=window.inyeccion=true>';
     const records = { [iso]: { etiqueta: payload, estado: 'ASISTE', causal: payload, clase: 'asiste' } };
-    const controlador = bloque('app/templates/aprendiz/panel.html', "querySelector('.learner-attendance-calendar')").replace('{{ asistencia_calendario|tojson|safe }}', JSON.stringify(records));
-    paginas.set('/calendario', pagina('<section class="learner-attendance-calendar"><button data-learner-calendar-prev>Anterior</button><button data-learner-calendar-next>Siguiente</button><h2 data-learner-calendar-month></h2><div data-learner-calendar-grid></div><p data-learner-calendar-detail></p></section>', controlador));
+    // Igual que el filtro tojson de Jinja: los datos viajan como JSON escapado y el script es el archivo real.
+    const json = JSON.stringify(records).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+    const controlador = leer('app/static/js/aprendiz_panel.js');
+    paginas.set('/calendario', pagina(`<section class="learner-attendance-calendar"><button data-learner-calendar-prev>Anterior</button><button data-learner-calendar-next>Siguiente</button><h2 data-learner-calendar-month></h2><div data-learner-calendar-grid></div><p data-learner-calendar-detail></p></section><script type="application/json" id="asistencia-calendario-data">${json}</script>`, controlador));
     const page = await browser.newPage(); await page.goto(`${url}/calendario`);
     assert.equal(await page.locator('[data-learner-calendar-grid] img').count(), 0);
     await page.locator('.learner-calendar-day.is-asiste').click();

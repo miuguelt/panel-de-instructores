@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/aprendiz_personalizacion.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/aprendiz_experiencia.css') }}">
 <script src="{{ url_for('static', filename='js/aprendiz_personalizacion.js') }}" defer></script>
+{# Va antes de la experiencia: sus oyentes deben existir cuando la experiencia emite eventos. #}
+<script src="{{ url_for('static', filename='js/aprendiz_panel.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/aprendiz_experiencia.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/notificaciones_aprendiz.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/grupo_chat.js') }}" defer></script>
@@ -59,7 +61,7 @@
 
     {% include 'aprendiz/panel/_evidencias.html' %}
 
-    {% include 'aprendiz/panel/_script_calendario.html' %}
+    <script type="application/json" id="asistencia-calendario-data">{{ asistencia_calendario|tojson }}</script>
 
     <!-- ============================================================ -->
     <!-- MODAL DE PERSONALIZACIÓN DEL APRENDIZ                         -->
@@ -70,7 +72,6 @@
     <!-- ============================================================ -->
     <!-- JAVASCRIPT DE NAVEGACIÓN, PORTAFOLIO Y FILTROS                       -->
     <!-- ============================================================ -->
-    {% include 'aprendiz/panel/_script_panel.html' %}
 
     <!-- Barra de Navegación Inferior Móvil para Aprendices -->
     <nav class="learner-bottom-nav" aria-label="Navegación rápida móvil">
@@ -90,9 +91,9 @@
             <i data-lucide="graduation-cap" class="bottom-nav-icon" aria-hidden="true"></i>
             <span>Juicios</span>
         </a>
-        <a href="#seccion-ranking" class="learner-bottom-link">
+        <a href="#seccion-ranking" class="learner-bottom-link" aria-label="Rendimiento y logros">
             <i data-lucide="trophy" class="bottom-nav-icon" aria-hidden="true"></i>
-            <span>Rendimiento</span>
+            <span>Logros</span>
         </a>
         <a href="#seccion-aseo" class="learner-bottom-link">
             <i data-lucide="sparkles" class="bottom-nav-icon" aria-hidden="true"></i>

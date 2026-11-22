@@ -25,10 +25,17 @@
   - Capturas a 390 y 1440 px de «Mis fichas», Visión general, Juicios, Tareas, Alertas, Estadísticas, Asistencia, Aprendices y el panel del aprendiz.
   - `npm test`: 189/189.
   - `tests_browser/auditoria_funciones.test.cjs`: 11/11.
+- Limpieza posterior (21 de noviembre de 2026):
+  - Se retiraron 426 reglas CSS huérfanas (unas 2 900 líneas; `styles.css` pasó de 14 503 a 12 403).
+  - Criterio conservador: solo clases que estaban en las plantillas antes del rediseño y que hoy no aparecen como texto en ningún archivo de la app ni de las pruebas.
+  - Se excluyeron los modificadores genéricos (`is-*`, `text-*`, `tag-*`) porque pueden armarse dinámicamente.
+  - El JS del panel del aprendiz pasó a `app/static/js/aprendiz_panel.js`, sin dependencia de Jinja: el calendario lee sus datos de un `<script type="application/json">`.
+  - La prueba nueva `tests_js/aprendiz_panel.test.cjs` cubre el 100 % de las funciones y se ejecuta en CI.
+  - La auditoría de inyección ahora carga el archivo real con datos escapados como lo hace `tojson`, incluido un intento de cerrar la etiqueta `</script>`.
+  - Hallazgo: con los nombres nuevos, la barra inferior del aprendiz desbordaba 25 px a 320 px. Se corrigió con el rótulo corto «Logros» (que conserva «Rendimiento y logros» como nombre accesible) y celdas que pueden encogerse.
+  - Verificación: sin desbordamiento horizontal en 10 páginas del instructor y en el panel del aprendiz, a 320, 390, 768, 1440 y 2560 px.
 - Evidencia pendiente:
-  - `tests_browser/diseno_visual.test.cjs` ya se puede ejecutar en este equipo, pero falla en 3 de sus aserciones sobre `backdrop-filter` y fondos de botón. Esa prueba solo lee `styles.css` y `modal-system.css`, que este cambio no modificó; queda como deuda previa.
-  - El JS en línea del panel del aprendiz sigue dentro de sus parciales (`_script_panel.html`, `_script_calendario.html`). Extraerlo a un archivo exige reescribir la auditoría que lo prueba por inyección.
-  - En `styles.css` quedan reglas huérfanas de los bloques retirados (cuenta regresiva doble, hitos y tarjetas de detalle del dashboard anterior).
+  - `tests_browser/diseno_visual.test.cjs` ya se puede ejecutar en este equipo, pero falla en 3 de sus aserciones sobre `backdrop-filter` y fondos de botón. Esa prueba solo lee `styles.css` y `modal-system.css`. Fallaban las mismas 3 antes de retirar las reglas huérfanas y siguen igual después, así que es una deuda previa y no una consecuencia de la poda.
 
 ## 23 de octubre de 2026 — sistema visual de superficies translúcidas, botones y bordes
 
