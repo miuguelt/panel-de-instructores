@@ -5,7 +5,7 @@
 <div class="page-header cleaning-page-header">
     <div class="page-title-cluster">
         <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) if documento else url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn-back" title="Volver">&larr; Volver</a>
-        <h1>🧹 Turnos de aseo</h1>
+        <h1><i data-lucide="sparkles" class="icon-lg" aria-hidden="true"></i> Turnos de aseo</h1>
     </div>
     <div class="header-actions">
         <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-sm btn-primary">🧹 Programar y gestionar turnos</a>

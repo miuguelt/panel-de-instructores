@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Gestión de Grupos - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Gestión de grupos - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block head %}
 <script src="{{ url_for('static', filename='vendor/lucide/lucide.min.js') }}" defer></script>
@@ -20,8 +20,8 @@
                <i data-lucide="users" class="icon-lg"></i>
             </div>
             <div>
-                <h1 style="font-size:1.4rem;font-weight:800;margin:0;color:var(--text-strong,inherit);">
-                    Gestión de Grupos
+                <h1 class="grupos-titulo">
+                    Gestión de grupos
                 </h1>
                 <p style="font-size:0.86rem;color:var(--text-muted);margin:0.2rem 0 0 0;">
                     Ficha <strong style="color:var(--accent-primary);">{{ ficha.codigo }}</strong>

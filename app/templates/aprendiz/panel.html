@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_card_recomendacion %}
 {% from 'components/_viz.html' import dona, kpi, apilada %}
-{% block title %}Mi Panel - {{ aprendiz.nombre }} - SENA Control{% endblock %}
+{% block title %}Mi panel - {{ aprendiz.nombre }} - SENA Control{% endblock %}
 {% block body_class %}has-learner-bottom-nav{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">

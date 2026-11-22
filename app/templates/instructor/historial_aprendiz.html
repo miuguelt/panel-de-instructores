@@ -6,7 +6,8 @@
 {% endblock %}
 
 {% macro tone_for_pct(value) -%}
-    {%- if value >= 80 -%}success{%- elif value >= 60 -%}warning{%- else -%}danger{%- endif -%}
+    {#- Mismos umbrales de toda la app; sin dato el tono es neutral. -#}
+    {{- viz_estado(value) -}}
 {%- endmacro %}
 
 {% macro status_badge(label, tone='neutral') -%}
@@ -244,9 +245,9 @@
         </article>
         <article class="report-kpi report-kpi--{{ attendance_tone }}">
             <span class="report-kpi__label">Asistencia efectiva</span>
-            <strong class="report-kpi__value">{{ '%.0f'|format(pct_asistencia) }}%</strong>
+            <strong class="report-kpi__value">{% if pct_asistencia is none %}Sin datos{% else %}{{ '%.0f'|format(pct_asistencia) }}%{% endif %}</strong>
             <span>{{ estados_asistencia.ASISTE.count }} asistencias · {{ estados_asistencia.TARDANZA.count }} tardanzas</span>
-            <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ attendance_tone }}" style="width: {{ pct_asistencia }}%"></span></div>
+            <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ attendance_tone }}" style="width: {{ pct_asistencia or 0 }}%"></span></div>
         </article>
         <article class="report-kpi report-kpi--{{ task_tone }}">
             <span class="report-kpi__label">Entrega a tiempo</span>
@@ -285,7 +286,7 @@
                         </div>
                         <div class="report-health-row">
                             <div><strong>Asistencia</strong><small>{{ faltas_injustificadas }} faltas injustificadas · {{ faltas_justificadas }} justificadas o médicas</small></div>
-                            {{ status_badge(attendance_tone == 'success' and 'Estable' or (attendance_tone == 'warning' and 'Seguimiento' or 'Crítica'), attendance_tone) }}
+                            {{ status_badge(attendance_tone == 'neutral' and 'Sin sesiones' or (attendance_tone == 'success' and 'Estable' or (attendance_tone == 'warning' and 'Seguimiento' or 'Crítica')), attendance_tone) }}
                         </div>
                         <div class="report-health-row">
                             <div><strong>Gestión de evidencias</strong><small>{{ tareas_resumen.calificadas }} calificadas · {% if tareas_resumen.promedio is not none %}promedio {{ tareas_resumen.promedio }}{% else %}sin promedio aún{% endif %}</small></div>
@@ -387,7 +388,7 @@
                     <dl class="report-facts-list">
                         <div><dt>Faltas injustificadas</dt><dd>{{ faltas_injustificadas }}</dd></div>
                         <div><dt>Faltas justificadas</dt><dd>{{ faltas_justificadas }}</dd></div>
-                        <div><dt>Porcentaje efectivo</dt><dd>{{ '%.1f'|format(pct_asistencia) }}%</dd></div>
+                        <div><dt>Porcentaje efectivo</dt><dd>{% if pct_asistencia is none %}Sin datos{% else %}{{ '%.1f'|format(pct_asistencia) }}%{% endif %}</dd></div>
                         <div><dt>Última marcación</dt><dd>{{ resumen_reporte.ultima_asistencia.strftime('%d/%m/%Y') if resumen_reporte.ultima_asistencia else 'Sin registro' }}</dd></div>
                     </dl>
                     {% if faltas_injustificadas %}<div class="report-callout report-callout--danger"><strong>Revisar causales y compromisos</strong><span>El reporte registra {{ faltas_injustificadas }} falta{% if faltas_injustificadas != 1 %}s{% endif %} sin justificación.</span></div>{% else %}<div class="report-callout report-callout--success"><strong>Sin faltas injustificadas</strong><span>La asistencia no presenta faltas sin justificar.</span></div>{% endif %}

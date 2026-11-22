@@ -128,7 +128,7 @@ class AdminRestablecimientoTestCase(unittest.TestCase):
         })
         respuesta = cliente.get('/admin/instructores')
         self.assertEqual(respuesta.status_code, 200)
-        self.assertIn('Administración de Cuentas de Instructores'.encode('utf-8'), respuesta.data)
+        self.assertIn('Administración de cuentas de instructores'.encode('utf-8'), respuesta.data)
         self.assertIn(self.admin.nombre.encode('utf-8'), respuesta.data)
         self.assertIn(self.colaborador.nombre.encode('utf-8'), respuesta.data)
 

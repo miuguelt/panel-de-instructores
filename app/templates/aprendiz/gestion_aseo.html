@@ -8,7 +8,7 @@
         <a href="{{ url_for('aprendiz.panel', ficha_id=ficha.id) }}" class="btn-back" title="Volver a mi panel">&larr; Mi panel</a>
         <div>
             <span class="eyebrow">{% if puede_gestionar_aseo %}Aprendiz administrador — Gestionar turnos de aseo{% else %}Consulta de turnos de aseo{% endif %} · {{ ficha.codigo }}</span>
-            <h1>{% if puede_gestionar_aseo %}🧹 Programar y gestionar turnos de aseo{% else %}🧹 Calendario de turnos de aseo{% endif %}</h1>
+            <h1><i data-lucide="sparkles" class="icon-lg" aria-hidden="true"></i> {% if puede_gestionar_aseo %}Programar y gestionar turnos de aseo{% else %}Calendario de turnos de aseo{% endif %}</h1>
         </div>
     </div>
     <div class="page-header-actions">

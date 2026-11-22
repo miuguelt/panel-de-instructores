@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
 {% from 'components/_viz.html' import kpi, barra, dona, apilada %}
-{% block title %}Juicios Evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Juicios evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/juicios.css') }}">
 {% endblock %}
@@ -12,8 +12,8 @@
         <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="nav-context-btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
         <span class="nav-context-divider" aria-hidden="true"></span>
         <h1 class="nav-context-title">
-            <span class="nav-context-icon" aria-hidden="true">🎓</span>
-            <span class="nav-context-text">Juicios de Evaluación<span class="nav-context-title-ext"> Oficiales</span></span>
+            <span class="nav-context-icon" aria-hidden="true"><i data-lucide="graduation-cap" class="icon-md"></i></span>
+            <span class="nav-context-text">Juicios de evaluación<span class="nav-context-title-ext"> oficiales</span></span>
         </h1>
         <span class="nav-context-divider" aria-hidden="true"></span>
         <button type="button" class="nav-context-btn-action nav-context-btn-action--primary" onclick="document.getElementById('modal-cargar-juicios').showModal()" title="Cargar o actualizar el Reporte de Juicios de SOFIA Plus">

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Materiales de Apoyo - {{ ficha.codigo }}{% endblock %}
+{% block title %}Materiales de apoyo - {{ ficha.codigo }}{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
@@ -12,7 +12,7 @@
 <div class="page-header">
   <div class="page-title-cluster">
     <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
-    <h1>📂 Materiales de Apoyo</h1>
+    <h1><i data-lucide="folder" class="icon-lg" aria-hidden="true"></i> Materiales de apoyo</h1>
   </div>
   <div class="page-header-actions">
     <button onclick="abrirModal('modalSubir')" class="btn btn-primary">➕ Subir Archivo</button>

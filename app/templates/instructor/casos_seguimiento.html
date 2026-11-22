@@ -3,15 +3,6 @@
 {% block title %}Casos de seguimiento - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
-        <h1>🛡️ Casos de Seguimiento</h1>
-    </div>
-</div>
-
-{{ render_alertas_contextuales(ficha.id, 'asistencia_comite') }}
-
 {% if resumen is defined and resumen %}
 {% set page_summary = resumen %}
 {% else %}
@@ -28,16 +19,19 @@
 {% set evaluation_time = ultima_evaluacion|default(datetime.utcnow(), true) %}
 <div class="page-header followup-page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="btn-back" title="Volver a Alertas">&larr; Volver</a>
-        <h1>⚖️ Casos de Seguimiento</h1>
+        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
+        <h1><i data-lucide="shield-check" class="icon-lg" aria-hidden="true"></i> Casos de seguimiento</h1>
     </div>
     <div class="page-header-actions">
         {% if ultima_evaluacion is defined and ultima_evaluacion %}
         <span class="followup-evaluation-time">Actualizado {{ evaluation_time.strftime('%d/%m/%Y %H:%M') }}</span>
         {% endif %}
-        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline">🔔 Notificaciones</a>
+        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline"><i data-lucide="bell" class="icon-sm" aria-hidden="true"></i> Notificaciones</a>
     </div>
 </div>
+
+{{ render_alertas_contextuales(ficha.id, 'asistencia_comite') }}
+
 
 <div class="participation-note followup-guidance">
     <span aria-hidden="true">⚖️</span>

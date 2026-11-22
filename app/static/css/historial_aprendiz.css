@@ -38,7 +38,7 @@
     .report-kpi-grid, .report-stat-grid { display: grid; gap: .9rem; }
     .report-kpi-grid { grid-template-columns: repeat(4, 1fr); }
     .report-kpi { display: flex; flex-direction: column; gap: .45rem; min-width: 0; padding: 1.1rem 1.15rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-top: 4px solid var(--accent-primary); border-radius: var(--radius-sm); box-shadow: var(--shadow); }
-    .report-kpi--success { border-top-color: var(--success); } .report-kpi--warning { border-top-color: var(--warning); } .report-kpi--danger { border-top-color: var(--danger); }
+    .report-kpi--success { border-top-color: var(--success); } .report-kpi--warning { border-top-color: var(--warning); } .report-kpi--danger { border-top-color: var(--danger); } .report-kpi--neutral { border-top-color: var(--text-muted); }
     .report-kpi__label, .report-stat span { color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
     .report-kpi__value { color: var(--text-strong); font-size: 2rem; line-height: 1; }
     .report-kpi > span:not(.report-kpi__label), .report-kpi__footer, .report-stat small { color: var(--text-muted); font-size: .76rem; }

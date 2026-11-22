@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_card_recomendacion %}
 {% from 'components/_viz.html' import barra, dona, apilada, semaforo, kpi, vacio %}
-{% block title %}Visión General - Ficha {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Visión general - Ficha {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">

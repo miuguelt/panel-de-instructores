@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
 {% from "components/_viz.html" import sparkline, apilada %}
-{% block title %}Llamado a Lista - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Llamado a lista - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asistencia.css') }}">
 {% endblock %}

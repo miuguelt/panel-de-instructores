@@ -157,3 +157,23 @@ class FuncionesCanonicasTest(unittest.TestCase):
             filas = db.session.query(condicion_aprobado_sql(db.literal(' aprobado ')),
                                      condicion_aprobado_sql(db.literal('NO APROBADO'))).one()
         self.assertEqual(tuple(bool(v) for v in filas), (True, False))
+
+
+class HistorialSinSesionesTest(unittest.TestCase):
+    """Sin sesiones registradas, el historial no inventa un 100 % de asistencia."""
+
+    setUp = ReglaJuicioAprobadoTest.setUp
+    tearDown = ReglaJuicioAprobadoTest.tearDown
+    _capturar = ReglaJuicioAprobadoTest._capturar
+    _como_instructor = ReglaJuicioAprobadoTest._como_instructor
+
+    def test_muestra_sin_datos(self):
+        self._como_instructor()
+        respuesta = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/aprendices/{self.aprendiz.id}/historial')
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.get_data(as_text=True)
+        kpi = html[html.index('Asistencia efectiva'):]
+        kpi = kpi[:kpi.index('</article>')]
+        self.assertIn('Sin datos', kpi)
+        self.assertNotIn('100%', kpi)
+        self.assertIn('report-kpi--neutral', html)

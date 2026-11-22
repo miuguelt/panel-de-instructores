@@ -1,5 +1,26 @@
 # Aprendizajes de diseño web
 
+## 22 de noviembre de 2026 — auditoría de arquitectura y consistencia
+
+- Error de datos corregido: la regla `'APROBADO' in juicio and 'AUN NO' not in juicio`, repetida en 23 lugares, contaba «NO APROBADO» y «AÚN NO APROBADO» como aprobados.
+  - Con cinco juicios y uno aprobado, varias vistas mostraban 60 % en lugar de 20 %.
+  - Ahora todo usa `es_aprobado()`, que normaliza tildes, o su versión SQL `condicion_aprobado_sql()`.
+  - Una prueba impide que la regla por subcadena vuelva a aparecer en `app/`.
+- Arquitectura:
+  - `panel()` del aprendiz pasó de 604 a 343 líneas, y la lógica quedó en tres servicios con pruebas: `juicios_aprendiz`, `evidencias_aprendiz` y `asistencia`.
+  - El reporte PDF reutiliza esos servicios y deja de diferir del panel: ahora deduplica juicios, respeta prórrogas y excluye trabajos grupales.
+- Patrón de interacción:
+  - Al cargar, una página no debe mover la vista.
+  - Casos de seguimiento aplicaba sus filtros con `FiltroVista.aplicar`, que desplazaba la página hasta la barra de filtros y escondía el título y el resumen.
+  - Ahora el filtrado inicial es directo y solo los cambios del usuario conservan la posición de lectura.
+- Consistencia:
+  - Un solo `<h1>` por página; casos de seguimiento tenía dos cabeceras completas.
+  - Íconos Lucide en lugar de emojis en los títulos.
+  - Mayúscula solo en la primera palabra y en los nombres propios, también en los títulos de pestaña.
+  - `tests/test_titulos_paginas.py` lo vigila.
+- Pendiente de decisión: el historial del instructor muestra «Asistencia efectiva» (las faltas justificadas restan) y el panel del aprendiz muestra un porcentaje donde solo restan las injustificadas. Son dos criterios válidos con el mismo nombre visible.
+- Deuda declarada: `juicios.html` conserva 85 estilos en línea, casi todos únicos. Migrarlos no cambia lo que ve el usuario, por eso no se priorizó.
+
 ## 21 de noviembre de 2026 — primero lo importante y biblioteca de visualización
 
 - Alcance observado:

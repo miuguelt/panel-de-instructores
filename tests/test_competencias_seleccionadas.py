@@ -143,7 +143,7 @@ class CompetenciasSeleccionadasTestCase(unittest.TestCase):
         self.assertIn('nav-context-slot', html)
         self.assertIn('nav-context-bar', html)
         self.assertIn('nav-context-btn-back', html)
-        self.assertIn('Juicios de Evaluación', html)
+        self.assertIn('Juicios de evaluación', html)
         self.assertIn('Analizar planeación', html)
         # Verificar que el header antiguo no duplica el contenido dentro de juicios-container
         self.assertNotIn('<div class="page-header">\n        <div class="page-title-cluster">', html)

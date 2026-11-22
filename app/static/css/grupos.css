@@ -779,3 +779,11 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* Título de las páginas de grupos (antes con estilo en línea). */
+.grupos-titulo {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-strong);
+}

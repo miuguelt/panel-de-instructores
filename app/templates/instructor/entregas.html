@@ -11,7 +11,7 @@
 <div class="page-header">
     <div class="page-title-cluster">
         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}" class="btn-back" title="Volver a Tareas">&larr; Volver</a>
-        <h1>📝 {% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}: {{ tarea.titulo }}</h1>
+        <h1><i data-lucide="inbox" class="icon-lg" aria-hidden="true"></i> {% if tarea.es_actividad_clase %}Cumplimiento{% else %}Entregas{% endif %}: {{ tarea.titulo }}</h1>
     </div>
 </div>
 

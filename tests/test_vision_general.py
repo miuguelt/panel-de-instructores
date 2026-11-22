@@ -206,7 +206,7 @@ class VisionGeneralTestCase(unittest.TestCase):
         res = self.client.get(f'/instructor/fichas/{self.ficha.id}')
         self.assertEqual(res.status_code, 200)
         contenido = res.get_data(as_text=True)
-        self.assertIn('Visión General', contenido)
+        self.assertIn('Visión general', contenido)
         self.assertIn('2890123', contenido)
         self.assertIn('Análisis y Desarrollo de Software', contenido)
         self.assertIn('Atención inmediata', contenido)

@@ -5,7 +5,7 @@
 <div class="page-header ranking-heading">
     <div class="page-title-cluster">
         <a href="{{ url_for('ranking.ranking', ficha_id=ficha.id) }}" class="btn-back" title="Volver al Ranking">&larr; Volver</a>
-        <h1>🏅 Insignias y Logros</h1>
+        <h1><i data-lucide="award" class="icon-lg" aria-hidden="true"></i> Insignias y logros</h1>
     </div>
     <div class="page-header-actions">
         <a href="{{ url_for('ranking.exportar_insignias', ficha_id=ficha.id, formato='excel') }}" class="btn btn-outline">📊 Excel</a>

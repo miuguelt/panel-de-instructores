@@ -85,7 +85,8 @@ def historial_aprendiz(ficha_id, aprendiz_id):
         RegistroAsistencia.aprendiz_id == aprendiz.id,
         RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
     ).count()
-    pct_asistencia = round(((total_sesiones - total_faltas) / total_sesiones * 100), 1) if total_sesiones else 100.0
+    # Sin sesiones no hay porcentaje que mostrar: la vista dice «Sin datos».
+    pct_asistencia = round(((total_sesiones - total_faltas) / total_sesiones * 100), 1) if total_sesiones else None
 
     # Tareas
     tareas = tareas_visibles(ficha_id).order_by(Tarea.fecha_limite).all()
