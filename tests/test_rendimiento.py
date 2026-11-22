@@ -186,9 +186,10 @@ class CacheEstaticosTestCase(BaseRendimiento):
 
     def test_dependencias_externas_no_bloquean_la_primera_pintura(self):
         html = self.cliente.get('/instructor/fichas').get_data(as_text=True)
-        self.assertIn('rel="preload"', html)
-        self.assertIn('fonts.googleapis.com/css2', html)
-        self.assertIn('onload="this.onload=null;this.rel=\'stylesheet\'"', html)
+        # La tipografía usa fuentes del sistema: ninguna hoja externa retrasa la primera pintura
+        # ni falla sin red (styles.css declara Outfit con respaldo en fuentes locales).
+        self.assertNotIn('fonts.googleapis.com', html)
+        self.assertNotIn('fonts.gstatic.com', html)
         self.assertRegex(html, r'src="/static/vendor/htmx/htmx\.min\.js\?v=[a-f0-9]+" defer')
         self.assertNotIn('src="https://unpkg.com/htmx.org', html)
 
