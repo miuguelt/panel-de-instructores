@@ -95,7 +95,8 @@ def _dashboard_inner():
             .join(Aprendiz, RegistroAsistencia.aprendiz_id == Aprendiz.id)
             .filter(
                 SesionAsistencia.ficha_id.in_(ficha_ids),
-                RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
+                # Solo las faltas sin justificar restan al porcentaje de asistencia.
+                RegistroAsistencia.estado == 'FALTA',
                 Aprendiz.estado.in_(ESTADOS_EN_FORMACION)
             )
             .group_by(SesionAsistencia.ficha_id).all()

@@ -95,8 +95,9 @@ def calcular_semaforo(ficha_id: int, aprendices: List[Aprendiz], config: Configu
         faltas_no_justificadas = conteo.get('FALTA', 0)
         total_faltas = sum(conteo.values())
         faltas_justificadas = total_faltas - faltas_no_justificadas
+        # Solo las faltas sin justificar restan (mismo criterio en toda la app).
         pct_asistencia = (
-            (total_sesiones - total_faltas) / total_sesiones * 100
+            (total_sesiones - faltas_no_justificadas) / total_sesiones * 100
             if total_sesiones > 0 else 100.0
         )
 
@@ -184,9 +185,8 @@ def obtener_resumen_ficha_360(ficha: Ficha, instructor_id: Optional[int] = None,
     # 5. Métricas de Asistencia Global
     posibles_asistencias = total_sesiones * total_activos
     total_faltas_injustificadas = sum(st.get('faltas_no_justificadas', 0) for st in stats_map.values())
-    total_faltas_todas = sum(st.get('faltas_no_justificadas', 0) + st.get('faltas_justificadas', 0) for st in stats_map.values())
     pct_asistencia_global = (
-        round(((posibles_asistencias - total_faltas_todas) / posibles_asistencias * 100), 1)
+        round(((posibles_asistencias - total_faltas_injustificadas) / posibles_asistencias * 100), 1)
         if posibles_asistencias > 0 else None  # Sin sesiones no hay porcentaje que mostrar.
     )
 

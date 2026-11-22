@@ -7,6 +7,7 @@
 - Una acción principal por cabecera, como máximo dos secundarias; el resto va en «Más acciones».
 - Sin datos inventados: si no hay sesiones, tareas o juicios, la interfaz muestra «Sin datos» y nunca un 0 % o un 100 % que no se midió. Los servicios devuelven `None` y las macros lo respetan.
 - Umbrales únicos (`app/services/visualizacion.py`): verde desde 80 %, amarillo desde 60 %, rojo por debajo; meta institucional TyT del 70 %. Los módulos académicos que ya usaban 70/50 lo declaran explícitamente al llamar a `viz_estado`.
+- Asistencia (criterio único, decidido el 22 de noviembre de 2026): el porcentaje descuenta solo las faltas sin justificar. Las faltas justificadas, las excusas médicas y las tardanzas se informan aparte y no lo bajan. El aprendiz y su instructor ven la misma cifra en el panel, el historial, la Visión general, Mis fichas, Alertas, Llamado a lista y la tendencia por sesión (`tests/test_criterio_asistencia.py`).
 - Biblioteca de visualización (`components/_viz.html` + `static/css/viz.css`), sin librerías externas y funcional sin red:
   - `kpi`: cifra con estado y enlace opcional.
   - `barra`: progreso con marcador de meta y segunda serie comparada (por ejemplo, RAPs frente al tiempo transcurrido).

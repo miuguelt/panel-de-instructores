@@ -165,7 +165,6 @@ def sesiones_registradas_query(ficha_id, corte_id=None):
     return consulta.distinct()
 
 
-ESTADOS_PRESENTE = ('ASISTE', 'TARDANZA')
 
 
 ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
@@ -210,12 +209,13 @@ def resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas):
 
 
 def serie_asistencia(ficha_id, limite=10, corte_id=None):
-    """Porcentaje de presencia de las últimas sesiones, de la más antigua a la más reciente.
+    """Porcentaje de asistencia de las últimas sesiones, de la más antigua a la más reciente.
 
-    La tardanza cuenta como presencia; las faltas, justificadas o no, no.
+    Mismo criterio que el resto de la app: solo la falta sin justificar resta;
+    tardanzas, faltas justificadas y excusas médicas no bajan el porcentaje.
     Las sesiones sin registros se omiten porque no tienen dato.
     """
-    presentes = db.func.sum(db.case((RegistroAsistencia.estado.in_(ESTADOS_PRESENTE), 1), else_=0))
+    presentes = db.func.sum(db.case((RegistroAsistencia.estado == 'FALTA', 0), else_=1))
     consulta = (
         db.session.query(SesionAsistencia.fecha, db.func.count(RegistroAsistencia.id), presentes)
         .join(RegistroAsistencia, RegistroAsistencia.sesion_id == SesionAsistencia.id)

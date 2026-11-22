@@ -49,9 +49,9 @@ class SerieAsistenciaTest(unittest.TestCase):
         self.sesion(date(2026, 3, 1), ['ASISTE', 'ASISTE', 'ASISTE', 'ASISTE'])
         serie = serie_asistencia(self.ficha.id)
         self.assertEqual([p['fecha'] for p in serie], [date(2026, 3, 1), date(2026, 3, 2)])
-        # Tardanza cuenta como presencia; faltas y excusas no.
-        self.assertEqual([p['pct'] for p in serie], [100.0, 50.0])
-        self.assertEqual(serie[1]['presentes'], 2)
+        # Solo la falta sin justificar resta; tardanza y excusa médica no.
+        self.assertEqual([p['pct'] for p in serie], [100.0, 75.0])
+        self.assertEqual(serie[1]['presentes'], 3)
         self.assertEqual(serie[1]['registros'], 4)
 
     def test_limita_a_las_ultimas_sesiones(self):

@@ -18,7 +18,7 @@
   - Íconos Lucide en lugar de emojis en los títulos.
   - Mayúscula solo en la primera palabra y en los nombres propios, también en los títulos de pestaña.
   - `tests/test_titulos_paginas.py` lo vigila.
-- Pendiente de decisión: el historial del instructor muestra «Asistencia efectiva» (las faltas justificadas restan) y el panel del aprendiz muestra un porcentaje donde solo restan las injustificadas. Son dos criterios válidos con el mismo nombre visible.
+- Decisión aplicada: la asistencia descuenta solo las faltas sin justificar en todas las vistas. Antes, para un aprendiz con una falta sin justificar, una justificada y una excusa médica en cuatro sesiones, seis vistas del instructor mostraban 25 % y su panel 75 %.
 - Deuda declarada: `juicios.html` conserva 85 estilos en línea, casi todos únicos. Migrarlos no cambia lo que ve el usuario, por eso no se priorizó.
 
 ## 21 de noviembre de 2026 — primero lo importante y biblioteca de visualización

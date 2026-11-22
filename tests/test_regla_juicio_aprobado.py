@@ -172,7 +172,7 @@ class HistorialSinSesionesTest(unittest.TestCase):
         respuesta = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/aprendices/{self.aprendiz.id}/historial')
         self.assertEqual(respuesta.status_code, 200)
         html = respuesta.get_data(as_text=True)
-        kpi = html[html.index('Asistencia efectiva'):]
+        kpi = html[html.index('report-kpi__label">Asistencia<'):]
         kpi = kpi[:kpi.index('</article>')]
         self.assertIn('Sin datos', kpi)
         self.assertNotIn('100%', kpi)

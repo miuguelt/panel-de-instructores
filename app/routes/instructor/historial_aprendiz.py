@@ -25,6 +25,7 @@ from app.models.juicio import JuicioEvaluativo
 from app.models.observador import NotaObservador
 from app.models.tarea import Entrega, Tarea
 from app.services.aseo import resumen_aprendiz
+from app.services.asistencia import resumen_asistencia_aprendiz
 from app.services.importacion_ficha import clasificar_competencia
 from app.services.permisos import (
     puede_gestionar_ficha,
@@ -86,7 +87,12 @@ def historial_aprendiz(ficha_id, aprendiz_id):
         RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
     ).count()
     # Sin sesiones no hay porcentaje que mostrar: la vista dice «Sin datos».
-    pct_asistencia = round(((total_sesiones - total_faltas) / total_sesiones * 100), 1) if total_sesiones else None
+    faltas_sin_justificar = RegistroAsistencia.query.join(SesionAsistencia).filter(
+        SesionAsistencia.ficha_id == ficha_id,
+        RegistroAsistencia.aprendiz_id == aprendiz.id,
+        RegistroAsistencia.estado == 'FALTA',
+    ).count()
+    pct_asistencia = resumen_asistencia_aprendiz(total_sesiones, faltas_sin_justificar)['pct']
 
     # Tareas
     tareas = tareas_visibles(ficha_id).order_by(Tarea.fecha_limite).all()

@@ -250,10 +250,10 @@ function updateRowStats(row, selectedValue) {
         currentJ += 1;
     }
 
-    const totalFaltas = currentNj + currentJ;
+    // Solo las faltas sin justificar restan; las justificadas se muestran aparte.
     let pct = 100;
     if (sesionesProyectadas > 0) {
-        pct = ((sesionesProyectadas - totalFaltas) / sesionesProyectadas) * 100;
+        pct = ((sesionesProyectadas - currentNj) / sesionesProyectadas) * 100;
     }
     pct = Math.max(0, Math.min(100, pct));
 

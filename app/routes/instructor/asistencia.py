@@ -315,7 +315,7 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
 
     total_sesiones = contar_sesiones_registradas(ficha_id, corte_id=corte_id)
     total_faltas = total_faltas_nj + total_faltas_j
-    pct_asistencia = ((total_sesiones - total_faltas) / total_sesiones * 100) if total_sesiones > 0 else 100.0
+    pct_asistencia = ((total_sesiones - total_faltas_nj) / total_sesiones * 100) if total_sesiones > 0 else 100.0
 
     # El mes visible se arma en el servidor: la primera pintura ya sale con los
     # colores de este aprendiz, sin esperar a JavaScript.

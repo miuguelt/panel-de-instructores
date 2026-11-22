@@ -244,7 +244,7 @@
             <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ academic_tone }}" style="width: {{ stats_juicios.pct_total }}%"></span></div>
         </article>
         <article class="report-kpi report-kpi--{{ attendance_tone }}">
-            <span class="report-kpi__label">Asistencia efectiva</span>
+            <span class="report-kpi__label">Asistencia</span>
             <strong class="report-kpi__value">{% if pct_asistencia is none %}Sin datos{% else %}{{ '%.0f'|format(pct_asistencia) }}%{% endif %}</strong>
             <span>{{ estados_asistencia.ASISTE.count }} asistencias · {{ estados_asistencia.TARDANZA.count }} tardanzas</span>
             <div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ attendance_tone }}" style="width: {{ pct_asistencia or 0 }}%"></span></div>
@@ -362,7 +362,7 @@
         </section>
 
         <section id="report-attendance" class="report-panel" role="tabpanel" hidden>
-            <section class="report-section report-section--intro"><span class="report-eyebrow">Control de asistencia</span><h2>Detalle completo de asistencia</h2><p>Se consideran como asistencia efectiva los estados <strong>Asiste</strong> y <strong>Tardanza</strong>. Las faltas justificadas se muestran separadas para facilitar el seguimiento.</p></section>
+            <section class="report-section report-section--intro"><span class="report-eyebrow">Control de asistencia</span><h2>Detalle completo de asistencia</h2><p>El porcentaje descuenta solo las <strong>faltas sin justificar</strong>. Las faltas justificadas, las excusas médicas y las tardanzas se muestran aparte y no lo bajan.</p></section>
             <div class="report-stat-grid report-stat-grid--five">
                 <div class="report-stat"><span>Registros</span><strong>{{ resumen_reporte.total_registros_asistencia }}</strong><small>sesiones con marcación</small></div>
                 <div class="report-stat report-stat--success"><span>Asistió</span><strong>{{ estados_asistencia.ASISTE.count }}</strong><small>presencias</small></div>
@@ -388,7 +388,7 @@
                     <dl class="report-facts-list">
                         <div><dt>Faltas injustificadas</dt><dd>{{ faltas_injustificadas }}</dd></div>
                         <div><dt>Faltas justificadas</dt><dd>{{ faltas_justificadas }}</dd></div>
-                        <div><dt>Porcentaje efectivo</dt><dd>{% if pct_asistencia is none %}Sin datos{% else %}{{ '%.1f'|format(pct_asistencia) }}%{% endif %}</dd></div>
+                        <div><dt>Porcentaje de asistencia</dt><dd>{% if pct_asistencia is none %}Sin datos{% else %}{{ '%.1f'|format(pct_asistencia) }}%{% endif %}</dd></div>
                         <div><dt>Última marcación</dt><dd>{{ resumen_reporte.ultima_asistencia.strftime('%d/%m/%Y') if resumen_reporte.ultima_asistencia else 'Sin registro' }}</dd></div>
                     </dl>
                     {% if faltas_injustificadas %}<div class="report-callout report-callout--danger"><strong>Revisar causales y compromisos</strong><span>El reporte registra {{ faltas_injustificadas }} falta{% if faltas_injustificadas != 1 %}s{% endif %} sin justificación.</span></div>{% else %}<div class="report-callout report-callout--success"><strong>Sin faltas injustificadas</strong><span>La asistencia no presenta faltas sin justificar.</span></div>{% endif %}
