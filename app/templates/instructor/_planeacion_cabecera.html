@@ -1,8 +1,7 @@
 <header class="pl-workspace-header">
-    <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="pl-back-link">&larr; Visión general</a>
     <div class="pl-heading-row">
         <div class="pl-heading-copy">
-            <h1>Planeación de la ficha</h1>
+            <h1>Planeación</h1>
             <p class="pl-heading-context"><span class="pl-ficha-code">Ficha {{ ficha.codigo }}</span> <span>{{ ficha.nombre_programa }}</span></p>
             {% if analisis %}
             <p class="pl-heading-fuentes">

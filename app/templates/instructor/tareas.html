@@ -12,14 +12,13 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
         <h1><i data-lucide="file-check" class="icon-lg" aria-hidden="true"></i> Tareas y evidencias</h1>
     </div>
     <div class="page-actions" style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
-        <a href="{{ url_for('instructor.evidencias_faltantes', ficha_id=ficha.id) }}" class="btn btn-outline" title="Ver evidencias que hacen falta por aprendiz">📋 Faltantes por Aprendiz</a>
+        <a href="{{ url_for('instructor.evidencias_faltantes', ficha_id=ficha.id) }}" class="btn btn-outline" title="Ver evidencias que hacen falta por aprendiz"><i data-lucide="clipboard-list" class="icon-sm" aria-hidden="true"></i> Faltantes por aprendiz</a>
         {% if puede_editar_corte %}
         <button type="button" class="btn btn-primary" id="btn-toggle-crear-tarea" aria-expanded="false" onclick="toggleFormularioCrear()">
-            ➕ Nueva Tarea
+            <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i> Nueva tarea
         </button>
         {% endif %}
     </div>
@@ -44,14 +43,14 @@
         {% if cortes %}
         <div class="control-item">
             <label class="control-label" for="corte-tareas">
-                <span class="control-icon" aria-hidden="true">📂</span>
-                <span>Corte de trabajo</span>
+                <span class="control-icon" aria-hidden="true"><i data-lucide="calendar-range" class="icon-sm"></i></span>
+                <span>Periodo de evaluación</span>
             </label>
             <div class="control-select-wrap">
-                <select id="corte-tareas" onchange="window.location.href=this.value" aria-label="Seleccionar corte de trabajo">
+                <select id="corte-tareas" onchange="window.location.href=this.value" aria-label="Seleccionar el periodo de evaluación (corte)">
                     <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id='todos', filtro_instructor=filtro_instructor) }}"
                             {% if modo_todos %}selected{% endif %}>
-                        📚 Todos los cortes (tablero agrupado)
+                        Todos los periodos (tablero agrupado)
                     </option>
                     {% for item in cortes %}
                     <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=item.id, filtro_instructor=filtro_instructor) }}"
@@ -67,25 +66,25 @@
         {% if instructores_ficha and instructores_ficha|length > 1 %}
         <div class="control-item">
             <label class="control-label" for="filtro-docente">
-                <span class="control-icon" aria-hidden="true">👨‍🏫</span>
-                <span>Filtrar por Instructor</span>
+                <span class="control-icon" aria-hidden="true"><i data-lucide="user-round" class="icon-sm"></i></span>
+                <span>Filtrar por instructor</span>
             </label>
             <div class="control-select-wrap">
                 <select id="filtro-docente" onchange="window.location.href=this.value" aria-label="Filtrar por instructor">
                     {% set corte_sel = 'todos' if modo_todos else (corte_actual.id if corte_actual else None) %}
                     <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='mias') }}"
                             {% if filtro_instructor == 'mias' %}selected{% endif %}>
-                        👤 Mis Tareas ({{ current_user.nombre }})
+                        Mis tareas ({{ current_user.nombre }})
                     </option>
                     <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor='todas') }}"
                             {% if filtro_instructor == 'todas' %}selected{% endif %}>
-                        👥 Todas las tareas (agrupadas por instructor)
+                        Todas las tareas (agrupadas por instructor)
                     </option>
                     {% for inst in instructores_ficha %}
                     {% if inst.id != current_user.id %}
                     <option value="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_sel, filtro_instructor=inst.id) }}"
                             {% if filtro_instructor == inst.id|string %}selected{% endif %}>
-                        👨‍🏫 Tareas de {{ inst.nombre }}
+                        Tareas de {{ inst.nombre }}
                     </option>
                     {% endif %}
                     {% endfor %}
@@ -97,16 +96,16 @@
 
     {% if corte_actual and corte_actual.esta_activo %}
     <div class="control-actions-cluster">
-        <span class="badge badge-success">Corte Activo</span>
+        <span class="badge badge-success">Corte activo</span>
     </div>
     {% elif modo_todos %}
     <div class="control-actions-cluster">
-        <span class="badge badge-info">Vista Agrupada</span>
+        <span class="badge badge-info">Vista agrupada</span>
     </div>
     {% endif %}
 
     <div class="busqueda-panel-wrap">
-        <input type="search" id="busqueda-tareas" class="busqueda-input" placeholder="🔍 Filtrar tareas por título o descripción..." aria-label="Filtrar tareas por título o descripción" oninput="filtrarTareas(this.value)">
+        <input type="search" id="busqueda-tareas" class="busqueda-input" placeholder="Filtrar tareas por título o descripción…" aria-label="Filtrar tareas por título o descripción" oninput="filtrarTareas(this.value)">
     </div>
 </div>
 
@@ -215,7 +214,7 @@
             </label>
         </div>
 
-        <button type="submit" class="btn btn-primary">Crear Tarea</button>
+        <button type="submit" class="btn btn-primary">Crear tarea</button>
     </form>
 </div>
 {% endif %}
@@ -229,11 +228,11 @@
         <summary>
             <span class="corte-grupo-titulo">
                 {% if grupo.corte %}
-                📂 {{ grupo.corte.nombre }}
+                <i data-lucide="folder" class="icon-sm" aria-hidden="true"></i> {{ grupo.corte.nombre }}
                 <span class="badge badge-{{ 'info' if grupo.corte.esta_activo else 'secondary' }}">{{ grupo.corte.estado }}</span>
                 {% if grupo.corte.compartido %}<span class="badge badge-secondary">Compartido</span>{% endif %}
                 {% else %}
-                📂 Sin corte asignado
+                <i data-lucide="folder" class="icon-sm" aria-hidden="true"></i> Sin corte asignado
                 {% endif %}
             </span>
             <span class="badge badge-secondary">{{ grupo.total }} tarea(s)</span>
@@ -242,7 +241,7 @@
             {% for sub in grupo.instructores %}
             <section class="instructor-grupo">
                 <h3 class="instructor-grupo-head">
-                    👨‍🏫 {{ sub.instructor.nombre if sub.instructor else 'Instructor desconocido' }}
+                    <i data-lucide="user-round" class="icon-sm" aria-hidden="true"></i> {{ sub.instructor.nombre if sub.instructor else 'Instructor desconocido' }}
                     {% if sub.instructor and sub.instructor.id == current_user.id %}<span class="badge badge-info">Tú</span>{% endif %}
                     <span class="text-muted">{{ sub.tareas|length }} tarea(s)</span>
                 </h3>
@@ -269,12 +268,12 @@
                 </div>
                 <div class="instructor-titulos-wrap">
                     <h2 class="instructor-nombre-h2">
-                        <span>👨‍🏫 {{ grupo_inst.nombre }}</span>
+                        <span>{{ grupo_inst.nombre }}</span>
                         {% if grupo_inst.es_actual %}
                         <span class="badge badge-info">Tú</span>
                         {% endif %}
                         {% if ficha.instructor_id == (grupo_inst.instructor.id if grupo_inst.instructor else None) %}
-                        <span class="badge badge-success">Instructor Titular</span>
+                        <span class="badge badge-success">Instructor titular</span>
                         {% endif %}
                     </h2>
                     <p class="instructor-chips-line text-muted">
@@ -307,7 +306,7 @@
 </div>
 {% else %}
 <div class="empty-state">
-    <div class="empty-icon">📝</div>
+    <div class="empty-icon" aria-hidden="true"><i data-lucide="file-text" class="icon-lg"></i></div>
     <h3>Todavía no hay tareas creadas</h3>
     <p>Crea tu primera tarea para asignar actividades a los aprendices.</p>
 </div>

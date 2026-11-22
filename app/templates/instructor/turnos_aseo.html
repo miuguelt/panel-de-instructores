@@ -5,10 +5,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
 {% endblock %}
 
+{% from "components/_viz.html" import vacio %}
 {% block content %}
 <div class="page-header cleaning-page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
         <h1><i data-lucide="sparkles" class="icon-lg" aria-hidden="true"></i> Turnos de aseo</h1>
     </div>
     <div class="page-header-actions">
@@ -149,11 +149,9 @@
 </div>
 
 {% if sesiones_mes|length == 0 and turnos_por_fecha|length == 0 %}
-<div class="alert alert-info" role="alert">
-    <strong>Todavía no hay sesiones de clase registradas en {{ nombre_mes }}.</strong><br>
-    Las sesiones se crean al tomar asistencia o al importar un reporte de juicios.
-    <span class="text-muted">Sin sesiones no se pueden generar turnos de aseo.</span>
-</div>
+{{ vacio('Todavía no hay sesiones de clase registradas en ' ~ nombre_mes ~ '.',
+         'Las sesiones se crean al tomar asistencia o al importar un reporte de juicios. Sin sesiones no se pueden generar turnos de aseo.',
+         url=url_for('instructor.asistencia', ficha_id=ficha.id), accion='Tomar asistencia', icono='calendar-x') }}
 {% endif %}
 
 <section class="card calendar-card">

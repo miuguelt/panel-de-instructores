@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
-{% block title %}Línea de tiempo de la ficha {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Planeación - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block body_class %}pl-planeacion-ancha{% endblock %}
 
 {% block head %}
@@ -19,7 +19,7 @@
 
     {% if importacion_id %}
     <div class="pl-verdict pl-tone-info" role="status" aria-live="polite" data-importacion-id="{{ importacion_id }}">
-        <span class="pl-verdict-icon" aria-hidden="true">⏳</span>
+        <span class="pl-verdict-icon" aria-hidden="true"><i data-lucide="hourglass" class="icon-md"></i></span>
         <div>
             <strong>Reporte en procesamiento</strong>
             <p>La vista se actualizará cuando termine la importación. Puede permanecer aquí; el sistema revisa el estado automáticamente.</p>
@@ -29,7 +29,7 @@
 
     {% if error_planeacion %}
     <div class="pl-verdict pl-tone-danger" role="alert">
-        <span class="pl-verdict-icon" aria-hidden="true">⚠️</span>
+        <span class="pl-verdict-icon" aria-hidden="true"><i data-lucide="alert-triangle" class="icon-md"></i></span>
         <div>
             <strong>La planeación no está disponible</strong>
             <p>{{ error_planeacion }}</p>
@@ -43,7 +43,7 @@
     {{ render_alertas_contextuales(ficha.id, 'fases_cronograma') }}
     {% include 'instructor/_planeacion_carga_unificada.html' %}
     <div class="pl-empty">
-        <div class="empty-icon">🧭</div>
+        <div class="empty-icon" aria-hidden="true"><i data-lucide="compass" class="icon-lg"></i></div>
         <h2>Comience con los archivos de la ficha</h2>
         <p>Cargue la planeación pedagógica para consultar el cronograma. Añada el reporte de juicios para comparar el avance real y el programa de formación para completar el detalle curricular.</p>
         <a href="#centro-carga" class="btn btn-primary">Cargar archivos</a>
@@ -51,7 +51,7 @@
     {% else %}
         {% if not analisis.alineacion.alineado %}
         <div class="pl-verdict pl-tone-danger">
-            <span class="pl-verdict-icon" aria-hidden="true">🚫</span>
+            <span class="pl-verdict-icon" aria-hidden="true"><i data-lucide="ban" class="icon-md"></i></span>
             <div>
                 <strong>Los archivos no corresponden al mismo programa</strong>
                 <p>La línea de tiempo se conserva, pero no debe leerse como avance de esta ficha: {{ analisis.alineacion.motivos|join(' ') }}</p>
@@ -85,7 +85,7 @@
                         <span id="pl-modal-phase-badge" class="pl-chip pl-tone-info" style="display:none;"></span>
                         {% if version_programa %}
                         <a href="{{ url_for('planeacion.descargar_version', ficha_id=ficha.id, version_id=version_programa.id) }}" class="pl-chip pl-tone-info is-tone pl-btn-modal-pdf" target="_blank" title="Descargar Programa de Formación Oficial">
-                            📑 Descargar PDF Oficial (v{{ version_programa.version }})
+                            <i data-lucide="file-down" class="icon-sm" aria-hidden="true"></i> Descargar PDF oficial (v{{ version_programa.version }})
                         </a>
                         {% endif %}
                     </div>
@@ -101,38 +101,38 @@
 
             <div class="pl-modal-toolbar">
                 <div class="pl-modal-search-wrap">
-                    <span class="pl-modal-search-icon">🔍</span>
+                    <span class="pl-modal-search-icon" aria-hidden="true"><i data-lucide="search" class="icon-sm"></i></span>
                     <input type="text" id="modal-search-input" class="pl-modal-search-input" placeholder="Filtrar saberes, criterios, perfil docente o palabras clave..." autocomplete="off">
                     <span id="modal-search-count" class="pl-modal-search-count"></span>
                 </div>
                 <div class="pl-modal-actions">
                     <button type="button" id="btn-copiar-ficha" class="pl-btn-modal-action" title="Copiar todo el contenido pedagógico de esta competencia al portapapeles">
-                        📋 Copiar datos
+                        <i data-lucide="copy" class="icon-sm" aria-hidden="true"></i> Copiar datos
                     </button>
                     <button type="button" id="btn-imprimir-ficha" class="pl-btn-modal-action" title="Imprimir ficha de la competencia">
-                        🖨️ Imprimir
+                        <i data-lucide="printer" class="icon-sm" aria-hidden="true"></i> Imprimir
                     </button>
                 </div>
             </div>
 
             <div class="pl-modal-tabs" role="tablist">
                 <button type="button" class="pl-modal-tab is-active" data-pane="pane-todo" role="tab" aria-selected="true">
-                    👁️ Vista Integral (Todo)
+                    <i data-lucide="eye" class="icon-sm" aria-hidden="true"></i> Vista integral (todo)
                 </button>
                 <button type="button" class="pl-modal-tab" data-pane="pane-proceso" role="tab" aria-selected="false">
-                    ⚙️ Conocimientos de Proceso <span class="pl-tab-badge" id="tab-cnt-proceso"></span>
+                    <i data-lucide="settings" class="icon-sm" aria-hidden="true"></i> Conocimientos de proceso <span class="pl-tab-badge" id="tab-cnt-proceso"></span>
                 </button>
                 <button type="button" class="pl-modal-tab" data-pane="pane-saber" role="tab" aria-selected="false">
-                    📚 Conocimientos del Saber <span class="pl-tab-badge" id="tab-cnt-saber"></span>
+                    <i data-lucide="book-open" class="icon-sm" aria-hidden="true"></i> Conocimientos del saber <span class="pl-tab-badge" id="tab-cnt-saber"></span>
                 </button>
                 <button type="button" class="pl-modal-tab" data-pane="pane-criterios" role="tab" aria-selected="false">
-                    🎯 Criterios de Evaluación <span class="pl-tab-badge" id="tab-cnt-criterios"></span>
+                    <i data-lucide="target" class="icon-sm" aria-hidden="true"></i> Criterios de evaluación <span class="pl-tab-badge" id="tab-cnt-criterios"></span>
                 </button>
                 <button type="button" class="pl-modal-tab" data-pane="pane-perfil" role="tab" aria-selected="false">
-                    👨‍🏫 Perfil del Instructor
+                    <i data-lucide="user-round" class="icon-sm" aria-hidden="true"></i> Perfil del instructor
                 </button>
                 <button type="button" class="pl-modal-tab" data-pane="pane-resultados" role="tab" aria-selected="false">
-                    📝 Resultados y Juicios <span class="pl-tab-badge" id="tab-cnt-resultados"></span>
+                    <i data-lucide="file-text" class="icon-sm" aria-hidden="true"></i> Resultados y juicios <span class="pl-tab-badge" id="tab-cnt-resultados"></span>
                 </button>
             </div>
 
@@ -234,7 +234,7 @@
                 dz.classList.add('has-file');
                 if (preview) {
                     preview.style.display = 'block';
-                    preview.textContent = `✓ Seleccionado: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+                    preview.textContent = `Seleccionado: ${file.name} (${Math.round(file.size / 1024)} KB)`;
                 }
                 if (textSpan) textSpan.style.display = 'none';
                 refrescarEstadoArchivos();
@@ -415,7 +415,7 @@
                 <div class="pl-pedagogico-empty">
                     <p class="pl-note">${emptyMsg}</p>
                     <div class="pl-pedagogico-tip">
-                        💡 <strong>Sugerencia:</strong> Carga el <em>Programa de Formación (.pdf)</em> en el panel superior y haz clic en <em>Ejecutar Análisis Completo</em> para activar la extracción oficial de saberes y criterios.
+                        <strong>Sugerencia:</strong> Carga el <em>Programa de Formación (.pdf)</em> en el panel superior y haz clic en <em>Ejecutar Análisis Completo</em> para activar la extracción oficial de saberes y criterios.
                     </div>
                 </div>
             `;
@@ -437,7 +437,7 @@
                 }
                 html += `
                     <div class="pl-pedagogico-group">
-                        <h4 class="pl-pedagogico-subhead">📌 ${highlightText(trimmed, query)}</h4>
+                        <h4 class="pl-pedagogico-subhead">${highlightText(trimmed, query)}</h4>
                         <ul class="pl-pedagogico-list">
                 `;
                 inSubgroup = true;
@@ -446,7 +446,7 @@
                     html += '<div class="pl-pedagogico-group"><ul class="pl-pedagogico-list">';
                     inSubgroup = true;
                 }
-                html += `<li><span class="pl-item-dot">✦</span> <span>${highlightText(trimmed, query)}</span></li>`;
+                html += `<li><span class="pl-item-dot" aria-hidden="true">•</span> <span>${highlightText(trimmed, query)}</span></li>`;
             }
         });
 
@@ -468,7 +468,7 @@
                 <div class="pl-pedagogico-empty">
                     <p class="pl-note">No hay requisitos de perfil docente especificados en el documento cargado.</p>
                     <div class="pl-pedagogico-tip">
-                        💡 <strong>Sugerencia:</strong> Carga el <em>Programa de Formación (.pdf)</em> oficial para ver los requisitos académicos, años de experiencia laboral/docente y competencias requeridas.
+                        <strong>Sugerencia:</strong> Carga el <em>Programa de Formación (.pdf)</em> oficial para ver los requisitos académicos, años de experiencia laboral/docente y competencias requeridas.
                     </div>
                 </div>
             `;
@@ -480,7 +480,7 @@
         if (tieneAcad) {
             html += `
                 <div class="pl-perfil-card is-academico">
-                    <div class="pl-perfil-head">🎓 4.8.1 Requisitos Académicos</div>
+                    <div class="pl-perfil-head">4.8.1 Requisitos Académicos</div>
                     <div class="pl-perfil-body">${highlightText(perf.requisitos_academicos, query)}</div>
                 </div>
             `;
@@ -489,7 +489,7 @@
         if (tieneExp) {
             html += `
                 <div class="pl-perfil-card is-experiencia">
-                    <div class="pl-perfil-head">⏱️ 4.8.2 Experiencia Laboral y Docente</div>
+                    <div class="pl-perfil-head">4.8.2 Experiencia Laboral y Docente</div>
                     <div class="pl-perfil-body">${highlightText(perf.experiencia, query)}</div>
                 </div>
             `;
@@ -498,9 +498,9 @@
         if (tieneComp) {
             html += `
                 <div class="pl-perfil-card is-competencias">
-                    <div class="pl-perfil-head">⭐ 4.8.3 Competencias Docentes Exigidas</div>
+                    <div class="pl-perfil-head">4.8.3 Competencias Docentes Exigidas</div>
                     <ul class="pl-pedagogico-list">
-                        ${perf.competencias.map(c => `<li><span class="pl-item-dot">✦</span> <span>${highlightText(c, query)}</span></li>`).join('')}
+                        ${perf.competencias.map(c => `<li><span class="pl-item-dot" aria-hidden="true">•</span> <span>${highlightText(c, query)}</span></li>`).join('')}
                     </ul>
                 </div>
             `;
@@ -543,8 +543,8 @@
                             </div>
                         </div>
 
-                        ${r.instructores && r.instructores.length ? `<div class="pl-note" style="margin-top:.4rem;">👨‍🏫 <strong>Planeado para:</strong> ${highlightText(r.instructores.join(', '), query)}</div>` : ''}
-                        ${r.evaluadores && r.evaluadores.length ? `<div class="pl-note">✍️ <strong>Evaluado en SOFIA por:</strong> ${highlightText(r.evaluadores.join(', '), query)}</div>` : ''}
+                        ${r.instructores && r.instructores.length ? `<div class="pl-note" style="margin-top:.4rem;"><strong>Planeado para:</strong> ${highlightText(r.instructores.join(', '), query)}</div>` : ''}
+                        ${r.evaluadores && r.evaluadores.length ? `<div class="pl-note"><strong>Evaluado en SOFIA por:</strong> ${highlightText(r.evaluadores.join(', '), query)}</div>` : ''}
                     </div>
                 `;
             });
@@ -609,7 +609,7 @@
                 <!-- 1. Criterios de Evaluación (siempre visible — lo más importante) -->
                 <section class="pl-modal-section-card">
                     <div class="pl-modal-section-head">
-                        <h4>🎯 4.7 Criterios de Evaluación</h4>
+                        <h4>4.7 Criterios de Evaluación</h4>
                         <span class="pl-chip pl-tone-success is-tone">${nCrit} criterios</span>
                     </div>
                     ${renderStructuredList(
@@ -623,7 +623,7 @@
                 <!-- 2. Resultados de Aprendizaje & Avance SOFIA (siempre visible) -->
                 <section class="pl-modal-section-card">
                     <div class="pl-modal-section-head">
-                        <h4>📝 4.5 Resultados de Aprendizaje y Juicios Evaluativos</h4>
+                        <h4>4.5 Resultados de Aprendizaje y Juicios Evaluativos</h4>
                         <span class="pl-chip pl-tone-info is-tone">${rapsList.length} RAPs</span>
                     </div>
                     ${renderResultadosJuicios(dato, query)}
@@ -632,7 +632,7 @@
                 <!-- 3. Conocimientos de Proceso (colapsado por defecto) -->
                 <details class="pl-collapsible-section">
                     <summary>
-                        <span>⚙️ 4.6.1 Conocimientos de Proceso</span>
+                        <span>4.6.1 Conocimientos de Proceso</span>
                         <span class="pl-chip pl-tone-info is-tone">${nProc} ítems</span>
                     </summary>
                     <div class="pl-collapsible-body">
@@ -648,7 +648,7 @@
                 <!-- 4. Conocimientos del Saber (colapsado por defecto) -->
                 <details class="pl-collapsible-section">
                     <summary>
-                        <span>📚 4.6.2 Conocimientos del Saber (Conceptos y Principios)</span>
+                        <span>4.6.2 Conocimientos del Saber (Conceptos y Principios)</span>
                         <span class="pl-chip pl-tone-info is-tone">${nSab} conceptos</span>
                     </summary>
                     <div class="pl-collapsible-body">
@@ -664,7 +664,7 @@
                 <!-- 5. Perfil del Instructor (colapsado por defecto) -->
                 <details class="pl-collapsible-section">
                     <summary>
-                        <span>👨‍🏫 4.8 Perfil del Instructor Exigido</span>
+                        <span>4.8 Perfil del Instructor Exigido</span>
                         <span class="pl-chip pl-tone-neutral">Requisitos Curriculares</span>
                     </summary>
                     <div class="pl-collapsible-body">
@@ -802,7 +802,7 @@
             }
         }
 
-        const tipoTexto = dato.tipo === 'tecnica' ? '⚡ Competencia Técnica (Exigible)' : (dato.tipo === 'ingles' ? '🌐 Inglés (Flexible)' : (dato.tipo === 'productiva' ? '🏢 Etapa Productiva' : '🌱 Competencia Transversal'));
+        const tipoTexto = dato.tipo === 'tecnica' ? 'Competencia Técnica (Exigible)' : (dato.tipo === 'ingles' ? 'Inglés (Flexible)' : (dato.tipo === 'productiva' ? 'Etapa Productiva' : 'Competencia Transversal'));
         badgeEl.textContent = tipoTexto;
         badgeEl.className = 'pl-chip is-tone ' + (dato.tipo === 'tecnica' ? 'pl-tone-info' : (dato.tipo === 'productiva' ? 'pl-tone-success' : 'pl-tone-neutral'));
 
@@ -828,12 +828,12 @@
                 parts.push(`<span class="pl-status-sep">·</span>`);
                 const fechaInicio = dato.fecha_primera_aprobacion ? `<strong>${dato.fecha_primera_aprobacion}</strong>` : '—';
                 const fechaCierre = dato.fecha_cierre_real ? `<strong>${dato.fecha_cierre_real}</strong>` : 'sin cerrar';
-                parts.push(`<span class="pl-status-detail">📅 ${fechaInicio} → ${fechaCierre}</span>`);
+                parts.push(`<span class="pl-status-detail">${fechaInicio} → ${fechaCierre}</span>`);
             }
 
             if (dato.instructores && dato.instructores.length) {
                 parts.push(`<span class="pl-status-sep">·</span>`);
-                parts.push(`<span class="pl-status-detail">👨‍🏫 ${escapeHtml(dato.instructores.join(', '))}</span>`);
+                parts.push(`<span class="pl-status-detail">${escapeHtml(dato.instructores.join(', '))}</span>`);
             }
 
             statusBar.innerHTML = parts.join('');
@@ -999,7 +999,7 @@
 
             navigator.clipboard.writeText(texto).then(() => {
                 const originalText = btnCopiar.innerHTML;
-                btnCopiar.innerHTML = '✅ ¡Copiado!';
+                btnCopiar.innerHTML = '¡Copiado!';
                 setTimeout(() => { btnCopiar.innerHTML = originalText; }, 2000);
             }).catch(err => {
                 console.error('Error al copiar al portapapeles', err);
@@ -1112,7 +1112,7 @@
             if (rango) {
                 html += `
                     <div class="pl-tooltip-row" style="color:var(--accent-primary); font-size:0.72rem; margin-bottom:0.3rem;">
-                        <span>📅 Período:</span>
+                        <span>Período:</span>
                         <strong>${rango} ${dias ? '(' + dias + ' días)' : ''}</strong>
                     </div>
                 `;
@@ -1201,7 +1201,7 @@
             }
 
             let html = `
-                <div class="pl-tooltip-title"><strong>🔮 Escenario ${tipo}</strong></div>
+                <div class="pl-tooltip-title"><strong>Escenario ${tipo}</strong></div>
                 <div class="pl-tooltip-body">
                     <div class="pl-tooltip-row">
                         <span>Fecha estimada de culminación:</span>
@@ -1244,19 +1244,19 @@
                 <div class="pl-tooltip-title"><strong>Flujo de RAPs en ${lbl}</strong> (Total: ${tot})</div>
                 <div class="pl-tooltip-body">
                     <div class="pl-tooltip-row" style="color:var(--success)">
-                        <span>✓ Aprobados (≥80%):</span>
+                        <span>Aprobados (≥80%):</span>
                         <strong>${aprob} (${aprobPct}%)</strong>
                     </div>
                     <div class="pl-tooltip-row" style="color:var(--accent-primary)">
-                        <span>📝 En Evaluación SOFIA:</span>
+                        <span>En Evaluación SOFIA:</span>
                         <strong>${evalC} (${evalPct}%)</strong>
                     </div>
                     <div class="pl-tooltip-row" style="color:var(--warning)">
-                        <span>⏳ En Formación Activa:</span>
+                        <span>En Formación Activa:</span>
                         <strong>${form} (${formPct}%)</strong>
                     </div>
                     <div class="pl-tooltip-row text-muted">
-                        <span>⚪ No Iniciados:</span>
+                        <span>No Iniciados:</span>
                         <strong>${noin} (${noinPct}%)</strong>
                     </div>
                 </div>
@@ -1297,7 +1297,7 @@
                         <strong>${hprog} h</strong>
                     </div>
                     <div class="pl-tooltip-sub" style="margin-top:0.3rem; font-size:0.68rem; color:var(--accent-primary);">
-                        👆 Haz clic para abrir la ficha pedagógica
+                        Haz clic para abrir la ficha pedagógica
                     </div>
                 </div>
             `;

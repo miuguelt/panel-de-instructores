@@ -8,12 +8,10 @@
 {% from 'components/_viz.html' import apilada %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
-        <h1><i data-lucide="alert-triangle" class="icon-lg" aria-hidden="true"></i> Rendimiento y alertas</h1>
+        <h1><i data-lucide="alert-triangle" class="icon-lg" aria-hidden="true"></i> Alertas</h1>
     </div>
     <div class="page-header-actions">
-        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn btn-warning">⚖️ Casos a seguimiento</a>
-        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline">🔔 Notificaciones</a>
+        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn btn-warning"><i data-lucide="scale" class="icon-sm" aria-hidden="true"></i> Casos de seguimiento</a>
     </div>
 </div>
 
@@ -31,17 +29,17 @@
 {% set en_riesgo = datos_alertas|selectattr('nivel', 'equalto', 'amarillo')|list|length %}
 {% set en_alerta = datos_alertas|selectattr('nivel', 'equalto', 'rojo')|list|length %}
 <section class="viz-panel alertas-resumen" aria-label="Resumen del estado de los aprendices">
-    {{ apilada([('En alerta', en_alerta, 'danger'), ('En riesgo', en_riesgo, 'warning'), ('Al día', al_dia, 'success')], 'Semáforo del grupo') }}
-    <p class="alertas-resumen-nota">Los aprendices en alerta aparecen primero. El semáforo combina faltas sin justificar y tareas pendientes.</p>
+    {{ apilada([('Riesgo alto', en_alerta, 'danger'), ('En seguimiento', en_riesgo, 'warning'), ('Al día', al_dia, 'success')], 'Semáforo del grupo') }}
+    <p class="alertas-resumen-nota">Los aprendices en riesgo alto aparecen primero. El semáforo combina faltas sin justificar y tareas pendientes.</p>
 </section>
 
 <div class="section-header panorama-header">
     <h2>Panorama por aprendiz</h2>
     <div class="panorama-tools">
         <span class="legend-item"><span class="dot dot-green"></span> Al día</span>
-        <span class="legend-item"><span class="dot dot-yellow"></span> Riesgo</span>
-        <span class="legend-item"><span class="dot dot-red"></span> Alerta</span>
-        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-primary btn-sm">+ Tomar Asistencia Hoy</a>
+        <span class="legend-item"><span class="dot dot-yellow"></span> En seguimiento</span>
+        <span class="legend-item"><span class="dot dot-red"></span> Riesgo alto</span>
+        <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-primary btn-sm"><i data-lucide="clipboard-check" class="icon-sm" aria-hidden="true"></i> Tomar asistencia hoy</a>
     </div>
 </div>
 
@@ -55,10 +53,10 @@
                 <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=d.aprendiz.id) }}" class="hover-link alertas-card-link">
                     <h3 class="alertas-card-title">{{ d.aprendiz.nombre }} {{ d.aprendiz.apellidos }}</h3>
                 </a>
-                <span class="text-muted alertas-card-doc">CC/TI: {{ d.aprendiz.documento }}</span>
+                <span class="text-muted alertas-card-doc"><abbr title="Cédula de ciudadanía o tarjeta de identidad">CC/TI</abbr>: {{ d.aprendiz.documento }}</span>
             </div>
             <span class="badge badge-{{ d.nivel }} alertas-card-badge">
-                {% if d.nivel == 'rojo' %}Alerta{% elif d.nivel == 'amarillo' %}Riesgo{% else %}Al día{% endif %}
+                {% if d.nivel == 'rojo' %}Riesgo alto{% elif d.nivel == 'amarillo' %}En seguimiento{% else %}Al día{% endif %}
             </span>
         </div>
 
@@ -80,21 +78,21 @@
         {% if d.tareas_pendientes > 0 %}
         <div class="alert-banner alertas-banner alertas-banner--warning">
             <div class="alertas-banner-row">
-                <span class="alertas-banner-icon">⚠️</span>
+                <span class="alertas-banner-icon" aria-hidden="true"><i data-lucide="alert-triangle" class="icon-sm"></i></span>
                 <span><strong>{{ d.tareas_pendientes }} Tarea(s)</strong> atrasada(s) o rechazada(s)</span>
             </div>
         </div>
         {% else %}
         <div class="alert-banner alertas-banner alertas-banner--ok">
             <div class="alertas-banner-row">
-                <span class="alertas-banner-icon">✅</span>
+                <span class="alertas-banner-icon" aria-hidden="true"><i data-lucide="check-circle-2" class="icon-sm"></i></span>
                 <span><strong>Al día</strong> académicamente</span>
             </div>
         </div>
         {% endif %}
 
         <div class="card-actions alertas-card-actions">
-            <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=d.aprendiz.id) }}" class="btn btn-outline alertas-card-accion">📋 Ver Historial</a>
+            <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=d.aprendiz.id) }}" class="btn btn-outline alertas-card-accion"><i data-lucide="history" class="icon-sm" aria-hidden="true"></i> Ver historial</a>
         </div>
     </div>
     {% endfor %}
@@ -102,7 +100,7 @@
 
 {% else %}
 <div class="empty-state">
-    <div class="empty-icon">📊</div>
+    <div class="empty-icon" aria-hidden="true"><i data-lucide="bar-chart-3" class="icon-lg"></i></div>
     <h3>Todavía no hay aprendices registrados</h3>
     <p>Carga los aprendices para ver el panorama general y su estado de rendimiento.</p>
 </div>
@@ -110,13 +108,13 @@
 
 <div class="alertas-configuracion">
 <details class="card cronograma-plegado">
-    <summary class="alertas-reglas-summary">Etapa lectiva, hito TyT y resultados del grupo</summary>
+    <summary class="alertas-reglas-summary">Etapa lectiva, hito <abbr title="Pruebas Saber TyT para técnicos y tecnólogos">TyT</abbr> y resultados del grupo</summary>
     {% include '_cronograma.html' %}
 </details>
 <details class="card reglamento-card alertas-hero">
     <summary class="alertas-reglas-summary">Reglas automáticas del Acuerdo 009 de 2024</summary>
     <div class="alertas-hero-head">
-        <span class="alertas-hero-icon">⚖️</span>
+        <span class="alertas-hero-icon" aria-hidden="true"><i data-lucide="scale" class="icon-md"></i></span>
         <div>
             <h3 class="alertas-hero-title">Reglas automáticas — Acuerdo 009 de 2024</h3>
             <p class="text-muted alertas-hero-text">Reglamento del Aprendiz SENA. Estas reglas se evalúan automáticamente y no requieren configuración.</p>
@@ -168,9 +166,9 @@
     <div class="alertas-hero-actions">
         <form method="POST" action="{{ url_for('seguimiento.auto_evaluar_ficha', ficha_id=ficha.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-primary btn-sm">🔄 Ejecutar revisión automática ahora</button>
+            <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="refresh-cw" class="icon-sm" aria-hidden="true"></i> Ejecutar revisión automática ahora</button>
         </form>
-        <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">📋 Planes de mejoramiento</a>
+        <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm"><i data-lucide="clipboard-list" class="icon-sm" aria-hidden="true"></i> Planes de mejoramiento</a>
     </div>
 </details>
 

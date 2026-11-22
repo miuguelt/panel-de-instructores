@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/_recomendacion_card.html" import render_alertas_contextuales %}
 {% from "components/_viz.html" import sparkline, apilada %}
-{% block title %}Llamado a lista - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Asistencia - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asistencia.css') }}">
 {% endblock %}
@@ -9,8 +9,7 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
-        <h1><i data-lucide="clipboard-check" class="icon-lg" aria-hidden="true"></i> Llamado a lista</h1>
+        <h1><i data-lucide="clipboard-check" class="icon-lg" aria-hidden="true"></i> Asistencia</h1>
     </div>
 </div>
 
@@ -21,11 +20,11 @@
         <div class="control-selectors-cluster">
             <div class="control-item">
                 <label class="control-label" for="corte-asistencia">
-                    <span class="control-icon" aria-hidden="true">📂</span>
-                    <span>Corte de trabajo</span>
+                    <span class="control-icon" aria-hidden="true"><i data-lucide="calendar-range" class="icon-sm"></i></span>
+                    <span>Periodo de evaluación</span>
                 </label>
                 <div class="control-select-wrap">
-                    <select id="corte-asistencia" onchange="window.location.href=this.value" aria-label="Seleccionar corte de trabajo">
+                    <select id="corte-asistencia" onchange="window.location.href=this.value" aria-label="Seleccionar el periodo de evaluación (corte)">
                         {% for item in cortes %}
                         <option value="{{ url_for('instructor.asistencia', ficha_id=ficha.id, corte_id=item.id) }}"
                                 {% if corte_actual and item.id == corte_actual.id %}selected{% endif %}>
@@ -51,7 +50,6 @@
     <div class="alert alert-info" style="margin-top: 10px;">Este corte es compartido y está disponible en modo consulta.</div>
     {% endif %}
     {% endif %}
-</div>
 
 {% set niveles = stats_map.values()|map(attribute='nivel')|list %}
 <section class="viz-panel asistencia-resumen" aria-label="Resumen de asistencia del grupo">
@@ -78,8 +76,8 @@
 
         {% if aprendices %}
         <div class="attendance-toolbar" data-filter-region="asistencia-toolbar">
-            <button type="button" class="btn btn-sm btn-outline" id="mark-all-present">✓ Marcar todos como “Asiste”</button>
-            <input type="search" id="asistencia-search" class="form-control" placeholder="🔍 Buscar aprendiz..." style="font-size: 13px; padding: 7px 12px; max-width: 240px;" aria-label="Buscar aprendiz en la lista de asistencia">
+            <button type="button" class="btn btn-sm btn-outline" id="mark-all-present"><i data-lucide="check-check" class="icon-sm" aria-hidden="true"></i> Marcar a todos como «Asiste»</button>
+            <input type="search" id="asistencia-search" class="form-control" placeholder="Buscar aprendiz…" style="font-size: 13px; padding: 7px 12px; max-width: 240px;" aria-label="Buscar aprendiz en la lista de asistencia">
             <span id="attendance-summary" role="status" aria-live="polite"></span>
         </div>
         <div class="asistencia-list">
@@ -109,7 +107,7 @@
                             aria-label="Ver detalles y novedades de {{ ap.nombre }} {{ ap.apellidos }}">{{ ap.nombre }} {{ ap.apellidos }}</button>
                     <span class="badge badge-{{ ap.estado|tono_estado }} estado-mini">{{ ap.estado|etiqueta_estado }}</span>
                     {% if stats.faltas_no_justificadas >= 3 %}
-                    <span class="racha-alerta" title="Atención: acumula {{ stats.faltas_no_justificadas }} faltas no justificadas">⚠️ {{ stats.faltas_no_justificadas }} faltas</span>
+                    <span class="racha-alerta" title="Atención: acumula {{ stats.faltas_no_justificadas }} faltas no justificadas"><i data-lucide="alert-triangle" class="icon-sm" aria-hidden="true"></i> {{ stats.faltas_no_justificadas }} faltas</span>
                     {% endif %}
                 </div>
 
@@ -170,7 +168,7 @@
                 </div>
                 <div class="sticky-save-actions">
                     <button type="submit" class="btn btn-primary">
-                        💾 Guardar asistencia
+                        <i data-lucide="save" class="icon-sm" aria-hidden="true"></i> Guardar asistencia
                     </button>
                 </div>
             </div>
@@ -178,10 +176,10 @@
         {% endif %}
         {% else %}
         <div class="empty-state">
-            <div class="empty-icon">👥</div>
+            <div class="empty-icon" aria-hidden="true"><i data-lucide="users" class="icon-lg"></i></div>
             <h3>No hay aprendices para el llamado a lista</h3>
             <p>El llamado a lista incluye aprendices en formación y condicionados. Carga o actualiza los aprendices antes de continuar.</p>
-            <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-primary">Cargar Aprendices</a>
+            <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-primary">Cargar aprendices</a>
         </div>
         {% endif %}
     </form>

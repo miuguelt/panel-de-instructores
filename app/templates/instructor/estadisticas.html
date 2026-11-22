@@ -8,7 +8,6 @@
 {% from 'components/_viz.html' import kpi, barra, dona, apilada %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
         <h1>Estadísticas de la ficha {{ ficha.codigo }}</h1>
     </div>
 </div>
@@ -314,7 +313,7 @@
 
 
 <details class="card cronograma-plegado">
-    <summary class="alertas-reglas-summary">Etapa lectiva, hito TyT y resultados del grupo</summary>
+    <summary class="alertas-reglas-summary">Etapa lectiva, hito <abbr title="Pruebas Saber TyT para técnicos y tecnólogos">TyT</abbr> y resultados del grupo</summary>
     {% include '_cronograma.html' %}
 </details>
 

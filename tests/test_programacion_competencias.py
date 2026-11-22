@@ -774,7 +774,8 @@ class ProgramacionCompetenciasTestCase(unittest.TestCase):
 
         # Verificar badge de fase de competencia
         self.assertIn('badge-fase', html)
-        self.assertIn('📌', html)
+        self.assertRegex(html, r'class="badge badge-fase"[^>]*><i data-lucide="pin"')
+        self.assertNotIn('📌', html)
 
 
 

@@ -65,7 +65,7 @@ class PlaneacionRouteTestCase(unittest.TestCase):
         )
         cuerpo = pagina.get_data(as_text=True)
         self.assertEqual(pagina.status_code, 200)
-        self.assertIn('Línea de tiempo de la ficha', cuerpo)
+        self.assertIn('<title>Planeación - ', cuerpo)
         self.assertIn('<h2>Cronograma de la ficha</h2>', cuerpo)
         self.assertIn('data-gantt-target="evento-0-0"', cuerpo)
         self.assertIn('Etapa productiva', cuerpo)
@@ -286,7 +286,7 @@ class PlaneacionRouteTestCase(unittest.TestCase):
         self.assertEqual(pagina.status_code, 200)
         self.assertEqual(ArchivoFichaVersion.query.count(), 3)
         cuerpo = pagina.get_data(as_text=True)
-        self.assertIn('Línea de tiempo de la ficha', cuerpo)
+        self.assertIn('<title>Planeación - ', cuerpo)
         # Con las tres fuentes sincronizadas, el centro de carga se muestra compacto
         self.assertIn('Fuentes sincronizadas', cuerpo)
         self.assertIn('Actualizar archivos fuente', cuerpo)
@@ -396,7 +396,7 @@ class PlaneacionRouteTestCase(unittest.TestCase):
         self.assertEqual(resp_carga.status_code, 200)
         cuerpo_post = resp_carga.get_data(as_text=True)
         # Ahora se contrastan las fuentes y se genera el análisis
-        self.assertIn('Línea de tiempo de la ficha', cuerpo_post)
+        self.assertIn('<title>Planeación - ', cuerpo_post)
         self.assertIn('2 de 3 archivos', cuerpo_post)
 
 

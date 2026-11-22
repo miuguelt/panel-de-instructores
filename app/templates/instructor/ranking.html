@@ -10,7 +10,6 @@
 {% block content %}
 <div class="page-header ranking-heading">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
         <h1><i data-lucide="trophy" class="icon-lg" aria-hidden="true"></i> Ranking de participación</h1>
     </div>
     <div class="page-header-actions">
@@ -27,8 +26,8 @@
     <div class="control-selectors-cluster">
         <div class="control-item ranking-cut-selector">
             <label class="control-label" for="corte-ranking">
-                <span class="control-icon" aria-hidden="true">📂</span>
-                <span>Corte de trabajo</span>
+                <span class="control-icon" aria-hidden="true"><i data-lucide="calendar-range" class="icon-sm"></i></span>
+                <span>Periodo de evaluación</span>
             </label>
             <div class="control-select-wrap">
                 <select id="corte-ranking" onchange="window.location.href=this.value"

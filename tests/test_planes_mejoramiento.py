@@ -632,10 +632,10 @@ class PlanesMejoramientoWebTestCase(unittest.TestCase):
         html = panel.get_data(as_text=True)
         self.assertIn('aria-label="Asistencia: 100%"', html)
         self.assertIn('1 de 1 sesiones', html)
-        self.assertNotIn('📅 Asistencia', tarjetas)
+        self.assertNotIn('Asistencia', tarjetas)
 
         for metrica, nombre_aria, valor, texto in (
-            ('📋 Evidencias', 'Evidencias entregadas', '0', '0 de 1 evidencias entregadas'),
+            ('Evidencias', 'Evidencias entregadas', '0', '0 de 1 evidencias entregadas'),
         ):
             with self.subTest(metrica=metrica):
                 tarjeta = tarjetas[metrica]

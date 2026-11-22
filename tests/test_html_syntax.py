@@ -15,6 +15,14 @@ class HTMLSyntaxTestCase(unittest.TestCase):
             os.path.join('grupos', 'podio_grupos.html'),
             os.path.join('instructor', 'fila_atencion.html'),
             os.path.join('aprendiz', 'panel.html'),
+            os.path.join('instructor', 'asistencia.html'),
+            os.path.join('instructor', 'alertas.html'),
+            os.path.join('instructor', 'tareas.html'),
+            os.path.join('instructor', '_tarea_card.html'),
+            os.path.join('instructor', 'juicios.html'),
+            os.path.join('instructor', 'planeacion.html'),
+            os.path.join('instructor', 'turnos_aseo.html'),
+            os.path.join('instructor', 'vision_general.html'),
         ]
         
         for rel_path in archivos_a_verificar:

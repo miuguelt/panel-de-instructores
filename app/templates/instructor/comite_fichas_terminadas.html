@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Fichas terminadas: remisiones a comité - SENA Control{% endblock %}
+{% block title %}Comité - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
 {% endblock %}
@@ -7,8 +7,8 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al panel">&larr; Volver</a>
-        <h1>Fichas terminadas: remisiones a comité</h1>
+        <h1><i data-lucide="users" class="icon-lg" aria-hidden="true"></i> Comité</h1>
+        <p class="text-muted">Fichas terminadas y remisiones a comité.</p>
     </div>
     <div class="page-header-actions">
         <a href="{{ url_for('comite.normativa') }}" class="btn btn-outline">Normativa SENA</a>

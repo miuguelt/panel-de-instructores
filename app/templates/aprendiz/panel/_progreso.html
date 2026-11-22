@@ -10,7 +10,7 @@
             <div class="progress-card">
                 {% set c_jui = 'var(--success)' if stats_juicios.pct_total >= 80 else ('var(--warning)' if stats_juicios.pct_total >= 50 else 'var(--danger)') %}
                 <div class="progress-card-header">
-                    <span class="progress-card-label">🎓 Juicios Evaluativos</span>
+                    <span class="progress-card-label"><i data-lucide="graduation-cap" class="icon-sm" aria-hidden="true"></i> Juicios evaluativos</span>
                     <span class="progress-card-value" style="--metric-color: {{ c_jui }};">{{ stats_juicios.pct_total }}%</span>
                 </div>
                 <div class="progress-card-track">
@@ -46,7 +46,7 @@
                 {% set pct_ev = pct_evidencias if tareas_individuales else 0 %}
                 {% set c_ev = 'var(--success)' if pct_ev >= 80 else ('var(--warning)' if pct_ev >= 50 else 'var(--danger)') %}
                 <div class="progress-card-header">
-                    <span class="progress-card-label">📋 Evidencias</span>
+                    <span class="progress-card-label"><i data-lucide="clipboard-list" class="icon-sm" aria-hidden="true"></i> Evidencias</span>
                     <span class="progress-card-value" style="--metric-color: {{ c_ev }};">{{ pct_ev }}%</span>
                 </div>
                 <div class="progress-card-track" role="progressbar"
@@ -70,7 +70,7 @@
                 {% set pct_rank = fila_propia.barra_puntaje if fila_propia else 0 %}
                 {% set c_rank = 'var(--success)' if pct_rank >= 80 else ('var(--warning)' if pct_rank >= 50 else 'var(--danger)') %}
                 <div class="progress-card-header">
-                    <span class="progress-card-label">🏆 Ranking</span>
+                    <span class="progress-card-label"><i data-lucide="trophy" class="icon-sm" aria-hidden="true"></i> Ranking</span>
                     <span class="progress-card-value" style="--metric-color: {{ c_rank }};">{{ '%.1f'|format(pct_rank) }}%</span>
                 </div>
                 <div class="progress-card-track">

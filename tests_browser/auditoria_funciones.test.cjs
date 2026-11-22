@@ -147,7 +147,7 @@ test('la selección de competencias trata el nombre del instructor como texto', 
     paginas.set('/juicios', pagina('<script id="comp-data" type="application/json">[{"nombre":"Competencia de prueba"}]</script><div id="comp-card-0"><button class="comp-select-btn">Seleccionar</button></div>', controlador));
     const page = await browser.newPage(); await page.goto(`${url}/juicios`);
     await page.evaluate(() => toggleSeleccionCompetencia(1, 'Competencia de prueba', 0));
-    await page.waitForFunction(() => document.querySelector('.comp-select-btn').textContent.includes('👤'));
+    await page.waitForFunction(() => document.querySelector('.comp-select-btn').textContent.includes('<img src=x'));
     assert.equal(await page.locator('.comp-select-btn img').count(), 0);
     assert.ok((await page.locator('.comp-select-btn').textContent()).includes('<img src=x'));
     assert.equal(await page.evaluate(() => Boolean(window.inyeccion)), false);

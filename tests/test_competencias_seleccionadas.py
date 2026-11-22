@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from app import create_app, db
 from app.models import Ficha, Instructor, FichaInstructor, JuicioEvaluativo, FichaCompetenciaSeleccionada, Aprendiz
@@ -134,19 +135,18 @@ class CompetenciasSeleccionadasTestCase(unittest.TestCase):
         data = res.get_json()
         self.assertFalse(data['success'])
 
-    def test_juicios_header_in_navbar(self):
+    def test_juicios_usa_la_cabecera_comun(self):
         self._autenticar(self.inst1)
         res = self.client.get(f'/instructor/fichas/{self.ficha.id}/juicios')
         self.assertEqual(res.status_code, 200)
         html = res.get_data(as_text=True)
-        # Verificar que la barra contextual aparece en el navbar
-        self.assertIn('nav-context-slot', html)
-        self.assertIn('nav-context-bar', html)
-        self.assertIn('nav-context-btn-back', html)
-        self.assertIn('Juicios de evaluación', html)
-        self.assertIn('Analizar planeación', html)
-        # Verificar que el header antiguo no duplica el contenido dentro de juicios-container
-        self.assertNotIn('<div class="page-header">\n        <div class="page-title-cluster">', html)
+        # La cabecera es la común (page_header) y el título coincide con el menú.
+        self.assertNotIn('nav-context', html)
+        cabecera = re.search(r'<header class="page-header\s*">(.*?)</header>', html, re.S)
+        self.assertIsNotNone(cabecera)
+        self.assertRegex(cabecera.group(1), r'<h1>Juicios</h1>')
+        self.assertIn('Cargar juicios', cabecera.group(1))
+        self.assertIn('Analizar planeación', cabecera.group(1))
 
     def test_modal_detalle_competencia_estructura_y_dialogo(self):
         self._autenticar(self.inst1)

@@ -100,13 +100,23 @@ class VisionGeneralOrdenTestCase(unittest.TestCase):
         self.assertEqual(sum(f'Recomendación {i}' in visibles for i in range(5)), 3)
         self.assertIn('Ver 2 recomendaciones más', centro)
 
-    def test_cabecera_con_una_accion_principal_y_dos_secundarias(self):
+    def test_cabecera_no_repite_los_modulos_del_menu_de_la_ficha(self):
         ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
         html = self.pagina(ficha)
         cabecera = html[html.index('class="page-header vision-header"'):html.index('</header>', html.index('vision-header'))]
-        self.assertEqual(cabecera.count('btn-primary'), 1)
-        self.assertEqual(cabecera.count('btn btn-outline btn-sm"'), 2)
-        self.assertIn('popovertarget="vision-mas-acciones"', cabecera)
+        for modulo in ('asistencia', 'tareas', 'alertas', 'grupos', 'fila-atencion', 'estadisticas'):
+            self.assertNotIn(f'/instructor/fichas/{ficha.id}/{modulo}', cabecera, modulo)
+        self.assertNotIn('vision-mas-acciones', html)
+        self.assertNotIn('Llamado a lista', cabecera)
+        # La barra de la ficha sigue ofreciendo esos accesos.
+        nav = re.search(r'<nav class="ficha-nav"[\s\S]*?</nav>', html).group(0)
+        self.assertIn(f'/instructor/fichas/{ficha.id}/asistencia', nav)
+        self.assertIn(f'/instructor/fichas/{ficha.id}/alertas', nav)
+
+    def test_volver_lleva_a_inicio_con_la_etiqueta_del_menu(self):
+        ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
+        html = self.pagina(ficha)
+        self.assertRegex(html, r'<a href="/instructor/"[^>]*class="btn-back"[^>]*>&larr; Inicio</a>')
 
     def test_no_repite_la_rejilla_de_modulos_del_menu(self):
         ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))

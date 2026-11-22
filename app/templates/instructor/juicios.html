@@ -1,34 +1,22 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
 {% from 'components/_viz.html' import kpi, barra, dona, apilada %}
-{% block title %}Juicios evaluativos - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% from 'components/_ui.html' import page_header %}
+{% block title %}Juicios - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/juicios.css') }}">
 {% endblock %}
 
-{% block nav_center %}
-<div class="nav-context-slot">
-    <div class="nav-context-bar" role="region" aria-label="Contexto de la vista de Juicios">
-        <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="nav-context-btn-back" title="Volver a la visión general de la ficha">&larr; Visión general</a>
-        <span class="nav-context-divider" aria-hidden="true"></span>
-        <h1 class="nav-context-title">
-            <span class="nav-context-icon" aria-hidden="true"><i data-lucide="graduation-cap" class="icon-md"></i></span>
-            <span class="nav-context-text">Juicios de evaluación<span class="nav-context-title-ext"> oficiales</span></span>
-        </h1>
-        <span class="nav-context-divider" aria-hidden="true"></span>
-        <button type="button" class="nav-context-btn-action nav-context-btn-action--primary" onclick="document.getElementById('modal-cargar-juicios').showModal()" title="Cargar o actualizar el Reporte de Juicios de SOFIA Plus">
-            <span class="nav-context-btn-icon" aria-hidden="true">📋</span>
-            <span>Cargar Juicios</span>
-        </button>
-        <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="nav-context-btn-action" title="Analizar planeación pedagógica">
-            <span class="nav-context-btn-icon" aria-hidden="true">🧭</span>
-            <span>Analizar planeación</span>
-        </a>
-    </div>
-</div>
-{% endblock %}
 
 {% block content %}
+{% call page_header('Juicios', subtitulo='Juicios de evaluación oficiales reportados en SOFIA Plus.', icono='graduation-cap') %}
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-cargar-juicios').showModal()" title="Cargar o actualizar el reporte de juicios de SOFIA Plus">
+        <i data-lucide="upload" class="icon-sm" aria-hidden="true"></i> Cargar juicios
+    </button>
+    <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="btn btn-outline" title="Analizar la planeación pedagógica">
+        <i data-lucide="compass" class="icon-sm" aria-hidden="true"></i> Analizar planeación
+    </a>
+{% endcall %}
 
 
 <div class="juicios-container">
@@ -49,7 +37,7 @@
                 <header class="app-modal-header">
                     <div class="app-modal-header-copy">
                         <span class="app-modal-eyebrow">Juicios evaluativos</span>
-                        <h2 id="modal-cargar-juicios-titulo"><span aria-hidden="true">📋</span> Cargar Reporte de Juicios Evaluativos</h2>
+                        <h2 id="modal-cargar-juicios-titulo"><i data-lucide="upload" class="icon-sm" aria-hidden="true"></i> Cargar reporte de juicios evaluativos</h2>
                     </div>
                     <button type="button" class="app-modal-close" onclick="document.getElementById('modal-cargar-juicios').close()" aria-label="Cerrar">&times;</button>
                 </header>
@@ -126,7 +114,7 @@
                 <p style="margin:0; font-size:.83rem; color:var(--text-muted)">Haz clic en una competencia para ver el análisis detallado</p>
             </div>
             <div style="display:flex; gap:.75rem; flex-wrap:wrap; flex: 1; max-width: 400px;">
-                <input type="text" id="comp-search" placeholder="🔍 Buscar competencia…" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; width:100%; border-radius:8px;">
+                <input type="text" id="comp-search" placeholder="Buscar competencia…" class="form-control" style="font-size:.85rem; padding:.5rem .8rem; width:100%; border-radius:8px;">
             </div>
         </div>
 
@@ -134,7 +122,7 @@
         <div style="margin-bottom:.85rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:8px; padding:.5rem .85rem; font-size:.8rem;">
             <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
                 <span style="font-weight:700; color:var(--text-strong); display:flex; align-items:center; gap:.35rem;">
-                    ⏱️ Etapa lectiva: {{ auditoria_duracion.meses_lectivos }} meses
+                    <i data-lucide="timer" class="icon-sm" aria-hidden="true"></i> Etapa lectiva: {{ auditoria_duracion.meses_lectivos }} meses
                 </span>
                 <span class="text-muted">({{ auditoria_duracion.inicio_lectiva_texto }} – {{ auditoria_duracion.fin_lectiva_texto }})</span>
                 {% if auditoria_duracion.meses_productivos > 0 %}
@@ -144,7 +132,7 @@
             </div>
             <div>
                 {% if auditoria_duracion.cumple_21_meses %}
-                <span class="badge badge-solid-success" style="font-size:.72rem; padding:2px 8px; font-weight:700;">✓ 21 meses lectiva</span>
+                <span class="badge badge-solid-success" style="font-size:.72rem; padding:2px 8px; font-weight:700;"><i data-lucide="check" class="icon-sm" aria-hidden="true"></i> 21 meses lectiva</span>
                 {% else %}
                 <span class="badge" style="font-size:.72rem; padding:2px 8px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border-subtle);">{{ auditoria_duracion.meses_lectivos }} meses</span>
                 {% endif %}
@@ -154,10 +142,10 @@
 
         <div class="comp-filter-pills" style="display:flex; gap:8px; flex-wrap:wrap;">
             <button type="button" class="btn btn-sm btn-primary comp-filter-pill is-active" data-filter="">Todas</button>
-            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="mis-competencias">⭐ Mis Competencias</button>
-            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="tecnica">💻 Técnicas</button>
-            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="transversal">🌱 Transversales</button>
-            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="ingles">🌐 Inglés</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="mis-competencias"><i data-lucide="star" class="icon-sm" aria-hidden="true"></i> Mis competencias</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="tecnica"><i data-lucide="monitor" class="icon-sm" aria-hidden="true"></i> Técnicas</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="transversal"><i data-lucide="sprout" class="icon-sm" aria-hidden="true"></i> Transversales</button>
+            <button type="button" class="btn btn-sm btn-outline comp-filter-pill" data-filter="ingles"><i data-lucide="globe" class="icon-sm" aria-hidden="true"></i> Inglés</button>
         </div>
     </div>
 
@@ -230,23 +218,23 @@
         <div class="comp-card-header">
             <div class="comp-card-title">{{ comp.nombre }}</div>
             {% if comp.pct == 100 %}
-                <span class="badge badge-solid-success" style="font-size:.75rem; padding:3px 8px; white-space:nowrap;">✓ Completa</span>
+                <span class="badge badge-solid-success" style="font-size:.75rem; padding:3px 8px; white-space:nowrap;"><i data-lucide="check" class="icon-sm" aria-hidden="true"></i> Completa</span>
             {% elif comp.aprobados > 0 %}
-                <span class="badge badge-solid-warning" style="font-size:.75rem; padding:3px 8px; white-space:nowrap;">⚡ En progreso</span>
+                <span class="badge badge-solid-warning" style="font-size:.75rem; padding:3px 8px; white-space:nowrap;"><i data-lucide="zap" class="icon-sm" aria-hidden="true"></i> En progreso</span>
             {% else %}
-                <span class="badge" style="font-size:.75rem; padding:3px 8px; white-space:nowrap; background:var(--bg-surface); color:var(--text-muted); border:1px solid var(--border-subtle);">⏳ Pendiente</span>
+                <span class="badge" style="font-size:.75rem; padding:3px 8px; white-space:nowrap; background:var(--bg-surface); color:var(--text-muted); border:1px solid var(--border-subtle);"><i data-lucide="hourglass" class="icon-sm" aria-hidden="true"></i> Pendiente</span>
             {% endif %}
         </div>
         <div class="comp-card-meta">
             <span class="badge {{ badge_cls }}" style="font-size:.72rem; padding:2px 7px;">{{ tipo_label }}</span>
             {% if comp.fase %}
-                <span class="badge badge-fase" title="Fase del proyecto formativo">📌 {{ comp.fase }}</span>
+                <span class="badge badge-fase" title="Fase del proyecto formativo"><i data-lucide="pin" class="icon-sm" aria-hidden="true"></i> {{ comp.fase }}</span>
             {% endif %}
-            <span style="font-size:.82rem; color:var(--text-muted)">{{ comp.detalles | map(attribute='rap') | unique | list | length }} RAPs</span>
+            <span style="font-size:.82rem; color:var(--text-muted)">{{ comp.detalles | map(attribute='rap') | unique | list | length }} <abbr title="Resultados de aprendizaje">RAP</abbr></span>
             {% if comp.horas %}
-                <span class="badge" style="font-size:.72rem; padding:2px 7px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;" title="Horas de formación">⏱️ {{ comp.horas | round(0) | int }} h</span>
+                <span class="badge" style="font-size:.72rem; padding:2px 7px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;" title="Horas de formación"><i data-lucide="timer" class="icon-sm" aria-hidden="true"></i> {{ comp.horas | round(0) | int }} h</span>
             {% elif comp.horas_planeadas %}
-                <span class="badge" style="font-size:.72rem; padding:2px 7px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;" title="Horas planeadas">⏱️ {{ comp.horas_planeadas | round(0) | int }} h</span>
+                <span class="badge" style="font-size:.72rem; padding:2px 7px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;" title="Horas planeadas"><i data-lucide="timer" class="icon-sm" aria-hidden="true"></i> {{ comp.horas_planeadas | round(0) | int }} h</span>
             {% endif %}
 
             <button type="button"
@@ -254,17 +242,17 @@
                     onclick="event.stopPropagation(); toggleSeleccionCompetencia({{ ficha.id }}, null, {{ loop.index0 }});"
                     title="{{ 'Clic para deseleccionar' if is_own else ('Seleccionada por ' ~ sel_info.nombre ~ ' - Clic para tomarla' if is_sel else 'Clic para seleccionar esta competencia') }}">
                 {% if is_own %}
-                    📌 Seleccionada por ti
+                    Seleccionada por ti
                 {% elif is_sel %}
-                    👤 {{ sel_info.nombre }}
+                    {{ sel_info.nombre }}
                 {% else %}
-                    📌 Seleccionar
+                    Seleccionar
                 {% endif %}
             </button>
         </div>
         <div class="comp-fechas-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.65rem; padding:.35rem .65rem; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:8px; font-size:.78rem;">
             <div style="display:flex; align-items:center; gap:.4rem; color:var(--text-strong); font-weight:600;">
-                <span aria-hidden="true">📅</span>
+                <span aria-hidden="true"><i data-lucide="calendar" class="icon-sm"></i></span>
                 <span id="comp-fechas-txt-{{ loop.index0 }}">
                     {% if comp.fecha_inicio_texto and comp.fecha_fin_texto %}
                         {{ comp.fecha_inicio_texto }} &ndash; {{ comp.fecha_fin_texto }}
@@ -288,7 +276,7 @@
         </div>
         <div class="comp-card-footer">
             <span>{{ comp.pendientes }} pendientes</span>
-            <span class="comp-open-hint">📊 Ver análisis detallado &rsaquo;</span>
+            <span class="comp-open-hint"><i data-lucide="bar-chart-3" class="icon-sm" aria-hidden="true"></i> Ver análisis detallado &rsaquo;</span>
         </div>
     </div>
     {% endfor %}
@@ -296,11 +284,11 @@
     </div>
     {% else %}
     <div class="empty-state card" style="text-align:center; padding:2.5rem 1rem;">
-        <div class="empty-icon" style="font-size:2.5rem; margin-bottom:0.75rem;">📑</div>
-        <h3 style="color:var(--text-strong); margin-bottom:0.5rem;">Sin Juicios Evaluativos</h3>
+        <div class="empty-icon" style="font-size:2.5rem; margin-bottom:0.75rem;" aria-hidden="true"><i data-lucide="file-spreadsheet" class="icon-lg"></i></div>
+        <h3 style="color:var(--text-strong); margin-bottom:0.5rem;">Sin juicios evaluativos</h3>
         <p style="color:var(--text-muted); max-width:100%; margin:0 auto 1.5rem;">Sube el archivo Excel oficial de SOFIA Plus (.xls o .xlsx) para ver el desglose agrupado por competencias y el progreso de los aprendices.</p>
         <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-cargar-juicios').showModal()">
-            <span aria-hidden="true">↑</span> Subir Reporte de SOFIA Plus
+            <i data-lucide="upload" class="icon-sm" aria-hidden="true"></i> Subir reporte de SOFIA Plus
         </button>
     </div>
     {% endif %}
@@ -358,7 +346,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=stat.aprendiz.id) }}" class="btn btn-sm btn-outline" style="border-radius:6px; font-weight:600;">Ver Historial</a>
+                                <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=stat.aprendiz.id) }}" class="btn btn-sm btn-outline" style="border-radius:6px; font-weight:600;">Ver historial</a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -391,7 +379,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.5rem; margin-bottom:.85rem;">
                     <div>
                         <div style="font-size:.92rem; font-weight:700; color:var(--text-strong); display:flex; align-items:center; gap:.45rem;">
-                            <span aria-hidden="true">📅</span> Programación de fechas de la competencia
+                            <i data-lucide="calendar" class="icon-sm" aria-hidden="true"></i> Programación de fechas de la competencia
                             <span id="modal-comp-prog-badge" class="badge" style="font-size:.7rem; padding:2px 7px;">—</span>
                         </div>
                         <p id="modal-comp-prog-desc" style="margin:.3rem 0 0; font-size:.78rem; color:var(--text-muted); line-height:1.4;">
@@ -412,7 +400,7 @@
                         <input type="date" id="modal-input-fecha-fin" class="form-control" style="font-size:.82rem; padding:.35rem .6rem; border-radius:8px; border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-strong);">
                     </div>
                     <button type="button" id="modal-btn-guardar-fecha" class="btn btn-sm btn-primary" style="font-size:.82rem; padding:.45rem 1rem; border-radius:8px; display:inline-flex; align-items:center; gap:.4rem;" onclick="guardarProgramacionFechas()">
-                        <span aria-hidden="true">💾</span> Guardar fechas
+                        <i data-lucide="save" class="icon-sm" aria-hidden="true"></i> Guardar fechas
                     </button>
                 </div>
             </div>
@@ -437,20 +425,20 @@
 
                 <!-- Evaluadores -->
                 <div style="flex:1; min-width:200px;">
-                    <div class="rap-section-title">👨‍🏫 Evaluadores registrados</div>
+                    <div class="rap-section-title"><i data-lucide="user-round" class="icon-sm" aria-hidden="true"></i> Evaluadores registrados</div>
                     <div id="modal-evaluadores"></div>
                 </div>
             </div>
 
             <!-- RAPs breakdown -->
             <div>
-                <div class="rap-section-title">📋 Resultados de Aprendizaje (RAPs)</div>
+                <div class="rap-section-title"><i data-lucide="clipboard-list" class="icon-sm" aria-hidden="true"></i> Resultados de aprendizaje (<abbr title="Resultados de aprendizaje">RAP</abbr>)</div>
                 <div id="modal-raps"></div>
             </div>
 
             <!-- Aprendices pendientes -->
             <div id="modal-pendientes-section">
-                <div class="rap-section-title is-danger">⚠️ Aprendices con RAPs pendientes</div>
+                <div class="rap-section-title is-danger"><i data-lucide="alert-triangle" class="icon-sm" aria-hidden="true"></i> Aprendices con <abbr title="Resultados de aprendizaje">RAP</abbr> pendientes</div>
                 <div class="pendientes-list" id="modal-pendientes"></div>
             </div>
         </div>
@@ -554,7 +542,7 @@
 
     function statusBadge(estado) {
         if (estado === 'APROBADO')
-            return `<span class="badge badge-solid-success" style="font-size:.72rem;padding:2px 7px;">✓ APROBADO</span>`;
+            return `<span class="badge badge-solid-success" style="font-size:.72rem;padding:2px 7px;">APROBADO</span>`;
         return `<span class="badge badge-solid-warning" style="font-size:.72rem;padding:2px 7px;">${escapeHtml(estado)}</span>`;
     }
 
@@ -596,10 +584,10 @@
         if (progBadge) {
             if (comp.es_programacion_manual) {
                 progBadge.className = 'badge badge-solid-success';
-                progBadge.textContent = '✓ Programada';
+                progBadge.textContent = 'Programada';
                 progBadge.style.cssText = 'font-size:.7rem; padding:2px 7px; background:#059669; color:#fff;';
                 if (btnReset) btnReset.style.display = 'inline-flex';
-                if (progDesc) progDesc.innerHTML = `📌 <strong>Fecha programada por el instructor</strong> (${escapeHtml(comp.instructor_programo || 'Instructor')}). Los RAPs se encuentran distribuidos acorde a este periodo.`;
+                if (progDesc) progDesc.innerHTML = `<strong>Fecha programada por el instructor</strong> (${escapeHtml(comp.instructor_programo || 'Instructor')}). Los RAPs se encuentran distribuidos acorde a este periodo.`;
             } else {
                 progBadge.className = 'badge';
                 progBadge.textContent = 'Estimada';
@@ -622,19 +610,19 @@
         if (comp.esta_seleccionada && comp.seleccionada_por) {
             const nomEsc = escapeHtml(comp.seleccionada_por.nombre);
             if (comp.seleccionada_por.es_propia) {
-                selBadgeHtml = `<button type="button" class="comp-select-btn is-own" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">📌 Seleccionada por ti (Deseleccionar)</button>`;
+                selBadgeHtml = `<button type="button" class="comp-select-btn is-own" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">Seleccionada por ti (deseleccionar)</button>`;
             } else {
-                selBadgeHtml = `<button type="button" class="comp-select-btn is-other" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">👤 Seleccionada por ${nomEsc} (Tomar)</button>`;
+                selBadgeHtml = `<button type="button" class="comp-select-btn is-other" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">Seleccionada por ${nomEsc} (tomar)</button>`;
             }
         } else {
-            selBadgeHtml = `<button type="button" class="comp-select-btn" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">📌 Seleccionar competencia</button>`;
+            selBadgeHtml = `<button type="button" class="comp-select-btn" onclick="toggleSeleccionCompetencia({{ ficha.id }}, null, ${idx})">Seleccionar competencia</button>`;
         }
 
         let horasBadge = '';
         if (comp.horas) {
-            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${escapeHtml(String(comp.horas))} horas</span> `;
+            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">${escapeHtml(String(comp.horas))} horas</span> `;
         } else if (comp.horas_planeadas) {
-            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">⏱️ ${escapeHtml(String(comp.horas_planeadas))} horas planeadas</span> `;
+            horasBadge = `<span class="badge" style="font-size:.74rem; padding:2px 8px; background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-weight:600;">${escapeHtml(String(comp.horas_planeadas))} horas planeadas</span> `;
         }
 
         metaEl.innerHTML = badgeHtml(comp.tipo) + ' ' +
@@ -688,7 +676,7 @@
         evalsEl.innerHTML = evalSorted.length
             ? evalSorted.map(([name, count]) => `
                 <div class="eval-row" style="display:flex; justify-content:space-between; align-items:center; padding:.5rem .8rem; margin-bottom:.4rem; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:8px;">
-                    <span class="eval-name" style="font-weight:700; color:var(--text-strong); font-size:.84rem;">👨‍🏫 ${escapeHtml(name)}</span>
+                    <span class="eval-name" style="font-weight:700; color:var(--text-strong); font-size:.84rem;">${escapeHtml(name)}</span>
                     <span class="badge badge-tech" style="font-size:.75rem; padding:3px 8px;">${count} juicio${count !== 1 ? 's' : ''}</span>
                 </div>`).join('')
             : '<p style="color:var(--text-muted);font-size:.85rem;margin:0;">Sin evaluadores registrados en SOFIA Plus.</p>';
@@ -712,25 +700,25 @@
                     </div>
                     <div class="rap-aprendiz-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:.25rem; flex-shrink:0;">
                         ${statusBadge(d.estado)}
-                        <span style="font-size:.72rem; color:var(--text-muted); font-weight:600;">👨‍🏫 ${escapeHtml(d.evaluador && d.evaluador !== '-' ? d.evaluador : 'SOFIA Plus')}</span>
+                        <span style="font-size:.72rem; color:var(--text-muted); font-weight:600;">${escapeHtml(d.evaluador && d.evaluador !== '-' ? d.evaluador : 'SOFIA Plus')}</span>
                     </div>
                 </div>`).join('');
 
             const rapDist = (comp.raps_distribucion_mapa && comp.raps_distribucion_mapa[rap]) || null;
             let rapFechaHtml = '';
             if (rapDist && rapDist.fecha_inicio_texto && rapDist.fecha_fin_texto) {
-                rapFechaHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">📅 ${escapeHtml(rapDist.fecha_inicio_texto)} al ${escapeHtml(rapDist.fecha_fin_texto)} · ${escapeHtml(String(rapDist.dias))} días</span>`;
+                rapFechaHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">${escapeHtml(rapDist.fecha_inicio_texto)} al ${escapeHtml(rapDist.fecha_fin_texto)} · ${escapeHtml(String(rapDist.dias))} días</span>`;
             }
             let rapHorasHtml = '';
             if (rapDist && rapDist.horas) {
-                rapHorasHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">⏱️ ${escapeHtml(String(rapDist.horas))} h</span>`;
+                rapHorasHtml = `<span class="badge" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:var(--text-strong); font-size:.74rem; font-weight:700; padding:2px 8px;">${escapeHtml(String(rapDist.horas))} h</span>`;
             }
 
             return `
             <div class="rap-item" style="margin-bottom:.75rem; border:1px solid var(--border-subtle); border-radius:10px; overflow:hidden; background:var(--bg-surface);">
                 <div class="rap-item-header" onclick="toggleRap(this)" data-open="false" style="padding:.8rem 1rem; display:flex; justify-content:space-between; align-items:center; gap:.8rem; cursor:pointer; background:var(--bg-card);">
                     <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:.3rem;">
-                        <div class="rap-item-title" style="font-size:.88rem; font-weight:700; color:var(--text-strong); line-height:1.4;">📋 ${escapeHtml(rap)}</div>
+                        <div class="rap-item-title" style="font-size:.88rem; font-weight:700; color:var(--text-strong); line-height:1.4;">${escapeHtml(rap)}</div>
                         ${(rapHorasHtml || rapFechaHtml) ? `<div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">${rapHorasHtml}${rapFechaHtml}</div>` : ''}
                     </div>
                     <div class="rap-item-stats" style="display:flex; gap:.6rem; align-items:center; flex-shrink:0;">
@@ -981,21 +969,21 @@
                         card.classList.add('is-selected-own');
                         if (btn) {
                             btn.className = 'comp-select-btn is-own';
-                            btn.innerHTML = '📌 Seleccionada por ti';
+                            btn.innerHTML = 'Seleccionada por ti';
                             btn.title = 'Clic para deseleccionar';
                         }
                     } else {
                         card.classList.add('is-selected-other');
                         if (btn) {
                             btn.className = 'comp-select-btn is-other';
-                            btn.textContent = `👤 ${data.seleccionada_por.nombre}`;
+                            btn.textContent = `${data.seleccionada_por.nombre}`;
                             btn.title = `Seleccionada por ${data.seleccionada_por.nombre} - Clic para tomarla`;
                         }
                     }
                 } else {
                     if (btn) {
                         btn.className = 'comp-select-btn';
-                        btn.innerHTML = '📌 Seleccionar';
+                        btn.innerHTML = 'Seleccionar';
                         btn.title = 'Clic para seleccionar esta competencia';
                     }
                 }

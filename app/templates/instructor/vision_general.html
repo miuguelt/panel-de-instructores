@@ -28,7 +28,7 @@
     <!-- 1. CABECERA: identidad, estado y una acción principal -->
     <header class="page-header vision-header">
         <div class="page-title-cluster">
-            <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver a Mis fichas">&larr; Mis fichas</a>
+            <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al inicio">&larr; Inicio</a>
             <div class="vision-title-wrap">
                 <div class="vision-badges-row">
                     <span class="card-badge">Ficha {{ ficha.codigo }}</span>
@@ -59,23 +59,6 @@
                 </select>
             </form>
             {% endif %}
-            <a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}" class="btn btn-primary btn-sm">
-                <i data-lucide="clipboard-check" class="icon-sm" aria-hidden="true"></i> Llamado a lista
-            </a>
-            <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">
-                <i data-lucide="plus-circle" class="icon-sm" aria-hidden="true"></i> Nueva tarea
-            </a>
-            <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm">
-                <i data-lucide="alert-triangle" class="icon-sm" aria-hidden="true"></i> Alertas
-            </a>
-            <button type="button" class="btn btn-ghost btn-sm btn-icon" popovertarget="vision-mas-acciones" aria-haspopup="true" aria-label="Más acciones" title="Más acciones">
-                <i data-lucide="more-horizontal" class="icon-sm" aria-hidden="true"></i>
-            </button>
-            <div id="vision-mas-acciones" popover class="app-popover acciones-mas-popover" aria-label="Más acciones">
-                <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="app-popover-item"><i data-lucide="users-2" class="icon-sm" aria-hidden="true"></i><span>Grupos aleatorios</span></a>
-                <a href="{{ url_for('atencion.fila_atencion', ficha_id=ficha.id) }}" class="app-popover-item"><i data-lucide="hand" class="icon-sm" aria-hidden="true"></i><span>Fila de atención</span></a>
-                <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="app-popover-item"><i data-lucide="bar-chart-3" class="icon-sm" aria-hidden="true"></i><span>Estadísticas</span></a>
-            </div>
         </div>
     </header>
 

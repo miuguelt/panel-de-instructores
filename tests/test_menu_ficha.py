@@ -137,6 +137,98 @@ class MenuFichaTestCase(unittest.TestCase):
         html = self.cliente.get('/instructor/').get_data(as_text=True)
         self.assertNotIn('class="ficha-nav"', html)
 
+    def _pagina(self, ruta):
+        respuesta = self.cliente.get(ruta)
+        self.assertEqual(respuesta.status_code, 200, ruta)
+        return respuesta.get_data(as_text=True)
+
+    @staticmethod
+    def _titulo_y_h1(html):
+        titulo = re.search(r'<title>([^<]*)</title>', html).group(1).strip()
+        h1 = re.search(r'<h1\b[^>]*>(.*?)</h1>', html, re.S).group(1)
+        return titulo, ' '.join(re.sub(r'<[^>]+>', ' ', h1).split())
+
+    def test_titulo_de_pestana_y_h1_coinciden_con_la_etiqueta_del_menu(self):
+        fid = self.ficha.id
+        paginas = {
+            '/instructor/': 'Inicio',
+            '/instructor/fichas': 'Fichas',
+            '/instructor/comite/fichas-terminadas': 'Comité',
+            f'/instructor/fichas/{fid}/asistencia': 'Asistencia',
+            f'/instructor/fichas/{fid}/juicios': 'Juicios',
+            f'/instructor/fichas/{fid}/planeacion': 'Planeación',
+            f'/instructor/fichas/{fid}/alertas': 'Alertas',
+        }
+        for ruta, etiqueta in paginas.items():
+            with self.subTest(ruta=ruta):
+                titulo, h1 = self._titulo_y_h1(self._pagina(ruta))
+                self.assertTrue(titulo.startswith(f'{etiqueta} - '), titulo)
+                self.assertEqual(h1, etiqueta)
+
+    def test_las_etiquetas_usadas_en_los_titulos_existen_en_los_menus(self):
+        nav, _ = self._menu(f'/instructor/fichas/{self.ficha.id}/tareas')
+        modulos = self._textos(nav.split('ficha-nav-more')[0])
+        for etiqueta in ('Asistencia', 'Juicios', 'Planeación'):
+            self.assertIn(etiqueta, modulos)
+        self.assertIn('Alertas', nav)
+        general = self._pagina('/instructor/')
+        barra = re.search(r'<div class="nav-primary"[\s\S]*?</div>', general).group(0)
+        for etiqueta in ('Inicio', 'Fichas', 'Comité'):
+            self.assertIn(f'<span>{etiqueta}</span>', barra)
+
+    def test_juicios_usa_la_cabecera_comun_y_no_la_barra_contextual(self):
+        html = self._pagina(f'/instructor/fichas/{self.ficha.id}/juicios')
+        cabecera = re.search(r'<header class="page-header[^"]*">[\s\S]*?</header>', html)
+        self.assertIsNotNone(cabecera)
+        self.assertIn('Cargar juicios', cabecera.group(0))
+        self.assertIn('data-lucide="upload"', cabecera.group(0))
+        self.assertNotIn('nav-context', html)
+
+    def test_los_modulos_no_repiten_el_enlace_a_vision_general(self):
+        fid = self.ficha.id
+        for modulo in ('asistencia', 'tareas', 'juicios', 'planeacion', 'alertas', 'aprendices',
+                       'estadisticas', 'materiales', 'observador', 'ranking', 'turnos-aseo',
+                       'casos-seguimiento'):
+            ruta = f'/instructor/fichas/{fid}/{modulo}'
+            respuesta = self.cliente.get(ruta)
+            if respuesta.status_code == 404:
+                continue
+            with self.subTest(ruta=ruta):
+                self.assertEqual(respuesta.status_code, 200)
+                html = respuesta.get_data(as_text=True)
+                contenido = html.split('</nav>', 2)[-1] if 'class="ficha-nav"' in html else html
+                self.assertNotIn('&larr; Visión general', contenido)
+                self.assertNotIn('← Visión general', contenido)
+                self.assertIn('class="ficha-nav"', html, 'la barra de la ficha reemplaza el enlace de volver')
+
+    def test_alertas_no_repite_notificaciones_y_usa_el_vocabulario_de_riesgo(self):
+        from flask import url_for
+        html = self._pagina(f'/instructor/fichas/{self.ficha.id}/alertas')
+        with self.app.test_request_context():
+            notificaciones = url_for('seguimiento.notificaciones_instructor')
+        contenido = html[html.index('<h1'):]
+        self.assertNotIn(f'href="{notificaciones}"', contenido, 'Notificaciones ya está en la barra superior')
+        self.assertNotIn('🔔', html)
+        for texto in ('Riesgo alto', 'En seguimiento', 'Al día'):
+            self.assertIn(texto, contenido)
+        for viejo in ("'En alerta'", '> Riesgo<', '> Alerta<', 'Tomar Asistencia Hoy'):
+            self.assertNotIn(viejo, contenido)
+        self.assertIn('Tomar asistencia hoy', contenido)
+
+    def test_aseo_sin_sesiones_muestra_el_estado_vacio_comun(self):
+        html = self._pagina(f'/instructor/fichas/{self.ficha.id}/turnos-aseo')
+        vacio = re.search(r'<div class="viz-empty">[\s\S]*?</div>', html)
+        self.assertIsNotNone(vacio)
+        self.assertIn('Todavía no hay sesiones de clase registradas', vacio.group(0))
+        self.assertIn('data-lucide="calendar-x"', vacio.group(0))
+        self.assertIn(f'/instructor/fichas/{self.ficha.id}/asistencia', vacio.group(0))
+        self.assertIn('Tomar asistencia', vacio.group(0))
+
+    def test_asistencia_no_usa_la_etiqueta_corte_de_trabajo(self):
+        html = self._pagina(f'/instructor/fichas/{self.ficha.id}/asistencia')
+        self.assertNotIn('Corte de trabajo', html)
+        self.assertNotIn('<title>Llamado a lista', html)
+
 
 if __name__ == '__main__':
     unittest.main()

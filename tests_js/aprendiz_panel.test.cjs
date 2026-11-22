@@ -299,7 +299,7 @@ test('la vista continua se aplica desde las preferencias y desplaza al activar u
     const p = panelCompleto();
     await p.win.disparar('learner:preferences-applied', { detail: { preferences: { viewMode: 'cascade' } } });
     assert.ok(p.raiz.classList.contains('is-cascade-mode'));
-    assert.equal(p.icono.textContent, '📑');
+    assert.equal(p.icono.textContent, '', 'el modo se comunica con texto, sin emojis');
     assert.equal(p.textoVista.textContent, 'Vista continua · Configurar');
     p.api.activarPestana('evidencias');
     assert.ok(p.panes.evidencias.desplazado);

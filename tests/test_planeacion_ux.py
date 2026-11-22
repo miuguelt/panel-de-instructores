@@ -71,7 +71,7 @@ class PlaneacionBase(unittest.TestCase):
 class PlaneacionUXTestCase(PlaneacionBase):
     def test_la_cabecera_identifica_la_ficha_y_ofrece_cargar_fuentes(self):
         html = self.pagina()
-        self.assertRegex(html, r'<h1[^>]*>Planeación de la ficha</h1>')
+        self.assertRegex(html, r'<h1[^>]*>Planeación</h1>')
         contexto = re.search(r'class="pl-heading-context"[^>]*>(.*?)</(?:div|p)>', html, re.S)
         self.assertIsNotNone(contexto)
         self.assertIn(self.ficha.codigo, contexto.group(1))

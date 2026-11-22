@@ -254,11 +254,9 @@ function initPanelAprendiz(doc = document, win = window) {
         });
     });
 
-    const icono = doc.getElementById('view-mode-icon');
     const textoVista = doc.getElementById('view-mode-text');
     function modoCascada(activo) {
         raiz.classList.toggle('is-cascade-mode', activo);
-        if (icono) icono.textContent = activo ? '📑' : '📜';
         if (textoVista) textoVista.textContent = activo ? 'Vista continua · Configurar' : 'Por pestañas · Configurar';
     }
     win.addEventListener('learner:preferences-applied', evento => modoCascada(evento.detail.preferences.viewMode === 'cascade'));
