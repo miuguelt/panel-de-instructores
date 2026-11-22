@@ -4,7 +4,6 @@
    Consume los tokens y componentes de styles.css.
 ========================================= */
 
-
 /* ==========================================================================
    ESTILOS MOBILE-FIRST Y COMPONENTES DE PROGRESO - APRENDICES SENA
    ========================================================================== */
@@ -23,88 +22,12 @@
     }
 }
 
-.kpi-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg, 12px);
-    padding: 1.15rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.kpi-card:hover {
-    border-color: var(--border-divider);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-}
-
-.kpi-card-featured {
-    border-color: var(--border-glass);
-    background: linear-gradient(145deg, var(--bg-surface) 0%, var(--status-success-bg) 100%);
-}
-
-.kpi-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-}
-
-.kpi-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-    line-height: 1;
-}
-
-.kpi-label {
-    display: block;
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    margin-bottom: 0.25rem;
-}
-
-.kpi-headline {
-    display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-}
-
-.kpi-value {
-    font-size: 1.75rem;
-    font-weight: 800;
-    line-height: 1.1;
-    color: var(--text-strong);
-}
-
-.kpi-progress-bar-wrap {
-    margin-top: 0.5rem;
-}
-
 .kpi-progress-track {
     height: 10px;
     background: var(--border-divider);
     border-radius: 5px;
     overflow: hidden;
     margin-bottom: 0.4rem;
-}
-
-.kpi-progress-fill {
-    height: 100%;
-    border-radius: 5px;
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.kpi-progress-legend {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.8rem;
-    color: var(--text-main);
 }
 
 .kpi-chip-summary {
@@ -117,47 +40,6 @@
 .badge-chip {
     font-size: 0.75rem;
     padding: 0.3rem 0.6rem;
-}
-
-.kpi-traffic-bars {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    margin-top: 0.25rem;
-}
-
-.traffic-row {
-    display: grid;
-    grid-template-columns: 105px 1fr 28px;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.76rem;
-}
-
-.traffic-label {
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.traffic-track {
-    height: 7px;
-    background: var(--border-divider);
-    border-radius: 3.5px;
-    overflow: hidden;
-}
-
-.traffic-fill {
-    height: 100%;
-    border-radius: 3.5px;
-    transition: width 0.4s ease;
-}
-
-.traffic-count {
-    font-weight: 700;
-    text-align: right;
-    color: var(--text-strong);
 }
 
 /* ---- Acordeón de Herramientas de Gestión ---- */

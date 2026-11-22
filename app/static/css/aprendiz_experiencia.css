@@ -30,11 +30,7 @@
 .experience-evidence-summary { display: grid; gap: 1rem; }
 .experience-official-progress { display: grid; gap: .25rem; padding: 1rem; border: 1px solid var(--border-data); border-radius: var(--radius-control); background: var(--surface-data); }
 .experience-official-progress strong { font-size: 1.15rem; color: var(--text-strong); }
-.experience-percent { font-size: .82rem; }
-.experience-evidence-pipeline { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
-.experience-evidence-pipeline div { display: grid; gap: .25rem; padding: 1rem; border: 1px solid var(--border-data); border-radius: var(--radius-control); background: var(--surface-data); }
-.experience-evidence-pipeline strong { font-size: 1.2rem; color: var(--text-strong); font-variant-numeric: tabular-nums; }
-.experience-evidence-pipeline span { font-size: .8rem; }
+
 .experience-evidence-status strong, .experience-evidence-status span { display: block; }
 .experience-insights, .experience-settings { border: 1px solid var(--border-data); border-radius: var(--radius-card); padding: 1rem; background: var(--surface-data); }
 #aprendiz-experiencia summary { padding: .7rem 0; color: var(--text-strong); cursor: pointer; font-weight: 700; line-height: 1.5; }
@@ -76,9 +72,8 @@
     .experience-focus-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
     .experience-settings-grid, .experience-insight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .experience-milestones { grid-column: 1 / -1; }
-    .experience-evidence-pipeline { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
 }
-@media (min-width: 1024px) { .experience-evidence-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); } }
 @media (max-width: 420px) {
     #panel-aprendiz-root .learner-calendar-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #panel-aprendiz-root .learner-calendar-toolbar h3 { grid-row: 1; grid-column: 1 / -1; }
