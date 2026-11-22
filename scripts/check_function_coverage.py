@@ -63,6 +63,9 @@ def lineas_cubiertas(ruta_xml, raiz_fuente=None):
         candidatas = [ruta] if ruta.is_absolute() else [fuente / ruta for fuente in fuentes]
         if not candidatas:
             candidatas = [ruta]
+        # Con varias fuentes, la primera candidata puede no contener el archivo.
+        existentes = [candidata for candidata in candidatas if candidata.is_file()]
+        candidatas = existentes or candidatas
         archivo = candidatas[0].as_posix()
         if proyecto:
             for candidata in candidatas:

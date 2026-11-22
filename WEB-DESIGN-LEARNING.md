@@ -34,8 +34,10 @@
   - La auditoría de inyección ahora carga el archivo real con datos escapados como lo hace `tojson`, incluido un intento de cerrar la etiqueta `</script>`.
   - Hallazgo: con los nombres nuevos, la barra inferior del aprendiz desbordaba 25 px a 320 px. Se corrigió con el rótulo corto «Logros» (que conserva «Rendimiento y logros» como nombre accesible) y celdas que pueden encogerse.
   - Verificación: sin desbordamiento horizontal en 10 páginas del instructor y en el panel del aprendiz, a 320, 390, 768, 1440 y 2560 px.
-- Evidencia pendiente:
-  - `tests_browser/diseno_visual.test.cjs` ya se puede ejecutar en este equipo, pero falla en 3 de sus aserciones sobre `backdrop-filter` y fondos de botón. Esa prueba solo lee `styles.css` y `modal-system.css`. Fallaban las mismas 3 antes de retirar las reglas huérfanas y siguen igual después, así que es una deuda previa y no una consecuencia de la poda.
+- Deuda previa resuelta: `tests_browser/diseno_visual.test.cjs` fallaba en 3 aserciones porque el Chromium de este equipo expone `prefers-reduced-transparency: reduce` (Windows con los efectos de transparencia desactivados), y el fallback accesible quitaba el vidrio como corresponde.
+  - El CSS era correcto; la prueba no fijaba la preferencia.
+  - Ahora la fija con `Emulation.setEmulatedMedia` y suma un caso que verifica el fallback sólido con transparencia reducida.
+  - El CI ejecuta esta prueba, así que antes habría fallado en cualquier máquina con esa preferencia.
 
 ## 23 de octubre de 2026 — sistema visual de superficies translúcidas, botones y bordes
 

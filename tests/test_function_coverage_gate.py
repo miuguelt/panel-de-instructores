@@ -64,6 +64,21 @@ class FunctionCoverageGateTestCase(unittest.TestCase):
 
         self.assertEqual(lineas['app/modulo.py'], {2})
 
+    def test_lineas_cubiertas_elige_la_fuente_donde_existe_el_archivo(self):
+        # coverage.py en Windows declara la raíz y app/ como fuentes y rutas relativas
+        # a la segunda; la primera fuente posible no siempre contiene el archivo.
+        reporte = self.raiz / 'coverage-fuentes.xml'
+        reporte.write_text(
+            '<?xml version="1.0" ?><coverage><sources>'
+            f'<source>{self.raiz}</source><source>{self.raiz / "app"}</source>'
+            '</sources><packages><package><classes>'
+            '<class filename="modulo.py"><lines><line number="2" hits="1"/></lines></class>'
+            '</classes></package></packages></coverage>',
+            encoding='utf-8',
+        )
+        lineas = lineas_cubiertas(reporte, self.raiz / 'app')
+        self.assertEqual(lineas, {'app/modulo.py': {2}})
+
     def test_revisar_cobertura_detecta_toda_funcion_sin_ejecucion(self):
         total, pendientes = revisar_cobertura_funciones(
             self.raiz / 'app', self.reporte

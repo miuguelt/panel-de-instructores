@@ -102,8 +102,17 @@ body { background: var(--bg-base); color: var(--text-main); font-family: system-
 </html>`;
 }
 
-async function abrirPagina(viewport = { width: 1440, height: 900 }) {
+// Windows puede tener desactivados los efectos de transparencia y Chromium lo
+// expone como `prefers-reduced-transparency: reduce`. La preferencia se fija
+// de forma explícita para que la prueba mida el mismo caso en cualquier equipo.
+async function fijarTransparencia(page, valor) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: valor }] });
+}
+
+async function abrirPagina(viewport = { width: 1440, height: 900 }, transparencia = 'no-preference') {
   const page = await browser.newPage({ viewport });
+  await fijarTransparencia(page, transparencia);
   await page.setContent(htmlPrueba(), { waitUntil: 'load' });
   return page;
 }
@@ -389,5 +398,20 @@ test('el cambio de tema actualiza superficies y colores sin romper el contraste'
   assert.match(soportes, /prefers-contrast/);
   assert.match(soportes, /forced-colors/);
 
+  await page.close();
+});
+
+test('con transparencia reducida, tarjetas y modales pasan a superficie sólida', async () => {
+  const page = await abrirPagina(undefined, 'reduce');
+  assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-transparency: reduce)').matches), true);
+  for (const selector of ['#tarjeta', '.app-modal-content']) {
+    const filtro = await page.locator(selector).first().evaluate(el => {
+      const estilos = getComputedStyle(el);
+      return estilos.backdropFilter || estilos.webkitBackdropFilter || 'none';
+    });
+    assert.equal(filtro, 'none', `${selector} no debe usar vidrio con transparencia reducida`);
+  }
+  assert.notEqual(await page.locator('#outline').evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)',
+    'El botón outline gana superficie sólida para no depender del fondo');
   await page.close();
 });
