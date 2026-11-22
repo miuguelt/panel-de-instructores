@@ -224,3 +224,56 @@ def bloquear_escritura_aprendiz_inactivo():
         'warning',
     )
     return redirect(url_for('aprendiz.panel', ficha_id=ficha_id))
+
+
+# --- Coordinación y equipos ejecutores ---
+
+def coordinacion_required(f):
+    """Exige rol de coordinación o administración."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login', next=request.url))
+        if not getattr(current_user, 'es_coordinacion', False):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def ids_equipos_liderados(usuario=None):
+    """Identificadores de los equipos activos que lidera el usuario."""
+    from flask import has_request_context
+
+    usuario = usuario or current_user
+    if not getattr(usuario, 'is_authenticated', False):
+        return set()
+    # Caché por petición: el calendario consulta el permiso de cada asignación visible.
+    cache = request.environ.setdefault('panel.equipos_liderados', {}) if has_request_context() else {}
+    if usuario.id not in cache:
+        cache[usuario.id] = {equipo.id for equipo in usuario.equipos_liderados}
+    return cache[usuario.id]
+
+
+def puede_entrar_a_coordinacion(usuario=None):
+    """Coordinación, administración y líderes de equipo ven el calendario de programación."""
+    usuario = usuario or current_user
+    if not getattr(usuario, 'is_authenticated', False):
+        return False
+    return usuario.es_coordinacion or bool(ids_equipos_liderados(usuario))
+
+
+def puede_programar(instructor, ficha, usuario=None):
+    """Coordinación programa a cualquiera; un líder programa a su equipo en cualquier ficha
+    y a instructores de otros equipos en las fichas de su equipo (transversales)."""
+    usuario = usuario or current_user
+    if not instructor or not ficha or not getattr(usuario, 'is_authenticated', False):
+        return False
+    if usuario.es_coordinacion:
+        return True
+    equipos = ids_equipos_liderados(usuario)
+    if not equipos:
+        return False
+    if instructor.equipo_id in equipos:
+        return True
+    duenio = ficha.instructor
+    return bool(duenio and duenio.equipo_id in equipos)

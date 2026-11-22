@@ -1,5 +1,7 @@
 from app.models.instructor import Instructor
 from app.models.ficha import Ficha
+from app.models.equipo import EquipoEjecutor
+from app.models.programacion import AsignacionProgramacion
 from app.models.corte import Corte
 from app.models.aprendiz import Aprendiz
 from app.models.asistencia import SesionAsistencia, RegistroAsistencia
@@ -48,7 +50,7 @@ from app.features.personalizacion_aprendiz.models import PersonalizacionAprendiz
 from app.features.experiencia_aprendiz.models import ExperienciaAprendiz
 
 __all__ = [
-    'Instructor', 'Ficha', 'Corte', 'Aprendiz',
+    'Instructor', 'Ficha', 'Corte', 'Aprendiz', 'EquipoEjecutor', 'AsignacionProgramacion',
     'SesionAsistencia', 'RegistroAsistencia',
     'Tarea', 'Entrega', 'ProrrogaTarea', 'ConfiguracionAlertas', 'ConfiguracionAlertasComite',
     'Alerta', 'Notificacion', 'PushDispatch', 'PushSubscription', 'PlanMejoramiento', 'LlamadoAtencion',

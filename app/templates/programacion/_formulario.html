@@ -1,0 +1,95 @@
+{#- Formulario de asignación (crear o editar). Lo rellena programacion.js según el botón pulsado. -#}
+{% from "components/_modal.html" import render_modal %}
+{% call render_modal('modal-asignacion', 'Programar instructor', eyebrow='Programación', form_id='form-asignacion', form_action=url_for('programacion.crear_asignacion')) %}
+<input type="hidden" name="vista" value="{{ params.vista }}">
+<input type="hidden" name="fecha" value="{{ params.fecha.isoformat() }}">
+<input type="hidden" name="equipo" value="{{ params.equipo or '' }}">
+<div class="prg-form" data-url-crear="{{ url_for('programacion.crear_asignacion') }}"
+     data-url-competencias="{{ url_for('programacion.competencias_ficha', ficha_id=0) }}">
+    <div class="form-group">
+        <label for="prg-instructor">Instructor</label>
+        <select id="prg-instructor" name="instructor_id" class="form-control" required>
+            <option value="">Elige un instructor</option>
+            {% for inst in instructores_form %}
+            <option value="{{ inst.id }}">{{ inst.nombre }}{% if inst.equipo %} · {{ inst.equipo.nombre }}{% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="prg-ficha">Ficha</label>
+        <select id="prg-ficha" name="ficha_id" class="form-control" required>
+            <option value="">Elige una ficha</option>
+            {% for f in fichas %}
+            <option value="{{ f.id }}">{{ f.codigo }} · {{ f.nombre_programa }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="prg-competencia">Competencia</label>
+        <input id="prg-competencia" name="competencia" class="form-control" list="prg-competencias"
+               maxlength="300" required autocomplete="off" placeholder="Escribe o elige una competencia">
+        <datalist id="prg-competencias"></datalist>
+        <small class="text-muted">Al elegir la ficha aparecen sus competencias. Puede ser técnica o transversal.</small>
+    </div>
+
+    <fieldset class="prg-fieldset">
+        <legend>¿Cuánto tiempo?</legend>
+        <div class="prg-opciones">
+            <label class="prg-opcion"><input type="radio" name="modo" value="dia" data-prg-modo> <span>Un día</span></label>
+            <label class="prg-opcion"><input type="radio" name="modo" value="semanas" data-prg-modo checked> <span>Varias semanas</span></label>
+        </div>
+    </fieldset>
+
+    <div class="prg-fechas">
+        <div class="form-group">
+            <label for="prg-inicio" data-prg-etiqueta-inicio>Desde</label>
+            <input type="date" id="prg-inicio" name="fecha_inicio" class="form-control" required>
+        </div>
+        <div class="form-group" data-prg-solo-semanas>
+            <label for="prg-fin">Hasta</label>
+            <input type="date" id="prg-fin" name="fecha_fin" class="form-control">
+        </div>
+    </div>
+
+    <fieldset class="prg-fieldset" data-prg-solo-semanas>
+        <legend>Días de la semana</legend>
+        <div class="prg-opciones">
+            {% for bit, letra, nombre in dias_semana %}
+            <label class="prg-opcion"><input type="checkbox" name="dias_semana" value="{{ bit }}" {% if bit < 5 %}checked{% endif %}> <span>{{ nombre }}</span></label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <fieldset class="prg-fieldset">
+        <legend>Jornada</legend>
+        <div class="prg-opciones">
+            {% for clave, etiqueta in jornadas.items() %}
+            <label class="prg-opcion"><input type="radio" name="jornada" value="{{ clave }}" {% if loop.first %}checked{% endif %} required> <span>{{ etiqueta }}</span></label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <div class="form-group">
+        <label for="prg-observacion">Nota (opcional)</label>
+        <input id="prg-observacion" name="observacion" class="form-control" maxlength="300" placeholder="Ambiente, sede u otra indicación">
+    </div>
+
+    <div class="prg-form-acciones">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="reset" class="btn btn-outline" data-prg-reset>Limpiar</button>
+        <button type="button" class="btn btn-ghost" onclick="cerrarModal('modal-asignacion')">Cancelar</button>
+        <button type="submit" form="form-eliminar-asignacion" class="btn btn-ghost prg-btn-quitar" data-prg-solo-editar hidden
+                data-confirm="¿Quitar esta asignación? La programación de la competencia en Planeación se recalcula."
+                data-confirm-title="Quitar asignación" data-confirm-label="Quitar" data-confirm-intent="danger">
+            <i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i> Quitar asignación
+        </button>
+    </div>
+</div>
+{% endcall %}
+
+<form method="POST" id="form-eliminar-asignacion" class="prg-form-eliminar" hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="vista" value="{{ params.vista }}">
+    <input type="hidden" name="fecha" value="{{ params.fecha.isoformat() }}">
+    <input type="hidden" name="equipo" value="{{ params.equipo or '' }}">
+</form>

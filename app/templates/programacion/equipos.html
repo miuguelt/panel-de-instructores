@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "components/_ui.html" import page_header %}
+{% from "components/_viz.html" import vacio %}
+{% block title %}Equipos ejecutores - SENA Control{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/programacion.css') }}">
+{% endblock %}
+
+{% block content %}
+{% call page_header('Equipos ejecutores', subtitulo='Cada instructor pertenece a un equipo. El líder ve y programa a su equipo; un instructor puede orientar transversales en fichas de otros equipos.', icono='users', volver=url_for('programacion.calendario')) %}
+{% endcall %}
+
+<div class="prg-equipos-grid">
+    <section class="card" aria-labelledby="prg-nuevo-equipo">
+        <h2 id="prg-nuevo-equipo">Nuevo equipo</h2>
+        <form method="POST" action="{{ url_for('equipos.crear') }}" class="prg-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="equipo-nombre">Nombre</label>
+                <input id="equipo-nombre" name="nombre" class="form-control" maxlength="120" required placeholder="Por ejemplo: Sistemas">
+            </div>
+            <div class="form-group">
+                <label for="equipo-descripcion">Descripción (opcional)</label>
+                <input id="equipo-descripcion" name="descripcion" class="form-control" maxlength="300">
+            </div>
+            <div class="form-group">
+                <label for="equipo-lider">Líder (opcional)</label>
+                <select id="equipo-lider" name="lider_id" class="form-control">
+                    <option value="">Sin líder</option>
+                    {% for i in instructores %}<option value="{{ i.id }}">{{ i.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Crear equipo</button>
+        </form>
+    </section>
+
+    <section class="card" aria-labelledby="prg-asignar-miembro">
+        <h2 id="prg-asignar-miembro">Cambiar el equipo de un instructor</h2>
+        {% if sin_equipo %}<p class="text-muted">{{ sin_equipo|length }} instructor{{ 'es' if sin_equipo|length != 1 }} sin equipo: {{ sin_equipo|map(attribute='nombre')|join(', ') }}.</p>{% endif %}
+        <form method="POST" action="{{ url_for('equipos.asignar_miembro') }}" class="prg-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="miembro-instructor">Instructor</label>
+                <select id="miembro-instructor" name="instructor_id" class="form-control" required>
+                    <option value="">Elige un instructor</option>
+                    {% for i in instructores %}<option value="{{ i.id }}">{{ i.nombre }} · {{ i.equipo.nombre if i.equipo else 'sin equipo' }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="miembro-equipo">Equipo</label>
+                <select id="miembro-equipo" name="equipo_id" class="form-control">
+                    <option value="">Sin equipo</option>
+                    {% for e in equipos if e.activo %}<option value="{{ e.id }}">{{ e.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+        </form>
+    </section>
+</div>
+
+{% for e in equipos %}
+<section class="card prg-equipo{% if not e.activo %} prg-equipo--archivado{% endif %}" aria-labelledby="equipo-{{ e.id }}">
+    <header class="prg-equipo-cabecera">
+        <h2 id="equipo-{{ e.id }}">{{ e.nombre }}</h2>
+        {% if not e.activo %}<span class="badge badge-secondary">Archivado</span>{% endif %}
+        <span class="text-muted">{{ e.miembros|length }} instructor{{ 'es' if e.miembros|length != 1 }}{% if e.lider %} · Líder: {{ e.lider.nombre }}{% endif %}</span>
+    </header>
+    {% if e.descripcion %}<p>{{ e.descripcion }}</p>{% endif %}
+    {% if e.miembros %}<p class="prg-miembros">{{ e.miembros|map(attribute='nombre')|join(' · ') }}</p>{% endif %}
+    <details class="prg-detalles">
+        <summary class="btn btn-sm btn-outline">Editar</summary>
+        <form method="POST" action="{{ url_for('equipos.editar', equipo_id=e.id) }}" class="prg-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="nombre-{{ e.id }}">Nombre</label>
+                <input id="nombre-{{ e.id }}" name="nombre" class="form-control" value="{{ e.nombre }}" maxlength="120" required>
+            </div>
+            <div class="form-group">
+                <label for="descripcion-{{ e.id }}">Descripción</label>
+                <input id="descripcion-{{ e.id }}" name="descripcion" class="form-control" value="{{ e.descripcion or '' }}" maxlength="300">
+            </div>
+            <div class="form-group">
+                <label for="lider-{{ e.id }}">Líder</label>
+                <select id="lider-{{ e.id }}" name="lider_id" class="form-control">
+                    <option value="">Sin líder</option>
+                    {% for i in instructores %}<option value="{{ i.id }}" {% if e.lider_id == i.id %}selected{% endif %}>{{ i.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
+        </form>
+    </details>
+    <form method="POST" action="{{ url_for('equipos.alternar_estado', equipo_id=e.id) }}" class="prg-form-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-sm btn-ghost">{{ 'Archivar' if e.activo else 'Reactivar' }}</button>
+    </form>
+</section>
+{% else %}
+<section class="card">{{ vacio('Aún no hay equipos', 'Crea el primero, por ejemplo Sistemas, Agrícola o Contabilidad.', icono='users') }}</section>
+{% endfor %}
+{% endblock %}

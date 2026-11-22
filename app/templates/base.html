@@ -69,6 +69,7 @@
                     {'label': 'Fichas', 'icon': 'folder-kanban', 'url': url_for('instructor.fichas'), 'activo': ep_general in ('instructor.fichas', 'instructor.importar_reporte_ficha')},
                     {'label': 'Comité', 'icon': 'users', 'url': url_for('comite.fichas_terminadas'), 'activo': request.blueprint == 'comite'},
                 ] %}
+                {% set enlaces_generales = enlaces_generales + [{'label': 'Programación', 'icon': 'calendar-range', 'url': url_for('programacion.calendario'), 'activo': request.blueprint in ('programacion', 'equipos'), 'contador': alertas_programacion}] %}
                 {% if current_user.es_admin %}
                 {% set enlaces_generales = enlaces_generales + [{'label': 'Administración', 'icon': 'shield-check', 'url': url_for('admin.listar_instructores'), 'activo': request.blueprint == 'admin'}] %}
                 {% endif %}
@@ -77,6 +78,7 @@
                     <a href="{{ e.url }}" class="nav-link {% if e.activo %}is-active{% endif %}"{% if e.activo %} aria-current="page"{% endif %}>
                         <i data-lucide="{{ e.icon }}" class="nav-link-icon" aria-hidden="true"></i>
                         <span>{{ e.label }}</span>
+                        {% if e.contador %}<span class="nav-link-count" title="Instructores con días sin programar esta semana">{{ e.contador|contador_compacto }}<span class="sr-only"> instructores con días sin programar</span></span>{% endif %}
                     </a>
                     {% endfor %}
                 </div>
@@ -100,7 +102,7 @@
                     </button>
                     <div id="nav-user-menu" popover class="nav-user-popover app-popover" aria-label="Menú de usuario">
                         <div class="nav-identity">
-                            <small>{{ 'Administrador' if current_user.es_admin else 'Instructor' }}</small>
+                            <small>{{ {'admin': 'Administrador', 'coordinacion': 'Coordinación'}.get(current_user.rol, 'Líder de equipo' if current_user.es_lider else 'Instructor') }}</small>
                             <strong class="nav-name">{{ current_user.nombre }}</strong>
                         </div>
                         <div class="nav-user-links" aria-label="Secciones generales (móvil)">

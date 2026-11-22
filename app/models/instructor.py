@@ -4,6 +4,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
 from app.helpers import utc_now
 
+ROLES = {'colaborador': 'Instructor', 'coordinacion': 'Coordinación', 'admin': 'Administrador'}
+ROLES_COORDINACION = {'coordinacion', 'admin'}
+
 
 class Instructor(UserMixin, db.Model):
     __tablename__ = 'instructores'
@@ -21,7 +24,10 @@ class Instructor(UserMixin, db.Model):
     rol = db.Column(db.String(20), nullable=False, default='colaborador')
     activo = db.Column(db.Boolean, default=True)
     creado_en = db.Column(db.DateTime, default=utc_now)
+    equipo_id = db.Column(db.Integer, db.ForeignKey('equipos_ejecutores.id', name='fk_instructor_equipo'),
+                          nullable=True, index=True)
 
+    equipo = db.relationship('EquipoEjecutor', foreign_keys=[equipo_id], back_populates='miembros')
     fichas = db.relationship('Ficha', backref='instructor', lazy='dynamic')
     fichas_asociadas = db.relationship('FichaInstructor', back_populates='instructor',
                                        lazy='dynamic', cascade='all, delete-orphan')
@@ -39,6 +45,20 @@ class Instructor(UserMixin, db.Model):
     @property
     def es_admin(self):
         return self.rol == 'admin'
+
+    @property
+    def es_coordinacion(self):
+        """Coordinación académica programa a todos los instructores; el administrador también."""
+        return self.rol in ROLES_COORDINACION
+
+    @property
+    def equipos_liderados(self):
+        from app.models.equipo import EquipoEjecutor
+        return EquipoEjecutor.query.filter_by(lider_id=self.id, activo=True).order_by(EquipoEjecutor.nombre).all()
+
+    @property
+    def es_lider(self):
+        return bool(self.equipos_liderados)
 
     def __repr__(self):
         return f'<Instructor {self.nombre}>'

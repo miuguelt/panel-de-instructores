@@ -17,6 +17,8 @@ def registrar_rutas(app):
         ('aseo', 'aseo_aprendiz_bp', '/aprendiz'),
         ('seguimiento', 'aprendiz_seguimiento_bp', '/aprendiz'),
         ('app.tyt.vistas', 'tyt_bp', '/instructor'),
+        ('programacion', 'programacion_bp', '/programacion'),
+        ('equipos', 'equipos_bp', '/programacion/equipos'),
     )
     for modulo, nombre, prefijo in rutas:
         ruta = modulo if modulo.startswith('app.') else f'app.routes.{modulo}'

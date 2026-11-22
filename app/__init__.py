@@ -1,7 +1,7 @@
 import logging
 import os
 
-from flask import Flask, g, make_response, redirect, render_template, request, session, url_for
+from flask import Flask, g, has_request_context, make_response, redirect, render_template, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
@@ -381,6 +381,8 @@ def create_app(test_config=None):
     _register('app.routes.grupos', 'grupos_bp', url_prefix='/instructor')
     _register('app.routes.atencion', 'atencion_bp', url_prefix='/instructor')
     _register('app.tyt.vistas', 'tyt_bp', url_prefix='/instructor')
+    _register('app.routes.programacion', 'programacion_bp', url_prefix='/programacion')
+    _register('app.routes.equipos', 'equipos_bp', url_prefix='/programacion/equipos')
     from app.services.cargas_confirmacion import registrar_confirmaciones
     registrar_confirmaciones(app)
 
@@ -464,6 +466,25 @@ def create_app(test_config=None):
     registrar_navegacion(app)
 
     _static_v_cache = {}
+
+    @app.context_processor
+    def inyectar_alertas_programacion():
+        """Cuenta instructores con días sin programar esta semana (coordinación y líderes)."""
+        if not has_request_context():
+            return {'alertas_programacion': 0}
+        if 'panel.alertas_programacion' in request.environ:
+            return {'alertas_programacion': request.environ['panel.alertas_programacion']}
+        total = 0
+        try:
+            from app.services.permisos import puede_entrar_a_coordinacion
+            if current_user.is_authenticated and puede_entrar_a_coordinacion():
+                from app.services.programacion_instructores import contar_alertas_semana
+                total = contar_alertas_semana(current_user)
+        except Exception:
+            log.warning('No se pudieron contar las alertas de programación; se muestra 0.', exc_info=True)
+            db.session.rollback()
+        request.environ['panel.alertas_programacion'] = total
+        return {'alertas_programacion': total}
 
     @app.context_processor
     def inyectar_notificaciones():

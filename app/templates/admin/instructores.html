@@ -55,7 +55,8 @@
                 <tr>
                     <th scope="col">Instructor</th>
                     <th scope="col">Correo Institucional</th>
-                    <th scope="col">Rol</th>
+                    <th scope="col">Perfil</th>
+                    <th scope="col">Equipo</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Seguridad</th>
                     <th scope="col">Acciones</th>
@@ -72,11 +73,19 @@
                         <span>{{ inst.correo }}</span>
                     </td>
                     <td>
-                        {% if inst.es_admin %}
-                        <span class="badge badge-info">Administrador</span>
-                        {% else %}
-                        <span class="badge badge-secondary">Colaborador</span>
-                        {% endif %}
+                        <form method="POST" action="{{ url_for('admin.cambiar_rol_instructor', instructor_id=inst.id) }}" class="form-inline-compacto">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label for="rol_{{ inst.id }}" class="sr-only">Perfil de {{ inst.nombre }}</label>
+                            <select id="rol_{{ inst.id }}" name="rol" class="form-control form-control-sm">
+                                {% for clave, etiqueta in roles.items() %}
+                                <option value="{{ clave }}" {% if inst.rol == clave or (clave == 'colaborador' and inst.rol not in roles) %}selected{% endif %}>{{ etiqueta }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline">Guardar</button>
+                        </form>
+                    </td>
+                    <td>
+                        {% if inst.equipo %}{{ inst.equipo.nombre }}{% else %}<span class="text-muted">Sin equipo</span>{% endif %}
                     </td>
                     <td>
                         {% if inst.activo %}

@@ -1,0 +1,43 @@
+{#- Celda de un instructor en un día. `compacta` para la vista mensual. -#}
+{% macro celda(fila, dia, puede_programar, compacta=False) -%}
+{% set puede_agregar = puede_programar is not none %}
+{% set asignaciones = fila.celdas.get(dia.fecha, []) %}
+{% set inst = fila.instructor %}
+<td class="prg-celda{% if dia.festivo %} prg-celda--festivo{% elif not asignaciones and dia.laborable %} prg-celda--libre{% endif %}{% if dia.fecha == hoy %} prg-celda--hoy{% endif %}">
+    {% if dia.festivo %}
+    <span class="prg-festivo" title="{{ dia.festivo }}">{% if compacta %}F<span class="sr-only"> festivo: {{ dia.festivo }}</span>{% else %}Festivo{% endif %}</span>
+    {% endif %}
+    {% for a in asignaciones %}
+    {% set texto = 'Ficha ' ~ (a.ficha.codigo if a.ficha else '') ~ ' · ' ~ a.competencia ~ ' · ' ~ a.jornada_etiqueta ~ ' · ' ~ a.dias_etiqueta ~ (' · ' ~ a.observacion if a.observacion else '') %}
+    {% set puede_editar = puede_programar is not none and puede_programar(a.instructor, a.ficha) %}
+    {% if puede_editar %}
+    <button type="button" class="prg-chip prg-chip--{{ a.jornada }}{% if compacta %} prg-chip--compacto{% endif %}" title="{{ texto }}"
+            aria-haspopup="dialog" aria-controls="modal-asignacion"
+            data-prg-editar
+            data-url="{{ url_for('programacion.editar_asignacion', asignacion_id=a.id) }}"
+            data-url-eliminar="{{ url_for('programacion.eliminar_asignacion', asignacion_id=a.id) }}"
+            data-instructor="{{ a.instructor_id }}" data-ficha="{{ a.ficha_id }}" data-competencia="{{ a.competencia }}"
+            data-inicio="{{ a.fecha_inicio.isoformat() }}" data-fin="{{ a.fecha_fin.isoformat() }}"
+            data-dias="{{ a.dias_semana }}" data-jornada="{{ a.jornada }}" data-observacion="{{ a.observacion or '' }}">
+    {% else %}
+    <span class="prg-chip prg-chip--{{ a.jornada }}{% if compacta %} prg-chip--compacto{% endif %}" title="{{ texto }}">
+    {% endif %}
+        {% if compacta %}
+        {{ a.jornada_etiqueta[:1] }}<span class="sr-only"> {{ texto }}</span>
+        {% else %}
+        <span class="prg-chip-jornada">{{ a.jornada_etiqueta }}</span>
+        <span class="prg-chip-ficha">{{ a.ficha.codigo if a.ficha }}</span>
+        <span class="prg-chip-competencia">{{ a.competencia }}</span>
+        {% endif %}
+    {% if puede_editar %}</button>{% else %}</span>{% endif %}
+    {% endfor %}
+    {% if puede_agregar and not dia.festivo and not compacta %}
+    <button type="button" class="prg-agregar" aria-haspopup="dialog" aria-controls="modal-asignacion"
+            data-prg-programar data-instructor="{{ inst.id }}" data-inicio="{{ dia.fecha.isoformat() }}"
+            title="Programar a {{ inst.nombre }} el {{ dia.nombre|lower }} {{ dia.fecha.day }}">
+        <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>
+        <span class="sr-only">Programar a {{ inst.nombre }} el {{ dia.nombre|lower }} {{ dia.fecha.day }}</span>
+    </button>
+    {% endif %}
+</td>
+{%- endmacro %}

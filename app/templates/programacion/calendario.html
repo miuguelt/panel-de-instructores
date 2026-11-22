@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% from "components/_ui.html" import page_header %}
+{% from "components/_viz.html" import kpi, barra, semaforo, vacio %}
+{% from "programacion/_celda.html" import celda with context %}
+{% block title %}Programación - SENA Control{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/programacion.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set compacta = params.vista == 'mes' %}
+{% set niveles = {'sin_programacion': 'danger', 'parcial': 'warning', 'completo': 'success', 'sin_dias_habiles': 'neutral'} %}
+{% call page_header('Programación', subtitulo='Dónde está cada instructor y quién tiene días sin programar.', icono='calendar-range') %}
+    <button type="button" class="btn btn-primary" data-prg-programar aria-haspopup="dialog" aria-controls="modal-asignacion">
+        <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i><span>Programar instructor</span>
+    </button>
+    {% if current_user.es_coordinacion %}
+    <a href="{{ url_for('equipos.listar') }}" class="btn btn-outline">
+        <i data-lucide="users" class="icon-sm" aria-hidden="true"></i><span>Equipos</span>
+    </a>
+    {% endif %}
+{% endcall %}
+
+<nav class="prg-barra" aria-label="Periodo del calendario">
+    <div class="prg-periodo">
+        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.calendario', vista=params.vista, fecha=anterior.isoformat(), equipo=params.equipo) }}">
+            <i data-lucide="chevron-left" class="icon-sm" aria-hidden="true"></i><span class="sr-only">{{ 'Mes' if compacta else 'Semana' }} anterior</span>
+        </a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.calendario', vista=params.vista, equipo=params.equipo) }}">Hoy</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.calendario', vista=params.vista, fecha=siguiente.isoformat(), equipo=params.equipo) }}">
+            <i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i><span class="sr-only">{{ 'Mes' if compacta else 'Semana' }} siguiente</span>
+        </a>
+        <h2 class="prg-periodo-titulo">{{ titulo_rango }}</h2>
+    </div>
+    <div class="prg-vistas" role="group" aria-label="Tipo de vista">
+        <a class="btn btn-sm {{ 'btn-primary' if not compacta else 'btn-outline' }}"{% if not compacta %} aria-current="true"{% endif %}
+           href="{{ url_for('programacion.calendario', vista='semana', fecha=params.fecha.isoformat(), equipo=params.equipo) }}">Semana</a>
+        <a class="btn btn-sm {{ 'btn-primary' if compacta else 'btn-outline' }}"{% if compacta %} aria-current="true"{% endif %}
+           href="{{ url_for('programacion.calendario', vista='mes', fecha=params.fecha.isoformat(), equipo=params.equipo) }}">Mes</a>
+    </div>
+    {% if equipos|length > 1 %}
+    <form method="GET" class="prg-filtro">
+        <input type="hidden" name="vista" value="{{ params.vista }}">
+        <input type="hidden" name="fecha" value="{{ params.fecha.isoformat() }}">
+        <label for="prg-filtro-equipo" class="sr-only">Equipo</label>
+        <select id="prg-filtro-equipo" name="equipo" class="form-control">
+            <option value="">Todos los equipos</option>
+            {% for e in equipos %}<option value="{{ e.id }}" {% if params.equipo == e.id %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="btn btn-outline btn-sm">Ver</button>
+    </form>
+    {% endif %}
+</nav>
+
+<section class="prg-resumen" aria-label="Resumen del periodo">
+    {{ kpi('Instructores', resumen.instructores, icono='users') }}
+    {{ kpi('Sin programación', resumen.sin_programacion, estado='danger' if resumen.sin_programacion else 'success', icono='alert-octagon') }}
+    {{ kpi('Con días libres', resumen.con_dias_libres, estado='warning' if resumen.con_dias_libres else 'success', icono='alert-triangle') }}
+    <div class="prg-resumen-barra">{{ barra(resumen.porcentaje, 'Días hábiles programados', detalle='Lunes a viernes, sin festivos') }}</div>
+</section>
+
+{% if resumen.instructores %}
+<section class="card prg-alertas" aria-labelledby="prg-alertas-titulo">
+    <h2 id="prg-alertas-titulo">Alertas {{ 'del mes' if compacta else 'de la semana' }}</h2>
+    {% if alertas %}
+    <ul class="prg-alertas-lista">
+        {% for f in alertas %}
+        <li class="prg-alerta">
+            {{ semaforo(niveles[f.nivel], f.etiqueta_nivel) }}
+            <span class="prg-alerta-texto">
+                <strong>{{ f.instructor.nombre }}</strong>
+                {% if f.instructor.equipo %}<span class="text-muted">· {{ f.instructor.equipo.nombre }}</span>{% endif %}
+                <span class="prg-alerta-detalle">
+                    {% if f.nivel == 'sin_programacion' %}No tiene asignaciones en {{ f.dias_laborables }} días hábiles.
+                    {% else %}{{ f.dias_libres|length }} de {{ f.dias_laborables }} días hábiles libres{% if not compacta %}: {% for d in f.dias_libres %}{{ dias_semana[d.weekday()][2]|lower }} {{ d.day }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}.{% endif %}
+                </span>
+            </span>
+            <button type="button" class="btn btn-outline btn-sm" data-prg-programar aria-haspopup="dialog" aria-controls="modal-asignacion"
+                    data-instructor="{{ f.instructor.id }}" data-inicio="{{ f.dias_libres[0].isoformat() }}">Programar</button>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {{ vacio('Todos tienen programación', 'Cada instructor tiene asignación en todos los días hábiles de este periodo.', icono='check-circle-2') }}
+    {% endif %}
+</section>
+{% endif %}
+
+{% for g in grupos %}
+<section class="card prg-equipo" aria-labelledby="prg-equipo-{{ loop.index }}">
+    <header class="prg-equipo-cabecera">
+        <h2 id="prg-equipo-{{ loop.index }}">{{ g.nombre }}</h2>
+        <span class="text-muted">{{ g.filas|length }} instructor{{ 'es' if g.filas|length != 1 }}{% if g.equipo and g.equipo.lider %} · Líder: {{ g.equipo.lider.nombre }}{% endif %}</span>
+        {% if g.alertas %}{{ semaforo('warning', g.alertas ~ ' por programar') }}{% endif %}
+        <div class="prg-equipo-barra">{{ barra(g.porcentaje, 'Ocupación del equipo') }}</div>
+    </header>
+    <div class="table-responsive prg-tabla-contenedor" data-manual-filters tabindex="0" role="region" aria-label="Calendario de {{ g.nombre }}">
+        <table class="prg-tabla{% if compacta %} prg-tabla--mes{% endif %}">
+            <caption class="sr-only">Programación de {{ g.nombre }}, {{ titulo_rango }}</caption>
+            <thead>
+                <tr>
+                    <th scope="col" class="prg-col-instructor">Instructor</th>
+                    {% for d in dias %}
+                    <th scope="col" class="prg-col-dia{% if d.fecha == hoy %} prg-col-dia--hoy{% endif %}{% if not d.laborable %} prg-col-dia--no-laborable{% endif %}">
+                        {% if compacta %}<abbr title="{{ d.nombre }} {{ d.fecha.day }}">{{ d.nombre[:1] }}<br>{{ d.fecha.day }}</abbr>
+                        {% else %}{{ d.nombre }} <span class="prg-dia-numero">{{ d.fecha.day }}</span>{% endif %}
+                    </th>
+                    {% endfor %}
+                    <th scope="col" class="prg-col-ocupacion">Ocupación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in g.filas %}
+                <tr class="prg-fila prg-fila--{{ f.nivel }}">
+                    <th scope="row" class="prg-col-instructor">
+                        <span class="prg-nombre">{{ f.instructor.nombre }}</span>
+                        {% if f.externo %}<span class="badge badge-secondary">De otro equipo</span>{% endif %}
+                    </th>
+                    {% for d in dias %}{{ celda(f, d, puede_programar, compacta) }}{% endfor %}
+                    <td class="prg-col-ocupacion">
+                        {{ barra(f.porcentaje, f.dias_programados ~ ' de ' ~ f.dias_laborables ~ ' días', estado=niveles[f.nivel] if f.nivel != 'sin_dias_habiles' else None) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% else %}
+<section class="card">
+    {% if current_user.es_coordinacion %}
+    {{ vacio('Aún no hay instructores para mostrar', 'Crea los equipos ejecutores y asigna a cada instructor su equipo.', url=url_for('equipos.listar'), accion='Ir a equipos', icono='users') }}
+    {% else %}
+    {{ vacio('Tu equipo aún no tiene instructores', 'Pide a coordinación que asigne los instructores a tu equipo.', icono='users') }}
+    {% endif %}
+</section>
+{% endfor %}
+
+<p class="prg-leyenda text-muted">
+    <span class="prg-chip prg-chip--manana prg-chip--compacto">M</span> Mañana
+    <span class="prg-chip prg-chip--tarde prg-chip--compacto">T</span> Tarde
+    <span class="prg-chip prg-chip--noche prg-chip--compacto">N</span> Noche.
+    El sábado se muestra, pero no cuenta en el porcentaje.
+</p>
+
+{% include "programacion/_formulario.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/programacion.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "components/_ui.html" import page_header %}
+{% from "components/_viz.html" import barra, semaforo, vacio %}
+{% from "programacion/_celda.html" import celda with context %}
+{% block title %}Programación - SENA Control{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/programacion.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set niveles = {'sin_programacion': 'danger', 'parcial': 'warning', 'completo': 'success', 'sin_dias_habiles': 'neutral'} %}
+{{ page_header('Programación', subtitulo='Tu semana: fichas, competencias y jornadas que te asignó coordinación o el líder de tu equipo.', icono='calendar-range') }}
+
+<nav class="prg-barra" aria-label="Semana">
+    <div class="prg-periodo">
+        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.mi_programacion', fecha=anterior.isoformat()) }}">
+            <i data-lucide="chevron-left" class="icon-sm" aria-hidden="true"></i><span class="sr-only">Semana anterior</span>
+        </a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.mi_programacion') }}">Hoy</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.mi_programacion', fecha=siguiente.isoformat()) }}">
+            <i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i><span class="sr-only">Semana siguiente</span>
+        </a>
+        <h2 class="prg-periodo-titulo">{{ titulo_rango }}</h2>
+    </div>
+    {% if fila.nivel != 'sin_dias_habiles' %}{{ semaforo(niveles[fila.nivel], fila.etiqueta_nivel) }}{% endif %}
+</nav>
+
+<section class="card prg-equipo">
+    <div class="prg-equipo-barra">{{ barra(fila.porcentaje, 'Días hábiles con programación', detalle=fila.dias_programados ~ ' de ' ~ fila.dias_laborables ~ ' días') }}</div>
+    <div class="table-responsive prg-tabla-contenedor" data-manual-filters tabindex="0" role="region" aria-label="Tu semana">
+        <table class="prg-tabla">
+            <caption class="sr-only">Tu programación, {{ titulo_rango }}</caption>
+            <thead>
+                <tr>
+                    <th scope="col" class="prg-col-instructor">Instructor</th>
+                    {% for d in dias %}
+                    <th scope="col" class="prg-col-dia{% if d.fecha == hoy %} prg-col-dia--hoy{% endif %}{% if not d.laborable %} prg-col-dia--no-laborable{% endif %}">{{ d.nombre }} <span class="prg-dia-numero">{{ d.fecha.day }}</span></th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="prg-fila">
+                    <th scope="row" class="prg-col-instructor"><span class="prg-nombre">{{ fila.instructor.nombre }}</span></th>
+                    {% for d in dias %}{{ celda(fila, d, none) }}{% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card" aria-labelledby="prg-proximas">
+    <h2 id="prg-proximas">Próximas asignaciones</h2>
+    {% if proximas %}
+    <ul class="prg-lista">
+        {% for a in proximas %}
+        <li class="prg-lista-item">
+            <span class="prg-chip prg-chip--{{ a.jornada }} prg-chip--compacto" aria-hidden="true">{{ a.jornada_etiqueta[:1] }}</span>
+            <span>
+                <strong>{{ a.competencia }}</strong>
+                <span class="text-muted">· Ficha {{ a.ficha.codigo }} · {{ a.fecha_inicio.strftime('%d/%m/%Y') }}{% if a.fecha_fin != a.fecha_inicio %} al {{ a.fecha_fin.strftime('%d/%m/%Y') }}{% endif %} · {{ a.dias_etiqueta }} · {{ a.jornada_etiqueta }}</span>
+                {% if a.observacion %}<span class="prg-alerta-detalle">{{ a.observacion }}</span>{% endif %}
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {{ vacio('No tienes asignaciones pendientes', 'Cuando coordinación o el líder de tu equipo te programe, verás aquí la ficha, la competencia y la jornada.', icono='calendar-x') }}
+    {% endif %}
+</section>
+{% endblock %}

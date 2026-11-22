@@ -1707,7 +1707,7 @@ class FlujosWebTestCase(unittest.TestCase):
         app_falso = Mock()
         app_falso.config = {'STARTUP_ERRORS': []}
         registrar_rutas(app_falso)
-        self.assertEqual(app_falso.register_blueprint.call_count, 15)
+        self.assertEqual(app_falso.register_blueprint.call_count, 17)
         self.assertEqual(app_falso.config['STARTUP_ERRORS'], [])
 
 

@@ -5,7 +5,7 @@ import string
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from app import db
-from app.models.instructor import Instructor
+from app.models.instructor import ROLES, Instructor
 from app.services.permisos import admin_required
 
 admin_bp = Blueprint('admin', __name__)
@@ -34,6 +34,7 @@ def listar_instructores():
         'admin/instructores.html',
         instructores=instructores,
         q=q,
+        roles=ROLES,
     )
 
 
@@ -73,4 +74,26 @@ def restablecer_clave_instructor(instructor_id):
         'El instructor deberá cambiarla obligatoriamente en su próximo inicio de sesión.',
         'success',
     )
+    return redirect(url_for('admin.listar_instructores'))
+
+
+@admin_bp.route('/instructores/<int:instructor_id>/rol', methods=['POST'])
+@admin_required
+def cambiar_rol_instructor(instructor_id):
+    """Asigna el perfil: instructor, coordinación o administración."""
+    from flask_login import current_user
+
+    instructor = db.session.get(Instructor, instructor_id)
+    if not instructor:
+        abort(404)
+    rol = request.form.get('rol') or ''
+    if rol not in ROLES:
+        flash('Elige un perfil válido.', 'error')
+        return redirect(url_for('admin.listar_instructores'))
+    if instructor.id == current_user.id and rol != 'admin':
+        flash('No puedes quitarte tu propio perfil de administración.', 'error')
+        return redirect(url_for('admin.listar_instructores'))
+    instructor.rol = rol
+    db.session.commit()
+    flash(f'{instructor.nombre} ahora tiene el perfil {ROLES[rol]}.', 'success')
     return redirect(url_for('admin.listar_instructores'))

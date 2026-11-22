@@ -1,0 +1,387 @@
+/* Programación de instructores: calendario panorámico, alertas y equipos.
+   Usa solo tokens del sistema (styles.css); sin colores literales. */
+
+.prg-barra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-block: 1rem;
+}
+
+.prg-periodo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 20rem;
+    min-inline-size: 0;
+}
+
+.prg-periodo-titulo {
+    margin: 0 0 0 0.5rem;
+    font-size: 1.1rem;
+}
+
+.prg-vistas,
+.prg-filtro {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.prg-filtro .form-control {
+    min-inline-size: 12rem;
+}
+
+.prg-resumen {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 0.75rem;
+    margin-block-end: 1rem;
+}
+
+.prg-resumen-barra {
+    grid-column: span 2;
+    align-self: center;
+    min-inline-size: 0;
+}
+
+@media (max-width: 40rem) {
+    .prg-resumen-barra {
+        grid-column: 1 / -1;
+    }
+}
+
+.prg-alertas,
+.prg-equipo {
+    margin-block-end: 1rem;
+}
+
+.prg-alertas h2,
+.prg-equipo h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.prg-alertas-lista,
+.prg-lista {
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.prg-alerta,
+.prg-lista-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+}
+
+.prg-alerta-texto {
+    flex: 1 1 16rem;
+    min-inline-size: 0;
+}
+
+.prg-alerta-detalle {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.prg-equipo-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-block-end: 0.75rem;
+}
+
+.prg-equipo-barra {
+    flex: 1 1 14rem;
+    min-inline-size: 0;
+    margin-block-end: 0.5rem;
+}
+
+.prg-equipo--archivado {
+    opacity: 0.75;
+}
+
+/* Calendario: la tabla se desplaza dentro de su propio contenedor. */
+.prg-tabla-contenedor {
+    position: relative; /* contiene los textos .sr-only (absolutos) dentro del desplazamiento */
+    overflow-x: auto;
+    max-inline-size: 100%;
+}
+
+.prg-tabla {
+    inline-size: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+}
+
+.prg-tabla th,
+.prg-tabla td {
+    border-block-end: 1px solid var(--border-light);
+    padding: 0.4rem;
+    vertical-align: top;
+    text-align: start;
+}
+
+.prg-tabla thead th {
+    position: sticky;
+    inset-block-start: 0;
+    background: var(--surface-card);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.prg-col-instructor {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 1;
+    background: var(--surface-card);
+    min-inline-size: 11rem;
+}
+
+.prg-col-dia {
+    min-inline-size: 8.5rem;
+}
+
+.prg-tabla--mes .prg-col-dia {
+    min-inline-size: 2.2rem;
+    text-align: center;
+}
+
+.prg-tabla--mes .prg-celda {
+    text-align: center;
+}
+
+.prg-col-dia--hoy {
+    color: var(--accent);
+}
+
+.prg-col-dia--no-laborable {
+    color: var(--text-secondary);
+}
+
+.prg-col-ocupacion {
+    min-inline-size: 10rem;
+}
+
+.prg-dia-numero {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.prg-nombre {
+    display: block;
+    font-weight: 600;
+}
+
+.prg-celda {
+    min-block-size: 3rem;
+}
+
+.prg-celda--libre {
+    background: var(--status-warning-bg);
+}
+
+.prg-celda--festivo {
+    background: var(--bg-surface-soft);
+}
+
+.prg-celda--hoy {
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.prg-festivo {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.prg-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    inline-size: 100%;
+    margin-block-end: 0.25rem;
+    padding: 0.3rem 0.45rem;
+    border: 1px solid var(--status-info-border);
+    border-inline-start-width: 4px;
+    border-radius: var(--radius-sm);
+    background: var(--status-info-bg);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: start;
+    cursor: default;
+}
+
+button.prg-chip {
+    cursor: pointer;
+}
+
+button.prg-chip:hover,
+button.prg-chip:focus-visible {
+    border-color: var(--accent);
+}
+
+.prg-chip--tarde {
+    border-color: var(--status-warning-border);
+    background: var(--status-warning-bg);
+}
+
+.prg-chip--noche {
+    border-color: var(--status-success-border);
+    background: var(--status-success-bg);
+}
+
+.prg-chip--compacto {
+    display: inline-flex;
+    inline-size: auto;
+    min-inline-size: 1.6rem;
+    justify-content: center;
+    padding: 0.1rem 0.3rem;
+    border-inline-start-width: 1px;
+    font-weight: 600;
+}
+
+.prg-chip-jornada {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.prg-chip-ficha {
+    font-weight: 600;
+}
+
+.prg-chip-competencia {
+    overflow-wrap: break-word;
+}
+
+.prg-agregar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 100%;
+    min-block-size: 1.8rem;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.prg-agregar:hover,
+.prg-agregar:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.prg-leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Formulario */
+.prg-form {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.prg-fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.prg-fieldset legend {
+    margin-block-end: 0.35rem;
+    font-weight: 600;
+}
+
+.prg-opciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.prg-opcion {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+}
+
+.prg-opcion:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+}
+
+.prg-fechas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+    gap: 0.75rem;
+}
+
+.prg-form-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.prg-btn-quitar {
+    margin-inline-start: auto;
+    color: var(--danger-text);
+}
+
+/* Equipos */
+.prg-equipos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1rem;
+    margin-block-end: 1rem;
+}
+
+.prg-miembros {
+    color: var(--text-secondary);
+}
+
+.prg-detalles {
+    margin-block: 0.5rem;
+}
+
+.prg-detalles[open] > .prg-form {
+    margin-block-start: 0.75rem;
+}
+
+.prg-form-inline {
+    display: inline;
+}
+
+/* En celular la columna fija del nombre ocupa menos para dejar ver los días. */
+@media (max-width: 40rem) {
+    .prg-col-instructor {
+        min-inline-size: 7rem;
+        max-inline-size: 7rem;
+    }
+
+    .prg-col-dia {
+        min-inline-size: 7.5rem;
+    }
+}

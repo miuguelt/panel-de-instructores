@@ -188,3 +188,26 @@
     outline: var(--focus-width) solid var(--accent-primary);
     outline-offset: var(--focus-offset);
 }
+
+/* Administración: selector de perfil en la tabla */
+.form-inline-compacto {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* Contador junto a un enlace del menú general (p. ej. instructores por programar). */
+.nav-link-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: var(--radius-pill);
+    background: var(--sena-red);
+    color: var(--color-white);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+}

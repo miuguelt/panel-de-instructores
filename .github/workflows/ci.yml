@@ -90,6 +90,9 @@ jobs:
       - name: Verificar selector aleatorio del instructor y cobertura de funciones
         run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/selector_aprendiz.js --test-reporter=spec --test tests_js/selector_aprendiz.test.cjs
 
+      - name: Verificar el calendario de programación y cobertura de funciones
+        run: node --experimental-test-coverage --test-coverage-functions=100 --test-coverage-include=app/static/js/programacion.js --test-reporter=spec --test tests_js/programacion.test.cjs
+
       - name: Verificar la disposición del panel de grupos
         run: node --test tests_js/grupos_layout.test.cjs
 
