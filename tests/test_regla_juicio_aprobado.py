@@ -115,6 +115,34 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class ReportePdfCoincideConPanelTest(unittest.TestCase):
+    """El PDF del aprendiz usa las mismas cifras que su panel (antes no deduplicaba juicios)."""
+
+    setUp = ReglaJuicioAprobadoTest.setUp
+    tearDown = ReglaJuicioAprobadoTest.tearDown
+    _capturar = ReglaJuicioAprobadoTest._capturar
+    _contexto = ReglaJuicioAprobadoTest._contexto
+
+    def test_reporte_y_panel_coinciden(self):
+        from unittest.mock import patch
+        from flask import Response
+        db.session.add(JuicioEvaluativo(  # duplicado del RAP 0: no debe contarse dos veces
+            ficha_id=self.ficha.id, aprendiz_id=self.aprendiz.id, competencia='220501096 - Desarrollar',
+            tipo_competencia='tecnica', resultado_aprendizaje='RAP 0', juicio='POR EVALUAR'))
+        db.session.commit()
+        with self.cliente.session_transaction() as sesion:
+            sesion['aprendiz_documento'] = '777'
+            sesion['aprendiz_ficha_id'] = self.ficha.id
+        panel = self._contexto(f'/aprendiz/{self.ficha.id}/panel', 'stats_juicios')
+        with patch('app.routes.aprendiz._generar_pdf_reporte_aprendiz', return_value=Response('pdf')) as pdf:
+            self.assertEqual(self.cliente.get(f'/aprendiz/{self.ficha.id}/descargar-reporte').status_code, 200)
+        argumentos = pdf.call_args.args
+        stats_pdf, nivel = argumentos[9], argumentos[7]
+        self.assertEqual((stats_pdf['aprobados'], stats_pdf['total']), (panel['aprobados'], panel['total']))
+        self.assertEqual((panel['aprobados'], panel['total']), (1, 5))
+        self.assertEqual(nivel, 'Verde (Al Día)')
+
+
 class FuncionesCanonicasTest(unittest.TestCase):
     def test_aprobado_y_evaluado_con_tildes_y_codigos(self):
         from app.services.emparejamiento_juicios import es_aprobado, es_evaluado

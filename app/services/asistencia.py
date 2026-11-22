@@ -168,6 +168,35 @@ def sesiones_registradas_query(ficha_id, corte_id=None):
 ESTADOS_PRESENTE = ('ASISTE', 'TARDANZA')
 
 
+ESTADOS_FALTA = ('FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA')
+
+
+def conteo_asistencia_aprendiz(ficha_id, aprendiz_id):
+    """Sesiones de la ficha y faltas del aprendiz, separadas por justificación."""
+    total_sesiones = sesiones_registradas_query(ficha_id).count()
+    faltas = (
+        db.session.query(RegistroAsistencia.estado, db.func.count(RegistroAsistencia.id))
+        .join(SesionAsistencia, RegistroAsistencia.sesion_id == SesionAsistencia.id)
+        .filter(SesionAsistencia.ficha_id == ficha_id, RegistroAsistencia.aprendiz_id == aprendiz_id,
+                RegistroAsistencia.estado.in_(ESTADOS_FALTA))
+        .group_by(RegistroAsistencia.estado).all()
+    )
+    por_estado = dict(faltas)
+    total_faltas = sum(por_estado.values())
+    sin_justificar = por_estado.get('FALTA', 0)
+    return {'total_sesiones': total_sesiones, 'total_faltas': total_faltas,
+            'faltas_no_justificadas': sin_justificar, 'faltas_justificadas': total_faltas - sin_justificar}
+
+
+def nivel_por_faltas(faltas_no_justificadas, config):
+    """verde, amarillo o rojo según los umbrales de alertas de la ficha."""
+    if config and faltas_no_justificadas >= config.umbral_rojo:
+        return 'rojo'
+    if config and faltas_no_justificadas >= config.umbral_amarillo:
+        return 'amarillo'
+    return 'verde'
+
+
 def resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas):
     """Asistencia de un aprendiz: solo las faltas sin justificar restan.
 

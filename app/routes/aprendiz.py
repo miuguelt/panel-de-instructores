@@ -13,7 +13,7 @@ from app.models.asistencia import (
     ESTADOS_ASISTENCIA,
     CAUSALES_JUSTIFICADAS,
 )
-from app.models.tarea import Tarea, Entrega, ProrrogaTarea
+from app.models.tarea import Tarea, Entrega
 from app.models.grupo import Grupo
 from app.models.material import MaterialFicha
 from app.models.alertas import ConfiguracionAlertas, PlanMejoramiento
@@ -33,7 +33,13 @@ from app.services.alertas import (
     vencer_planes_pendientes,
 )
 from app.services.cronograma import obtener_cronograma
-from app.services.asistencia import guardar_asistencia, mapa_asistencia_por_fecha, resumen_asistencia_aprendiz
+from app.services.asistencia import (
+    conteo_asistencia_aprendiz,
+    guardar_asistencia,
+    mapa_asistencia_por_fecha,
+    nivel_por_faltas,
+    resumen_asistencia_aprendiz,
+)
 from app.services.aseo import ajustar_turno_por_asistencia, resumen_aprendiz
 from app.services.cortes import corte_actual
 from app.services.trabajos_grupales import obtener_trabajos_grupales
@@ -52,7 +58,8 @@ from app.services.permisos import (
     puede_gestionar_ficha,
     puede_gestionar_tarea,
 )
-from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado
+from app.services.evidencias_aprendiz import saludo_por_hora, tareas_del_aprendiz
+from app.services.juicios_aprendiz import analizar_juicios, deduplicar_juicios
 from datetime import date, datetime, timedelta
 
 aprendiz_bp = Blueprint('aprendiz', __name__, template_folder='../templates/aprendiz')
@@ -127,29 +134,11 @@ def panel(ficha_id):
         db.session.rollback()
         current_app.logger.exception('No fue posible actualizar las alertas del panel del aprendiz.')
 
-    total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
-    total_faltas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz.id,
-        RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
-    ).count()
-    faltas_no_justificadas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz.id,
-        RegistroAsistencia.estado == 'FALTA',
-    ).count()
-    faltas_justificadas = total_faltas - faltas_no_justificadas
-
+    conteo = conteo_asistencia_aprendiz(ficha_id, aprendiz.id)
+    total_sesiones, total_faltas = conteo['total_sesiones'], conteo['total_faltas']
+    faltas_no_justificadas, faltas_justificadas = conteo['faltas_no_justificadas'], conteo['faltas_justificadas']
     config = ConfiguracionAlertas.query.filter_by(ficha_id=ficha_id).first()
-    if config:
-        if faltas_no_justificadas >= config.umbral_rojo:
-            nivel_alerta = 'rojo'
-        elif faltas_no_justificadas >= config.umbral_amarillo:
-            nivel_alerta = 'amarillo'
-        else:
-            nivel_alerta = 'verde'
-    else:
-        nivel_alerta = 'verde'
+    nivel_alerta = nivel_por_faltas(faltas_no_justificadas, config)
 
     # Las excusas no restan: misma fórmula para el porcentaje y el texto «X de Y».
     asistencia_resumen = resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas)
@@ -185,128 +174,8 @@ def panel(ficha_id):
         ficha_id=ficha_id, activa=True
     ).order_by(Insignia.nombre).all()
 
-    tareas = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite).all()
-    # Todas las entregas, prórrogas y planes del aprendiz en consultas agregadas
-    entregas_aprendiz = {}
-    prorrogas_aprendiz = {}
-    planes_tarea_aprendiz = {}
-    if tareas:
-        tarea_ids = [tarea.id for tarea in tareas]
-        for entrega in (
-            Entrega.query
-            .filter(
-                Entrega.aprendiz_id == aprendiz.id,
-                Entrega.tarea_id.in_(tarea_ids),
-            )
-            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-            .all()
-        ):
-            entregas_aprendiz.setdefault(entrega.tarea_id, entrega)
-
-        for pr in ProrrogaTarea.query.filter(
-            ProrrogaTarea.aprendiz_id == aprendiz.id,
-            ProrrogaTarea.tarea_id.in_(tarea_ids),
-        ).all():
-            prorrogas_aprendiz[pr.tarea_id] = pr
-
-        for pl in PlanMejoramiento.query.filter(
-            PlanMejoramiento.aprendiz_id == aprendiz.id,
-            PlanMejoramiento.tarea_id.in_(tarea_ids),
-        ).order_by(PlanMejoramiento.fecha_creacion.desc()).all():
-            planes_tarea_aprendiz.setdefault(pl.tarea_id, pl)
-
-    tareas_estado = []
     ahora_utc = datetime.utcnow()
-    for tarea in tareas:
-        if tarea.es_grupal:
-            continue
-        entrega = entregas_aprendiz.get(tarea.id)
-        prorroga = prorrogas_aprendiz.get(tarea.id)
-        plan_tarea = planes_tarea_aprendiz.get(tarea.id)
-        limite_efectivo = prorroga.nueva_fecha_limite if prorroga and prorroga.nueva_fecha_limite else tarea.fecha_limite
-
-        estado = 'pendiente'
-        if entrega:
-            if entrega.estado_revision == 'rechazada':
-                estado = 'correccion'
-            elif (
-                entrega.registrada_por_instructor
-                or not limite_efectivo
-                or entrega.fecha_entrega <= limite_efectivo
-            ):
-                # Usamos limite_efectivo pre-cargado (considera prórroga) para
-                # evitar el N+1 que dispara entregada_a_tiempo vía lazy query.
-                estado = 'entregada'
-            else:
-                estado = 'retraso'
-        elif limite_efectivo and limite_efectivo < ahora_utc:
-            estado = 'vencida'
-
-        progreso_plazo = None
-        clase_plazo = None
-        texto_tiempo_plazo = None
-        if limite_efectivo:
-            segundos_restantes = (limite_efectivo - ahora_utc).total_seconds()
-            segundos_absolutos = abs(segundos_restantes)
-            if segundos_restantes > 0:
-                if segundos_restantes <= 24 * 60 * 60:
-                    clase_plazo = 'urgent'
-                elif segundos_restantes <= 3 * 24 * 60 * 60:
-                    clase_plazo = 'soon'
-                else:
-                    clase_plazo = 'normal'
-                prefijo_tiempo = 'Quedan '
-            else:
-                clase_plazo = 'overdue'
-                prefijo_tiempo = 'Plazo vencido hace '
-
-            if segundos_absolutos >= 24 * 60 * 60:
-                dias = int(segundos_absolutos // (24 * 60 * 60))
-                horas = int((segundos_absolutos % (24 * 60 * 60)) // (60 * 60))
-                texto_duracion = f"{dias} {'día' if dias == 1 else 'días'}"
-                if horas:
-                    texto_duracion += f" y {horas} {'hora' if horas == 1 else 'horas'}"
-            elif segundos_absolutos >= 60 * 60:
-                horas = int(segundos_absolutos // (60 * 60))
-                minutos = int((segundos_absolutos % (60 * 60)) // 60)
-                texto_duracion = f"{horas} {'hora' if horas == 1 else 'horas'}"
-                if minutos:
-                    texto_duracion += f" y {minutos} {'minuto' if minutos == 1 else 'minutos'}"
-            else:
-                minutos = max(1, int((segundos_absolutos + 59) // 60))
-                texto_duracion = f"{minutos} {'minuto' if minutos == 1 else 'minutos'}"
-            texto_tiempo_plazo = prefijo_tiempo + texto_duracion
-
-            duracion_plazo = (
-                (limite_efectivo - tarea.creada_en).total_seconds()
-                if tarea.creada_en else 0
-            )
-            if duracion_plazo > 0:
-                if entrega and estado in ('entregada', 'retraso'):
-                    progreso_plazo = 100
-                    clase_plazo = 'complete'
-                    texto_tiempo_plazo = 'Evidencia entregada'
-                else:
-                    segundos_transcurridos = (ahora_utc - tarea.creada_en).total_seconds()
-                    progreso_plazo = max(
-                        0,
-                        min(100, round(segundos_transcurridos / duracion_plazo * 100)),
-                    )
-            elif entrega and estado in ('entregada', 'retraso'):
-                clase_plazo = 'complete'
-                texto_tiempo_plazo = 'Evidencia entregada'
-
-        tareas_estado.append({
-            'tarea': tarea,
-            'entrega': entrega,
-            'estado': estado,
-            'prorroga': prorroga,
-            'plan': plan_tarea,
-            'limite_efectivo': limite_efectivo,
-            'progreso_plazo': progreso_plazo,
-            'clase_plazo': clase_plazo,
-            'texto_tiempo_plazo': texto_tiempo_plazo,
-        })
+    tareas_estado = tareas_del_aprendiz(ficha_id, aprendiz.id, ahora_utc)
 
     if filas_ranking is None:
         filas_ranking, config_ranking = calcular_ranking(ficha_id)
@@ -418,146 +287,11 @@ def panel(ficha_id):
     from app.models.juicio import JuicioEvaluativo
     juicios_raw = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id).all()
 
-    # Deduplicar por (competencia, resultado_aprendizaje) conservando el mejor registro
-    juicios_dedup = {}
-    for j in juicios_raw:
-        key = ((j.competencia or '').strip().upper(), (j.resultado_aprendizaje or '').strip().upper())
-        if key not in juicios_dedup:
-            juicios_dedup[key] = j
-        else:
-            existing = juicios_dedup[key]
-            es_aprobado = juicio_aprobado(j.juicio)
-            existing_aprobado = juicio_aprobado(existing.juicio)
-            if es_aprobado and not existing_aprobado:
-                juicios_dedup[key] = j
-            elif es_aprobado == existing_aprobado and j.funcionario_registro and not existing.funcionario_registro:
-                juicios_dedup[key] = j
+    juicios = deduplicar_juicios(juicios_raw)
+    analisis_juicios = analizar_juicios(juicios)
+    stats_juicios = analisis_juicios['stats_juicios']
+    competencias_aprendiz_orden = analisis_juicios['competencias']
 
-    juicios = list(juicios_dedup.values())
-
-    stats_juicios = {
-        'total': 0, 'aprobados': 0,
-        'tecnica': 0, 'tecnica_aprobada': 0,
-        'transversal': 0, 'transversal_aprobada': 0,
-        'ingles': 0, 'ingles_aprobada': 0,
-    }
-    juicios_pendientes = []
-    juicios_aprobados = []
-
-    for j in juicios:
-        stats_juicios['total'] += 1
-        es_aprobado = juicio_aprobado(j.juicio)
-        if es_aprobado:
-            stats_juicios['aprobados'] += 1
-            juicios_aprobados.append(j)
-        else:
-            juicios_pendientes.append(j)
-
-        tipo = j.tipo_competencia or 'tecnica'
-        stats_juicios[tipo] += 1
-        if es_aprobado:
-            stats_juicios[f"{tipo}_aprobada"] += 1
-
-    stats_juicios['pct_total'] = round((stats_juicios['aprobados'] / stats_juicios['total'] * 100)) if stats_juicios['total'] > 0 else 0
-    stats_juicios['pct_tecnica'] = round((stats_juicios['tecnica_aprobada'] / stats_juicios['tecnica'] * 100)) if stats_juicios['tecnica'] > 0 else 0
-    stats_juicios['pct_transversal'] = round((stats_juicios['transversal_aprobada'] / stats_juicios['transversal'] * 100)) if stats_juicios['transversal'] > 0 else 0
-    stats_juicios['pct_ingles'] = round((stats_juicios['ingles_aprobada'] / stats_juicios['ingles'] * 100)) if stats_juicios['ingles'] > 0 else 0
-
-    # Evaluadores únicos para este aprendiz (excluye cédulas numéricas)
-    evaluadores_set = set()
-    for j in juicios:
-        if j.funcionario_registro and any(c.isalpha() for c in j.funcionario_registro):
-            evaluadores_set.add(j.funcionario_registro)
-    evaluadores_lista = sorted(evaluadores_set)
-
-    # ---- NUEVAS ESTADÍSTICAS PARA EL APRENDIZ ----
-
-    # Stats por competencia para este aprendiz agrupadas con sus RAPs
-    competencias_aprendiz = {}
-    for j in juicios:
-        comp = j.competencia or 'Sin nombre'
-        if comp not in competencias_aprendiz:
-            competencias_aprendiz[comp] = {
-                'nombre': comp,
-                'tipo': j.tipo_competencia or 'tecnica',
-                'total': 0, 'aprobados': 0, 'pendientes': 0,
-                'fecha_ultima': j.fecha_juicio,
-                'raps': []
-            }
-
-        datos_comp = competencias_aprendiz[comp]
-        datos_comp['total'] += 1
-        es_aprobado = juicio_aprobado(j.juicio)
-        if es_aprobado:
-            datos_comp['aprobados'] += 1
-        else:
-            datos_comp['pendientes'] += 1
-
-        if j.fecha_juicio and (not datos_comp['fecha_ultima'] or j.fecha_juicio > datos_comp['fecha_ultima']):
-            datos_comp['fecha_ultima'] = j.fecha_juicio
-
-        datos_comp['raps'].append({
-            'rap': j.resultado_aprendizaje or 'Sin descripción',
-            'juicio': j.juicio or 'POR EVALUAR',
-            'es_aprobado': es_aprobado,
-            'fecha': j.fecha_juicio.strftime('%d/%m/%Y') if j.fecha_juicio else 'Pendiente',
-            'evaluador': j.funcionario_registro or 'Sin registro'
-        })
-
-    for comp in competencias_aprendiz.values():
-        comp['pct'] = round((comp['aprobados'] / comp['total'] * 100)) if comp['total'] > 0 else 0
-        if comp['pct'] == 100:
-            comp['estado_label'] = 'Completada'
-        elif comp['pct'] > 0:
-            comp['estado_label'] = 'En Progreso'
-        else:
-            comp['estado_label'] = 'Pendiente'
-
-    competencias_aprendiz_orden = sorted(competencias_aprendiz.values(), key=lambda x: (x['tipo'], x['nombre']))
-
-    # Timeline de evaluaciones para este aprendiz
-    timeline_aprendiz = {}
-    for j in juicios:
-        if j.fecha_juicio:
-            mes = j.fecha_juicio.strftime('%Y-%m')
-            if mes not in timeline_aprendiz:
-                timeline_aprendiz[mes] = {'total': 0, 'aprobados': 0}
-            timeline_aprendiz[mes]['total'] += 1
-            es_aprobado = juicio_aprobado(j.juicio)
-            if es_aprobado:
-                timeline_aprendiz[mes]['aprobados'] += 1
-    timeline_aprendiz_orden = sorted(timeline_aprendiz.items())
-
-    # Stats por instructor para este aprendiz
-    instructores_aprendiz = {}
-    for j in juicios:
-        func = j.funcionario_registro or 'Sin registro'
-        if func not in instructores_aprendiz:
-            instructores_aprendiz[func] = {'total': 0, 'aprobados': 0, 'pendientes': 0}
-        instructores_aprendiz[func]['total'] += 1
-        es_aprobado = juicio_aprobado(j.juicio)
-        if es_aprobado:
-            instructores_aprendiz[func]['aprobados'] += 1
-        else:
-            instructores_aprendiz[func]['pendientes'] += 1
-
-    for func in instructores_aprendiz.values():
-        func['pct'] = round((func['aprobados'] / func['total'] * 100)) if func['total'] > 0 else 0
-
-    # Resumen extendido para el aprendiz
-    fechas_juicios_ap = [j.fecha_juicio for j in juicios if j.fecha_juicio]
-    stats_resumen_aprendiz = {
-        'total_competencias': len(competencias_aprendiz),
-        'total_instructores': len(instructores_aprendiz),
-        'promedio_por_instructor': round(stats_juicios['total'] / len(instructores_aprendiz), 1) if instructores_aprendiz else 0,
-        'primera_evaluacion': min(fechas_juicios_ap) if fechas_juicios_ap else None,
-        'ultima_evaluacion': max(fechas_juicios_ap) if fechas_juicios_ap else None,
-        'dias_entre_evaluaciones': (
-            (max(fechas_juicios_ap) - min(fechas_juicios_ap)).days
-            if len(fechas_juicios_ap) >= 2 else 0
-        ),
-    }
-    
     # Sin commit aqui: desde que se marcaron las insignias no hay escrituras
     # pendientes, y confirmar justo antes del render expiraba tareas, entregas
     # e insignias, que la plantilla volvia a leer una por una.
@@ -589,13 +323,7 @@ def panel(ficha_id):
     resumen_logros = obtener_logros_aprendiz(ficha_id, aprendiz.id)
 
     # Métricas y contexto personalizado para el aprendiz (hora de Colombia UTC-5)
-    hora_col = (datetime.utcnow() - timedelta(hours=5)).hour
-    if 5 <= hora_col < 12:
-        saludo_tiempo = "¡Buenos días"
-    elif 12 <= hora_col < 19:
-        saludo_tiempo = "¡Buenas tardes"
-    else:
-        saludo_tiempo = "¡Buenas noches"
+    saludo_tiempo = saludo_por_hora((datetime.utcnow() - timedelta(hours=5)).hour)
 
     tareas_pendientes = [t for t in tareas_estado if t['estado'] in ('pendiente', 'correccion', 'vencida')]
     tareas_entregadas = [t for t in tareas_estado if t['estado'] in ('entregada', 'retraso')]
@@ -692,14 +420,14 @@ def panel(ficha_id):
                            fecha_inicio_default=fecha_inicio_default,
                            fecha_fin_default=fecha_fin_default,
                            stats_juicios=stats_juicios,
-                           juicios_pendientes=juicios_pendientes,
-                           juicios_aprobados=juicios_aprobados,
+                           juicios_pendientes=analisis_juicios['juicios_pendientes'],
+                           juicios_aprobados=analisis_juicios['juicios_aprobados'],
                            competencias_aprendiz=competencias_aprendiz_orden,
                            juicios=juicios,
-                           evaluadores=evaluadores_lista,
-                           timeline_aprendiz=timeline_aprendiz_orden,
-                           instructores_aprendiz=instructores_aprendiz,
-                           resumen_aprendiz=stats_resumen_aprendiz,
+                           evaluadores=analisis_juicios['evaluadores'],
+                           timeline_aprendiz=analisis_juicios['timeline'],
+                           instructores_aprendiz=analisis_juicios['instructores'],
+                           resumen_aprendiz=analisis_juicios['resumen'],
                            grupo_actual=grupo_actual,
                            liga_grupos=liga_grupos,
                            mi_escuadron=mi_escuadron,
@@ -811,6 +539,11 @@ def asistencia_admin(ficha_id):
     )
 
 
+NIVEL_ALERTA_PDF = {'verde': 'Verde (Al Día)', 'amarillo': 'Amarillo (En Riesgo)', 'rojo': 'Rojo (Crítico)'}
+ESTADO_EVIDENCIA_PDF = {'pendiente': 'Pendiente', 'vencida': 'Vencida', 'correccion': 'Corrección',
+                        'entregada': 'Entregada', 'retraso': 'Retraso'}
+
+
 @aprendiz_bp.route('/<int:ficha_id>/descargar-reporte')
 @limiter.limit("10 per minute")
 def descargar_reporte(ficha_id):
@@ -822,93 +555,24 @@ def descargar_reporte(ficha_id):
     if not aprendiz:
         abort(404)
         
-    total_sesiones = SesionAsistencia.query.join(RegistroAsistencia).filter(SesionAsistencia.ficha_id == ficha_id).distinct().count()
-    total_faltas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz.id,
-        RegistroAsistencia.estado.in_(['FALTA', 'FALTA_JUSTIFICADA', 'EXCUSA_MEDICA']),
-    ).count()
-    faltas_no_justificadas = RegistroAsistencia.query.join(SesionAsistencia).filter(
-        SesionAsistencia.ficha_id == ficha_id,
-        RegistroAsistencia.aprendiz_id == aprendiz.id,
-        RegistroAsistencia.estado == 'FALTA',
-    ).count()
-    faltas_justificadas = total_faltas - faltas_no_justificadas
+    # Mismas reglas y cifras que el panel: asistencia, evidencias y juicios deduplicados.
+    conteo = conteo_asistencia_aprendiz(ficha_id, aprendiz.id)
+    total_sesiones, total_faltas = conteo['total_sesiones'], conteo['total_faltas']
+    faltas_no_justificadas, faltas_justificadas = conteo['faltas_no_justificadas'], conteo['faltas_justificadas']
     pct_asistencia = resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas)['pct'] or 0
-    
     config = ConfiguracionAlertas.query.filter_by(ficha_id=ficha_id).first()
-    if config:
-        if faltas_no_justificadas >= config.umbral_rojo:
-            nivel_alerta = 'Rojo (Crítico)'
-        elif faltas_no_justificadas >= config.umbral_amarillo:
-            nivel_alerta = 'Amarillo (En Riesgo)'
-        else:
-            nivel_alerta = 'Verde (Al Día)'
-    else:
-        nivel_alerta = 'Verde (Al Día)'
+    nivel_alerta = NIVEL_ALERTA_PDF[nivel_por_faltas(faltas_no_justificadas, config)]
 
-    tareas = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite).all()
-    tareas_estado = []
-    now = datetime.utcnow()
-    for tarea in tareas:
-        entrega = (
-            Entrega.query
-            .filter_by(tarea_id=tarea.id, aprendiz_id=aprendiz.id)
-            .order_by(Entrega.fecha_entrega.desc(), Entrega.id.desc())
-            .first()
-        )
-        if entrega:
-            if entrega.estado_revision == 'rechazada':
-                estado = 'Corrección'
-            elif entrega.entregada_a_tiempo:
-                estado = 'Entregada'
-            else:
-                estado = 'Retraso'
-        elif tarea.fecha_limite and tarea.fecha_limite < now:
-            estado = 'Vencida'
-        else:
-            estado = 'Pendiente'
-        tareas_estado.append({'tarea': tarea.titulo, 'estado': estado, 'calificacion': entrega.calificacion if entrega and entrega.calificacion else 'N/A'})
+    tareas_estado = [
+        {'tarea': item['tarea'].titulo, 'estado': ESTADO_EVIDENCIA_PDF[item['estado']],
+         'calificacion': item['entrega'].calificacion if item['entrega'] and item['entrega'].calificacion else 'N/A'}
+        for item in tareas_del_aprendiz(ficha_id, aprendiz.id)
+    ]
 
     from app.models.juicio import JuicioEvaluativo
-    juicios = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id).all()
-    stats_juicios = {
-        'total': 0, 'aprobados': 0,
-        'tecnica': 0, 'tecnica_aprobada': 0,
-        'transversal': 0, 'transversal_aprobada': 0,
-        'ingles': 0, 'ingles_aprobada': 0,
-    }
-    competencias_agrupadas = {}
-    for j in juicios:
-        stats_juicios['total'] += 1
-        es_aprobado = juicio_aprobado(j.juicio)
-        if es_aprobado:
-            stats_juicios['aprobados'] += 1
-        tipo = j.tipo_competencia or 'tecnica'
-        stats_juicios[tipo] += 1
-        if es_aprobado:
-            stats_juicios[f"{tipo}_aprobada"] += 1
-        comp = j.competencia or 'Sin nombre'
-        if comp not in competencias_agrupadas:
-            competencias_agrupadas[comp] = {
-                'nombre': comp, 'tipo': tipo,
-                'total': 0, 'aprobados': 0,
-                'raps': []
-            }
-        competencias_agrupadas[comp]['total'] += 1
-        if es_aprobado:
-            competencias_agrupadas[comp]['aprobados'] += 1
-        competencias_agrupadas[comp]['raps'].append({
-            'rap': j.resultado_aprendizaje or 'Sin descripción',
-            'juicio': j.juicio or 'POR EVALUAR',
-            'fecha': j.fecha_juicio.strftime('%d/%m/%Y') if j.fecha_juicio else 'Pendiente',
-            'evaluador': j.funcionario_registro or 'Sin registro'
-        })
-    stats_juicios['pct_total'] = round((stats_juicios['aprobados'] / stats_juicios['total'] * 100)) if stats_juicios['total'] > 0 else 0
-    stats_juicios['pct_tecnica'] = round((stats_juicios['tecnica_aprobada'] / stats_juicios['tecnica'] * 100)) if stats_juicios['tecnica'] > 0 else 0
-    stats_juicios['pct_transversal'] = round((stats_juicios['transversal_aprobada'] / stats_juicios['transversal'] * 100)) if stats_juicios['transversal'] > 0 else 0
-    stats_juicios['pct_ingles'] = round((stats_juicios['ingles_aprobada'] / stats_juicios['ingles'] * 100)) if stats_juicios['ingles'] > 0 else 0
-    competencias_lista = sorted(competencias_agrupadas.values(), key=lambda x: (x['tipo'], x['nombre']))
+    analisis = analizar_juicios(deduplicar_juicios(
+        JuicioEvaluativo.query.filter_by(ficha_id=ficha_id, aprendiz_id=aprendiz.id).all()))
+    stats_juicios, competencias_lista = analisis['stats_juicios'], analisis['competencias']
 
     otorgamientos = InsigniaOtorgada.query.join(Insignia).filter(
         InsigniaOtorgada.aprendiz_id == aprendiz.id,

@@ -95,3 +95,25 @@ class ResumenAsistenciaAprendizTest(unittest.TestCase):
     def test_mas_faltas_que_sesiones_se_acota(self):
         from app.services.asistencia import resumen_asistencia_aprendiz
         self.assertEqual(resumen_asistencia_aprendiz(2, 5)['pct'], 0.0)
+
+
+class ConteoAsistenciaAprendizTest(unittest.TestCase):
+    """Conteo de faltas del aprendiz y su nivel de alerta, comunes al panel y al PDF."""
+
+    setUp = SerieAsistenciaTest.setUp
+    tearDown = SerieAsistenciaTest.tearDown
+    sesion = SerieAsistenciaTest.sesion
+
+    def test_conteo_y_nivel(self):
+        from types import SimpleNamespace
+        from app.services.asistencia import conteo_asistencia_aprendiz, nivel_por_faltas
+        self.sesion(date(2026, 7, 1), ['FALTA', 'ASISTE', 'ASISTE', 'ASISTE'])
+        self.sesion(date(2026, 7, 2), ['EXCUSA_MEDICA', 'ASISTE', 'ASISTE', 'ASISTE'])
+        self.sesion(date(2026, 7, 3), ['FALTA_JUSTIFICADA', 'FALTA', 'ASISTE', 'ASISTE'])
+        conteo = conteo_asistencia_aprendiz(self.ficha.id, self.aprendices[0].id)
+        self.assertEqual(conteo, {'total_sesiones': 3, 'total_faltas': 3, 'faltas_no_justificadas': 1, 'faltas_justificadas': 2})
+        config = SimpleNamespace(umbral_rojo=3, umbral_amarillo=1)
+        self.assertEqual(nivel_por_faltas(1, config), 'amarillo')
+        self.assertEqual(nivel_por_faltas(3, config), 'rojo')
+        self.assertEqual(nivel_por_faltas(0, config), 'verde')
+        self.assertEqual(nivel_por_faltas(9, None), 'verde')
