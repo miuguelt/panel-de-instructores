@@ -6,8 +6,15 @@ la canónica (:func:`es_aprobado`), igual en todas las vistas.
 """
 
 from app.services.emparejamiento_juicios import es_aprobado
+from app.services.importacion_ficha import clasificar_competencia
 
 TIPOS = ('tecnica', 'transversal', 'ingles')
+
+
+def tipo_competencia(juicio):
+    """Tipo registrado del juicio; si falta, se clasifica por el nombre de la competencia."""
+    tipo = juicio.tipo_competencia or clasificar_competencia(juicio.competencia)
+    return tipo if tipo in TIPOS else 'tecnica'
 
 
 def _pct(parte, total):
@@ -37,12 +44,12 @@ def _estadisticas(juicios):
     pendientes, aprobados = [], []
     for juicio in juicios:
         aprobado = es_aprobado(juicio.juicio)
-        tipo = juicio.tipo_competencia or 'tecnica'
+        tipo = tipo_competencia(juicio)
         stats['total'] += 1
-        stats[tipo] = stats.get(tipo, 0) + 1
+        stats[tipo] += 1
         if aprobado:
             stats['aprobados'] += 1
-            stats[f'{tipo}_aprobada'] = stats.get(f'{tipo}_aprobada', 0) + 1
+            stats[f'{tipo}_aprobada'] += 1
             aprobados.append(juicio)
         else:
             pendientes.append(juicio)
@@ -57,7 +64,7 @@ def _competencias(juicios):
     for juicio in juicios:
         nombre = juicio.competencia or 'Sin nombre'
         datos = competencias.setdefault(nombre, {
-            'nombre': nombre, 'tipo': juicio.tipo_competencia or 'tecnica',
+            'nombre': nombre, 'tipo': tipo_competencia(juicio),
             'total': 0, 'aprobados': 0, 'pendientes': 0, 'fecha_ultima': juicio.fecha_juicio, 'raps': [],
         })
         aprobado = es_aprobado(juicio.juicio)
@@ -126,3 +133,51 @@ def analizar_juicios(juicios):
             'dias_entre_evaluaciones': (max(fechas) - min(fechas)).days if len(fechas) >= 2 else 0,
         },
     }
+
+
+def _estado_competencia(aprobados, total):
+    if total and aprobados == total:
+        return 'completada'
+    return 'en_progreso' if aprobados else 'pendiente'
+
+
+def competencias_por_tipo(juicios):
+    """Competencias agrupadas por tipo con sus RAP, estado y un resumen por tipo (reporte del instructor)."""
+    competencias = {}
+    for juicio in juicios:
+        nombre = (juicio.competencia or 'Sin nombre').strip()
+        datos = competencias.setdefault(nombre, {
+            'nombre': nombre, 'tipo': tipo_competencia(juicio), 'total_raps': 0, 'aprobados_raps': 0,
+            'raps': [], 'ultima_fecha': juicio.fecha_juicio,
+        })
+        aprobado = es_aprobado(juicio.juicio)
+        datos['total_raps'] += 1
+        datos['aprobados_raps'] += int(aprobado)
+        datos['raps'].append({
+            'resultado': juicio.resultado_aprendizaje or 'Sin descripción de resultado',
+            'juicio': juicio.juicio or 'Sin registrar', 'aprobado': aprobado,
+            'fecha': juicio.fecha_juicio, 'instructor': juicio.funcionario_registro or 'Sistema',
+        })
+        if juicio.fecha_juicio and (not datos['ultima_fecha'] or juicio.fecha_juicio > datos['ultima_fecha']):
+            datos['ultima_fecha'] = juicio.fecha_juicio
+
+    por_tipo = {tipo: [] for tipo in TIPOS}
+    for datos in competencias.values():
+        datos['pct'] = _pct(datos['aprobados_raps'], datos['total_raps'])
+        datos['pendientes_raps'] = datos['total_raps'] - datos['aprobados_raps']
+        datos['estado'] = _estado_competencia(datos['aprobados_raps'], datos['total_raps'])
+        por_tipo[datos['tipo']].append(datos)
+
+    resumen = {}
+    for tipo, lista in por_tipo.items():
+        lista.sort(key=lambda c: c['nombre'])
+        total_raps = sum(c['total_raps'] for c in lista)
+        aprobados_raps = sum(c['aprobados_raps'] for c in lista)
+        resumen[tipo] = {
+            'total': len(lista),
+            'completadas': sum(c['estado'] == 'completada' for c in lista),
+            'en_progreso': sum(c['estado'] == 'en_progreso' for c in lista),
+            'pendientes': sum(c['estado'] == 'pendiente' for c in lista),
+            'total_raps': total_raps, 'aprobados_raps': aprobados_raps, 'pct_raps': _pct(aprobados_raps, total_raps),
+        }
+    return por_tipo, resumen

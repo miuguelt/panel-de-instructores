@@ -140,6 +140,16 @@ class TareasDelAprendizTest(unittest.TestCase):
         self.assertEqual(items['Entregada']['estado'], 'entregada')
         self.assertEqual(items['Entregada']['clase_plazo'], 'complete')
 
+    def test_lista_de_tareas_ya_filtrada(self):
+        from app.models.tarea import Tarea
+        from app.services.evidencias_aprendiz import tareas_del_aprendiz
+        comun = {'ficha_id': self.ficha.id, 'instructor_id': self.instructor.id}
+        propia, otra = Tarea(titulo='Propia', **comun), Tarea(titulo='Otra', **comun)
+        self.db.session.add_all([propia, otra])
+        self.db.session.commit()
+        items = tareas_del_aprendiz(self.ficha.id, self.aprendiz.id, AHORA, tareas=[propia])
+        self.assertEqual([i['tarea'].titulo for i in items], ['Propia'])
+
     def test_sin_tareas(self):
         from app.services.evidencias_aprendiz import tareas_del_aprendiz
         self.assertEqual(tareas_del_aprendiz(self.ficha.id, self.aprendiz.id), [])

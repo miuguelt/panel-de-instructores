@@ -62,14 +62,16 @@ def plazo_evidencia(tarea, entrega, estado, limite, ahora):
     return None, clase, texto
 
 
-def tareas_del_aprendiz(ficha_id, aprendiz_id, ahora=None):
+def tareas_del_aprendiz(ficha_id, aprendiz_id, ahora=None, tareas=None):
     """Evidencias individuales del aprendiz con su entrega, prórroga, plan, estado y plazo.
 
     Entregas, prórrogas y planes se cargan en tres consultas agregadas para no
-    disparar una consulta por tarea.
+    disparar una consulta por tarea. ``tareas`` permite pasar una lista ya
+    filtrada (por ejemplo, solo las del instructor que consulta).
     """
     ahora = ahora or datetime.utcnow()
-    tareas = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite).all()
+    if tareas is None:
+        tareas = Tarea.query.filter_by(ficha_id=ficha_id).order_by(Tarea.fecha_limite).all()
     entregas, prorrogas, planes = {}, {}, {}
     if tareas:
         ids = [t.id for t in tareas]
