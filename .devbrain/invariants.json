@@ -11,7 +11,7 @@
       "description": "Algoritmo de turnos de aseo con equidad sobre la carga total (cumplidos + programados), sustitución automática y motor puro token-bucket",
       "protected_globs": [
         "app/services/aseo*.py",
-        "app/routes/aseo.py"
+        "app/routes/aseo/*.py"
       ],
       "min_test_count": 159,
       "forbid_skip_xfail": true,

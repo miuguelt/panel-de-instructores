@@ -13,6 +13,7 @@ from app.models.aseo import (
 )
 from app.models.ficha import Ficha
 from app.models.juicio import JuicioEvaluativo
+from app.services.aseo_vista import ordenar_equidad, resumen_cargas
 from app.services.aseo_cola import (
     elegir_por_cola_justa as _elegir_por_cola_justa,
     razon_eleccion as _razon_eleccion,
@@ -1514,6 +1515,10 @@ def contar_cumplidos_en_periodo(ficha_id, fecha_inicio, fecha_fin):
 
 
 def datos_transparencia(ficha_id, mes=None):
+    """Calendario y tabla de equidad de un mes, compartidos por las tres páginas de aseo.
+
+    Sincroniza ausencias y recalcula contadores antes de leer; no confirma la sesión.
+    """
     if mes is None:
         mes = date.today().replace(day=1)
     import calendar as cal
@@ -1562,13 +1567,8 @@ def datos_transparencia(ficha_id, mes=None):
         }
         for aprendiz in activos
     ]
-    equidad.sort(
-        key=lambda fila: (
-            fila['veces_total'],
-            fila['contador'].ultima_vez_aseo or date.min,
-        )
-    )
-    totales = [fila['veces_comprometidas'] for fila in equidad]
+    ordenar_equidad(equidad, 'veces')
+    cargas = resumen_cargas([fila['veces_comprometidas'] for fila in equidad])
 
     semanas = cal.Calendar(firstweekday=0).monthdatescalendar(mes.year, mes.month)
     anios_mes = {mes.year, fin_mes.year}
@@ -1583,9 +1583,18 @@ def datos_transparencia(ficha_id, mes=None):
         'sesiones_mes': sesiones_mes,
         'festivos_mes': festivos_mes,
         'equidad': equidad,
-        'equidad_delta': (max(totales) - min(totales)) if totales else 0,
+        'equidad_delta': cargas['delta'],
+        'equidad_minimo': cargas['minimo'],
+        'equidad_maximo': cargas['maximo'],
+        'equidad_promedio': cargas['promedio'],
         'semanas': semanas,
         'mes': mes,
+        'fin_mes': fin_mes,
+        'turnos': turnos_mes,
+        'contadores': contadores,
+        'aprendices': activos,
+        'total_turnos': len(turnos_mes),
         'total_cumplidos': sum(1 for t in turnos_mes if t.estado == 'cumplido'),
+        'total_no_cumplidos': sum(1 for t in turnos_mes if t.estado == 'no_cumplido'),
         'total_programados': sum(1 for t in turnos_mes if t.estado in ESTADOS_PENDIENTES),
     }
