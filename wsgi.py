@@ -21,6 +21,50 @@ def alertas_auto_evaluar(verbose):
     app.logger.info(mensaje)
 
 
+HOSTS_LOOPBACK = ('127.0.0.1', '::1', 'localhost')
+
+# The 'stat' reloader avoids watchdog reacting to reads inside site-packages
+# (venv, venv_win, uv, pycache) on Windows, which caused endless reload loops.
+RELOADER_EXCLUDES = (
+    '*venv*',
+    '*venv_win*',
+    '*uploads*',
+    '*logs*',
+    '*__pycache__*',
+)
+
+
+def opciones_servidor(env):
+    """Build app.run() options from an environment mapping.
+
+    With debug on, the Werkzeug interactive debugger allows code execution, so
+    a non-loopback HOST is replaced by 127.0.0.1. Binding '::' on Windows is
+    IPv6-only, so it also broke http://127.0.0.1 (the advertised URL).
+    """
+    debug = (env.get('FLASK_DEBUG') or '1').strip().lower() in ('1', 'true', 'yes')
+
+    puerto_texto = (env.get('PORT') or '').strip() or '8009'
+    try:
+        puerto = int(puerto_texto)
+    except ValueError as exc:
+        raise ValueError(f'PORT debe ser un número entero; se recibió {puerto_texto!r}.') from exc
+
+    host = (env.get('HOST') or '').strip() or '127.0.0.1'
+    if debug and host not in HOSTS_LOOPBACK:
+        print(f'HOST={host} no es loopback y el modo debug está activo: se usa 127.0.0.1.')
+        host = '127.0.0.1'
+
+    return {
+        'host': host,
+        'port': puerto,
+        'debug': debug,
+        'use_reloader': debug,
+        'reloader_type': 'stat',
+        'reloader_interval': 1,
+        'exclude_patterns': RELOADER_EXCLUDES,
+    }
+
+
 if __name__ == '__main__':
     with app.app_context():
         import time
@@ -36,24 +80,4 @@ if __name__ == '__main__':
         else:
             print("No se pudo conectar a la BD. La app inicia igual.")
 
-    debug = os.environ.get('FLASK_DEBUG', '1').lower() in ('1', 'true', 'yes')
-    # Usar el reloader 'stat' para evitar que en Windows watchdog reaccione ante
-    # accesos o lecturas dentro de site-packages (venv, venv_win, uv, pycache),
-    # eliminando reinicios espurios y bucles infinitos de recarga.
-    reloader_excludes = (
-        '*venv*',
-        '*venv_win*',
-        '*uploads*',
-        '*logs*',
-        '*__pycache__*',
-    )
-    app.run(
-        # Escucha en IPv6 para que localhost no dependa del fallback IPv4.
-        host='::',
-        port=int(os.getenv('PORT', '8009')),
-        debug=debug,
-        use_reloader=debug,
-        reloader_type='stat',
-        reloader_interval=1,
-        exclude_patterns=reloader_excludes,
-    )
+    app.run(**opciones_servidor(os.environ))

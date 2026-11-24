@@ -14,21 +14,65 @@ function Get-ListeningPidsOnPort($TargetPort) {
     }
     # pwsh 7 no trae el modulo NetTCPIP: sin este respaldo el puerto se lee
     # siempre como libre y la parada seria un falso verde.
-    $matchesFound = @(netstat -ano -p tcp 2>$null | Select-String ":$TargetPort\s+\S+\s+LISTENING\s+(\d+)")
+    # Without -p: `-p tcp` lists IPv4 only and missed a server bound to [::].
+    $matchesFound = @(netstat -ano 2>$null | Select-String ":$TargetPort\s+\S+\s+LISTENING\s+(\d+)")
     return @($matchesFound | ForEach-Object { [int]$_.Matches.Groups[1].Value } | Select-Object -Unique)
 }
 
-if ($Stop) {
-    Write-Host "Deteniendo Panel de Instructores (:8158)..." -ForegroundColor Yellow
-    $detenidos = 0
-    foreach ($ownerPid in (Get-ListeningPidsOnPort 8158)) {
-        if ($ownerPid -gt 4) {
-            try { Stop-Process -Id $ownerPid -Force -ErrorAction Stop; $detenidos++ } catch {
-                Write-Warning "No se pudo detener el proceso $ownerPid."
+# Only processes of THIS project are stopped: python running wsgi.py whose
+# executable lives under this folder (venv) or whose parent does (the venv
+# launcher spawns the base interpreter). The Werkzeug reloader parent is
+# returned too, otherwise it survives the child. Foreign owners of the port
+# are reported and left untouched.
+$script:ForeignPortOwners = @()
+function Get-ProjectServerPids($TargetPort) {
+    $script:ForeignPortOwners = @()
+    $root = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\') + '\'
+    $procs = @{}
+    foreach ($proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
+        $procs[[int]$proc.ProcessId] = $proc
+    }
+    $isProject = {
+        param($proc)
+        if (-not $proc -or $proc.Name -ne 'python.exe' -or $proc.CommandLine -notmatch 'wsgi\.py') { return $false }
+        $candidates = @($proc)
+        if ($procs.ContainsKey([int]$proc.ParentProcessId)) { $candidates += $procs[[int]$proc.ParentProcessId] }
+        foreach ($c in $candidates) {
+            if ($c.ExecutablePath -and $c.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+        }
+        return $false
+    }
+    $result = @()
+    foreach ($ownerPid in (Get-ListeningPidsOnPort $TargetPort)) {
+        $proc = $procs[[int]$ownerPid]
+        if (& $isProject $proc) {
+            $result += [int]$ownerPid
+            $parent = $procs[[int]$proc.ParentProcessId]
+            if ($parent -and $parent.Name -eq 'python.exe' -and $parent.CommandLine -match 'wsgi\.py') {
+                $result += [int]$parent.ProcessId
             }
+        } elseif ([int]$ownerPid -gt 4) {
+            $name = if ($proc) { $proc.Name } else { 'desconocido' }
+            $script:ForeignPortOwners += "$ownerPid ($name)"
         }
     }
-    Write-Host "Detenido(s): $detenidos proceso(s) en el puerto 8158." -ForegroundColor Green
+    return @($result | Select-Object -Unique)
+}
+
+$port = 8158
+
+if ($Stop) {
+    Write-Host "Deteniendo Panel de Instructores (:$port)..." -ForegroundColor Yellow
+    $detenidos = 0
+    foreach ($projectPid in (Get-ProjectServerPids $port)) {
+        try { Stop-Process -Id $projectPid -Force -ErrorAction Stop; $detenidos++ } catch {
+            Write-Warning "No se pudo detener el proceso $projectPid."
+        }
+    }
+    foreach ($owner in $script:ForeignPortOwners) {
+        Write-Warning "El puerto $port lo ocupa el proceso $owner, que no es de este proyecto; no se detuvo."
+    }
+    Write-Host "Detenido(s): $detenidos proceso(s) del proyecto en el puerto $port." -ForegroundColor Green
     return
 }
 
@@ -58,38 +102,18 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
     Write-Verbose "[WARN] PowerShell 7+ requerido para importar credenciales WCM. Usando vars .env por defecto."
 }
 
-Write-Host "Limpiando procesos fantasma en el puerto 8158..." -ForegroundColor Yellow
-$port = 8158
-
-function Get-PortPids($p) {
-    if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
-        $conns = Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue
-        if ($conns) { return $conns.OwningProcess | Select-Object -Unique }
+Write-Host "Limpiando instancias previas del proyecto en el puerto $port..." -ForegroundColor Yellow
+$previos = 0
+foreach ($projectPid in (Get-ProjectServerPids $port)) {
+    Write-Host "Deteniendo instancia previa (PID $projectPid)..." -ForegroundColor Yellow
+    try { Stop-Process -Id $projectPid -Force -ErrorAction Stop; $previos++ } catch {
+        Write-Warning "No se pudo detener el proceso $projectPid."
     }
-    $lines = netstat -ano 2>$null | Select-String ":$p\s+.*LISTENING\s+(\d+)"
-    $foundPids = @()
-    foreach ($l in $lines) {
-        if ($l.Matches.Groups.Count -gt 1) {
-            $foundPids += [int]$l.Matches.Groups[1].Value
-        }
-    }
-    return $foundPids | Select-Object -Unique
 }
-
-$pidsToKill = Get-PortPids $port
-if ($pidsToKill) {
-    foreach ($ownPid in $pidsToKill) {
-        if ($ownPid -gt 0) {
-            Write-Host "Matando proceso $ownPid que ocupa el puerto $port..." -ForegroundColor Red
-            try {
-                Stop-Process -Id $ownPid -Force -ErrorAction SilentlyContinue
-            } catch {
-                Write-Warning "No se pudo detener el proceso $ownPid."
-            }
-        }
-    }
-    Start-Sleep -Seconds 2
+if ($script:ForeignPortOwners.Count -gt 0) {
+    throw "El puerto $port lo ocupa otro programa: $($script:ForeignPortOwners -join ', '). Libérelo o detenga ese programa antes de iniciar el panel."
 }
+if ($previos -gt 0) { Start-Sleep -Seconds 2 }
 
 Write-Host "=== SENA Control Academico - Inicio ===" -ForegroundColor Green
 
@@ -133,6 +157,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-$env:PORT = '8158'
+$env:PORT = "$port"
+$env:HOST = '127.0.0.1'
 Write-Host "=== Iniciando servidor en http://127.0.0.1:8158 ===" -ForegroundColor Green
 python wsgi.py
