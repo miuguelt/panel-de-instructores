@@ -2,6 +2,7 @@
 
     Orden de lectura: identidad y hito más urgente → pendientes de hoy →
     avance académico frente al tiempo → asistencia y entregas → detalle bajo demanda.
+    Con espacio, el avance y el grupo van lado a lado (fichas_panel.css).
     Cada cifra aparece una vez; el panel de fases completo vive en la Visión general
     y el estado de los aprendices en Aprendices.
     Variables: ficha, cronograma, extra, stats, fases_data, recs, archivada.
@@ -39,6 +40,7 @@
         </div>
     </header>
 
+    <div class="ficha-card-body">
     {% if not archivada %}
     <ul class="ficha-today" aria-label="Pendientes de la ficha {{ ficha.codigo }}">
         {% for p in viz_pendientes(extra) %}
@@ -50,7 +52,7 @@
         {% endfor %}
     </ul>
 
-    <div class="ficha-card-progress">
+    <section class="ficha-card-section ficha-card-section--avance ficha-card-progress" aria-label="Avance académico">
         {{ barra(pct_raps, 'RAPs aprobados', meta=VIZ_META_TYT, estado=(brecha.estado if brecha else none),
                  comparar=pct_tiempo, comparar_label='Tiempo transcurrido',
                  detalle=(raps_ok ~ ' de ' ~ raps_total ~ ' RAPs' if raps_total else 'Carga el reporte de juicios')) }}
@@ -60,17 +62,32 @@
             {% if desfase > 0 %}{{ semaforo('warning', 'Retraso de ' ~ desfase ~ (' fase' if desfase == 1 else ' fases')) }}{% endif %}
         </p>
         {% endif %}
-    </div>
+    </section>
     {% endif %}
 
-    <div class="ficha-card-group">
+    {#- Un dato ausente se dice una vez y con la acción que lo produce; nunca se dibuja una gráfica vacía. -#}
+    <section class="ficha-card-section ficha-card-section--grupo" aria-label="Grupo">
+        {% if extra.get('pct_asistencia') is none %}
+        <p class="ficha-card-empty">
+            {{ semaforo('neutral', 'Asistencia: sin datos') }}
+            {% if not archivada %}<a href="{{ url_for('instructor.asistencia', ficha_id=ficha.id) }}">Hacer llamado a lista</a>{% endif %}
+        </p>
+        {% else %}
         {{ dona(extra.get('pct_asistencia'), 'Asistencia', detalle=(extra.get('sesiones', 0) ~ ' sesiones')) }}
+        {% endif %}
+        {% if not archivada %}
         <div class="ficha-card-group-bars">
-            {% if not archivada %}
+            {% if extra.get('tareas_totales', 0) %}
             {{ barra(extra.get('pct_entregas'), 'Entregas recibidas', detalle=(extra.get('entregas_totales', 0) ~ ' recibidas de ' ~ extra.get('tareas_totales', 0) ~ ' tareas')) }}
+            {% else %}
+            <p class="ficha-card-empty">
+                {{ semaforo('neutral', 'Aún no hay tareas publicadas') }}
+                <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}">Publicar una tarea</a>
+            </p>
             {% endif %}
         </div>
-    </div>
+        {% endif %}
+    </section>
 
     {% if not archivada %}
     {% set top_rec = recs[0] if recs else none %}
@@ -113,4 +130,5 @@
             </div>
         </div>
     </details>
+    </div>
 </article>

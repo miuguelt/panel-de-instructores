@@ -1,0 +1,27 @@
+{#- Cabecera común del módulo «Seguimiento» (casos, planes, novedades y observador).
+
+    Uso: {% set seguimiento_activa = 'casos' %}{% include 'instructor/_seguimiento_pestanas.html' %}
+    Las cuatro pantallas conservan sus direcciones; aquí solo se unifican el título y la navegación.
+-#}
+{% set pestanas_seguimiento = [
+    ('casos', 'Casos', 'shield-check', url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id)),
+    ('planes', 'Planes de mejoramiento', 'clipboard-list', url_for('seguimiento.gestionar_planes', ficha_id=ficha.id)),
+    ('novedades', 'Novedades', 'briefcase', url_for('comite.novedades_productiva', ficha_id=ficha.id)),
+    ('observador', 'Observador', 'book-open', url_for('instructor.observador', ficha_id=ficha.id)),
+] %}
+<div class="page-header seguimiento-header">
+    <div class="page-title-cluster">
+        <span class="eyebrow">Ficha {{ ficha.codigo }}</span>
+        <h1><i data-lucide="scale" class="icon-lg" aria-hidden="true"></i> Seguimiento</h1>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('comite.normativa') }}" class="btn btn-ghost btn-sm"><i data-lucide="book-marked" class="icon-sm" aria-hidden="true"></i> Normativa SENA</a>
+    </div>
+</div>
+<nav class="seguimiento-pestanas" aria-label="Secciones de seguimiento">
+    {% for clave, etiqueta, icono, url in pestanas_seguimiento %}
+    <a href="{{ url }}" class="seguimiento-pestana{% if clave == seguimiento_activa %} is-active{% endif %}"{% if clave == seguimiento_activa %} aria-current="page"{% endif %}>
+        <i data-lucide="{{ icono }}" class="icon-sm" aria-hidden="true"></i> {{ etiqueta }}
+    </a>
+    {% endfor %}
+</nav>

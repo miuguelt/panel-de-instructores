@@ -18,9 +18,10 @@ from app.models import (
     Instructor,
 )
 
-PRINCIPALES = ('Visión general', 'Asistencia', 'Tareas', 'Aprendices', 'Juicios', 'Planeación', 'Aseo')
-SECUNDARIOS = ('Observador', 'Casos de seguimiento', 'Novedades', 'Fila de atención', 'Seguimiento TyT',
-               'Estadísticas', 'Materiales', 'Ranking', 'Grupos')
+PRINCIPALES = ('Visión general', 'Asistencia', 'Tareas', 'Aprendices', 'Juicios', 'Planeación', 'Seguimiento')
+# Casos, planes, novedades y observador son pestañas de «Seguimiento», no entradas sueltas del menú.
+SECUNDARIOS = ('Aseo', 'Ranking', 'Grupos', 'Fila de atención',
+               'Estadísticas', 'Pruebas Saber TyT', 'Materiales')
 
 
 class MenuFichaTestCase(unittest.TestCase):
@@ -87,7 +88,7 @@ class MenuFichaTestCase(unittest.TestCase):
     def test_panel_mas_agrupa_los_modulos_con_titulo(self):
         _, mas = self._menu(f'/instructor/fichas/{self.ficha.id}/tareas')
         self.assertEqual(re.findall(r'<p class="ficha-nav-group-title"[^>]*>([^<]+)</p>', mas),
-                         ['Seguimiento y convivencia', 'Recursos y participación'])
+                         ['Participación', 'Informes y recursos'])
 
     def test_modulo_activo_dentro_de_mas_resalta_el_boton(self):
         nav, mas = self._menu(f'/instructor/fichas/{self.ficha.id}/ranking')
@@ -105,11 +106,14 @@ class MenuFichaTestCase(unittest.TestCase):
 
     def test_menu_visible_en_fila_tyt_y_novedades(self):
         for ruta, etiqueta in ((f'/instructor/fichas/{self.ficha.id}/fila-atencion', 'Fila de atención'),
-                               (f'/instructor/fichas/{self.ficha.id}/seguimiento-tyt', 'Seguimiento TyT'),
-                               (f'/instructor/fichas/{self.ficha.id}/novedades-productiva', 'Novedades')):
+                               (f'/instructor/fichas/{self.ficha.id}/seguimiento-tyt', 'Pruebas Saber TyT')):
             nav, _ = self._menu(ruta)
             boton = re.search(r'<button[^>]*ficha-nav-more[^>]*>[\s\S]*?</button>', nav).group(0)
             self.assertIn(etiqueta, boton, ruta)
+        # Novedades es una pestaña de Seguimiento: se resalta Seguimiento en la barra principal.
+        nav, _ = self._menu(f'/instructor/fichas/{self.ficha.id}/novedades-productiva')
+        activo = re.search(r'<a[^>]*class="is-active"[^>]*>[\s\S]*?</a>', nav.split('ficha-nav-more')[0]).group(0)
+        self.assertIn('Seguimiento', activo)
 
     def test_alertas_es_distintivo_junto_a_vision_general(self):
         from app.models.alertas import Alerta
@@ -120,6 +124,8 @@ class MenuFichaTestCase(unittest.TestCase):
         self.assertIsNotNone(enlace)
         self.assertIn('aria-label="Alertas: 1 activas"', enlace.group(0))
         self.assertIn('ficha-nav-alertas-count">1<', enlace.group(0))
+        # El texto visible acompaña al icono desde 768 px (el nombre accesible ya lo da aria-label).
+        self.assertIn('<span class="ficha-nav-alertas-texto" aria-hidden="true">Alertas</span>', enlace.group(0))
         self.assertLess(nav.index('Visión general'), nav.index('ficha-nav-alertas'))
         self.assertLess(nav.index('ficha-nav-alertas'), nav.index('>Asistencia<'))
         self.assertNotIn('Alertas', mas)

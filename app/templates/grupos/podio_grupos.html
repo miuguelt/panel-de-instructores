@@ -54,7 +54,7 @@
                     <span style="font-size:1.5rem;margin-bottom:4px;" aria-hidden="true">🥈</span>
                     <div class="podio-team-name" title="{{ plata.Grupo.nombre }}">{{ plata.Grupo.nombre }}</div>
                     <span class="podio-medal-badge badge-silver">
-                       <i data-lucide="medal" class="icon-sm"></i> {{ plata.total_insignias }} medallas
+                       <i data-lucide="medal" class="icon-sm"></i> {{ plata.total_insignias }} reconocimientos
                     </span>
                     <div class="podio-pillar pillar-silver">
                         <span class="podio-pillar-num">2</span>
@@ -69,7 +69,7 @@
                     <span style="font-size:1.8rem;margin-bottom:4px;" aria-hidden="true">👑 🥇</span>
                     <div class="podio-team-name" style="font-size:1.15rem;color:var(--accent-primary);" title="{{ oro.Grupo.nombre }}">{{ oro.Grupo.nombre }}</div>
                     <span class="podio-medal-badge badge-gold">
-                       <i data-lucide="award" class="icon-sm"></i> {{ oro.total_insignias }} medallas
+                       <i data-lucide="award" class="icon-sm"></i> {{ oro.total_insignias }} reconocimientos
                     </span>
                     <div class="podio-pillar pillar-gold">
                         <span class="podio-pillar-num">1</span>
@@ -84,7 +84,7 @@
                     <span style="font-size:1.4rem;margin-bottom:4px;" aria-hidden="true">🥉</span>
                     <div class="podio-team-name" title="{{ bronce.Grupo.nombre }}">{{ bronce.Grupo.nombre }}</div>
                     <span class="podio-medal-badge badge-bronze">
-                       <i data-lucide="medal" class="icon-sm"></i> {{ bronce.total_insignias }} medallas
+                       <i data-lucide="medal" class="icon-sm"></i> {{ bronce.total_insignias }} reconocimientos
                     </span>
                     <div class="podio-pillar pillar-bronze">
                         <span class="podio-pillar-num">3</span>
@@ -101,7 +101,7 @@
                     <h3 style="font-size:1.05rem;font-weight:700;margin:0;color:var(--text-strong,inherit);">
                         Clasificación General
                     </h3>
-                    <small style="color:var(--text-muted);">Basado en medallas otorgadas a cada equipo en la ficha</small>
+                    <small style="color:var(--text-muted);">Según los reconocimientos dados a cada grupo de la ficha</small>
                 </div>
                 <span class="badge" style="background:var(--bg-surface);border:1px solid var(--border-divider);color:var(--text-muted);border-radius:20px;padding:4px 10px;">
                     {{ ranking_grupos|length }} equipos registrados
@@ -115,7 +115,7 @@
                             <th style="width:70px;text-align:center;">Pos.</th>
                             <th style="width:220px;">Equipo</th>
                             <th>Integrantes</th>
-                            <th style="width:140px;text-align:center;">Medallas</th>
+                            <th style="width:140px;text-align:center;">Reconocimientos</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -166,10 +166,10 @@
                <i data-lucide="award" class="icon-lg"></i>
             </div>
             <h3 style="font-size:1.15rem;font-weight:700;color:var(--text-strong,inherit);margin-bottom:0.5rem;">
-                Aún no hay medallas otorgadas
+                Aún no hay reconocimientos de grupo
             </h3>
             <p style="max-width:100%;font-size:0.9rem;line-height:1.55;color:var(--text-muted);margin:0 auto 1.5rem;">
-                Crea equipos y otórgales medallas por retos, participación o logros académicos para habilitar el podio de grupos.
+                Crea grupos y dales reconocimientos por retos, participación o logros académicos para habilitar el podio.
             </p>
             <a href="{{ url_for('grupos.listar_grupos', ficha_id=ficha.id) }}" class="btn btn-primary" style="border-radius:50px;padding:8px 24px;">
                <i data-lucide="users" class="icon-sm" style="margin-right:6px;"></i> Ir a Gestión de Grupos

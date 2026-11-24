@@ -21,7 +21,7 @@ function initLearnerPersonalization(doc = document, win = window, config) {
     const legacyKey = 'sena_learner_prefs_' + config.learnerId;
     const themes = { sena: '#39a900', indigo: '#2563eb', cyan: '#0891b2', purple: '#7c3aed', amber: '#d97706', emerald: '#059669', rose: '#e11d48', slate: '#475569' };
     const avatars = ['💻', '🚀', '⚡', '🎯', '🧠', '🎨', '🔬', '🦊', '🦁', '🦉', '🌟', '💡', '🛡️', '⚙️', '📚', '🏆'];
-    const labels = { 'seccion-progreso': 'Progreso', 'seccion-portafolio-digital': 'Portafolio digital', 'seccion-grupo-trabajo': 'Mi grupo', 'seccion-juicios': 'Juicios de evaluación', 'seccion-aseo': 'Aseo', 'seccion-curva-rendimiento': 'Curva de rendimiento', 'seccion-ranking': 'Mi posición', 'seccion-liga-grupos': 'Liga de grupos', 'seccion-tareas': 'Evidencias' };
+    const labels = { 'seccion-progreso': 'Progreso', 'seccion-portafolio-digital': 'Portafolio digital', 'seccion-grupo-trabajo': 'Mi grupo', 'seccion-juicios': 'Juicios de evaluación', 'seccion-aseo': 'Aseo', 'seccion-curva-rendimiento': 'Curva de rendimiento', 'seccion-ranking': 'Mi posición', 'seccion-liga-grupos': 'Clasificación de grupos', 'seccion-tareas': 'Evidencias' };
     const sections = new Map();
     for (const id of Object.keys(labels)) {
         let section = byId(id);

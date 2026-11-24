@@ -274,7 +274,7 @@ class DesignSystemAndDepthTestCase(unittest.TestCase):
 
         # El menú de la ficha declara cada icono en navegacion.py y base.html lo pinta con data-lucide.
         self.assertIn('data-lucide="{{ m.icon }}"', base_html)
-        for icono in ('layout-dashboard', 'clipboard-check', 'file-check', 'sparkles', 'users', 'graduation-cap', 'compass', 'bar-chart-3', 'alert-triangle', 'book-open', 'search-check', 'folder', 'trophy', 'users-2'):
+        for icono in ('layout-dashboard', 'clipboard-check', 'file-check', 'sparkles', 'users', 'graduation-cap', 'compass', 'bar-chart-3', 'alert-triangle', 'scale', 'target', 'hand', 'folder', 'trophy', 'users-2'):
             self.assertIn(f"'{icono}'", nav_py)
         self.assertIn('data-lucide="bell"', base_html)
         self.assertIn('data-lucide="log-out"', base_html)

@@ -1023,6 +1023,9 @@ class TurnosAseoTestCase(unittest.TestCase):
         self.assertEqual(resp_transparencia_regular.status_code, 200)
         self.assertIn('calendar-card'.encode(), resp_transparencia_regular.data)
         self.assertNotIn('cumplir_como_aprendiz'.encode(), resp_transparencia_regular.data)
+        # Quien no es delegado consulta: no se le ofrece «programar».
+        self.assertNotIn('Programar y gestionar turnos'.encode(), resp_transparencia_regular.data)
+        self.assertIn('Ver el calendario completo'.encode(), resp_transparencia_regular.data)
 
         # No puede cambiar estados, aunque presente el documento del administrador.
         resp_cumplir_regular = cliente_no_admin.post(

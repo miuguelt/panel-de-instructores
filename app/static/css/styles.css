@@ -1859,14 +1859,12 @@ select optgroup {
     border-color: var(--border-glass-strong, var(--border-subtle));
 }
 .card--interactive,
-a.card,
-.card-ficha {
+a.card {
     color: inherit;
     cursor: pointer;
 }
 .card--interactive:hover,
-a.card:hover,
-.card-ficha:hover {
+a.card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
     border-color: var(--border-glass-strong, var(--border-subtle));
@@ -5139,16 +5137,15 @@ input[type="radio"] {
     font-size: 13px;
 }
 .dashboard-summary strong { color: var(--accent-hover); font-size: 18px; }
+/* auto-fit: con una sola ficha la tarjeta ocupa todo el ancho; con varias,
+   como máximo dos por fila (cada columna mide al menos la mitad), así la
+   ficha impar del final puede ocupar la fila completa. El padding vive en el
+   encabezado y el cuerpo de la tarjeta (fichas_panel.css). */
 .dashboard-cards {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(max(min(100%, 38rem), calc((100% - 20px) / 2)), 1fr));
     gap: 20px;
     margin-bottom: 20px;
-}
-.dashboard-cards .card-ficha {
-    margin: 0;
-    padding: clamp(18px, 3vw, 28px);
-    overflow: hidden;
 }
 .ficha-card-header {
     display: flex;
@@ -8261,10 +8258,6 @@ input[type="radio"] {
         gap: 14px;
     }
 
-    .dashboard-cards .card-ficha {
-        padding: 16px 14px;
-    }
-
         .ficha-secondary-metrics-grid {
         grid-template-columns: 1fr;
     }
@@ -9084,7 +9077,7 @@ input[type="radio"] {
         0 1px 2px rgba(15, 23, 42, .08),
         0 10px 24px rgba(15, 23, 42, .08),
         0 24px 48px -32px color-mix(in srgb, var(--ficha-accent) 42%, transparent);
-    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    transition: box-shadow .2s ease, border-color .2s ease;
 }
 
 .dashboard-cards .card-ficha.ficha-lectiva,
@@ -9118,7 +9111,6 @@ input[type="radio"] {
         0 2px 4px rgba(15, 23, 42, .08),
         0 16px 32px rgba(15, 23, 42, .12),
         0 28px 56px -34px color-mix(in srgb, var(--ficha-accent) 52%, transparent);
-    transform: translateY(-3px);
 }
 
 .card-ficha .ficha-card-header {
@@ -12372,6 +12364,11 @@ p.text-center {
     padding-inline: 10px;
 }
 .ficha-nav a.ficha-nav-alertas.has-count { color: var(--danger); }
+/* Desde 768 px el acceso dice «Alertas»; en móvil queda el icono con su nombre accesible. */
+.ficha-nav-alertas-texto { display: none; }
+@media (min-width: 768px) {
+    .ficha-nav-alertas-texto { display: inline; }
+}
 .ficha-nav-alertas-count {
     min-width: 20px;
     padding: 0 6px;
@@ -12414,4 +12411,41 @@ p.text-center {
     margin: 0;
     font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+/* Pestañas de módulo (Seguimiento y Tareas): navegación entre vistas de un mismo módulo. */
+.seguimiento-pestanas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-block: 0 1.25rem;
+    padding-block-end: 0.5rem;
+    border-block-end: 1px solid var(--border-divider);
+}
+
+.seguimiento-pestana {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-block-size: var(--control-h-sm);
+    padding-inline: 0.85rem;
+    border-radius: var(--radius-pill);
+    color: var(--text-main);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.seguimiento-pestana:hover {
+    background: var(--surface-hover);
+}
+
+.seguimiento-pestana.is-active {
+    background: var(--surface-selected);
+    color: var(--text-strong);
+    box-shadow: inset 0 0 0 1px var(--border-control);
+}
+
+.seguimiento-pestana:focus-visible {
+    outline: var(--focus-width) solid var(--accent-primary);
+    outline-offset: var(--focus-offset);
 }

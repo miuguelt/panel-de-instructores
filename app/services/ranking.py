@@ -97,7 +97,7 @@ CATALOGO_INSIGNIAS = (
     },
     {
         'codigo': 'SINERGIA_EQUIPO',
-        'nombre': 'Sinergia de Escuadrón',
+        'nombre': 'Sinergia de grupo',
         'descripcion': 'El equipo logra entregas colectivas a tiempo y con alta calidad técnica.',
         'icono': '🤝',
         'tipo': 'manual',

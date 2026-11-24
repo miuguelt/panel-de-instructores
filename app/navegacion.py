@@ -13,6 +13,10 @@ from flask import url_for
 
 log = logging.getLogger(__name__)
 
+# Pestañas del módulo «Seguimiento»: casos, planes, novedades y observador.
+ENDPOINTS_SEGUIMIENTO = ('seguimiento.casos_seguimiento', 'seguimiento.gestionar_planes',
+                         'comite.novedades_productiva', 'instructor.observador')
+
 # Blueprints en los que se muestra la barra de la ficha.
 BLUEPRINTS_CON_MENU = ('instructor', 'ranking', 'aseo', 'seguimiento', 'planeacion',
                        'grupos', 'atencion', 'tyt', 'comite')
@@ -66,32 +70,27 @@ def modulos_ficha(ficha, endpoint, blueprint, corte_id=None, alertas=None):
                 url_for('instructor.juicios', ficha_id=fid), ep == 'instructor.juicios'),
         _modulo('Planeación', 'compass', 'Planeación pedagógica y línea de tiempo',
                 url_for('planeacion.analisis', ficha_id=fid), blueprint == 'planeacion'),
-        _modulo('Aseo', 'sparkles', 'Turnos de aseo del ambiente',
-                url_for('aseo.turnos', ficha_id=fid), blueprint == 'aseo'),
+        _modulo('Seguimiento', 'scale', 'Casos, planes de mejoramiento, novedades y observador',
+                url_for('seguimiento.casos_seguimiento', ficha_id=fid), ep in ENDPOINTS_SEGUIMIENTO),
     ]
     grupos = [
-        {'titulo': 'Seguimiento y convivencia', 'modulos': [
-            _modulo('Observador', 'book-open', 'Observador del aprendiz',
-                    url_for('instructor.observador', ficha_id=fid), ep == 'instructor.observador'),
-            _modulo('Casos de seguimiento', 'search-check', 'Casos y planes de mejoramiento',
-                    url_for('seguimiento.casos_seguimiento', ficha_id=fid),
-                    ep in ('seguimiento.casos_seguimiento', 'seguimiento.gestionar_planes')),
-            _modulo('Novedades', 'briefcase', 'Novedades y etapa productiva',
-                    url_for('comite.novedades_productiva', ficha_id=fid), ep == 'comite.novedades_productiva'),
-            _modulo('Fila de atención', 'hand', 'Turnos de atención a aprendices',
-                    url_for('atencion.fila_atencion', ficha_id=fid), blueprint == 'atencion'),
-            _modulo('Seguimiento TyT', 'target', 'Preparación para las pruebas Saber TyT',
-                    url_for('tyt.detalle', ficha_id=fid), blueprint == 'tyt'),
-        ]},
-        {'titulo': 'Recursos y participación', 'modulos': [
-            _modulo('Estadísticas', 'bar-chart-3', 'Estadísticas y reportes',
-                    url_for('instructor.estadisticas', ficha_id=fid), ep == 'instructor.estadisticas'),
-            _modulo('Materiales', 'folder', 'Materiales de apoyo',
-                    url_for('instructor.materiales', ficha_id=fid), ep == 'instructor.materiales'),
+        {'titulo': 'Participación', 'modulos': [
+            _modulo('Aseo', 'sparkles', 'Turnos de aseo del ambiente',
+                    url_for('aseo.turnos', ficha_id=fid), blueprint == 'aseo'),
             _modulo('Ranking', 'trophy', 'Ranking de participación e insignias',
                     url_for('ranking.ranking', ficha_id=fid, corte_id=corte_id), blueprint == 'ranking'),
-            _modulo('Grupos', 'users-2', 'Gestión de grupos y equipos',
+            _modulo('Grupos', 'users-2', 'Grupos de trabajo y reconocimientos de grupo',
                     url_for('grupos.listar_grupos', ficha_id=fid), blueprint == 'grupos'),
+            _modulo('Fila de atención', 'hand', 'Turnos de atención a aprendices',
+                    url_for('atencion.fila_atencion', ficha_id=fid), blueprint == 'atencion'),
+        ]},
+        {'titulo': 'Informes y recursos', 'modulos': [
+            _modulo('Estadísticas', 'bar-chart-3', 'Estadísticas de juicios de la ficha',
+                    url_for('instructor.estadisticas', ficha_id=fid), ep == 'instructor.estadisticas'),
+            _modulo('Pruebas Saber TyT', 'target', 'Preparación para las pruebas Saber TyT',
+                    url_for('tyt.detalle', ficha_id=fid), blueprint == 'tyt'),
+            _modulo('Materiales', 'folder', 'Materiales de apoyo',
+                    url_for('instructor.materiales', ficha_id=fid), ep == 'instructor.materiales'),
         ]},
     ]
     activo_secundario = next((m for g in grupos for m in g['modulos'] if m['activo']), None)

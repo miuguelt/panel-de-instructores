@@ -153,6 +153,7 @@
                        title="{{ al.title }}"{% if al.activo %} aria-current="page"{% endif %}
                        aria-label="Alertas{% if al.count %}: {{ al.count }} activas{% endif %}">
                         <i data-lucide="{{ al.icon }}" class="nav-icon" aria-hidden="true"></i>
+                        <span class="ficha-nav-alertas-texto" aria-hidden="true">Alertas</span>
                         {% if al.count %}<span class="ficha-nav-alertas-count">{{ al.count|contador_compacto }}</span>{% endif %}
                     </a>
                     {% endif %}

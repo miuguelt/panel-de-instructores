@@ -21,13 +21,27 @@ class ModulosFichaTestCase(unittest.TestCase):
     def _labels(self, menu):
         return [m['label'] for m in menu['principales']]
 
-    def test_principales_incluyen_aseo_y_no_alertas(self):
+    def test_principales_incluyen_seguimiento_y_no_alertas(self):
         menu = modulos_ficha(self.ficha, 'instructor.tareas', 'instructor')
         self.assertEqual(self._labels(menu), ['Visión general', 'Asistencia', 'Tareas', 'Aprendices',
-                                              'Juicios', 'Planeación', 'Aseo'])
+                                              'Juicios', 'Planeación', 'Seguimiento'])
         secundarios = [m['label'] for g in menu['grupos'] for m in g['modulos']]
-        self.assertNotIn('Aseo', secundarios)
+        self.assertIn('Aseo', secundarios)
         self.assertNotIn('Alertas', secundarios)
+        for pestana in ('Observador', 'Casos de seguimiento', 'Novedades'):
+            self.assertNotIn(pestana, secundarios)
+
+    def test_seguimiento_se_activa_en_sus_cuatro_pestanas(self):
+        for endpoint, blueprint in (('seguimiento.casos_seguimiento', 'seguimiento'),
+                                    ('seguimiento.gestionar_planes', 'seguimiento'),
+                                    ('comite.novedades_productiva', 'comite'),
+                                    ('instructor.observador', 'instructor')):
+            with self.subTest(endpoint=endpoint):
+                menu = modulos_ficha(self.ficha, endpoint, blueprint)
+                self.assertEqual([m['label'] for m in menu['principales'] if m['activo']], ['Seguimiento'])
+        # Las notificaciones viven en el blueprint seguimiento, pero no son una pestaña del módulo.
+        menu = modulos_ficha(self.ficha, 'seguimiento.notificaciones_instructor', 'seguimiento')
+        self.assertFalse(any(m['activo'] for m in menu['principales']))
         self.assertEqual(menu['alertas']['label'], 'Alertas')
 
     def test_un_solo_modulo_activo(self):
@@ -38,8 +52,7 @@ class ModulosFichaTestCase(unittest.TestCase):
         self.assertFalse(menu['alertas']['activo'])
 
     def test_activo_por_blueprint(self):
-        self.assertTrue(next(m for m in modulos_ficha(self.ficha, 'aseo.turnos', 'aseo')['principales']
-                             if m['label'] == 'Aseo')['activo'])
+        self.assertEqual(modulos_ficha(self.ficha, 'aseo.turnos', 'aseo')['activo_secundario']['label'], 'Aseo')
         menu = modulos_ficha(self.ficha, 'ranking.ranking', 'ranking')
         self.assertEqual(menu['activo_secundario']['label'], 'Ranking')
         self.assertFalse(any(m['activo'] for m in menu['principales']))

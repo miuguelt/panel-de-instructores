@@ -177,8 +177,8 @@
                                     data-grupo-id="{{ grupo.id }}"
                                     data-grupo-nombre="{{ grupo.nombre }}"
                                     onclick="abrirModalInsignia(this.dataset.grupoId, this.dataset.grupoNombre)"
-                                    title="Otorgar medalla a este equipo"
-                                    aria-label="Otorgar medalla a {{ grupo.nombre }}">
+                                    title="Dar un reconocimiento a este grupo"
+                                    aria-label="Dar un reconocimiento a {{ grupo.nombre }}">
                                <i data-lucide="medal" class="icon-sm"></i>
                             </button>
                         </div>
@@ -231,7 +231,7 @@
     </div>
 </div>
 
-<!-- ═══ 3. Modal Nativo para Otorgar Medalla (Usando sistema app-modal-overlay) ═══ -->
+<!-- ═══ 3. Modal nativo para dar un reconocimiento de grupo (Usando sistema app-modal-overlay) ═══ -->
 <dialog id="modalInsignia" class="app-modal-overlay" aria-modal="true" aria-labelledby="modalInsigniaTitulo">
     <div class="app-modal-content app-modal-content--compact">
         <form action="{{ url_for('grupos.otorgar_insignia_grupo', ficha_id=ficha.id) }}" method="POST" class="app-modal-form">
@@ -242,7 +242,7 @@
                 <div class="app-modal-header-copy">
                     <span class="app-modal-eyebrow">Dinamización y Gamificación</span>
                     <h2 id="modalInsigniaTitulo" style="display:flex;align-items:center;gap:8px;">
-                        <span class="text-medal">🏅</span> Otorgar Medalla
+                        <i data-lucide="award" class="icon-sm" aria-hidden="true"></i> Dar un reconocimiento de grupo
                     </h2>
                 </div>
                 <button type="button" class="app-modal-close" onclick="cerrarModal('modalInsignia')" aria-label="Cerrar modal">&times;</button>
@@ -255,10 +255,10 @@
 
                 <div style="margin-bottom:1.25rem;">
                     <label for="selectInsignia" style="display:block;font-size:0.84rem;font-weight:700;color:var(--text-strong);margin-bottom:6px;">
-                        Selecciona la Medalla o Insignia
+                        Elige el reconocimiento
                     </label>
                     <select name="insignia_id" id="selectInsignia" class="form-select" required style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-color);">
-                        <option value="">-- Elige una medalla --</option>
+                        <option value="">Elige un reconocimiento</option>
                         {% for ins in insignias %}
                         <option value="{{ ins.id }}">{{ ins.icono }} {{ ins.nombre }}</option>
                         {% endfor %}
@@ -268,7 +268,7 @@
                 <div style="display:flex;gap:12px;padding:12px;border-radius:10px;background:var(--bg-surface);border:1px solid var(--border-divider);">
                    <i data-lucide="info" class="icon-md u-text-accent" style="flex-shrink:0; margin-top:2px;"></i>
                     <small style="color:var(--text-muted);line-height:1.45;">
-                        Esta medalla se computará en el podio de grupos y se registrará en el Portafolio de Evidencias de cada aprendiz integrante.
+                        Este reconocimiento cuenta en el podio de grupos y se registrará en el Portafolio de Evidencias de cada aprendiz integrante.
                     </small>
                 </div>
 

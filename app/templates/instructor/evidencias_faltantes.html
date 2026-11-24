@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Entregas por aprendiz - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Tareas por aprendiz - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
@@ -9,13 +9,12 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id) }}" class="btn-back" title="Volver a Tareas">&larr; Volver</a>
-        <h1><i data-lucide="list-checks" class="icon-lg" aria-hidden="true"></i> Entregas por aprendiz</h1>
-    </div>
-    <div class="page-actions">
-        <span class="badge badge-info">Ficha {{ ficha.codigo }}</span>
+        <span class="eyebrow">Ficha {{ ficha.codigo }}</span>
+        <h1><i data-lucide="file-check" class="icon-lg" aria-hidden="true"></i> Tareas</h1>
     </div>
 </div>
+{% set tareas_activa = 'aprendiz' %}
+{% include 'instructor/_tareas_pestanas.html' %}
 
 {% if resumen.total_tareas and resumen.total_aprendices %}
 <section class="entregas-resumen" aria-label="Resumen general de entregas">

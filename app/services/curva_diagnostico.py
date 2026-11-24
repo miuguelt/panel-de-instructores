@@ -50,8 +50,8 @@ def obtener_ruta_recuperacion_formativa() -> List[Dict[str, str]]:
             'icono': '⏱️',
         },
         {
-            'paso': '3. Desafíos y retos de escuadrón',
-            'detalle': 'Participa activamente en los retos grupales para ganar medallas de mérito formativo.',
+            'paso': '3. Desafíos y retos de tu grupo',
+            'detalle': 'Participa en los retos grupales para que tu grupo gane reconocimientos.',
             'icono': '🏆',
         },
     ]

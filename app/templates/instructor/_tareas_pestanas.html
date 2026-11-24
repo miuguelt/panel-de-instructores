@@ -1,0 +1,11 @@
+{#- Pestañas de «Tareas»: por tarea (lista) y por aprendiz (lo que falta a cada uno). -#}
+<nav class="seguimiento-pestanas" aria-label="Vistas de tareas">
+    {% for clave, etiqueta, icono, url in [
+        ('tareas', 'Por tarea', 'file-check', url_for('instructor.tareas', ficha_id=ficha.id)),
+        ('aprendiz', 'Por aprendiz', 'list-checks', url_for('instructor.evidencias_faltantes', ficha_id=ficha.id)),
+    ] %}
+    <a href="{{ url }}" class="seguimiento-pestana{% if clave == tareas_activa %} is-active{% endif %}"{% if clave == tareas_activa %} aria-current="page"{% endif %}>
+        <i data-lucide="{{ icono }}" class="icon-sm" aria-hidden="true"></i> {{ etiqueta }}
+    </a>
+    {% endfor %}
+</nav>

@@ -4,21 +4,9 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al Inicio">&larr; Volver al Inicio</a>
         <h1><i data-lucide="user-cog" class="icon-lg" aria-hidden="true"></i> Administración de cuentas de instructores</h1>
         <p class="text-muted">
-            Gestiona el acceso, estado institucional y soporte asistido de restablecimiento de contraseñas.
-        </p>
-    </div>
-</div>
-
-<!-- Tablero Bento de métricas administrativas -->
-<div class="dashboard-hero">
-    <div>
-        <span class="eyebrow">Gestión institucional</span>
-        <h2>Instructores y credenciales</h2>
-        <p class="text-muted">
-            Total: <strong>{{ instructores|length }}</strong> · Activas: <strong>{{ instructores|selectattr('activo')|list|length }}</strong> · Cambios pendientes: <strong>{{ instructores|selectattr('debe_cambiar_password')|list|length }}</strong>
+            {{ instructores|length }} cuentas · {{ instructores|selectattr('activo')|list|length }} activas · {{ instructores|selectattr('debe_cambiar_password')|list|length }} con cambio de contraseña pendiente
         </p>
     </div>
 </div>
@@ -135,7 +123,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="text-center">
+                    <td colspan="8" class="text-center">
                         <p class="text-muted">No se encontraron instructores registrados{% if q %} para el criterio "{{ q }}"{% endif %}.</p>
                     </td>
                 </tr>

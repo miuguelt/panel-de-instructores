@@ -21,6 +21,8 @@ SIN_EMOJIS = (
     'instructor/_planeacion_cabecera.html',
     'aprendiz/panel/_progreso.html',
     'aprendiz/panel/_pestanas.html',
+    'instructor/notificaciones.html',
+    'tyt/detalle.html',
 )
 EMOJI = re.compile('[\U0001F000-\U0001FAFF⌀-⏿☀-➿⬀-⯿️]')
 BOTON = re.compile(r'<(button|a)\b[^>]*class="[^"]*\bbtn\b[^"]*"[^>]*>(.*?)</\1>', re.S)
@@ -136,6 +138,13 @@ class PlaneacionOrdenadaTest(unittest.TestCase):
         self.assertNotIn('Ritmo de evaluación', panorama)
         self.assertIn('id="seccion-curva-s" data-collapse-default="cerrado"', panorama)
         self.assertNotIn('Planeación v{{', leer('instructor/_planeacion_carga_unificada.html'))
+
+
+class AseoEnUnSoloLugarTest(unittest.TestCase):
+    def test_el_panel_enlaza_a_la_gestion_en_vez_de_repetir_el_formulario(self):
+        aseo = leer('aprendiz/panel/_aseo.html')
+        self.assertNotIn('generar_como_aprendiz', aseo)
+        self.assertIn("url_for('aseo_aprendiz.gestionar'", aseo)
 
 
 if __name__ == '__main__':

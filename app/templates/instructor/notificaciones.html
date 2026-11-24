@@ -16,7 +16,6 @@
 {% else %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al Inicio">&larr; Volver al Inicio</a>
         <h1><i data-lucide="bell" class="icon-lg" aria-hidden="true"></i> Centro de notificaciones</h1>
     </div>
 </div>
@@ -35,14 +34,15 @@
 <div class="notification-list">
     {% for notificacion in notificaciones %}
     <article class="notification-item {% if not notificacion.leida %}notification-unread{% endif %}">
-        <div class="notification-icon">{% if notificacion.tipo == 'alerta' %}⚠️{% elif notificacion.tipo == 'tarea' %}📝{% elif notificacion.tipo == 'calificacion' %}📣{% elif notificacion.tipo == 'justificacion' %}📄{% elif notificacion.tipo == 'observador' %}📓{% else %}🔔{% endif %}</div>
+        {% set icono_notificacion = {'alerta': 'alert-triangle', 'tarea': 'file-check', 'calificacion': 'graduation-cap', 'justificacion': 'file-text', 'observador': 'book-open'}.get(notificacion.tipo, 'bell') %}
+        <div class="notification-icon"><i data-lucide="{{ icono_notificacion }}" class="icon-md" aria-hidden="true"></i></div>
         <div class="notification-copy"><p>{{ notificacion.mensaje }}</p><small>{{ notificacion.fecha_creada.strftime('%d/%m/%Y %H:%M') }}</small></div>
         <div class="notification-actions">
             {% if notificacion.url %}<a href="{{ notificacion.url }}" class="btn btn-sm btn-outline">Abrir</a>{% endif %}
             {% if not notificacion.leida %}
             <form method="POST" action="{{ url_for('seguimiento.marcar_notificacion_instructor', notificacion_id=notificacion.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-sm btn-primary">Leída</button>
+                <button type="submit" class="btn btn-sm btn-primary">Marcar como leída</button>
             </form>
             {% endif %}
         </div>
@@ -50,7 +50,7 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="empty-state"><div class="empty-icon">🔔</div><h3>No tienes notificaciones</h3><p>Cuando haya un aviso de seguimiento, tareas o calificaciones aparecerá aquí.</p></div>
+<div class="empty-state"><div class="empty-icon" aria-hidden="true"><i data-lucide="bell" class="icon-lg"></i></div><h3>No tienes notificaciones</h3><p>Cuando haya un aviso de seguimiento, tareas o calificaciones aparecerá aquí.</p></div>
 {% endif %}
 {% endif %}
 {% endblock %}

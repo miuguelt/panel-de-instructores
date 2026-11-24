@@ -1,21 +1,21 @@
-{#- Liga de escuadrones y logros. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
+{#- Clasificación de grupos y logros. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
     <!-- ============================================================ -->
-    <!-- LIGA DE ESCUADRONES Y RETOS EN EQUIPO                       -->
+    <!-- CLASIFICACIÓN DE GRUPOS Y RETOS EN EQUIPO                    -->
     <!-- ============================================================ -->
     <section class="card learner-squad-league" data-learner-tab="rendimiento" id="seccion-liga-grupos" data-experience-ranking>
         <div class="section-header compact">
             <div>
                 <span class="eyebrow">Cooperación y Desafíos Colectivos</span>
-                <h2>🛡️ Liga de Escuadrones Formativos</h2>
-                <p class="text-muted"><small>El éxito se construye colaborando. Cada reto cumplido y medalla grupal impulsa a tu equipo en la tabla.</small></p>
+                <h2>Clasificación de grupos</h2>
+                <p class="text-muted"><small>El éxito se construye colaborando. Cada reto cumplido y cada reconocimiento de grupo suben a tu grupo en la tabla.</small></p>
             </div>
             {% if mi_escuadron %}
-            <span class="badge badge-primary">Tu escuadrón: {{ mi_escuadron.nombre }} {{ mi_escuadron.podio or '' }}</span>
+            <span class="badge badge-primary">Tu grupo: {{ mi_escuadron.nombre }} {{ mi_escuadron.podio or '' }}</span>
             {% endif %}
         </div>
 
         {% if mi_escuadron %}
-        <!-- Resumen de Mi Escuadrón -->
+        <!-- Resumen de mi grupo -->
         <div class="my-squad-spotlight">
             <div class="my-squad-banner">
                 <div class="squad-badge-large">{{ mi_escuadron.podio or '🛡️' }}</div>
@@ -31,7 +31,7 @@
                 <div class="squad-stats-pills">
                     <div class="squad-pill-stat">
                         <span class="stat-number">🏅 {{ mi_escuadron.medallas_count }}</span>
-                        <span class="stat-label">Medallas</span>
+                        <span class="stat-label">Reconocimientos</span>
                     </div>
                     <div class="squad-pill-stat">
                         <span class="stat-number">📋 {{ mi_escuadron.tareas_entregadas }}</span>
@@ -42,7 +42,7 @@
 
             {% if otorgamientos_grupo %}
             <div class="squad-earned-badges">
-                <span class="eyebrow">Condecoraciones del Escuadrón</span>
+                <span class="eyebrow">Reconocimientos del grupo</span>
                 <div class="squad-badges-list">
                     {% for ot in otorgamientos_grupo %}
                     <span class="badge badge-gold" title="{{ ot.motivo or 'Reconocimiento grupal' }}">
@@ -55,12 +55,12 @@
         </div>
         {% endif %}
 
-        <!-- Tabla de la Liga de Equipos -->
+        <!-- Tabla de la clasificación de grupos -->
         <div class="squad-league-table">
             <div class="squad-league-header-row">
                 <span class="col-pos">Puesto</span>
-                <span class="col-name">Escuadrón</span>
-                <span class="col-stats">Retos y Medallas</span>
+                <span class="col-name">Grupo</span>
+                <span class="col-stats">Retos y reconocimientos</span>
                 <span class="col-score">Puntaje</span>
             </div>
             {% for g in liga_grupos %}
@@ -81,9 +81,9 @@
                 </div>
                 <div class="col-stats">
                     <span class="badge badge-ghost" title="Retos grupales entregados">📋 {{ g.tareas_entregadas }}</span>
-                    <span class="badge badge-ghost" title="Medallas colectivas">🏅 {{ g.medallas_count }}</span>
+                    <span class="badge badge-ghost" title="Reconocimientos de grupo">🏅 {{ g.medallas_count }}</span>
                     {% if g.insignias %}
-                    <div class="group-mini-medals" aria-label="Medallas ganadas">
+                    <div class="group-mini-medals" aria-label="Reconocimientos de grupo obtenidos">
                         {% for ins in g.insignias[:3] %}
                         <span title="{{ ins.nombre }}">{{ ins.icono }}</span>
                         {% endfor %}
@@ -95,7 +95,7 @@
                 </div>
             </div>
             {% else %}
-            <p class="text-muted p-3 text-center">Aún no se han configurado escuadrones o actividades grupales en esta ficha.</p>
+            <p class="text-muted p-3 text-center">Aún no hay grupos ni actividades grupales en esta ficha.</p>
             {% endfor %}
         </div>
     </section>

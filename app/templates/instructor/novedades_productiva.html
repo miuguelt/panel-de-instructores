@@ -5,15 +5,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-title-cluster">
-        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn-back" title="Volver a casos de seguimiento">&larr; Volver</a>
-        <h1>Novedades y etapa productiva</h1>
-    </div>
-    <div class="page-header-actions">
-        <a href="{{ url_for('comite.normativa') }}" class="btn btn-outline">Normativa SENA</a>
-    </div>
-</div>
+{% set seguimiento_activa = 'novedades' %}
+{% include 'instructor/_seguimiento_pestanas.html' %}
 
 <div class="card reglamento-card">
     <p class="devbrain-prose">

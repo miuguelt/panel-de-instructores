@@ -27,9 +27,11 @@
 
 .ficha-card-v2 {
     display: grid;
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
     align-content: start;
     min-inline-size: 0;
+    container-type: inline-size;
 }
 
 .ficha-card-v2 .ficha-card-header {
@@ -63,6 +65,75 @@
     margin: 0;
     font-size: 0.875rem;
     color: var(--text-muted);
+}
+
+/* Con dos tarjetas por fila, una ficha impar al final ocupa toda la fila en
+   lugar de dejar una celda vacía a su lado. */
+.dashboard-cards > .card-ficha:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
+/* La tarjeta no tiene padding propio (styles.css): el encabezado pone el suyo
+   y el cuerpo usa la misma medida para que nada quede pegado al borde. */
+.ficha-card-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+    inline-size: 100%;
+    min-inline-size: 0;
+    box-sizing: border-box;
+    padding: clamp(15px, 2.2vw, 23px) clamp(15px, 2.6vw, 27px);
+}
+
+.ficha-card-section {
+    display: grid;
+    gap: 0.75rem;
+    min-inline-size: 0;
+}
+
+.ficha-card-section--grupo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    background: var(--surface-data);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--radius-md);
+}
+
+.ficha-card-empty {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.ficha-card-empty a {
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+/* Con espacio, el avance y el grupo quedan lado a lado; la recomendación y
+   el detalle siguen a todo el ancho. */
+@container (min-width: 56rem) {
+    .ficha-card-body {
+        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    }
+
+    .ficha-card-body > .ficha-today,
+    .ficha-card-body > .ficha-card-rec,
+    .ficha-card-body > .ficha-card-more {
+        grid-column: 1 / -1;
+    }
+
+    .ficha-card-body > .ficha-card-section {
+        align-self: stretch;
+        align-content: center;
+    }
 }
 
 .ficha-today {
@@ -107,17 +178,15 @@
     margin: 0;
 }
 
-.ficha-card-group {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 1rem;
-    align-items: center;
-}
-
 .ficha-card-group-bars {
     display: grid;
+    flex: 1 1 14rem;
     gap: 0.75rem;
     min-inline-size: 0;
+}
+
+.ficha-card-section--grupo > .ficha-card-empty {
+    flex: 1 1 14rem;
 }
 
 .ficha-card-rec {
@@ -132,9 +201,30 @@
     color: var(--accent-primary);
 }
 
+/* La recomendación se lee dentro de la tarjeta: texto a tamaño legible y la
+   cifra junto al título, no flotando al centro. */
+.ficha-card-rec .strategic-alert-banner {
+    font-size: 0.875rem;
+    border-radius: var(--radius-md);
+}
+
+.ficha-card-rec .strategic-alert-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.375rem 0.625rem;
+}
+
+.ficha-card-rec .strategic-alert-body p {
+    text-align: start;
+    white-space: normal;
+}
+
 .ficha-card-more {
+    min-inline-size: 0;
     border-block-start: 1px solid var(--border-divider);
-    padding-block-start: 0.5rem;
+    padding-block-start: 0.25rem;
 }
 
 .ficha-card-more > summary {
@@ -143,10 +233,23 @@
     justify-content: space-between;
     gap: 0.5rem;
     min-block-size: var(--control-h-sm);
+    padding: 0.375rem 0.5rem;
+    margin-inline: -0.5rem;
+    border-radius: var(--radius-sm);
     font-weight: 600;
     color: var(--text-main);
     cursor: pointer;
     list-style: none;
+    transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+.ficha-card-more > summary:hover {
+    background: var(--surface-data);
+}
+
+.ficha-card-more > summary:focus-visible {
+    outline: var(--focus-width) solid var(--accent-primary);
+    outline-offset: 2px;
 }
 
 .ficha-card-more > summary::-webkit-details-marker {
@@ -189,6 +292,20 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Los botones de texto largo envuelven en pantallas estrechas en vez de
+   ensanchar la tarjeta. */
+.ficha-card-more-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.ficha-card-more-links .btn {
+    max-inline-size: 100%;
+    white-space: normal;
+    text-align: start;
+}
+
 .ficha-card-competencias {
     display: grid;
     gap: 0.75rem;
@@ -212,13 +329,8 @@
 }
 
 @media (max-width: 30rem) {
-    .ficha-card-v2 .ficha-card-header,
-    .ficha-card-group {
+    .ficha-card-v2 .ficha-card-header {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    .ficha-card-group .viz-donut {
-        justify-self: start;
     }
 }
 

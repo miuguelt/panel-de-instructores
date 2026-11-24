@@ -3,22 +3,18 @@
 {% block title %}Planes de mejoramiento - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-title-cluster">
-        <a href="{{ url_for('seguimiento.casos_seguimiento', ficha_id=ficha.id) }}" class="btn-back" title="Volver a Casos">&larr; Volver</a>
-        <h1><i data-lucide="clipboard-list" class="icon-lg" aria-hidden="true"></i> Planes de mejoramiento</h1>
-    </div>
-</div>
+{% set seguimiento_activa = 'planes' %}
+{% include 'instructor/_seguimiento_pestanas.html' %}
 
 {{ render_alertas_contextuales(ficha.id, 'planes_mejoramiento') }}
 
 <div class="participation-note">
-    <span aria-hidden="true">📋</span>
+    <span aria-hidden="true"><i data-lucide="clipboard-list" class="icon-md"></i></span>
     <p><strong>Plan de mejoramiento — Acuerdo 009 de 2024, Art. 46, num. 1, lit. b (pág. 37).</strong> Dura máximo 20 días calendario y procede después de dos llamados de atención escritos. El plan de mejoramiento es un acuerdo entre el instructor y el aprendiz para superar las dificultades académicas antes de llegar a comité.</p>
 </div>
 
 <details class="card form-card" {% if request.args.get('aprendiz_id') %}open{% endif %}>
-    <summary><span>+ Crear nuevo plan de mejoramiento</span></summary>
+    <summary><span>Crear plan de mejoramiento</span></summary>
     <form method="POST" action="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">

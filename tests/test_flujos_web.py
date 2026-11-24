@@ -635,10 +635,15 @@ class FlujosWebTestCase(unittest.TestCase):
         self.assertIn('Lideró la organización del ambiente.'.encode(), historial.data)
         self.assertIn('Bitácora de formación integral'.encode(), historial.data)
 
-        # El módulo se alcanza desde la navegación de la ficha, no solo por URL.
+        # El módulo se alcanza desde la navegación de la ficha, no solo por URL:
+        # la barra lleva a Seguimiento y Observador es una de sus pestañas.
+        self.assertIn(
+            f'/instructor/fichas/{self.ficha.id}/casos-seguimiento'.encode(),
+            self.cliente.get(f'/instructor/fichas/{self.ficha.id}/tareas').data,
+        )
         self.assertIn(
             f'/instructor/fichas/{self.ficha.id}/observador'.encode(),
-            self.cliente.get(f'/instructor/fichas/{self.ficha.id}/tareas').data,
+            self.cliente.get(f'/instructor/fichas/{self.ficha.id}/casos-seguimiento').data,
         )
 
     def test_observador_rechaza_fecha_futura_y_aprendiz_de_otra_ficha(self):

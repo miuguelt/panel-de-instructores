@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion, render_alertas_contextuales %}
 {% from 'components/_viz.html' import kpi, apilada %}
-{% block title %}Tareas y evidencias - {{ ficha.codigo }} - SENA Control{% endblock %}
+{% block title %}Tareas - {{ ficha.codigo }} - SENA Control{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/grupo_chat.css') }}">
@@ -12,10 +12,10 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <h1><i data-lucide="file-check" class="icon-lg" aria-hidden="true"></i> Tareas y evidencias</h1>
+        <span class="eyebrow">Ficha {{ ficha.codigo }}</span>
+        <h1><i data-lucide="file-check" class="icon-lg" aria-hidden="true"></i> Tareas</h1>
     </div>
-    <div class="page-actions" style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
-        <a href="{{ url_for('instructor.evidencias_faltantes', ficha_id=ficha.id) }}" class="btn btn-outline" title="Ver evidencias que hacen falta por aprendiz"><i data-lucide="clipboard-list" class="icon-sm" aria-hidden="true"></i> Faltantes por aprendiz</a>
+    <div class="page-header-actions">
         {% if puede_editar_corte %}
         <button type="button" class="btn btn-primary" id="btn-toggle-crear-tarea" aria-expanded="false" onclick="toggleFormularioCrear()">
             <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i> Nueva tarea
@@ -23,6 +23,9 @@
         {% endif %}
     </div>
 </div>
+
+{% set tareas_activa = 'tareas' %}
+{% include 'instructor/_tareas_pestanas.html' %}
 
 {{ render_alertas_contextuales(ficha.id, 'tareas_calificaciones', recomendaciones_tareas) }}
 

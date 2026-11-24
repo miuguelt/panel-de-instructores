@@ -7,14 +7,11 @@
 
 
 {% block content %}
-<div class="page-header">
-    <div class="page-title-cluster">
-        <h1><i data-lucide="book-open" class="icon-lg" aria-hidden="true"></i> Observador del aprendiz</h1>
-    </div>
-</div>
+{% set seguimiento_activa = 'observador' %}
+{% include 'instructor/_seguimiento_pestanas.html' %}
 
 <div class="card form-card" id="registrar">
-    <h2>Registrar Novedad</h2>
+    <h2>Registrar una nota</h2>
     <p class="text-muted">
         Deja constancia fechada de hechos de convivencia, puntualidad, compromiso o trabajo en equipo. El aprendiz verá la nota en su panel.
     </p>

@@ -166,7 +166,7 @@ def otorgar_insignia_grupo(ficha_id):
         registrar_notificacion(
             destinatario_tipo='aprendiz',
             destinatario_id=ap.id,
-            mensaje=f'¡Tu equipo "{grupo.nombre}" fue reconocido con la medalla {insignia.icono} {insignia.nombre}!',
+            mensaje=f'¡Tu grupo "{grupo.nombre}" recibió el reconocimiento {insignia.icono} {insignia.nombre}!',
             tipo='logro',
             clave=f'insignia_grupo_{grupo.id}_{insignia.id}_{ap.id}',
             ficha_id=ficha_id,

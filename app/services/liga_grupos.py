@@ -1,4 +1,4 @@
-"""Servicio de cálculo y posiciones de la Liga de Escuadrones y Retos Grupales."""
+"""Clasificación de grupos de la ficha y retos grupales."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from app.models.tarea import Entrega
 
 
 def obtener_liga_grupos(ficha_id: int, aprendiz_id: Optional[int] = None) -> List[Dict[str, Any]]:
-    """Calcula la tabla de posiciones de la Liga de Escuadrones (grupos) de la ficha.
+    """Calcula la clasificación de grupos de la ficha.
 
     Pondera formativamente:
-    - Insignias/medallas grupales obtenidas (15.0 pts cada una).
+    - Reconocimientos de grupo obtenidos (15.0 pts cada uno).
     - Tareas grupales entregadas a tiempo (10.0 pts cada una).
     - Tareas grupales entregadas extemporáneas (5.0 pts cada una).
     - Tareas grupales con revisión aprobada / excelente.
@@ -133,7 +133,7 @@ def obtener_resumen_escuadron(
     ficha_id: int,
     aprendiz_id: int,
 ) -> Optional[Dict[str, Any]]:
-    """Devuelve la información destacada del escuadrón al que pertenece el aprendiz."""
+    """Devuelve la información destacada del grupo al que pertenece el aprendiz."""
     liga = obtener_liga_grupos(ficha_id=ficha_id, aprendiz_id=aprendiz_id)
     for escuadron in liga:
         if escuadron.get('es_mi_grupo'):

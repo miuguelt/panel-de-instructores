@@ -95,37 +95,8 @@
         </div>
 
         {% if aprendiz.rol_administrativo %}
-        <details class="learner-generate-inline" style="margin-top: 1rem; padding: 0.85rem 1rem; background: var(--surface-secondary); border: 1px solid var(--border-data); border-radius: 8px;">
-            <summary style="font-weight: 600; cursor: pointer; color: var(--accent);">✨ Generar nuevos turnos por periodo</summary>
-            <form method="POST" action="{{ url_for('aseo_aprendiz.generar_como_aprendiz', ficha_id=ficha.id) }}" style="margin-top: 0.75rem;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="origen" value="panel">
-                <p class="text-muted small">El sistema reparte los turnos empezando por quien menos suma en total (cumplidos + programados), sin repetir en días consecutivos y evitando los festivos de Colombia.</p>
-                <div class="form-row" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="panel-gen-inicio" class="small text-muted">Fecha inicial</label>
-                        <input id="panel-gen-inicio" name="fecha_inicio" type="date" value="{{ fecha_inicio_default.isoformat() if fecha_inicio_default else aseo.hoy.isoformat() }}" required style="font-size: 0.88rem; padding: 4px 8px;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="panel-gen-fin" class="small text-muted">Fecha final</label>
-                        <input id="panel-gen-fin" name="fecha_fin" type="date" value="{{ fecha_fin_default.isoformat() if fecha_fin_default else aseo.hoy.isoformat() }}" required style="font-size: 0.88rem; padding: 4px 8px;">
-                    </div>
-                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
-                        <input type="checkbox" name="recalcular" checked>
-                        Recalcular pendientes
-                    </label>
-                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
-                        <input type="checkbox" name="respetar_manuales" checked>
-                        Conservar manuales
-                    </label>
-                    <label class="checkbox-label small text-muted" style="align-self: center; margin-bottom: 0; display: flex; align-items: center; gap: 0.25rem;">
-                        <input type="checkbox" name="equilibrar_calendario" checked>
-                        Equilibrar todo el calendario
-                    </label>
-                    <button type="submit" class="btn btn-sm btn-primary">Generar turnos</button>
-                </div>
-            </form>
-        </details>
+        {#- Generar y ajustar turnos se hace en un solo lugar: la gestión de aseo. -#}
+        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline learner-generate-link"><i data-lucide="calendar-plus" class="icon-sm" aria-hidden="true"></i> Programar turnos</a>
         {% endif %}
 
         {% if aseo.turno_propio %}

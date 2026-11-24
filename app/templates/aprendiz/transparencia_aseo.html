@@ -8,7 +8,11 @@
         <h1><i data-lucide="sparkles" class="icon-lg" aria-hidden="true"></i> Turnos de aseo</h1>
     </div>
     <div class="header-actions">
-        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-sm btn-primary">🧹 Programar y gestionar turnos</a>
+        {% if puede_gestionar_aseo %}
+        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-sm btn-primary"><i data-lucide="calendar-plus" class="icon-sm" aria-hidden="true"></i> Programar y gestionar turnos</a>
+        {% else %}
+        <a href="{{ url_for('aseo_aprendiz.gestionar', ficha_id=ficha.id, mes=mes.strftime('%Y-%m')) }}" class="btn btn-sm btn-outline"><i data-lucide="calendar" class="icon-sm" aria-hidden="true"></i> Ver el calendario completo</a>
+        {% endif %}
     </div>
 </div>
 

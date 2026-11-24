@@ -166,6 +166,43 @@ class DashboardRenderTestCase(unittest.TestCase):
         self.assertIn('Sin datos', compacta)
         self.assertIn(f'href="{urls["vision"]}"', compacta)
 
+    def test_cuerpo_con_margen_propio_y_dos_secciones(self):
+        card = self.tarjeta(self.render()[0])
+        cuerpo = card.index('class="ficha-card-body"')
+        # El encabezado tiene su propio margen; todo lo demás vive en el cuerpo.
+        self.assertLess(card.index('</header>'), cuerpo)
+        avance = card.index('aria-label="Avance académico"')
+        grupo = card.index('aria-label="Grupo"')
+        self.assertLess(cuerpo, avance)
+        self.assertLess(avance, grupo)
+        # Los pendientes van primero, a todo el ancho, sobre el avance y el grupo.
+        self.assertLess(cuerpo, card.index('class="ficha-today"'))
+        self.assertLess(card.index('class="ficha-today"'), avance)
+        self.assertLess(card.index('aria-label="RAPs aprobados"'), grupo)
+        self.assertGreater(card.index('aria-label="Asistencia: 93.5%"'), grupo)
+        self.assertGreater(card.index('aria-label="Entregas recibidas"'), grupo)
+
+    def test_entregas_sin_tareas_muestra_una_sola_senal_con_accion(self):
+        extra = dict(EXTRA, pct_entregas=None, tareas_totales=0, entregas_totales=0)
+        html, urls = self.render(extra=extra)
+        grupo = self.tarjeta(html)
+        grupo = grupo[grupo.index('aria-label="Grupo"'):]
+        self.assertIn('Aún no hay tareas publicadas', grupo)
+        self.assertIn(f'href="{urls["tareas"]}"', grupo)
+        self.assertNotIn('0 recibidas de 0 tareas', grupo)
+        self.assertNotIn('aria-label="Entregas recibidas"', grupo)
+
+    def test_asistencia_sin_datos_no_dibuja_dona_vacia(self):
+        extra = dict(EXTRA, pct_asistencia=None, sesiones=0)
+        html, _ = self.render(extra=extra)
+        card = self.tarjeta(html)
+        grupo = card[card.index('aria-label="Grupo"'):]
+        with self.app.test_request_context():
+            url_asistencia = url_for('instructor.asistencia', ficha_id=1)
+        self.assertIn('Asistencia: sin datos', grupo)
+        self.assertIn(f'href="{url_asistencia}"', grupo)
+        self.assertNotIn('viz-donut', card)
+
     def test_resumen_global_de_hoy(self):
         resumen = {'activas': 3, 'por_calificar': 12, 'alertas': 4, 'cierres_proximos': 1, 'con_pendientes': 2}
         html, _ = self.render(resumen_hoy=resumen)

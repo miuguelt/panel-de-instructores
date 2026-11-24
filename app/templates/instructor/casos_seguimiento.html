@@ -17,23 +17,15 @@
 {% set page_summary = fallback_summary %}
 {% endif %}
 {% set evaluation_time = ultima_evaluacion|default(datetime.utcnow(), true) %}
-<div class="page-header followup-page-header">
-    <div class="page-title-cluster">
-        <h1><i data-lucide="shield-check" class="icon-lg" aria-hidden="true"></i> Casos de seguimiento</h1>
-    </div>
-    <div class="page-header-actions">
-        {% if ultima_evaluacion is defined and ultima_evaluacion %}
-        <span class="followup-evaluation-time">Actualizado {{ evaluation_time.strftime('%d/%m/%Y %H:%M') }}</span>
-        {% endif %}
-        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="btn btn-outline"><i data-lucide="bell" class="icon-sm" aria-hidden="true"></i> Notificaciones</a>
-    </div>
-</div>
+{% set seguimiento_activa = 'casos' %}
+{% include 'instructor/_seguimiento_pestanas.html' %}
+{% if ultima_evaluacion is defined and ultima_evaluacion %}<p class="followup-evaluation-time">Revisión automática: {{ evaluation_time.strftime('%d/%m/%Y %H:%M') }}</p>{% endif %}
 
 {{ render_alertas_contextuales(ficha.id, 'asistencia_comite') }}
 
 
 <div class="participation-note followup-guidance">
-    <span aria-hidden="true">⚖️</span>
+    <span aria-hidden="true"><i data-lucide="scale" class="icon-md"></i></span>
     <div>
         <strong>El sistema prioriza; el instructor decide.</strong>
         <p>Las alertas se generan con los parámetros de la ficha. Revisa la evidencia, registra el acuerdo con el aprendiz y elige el siguiente paso: resolver, plan de mejoramiento o comité.</p>
@@ -43,94 +35,33 @@
 <div class="followup-action-bar">
     <form method="POST" action="{{ url_for('seguimiento.auto_evaluar_ficha', ficha_id=ficha.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-primary">🔄 Re-evaluar ahora</button>
+        <button type="submit" class="btn btn-outline"><i data-lucide="refresh-cw" class="icon-sm" aria-hidden="true"></i> Revisar de nuevo</button>
     </form>
-    <a href="{{ url_for('seguimiento.gestionar_planes', ficha_id=ficha.id) }}" class="btn btn-outline">📋 Gestionar planes</a>
-    <a href="{{ url_for('instructor.alertas', ficha_id=ficha.id) }}" class="btn btn-outline">📊 Ver alertas</a>
 </div>
 
 <section class="followup-summary-grid" aria-label="Resumen de seguimiento">
     <div class="followup-summary-card">
-        <span class="followup-summary-icon">👥</span>
+        <span class="followup-summary-icon" aria-hidden="true"><i data-lucide="users" class="icon-md"></i></span>
         <div><strong>{{ page_summary.casos }}</strong><span>Casos abiertos</span></div>
         <small>Aprendices que requieren revisión</small>
     </div>
     <div class="followup-summary-card is-danger">
-        <span class="followup-summary-icon">🚩</span>
+        <span class="followup-summary-icon" aria-hidden="true"><i data-lucide="flag" class="icon-md"></i></span>
         <div><strong>{{ page_summary.prioritarios }}</strong><span>Prioridad alta</span></div>
         <small>Con causal roja o riesgo crítico</small>
     </div>
     <div class="followup-summary-card is-warning">
-        <span class="followup-summary-icon">⏳</span>
+        <span class="followup-summary-icon" aria-hidden="true"><i data-lucide="hourglass" class="icon-md"></i></span>
         <div><strong>{{ page_summary.alertas_activas }}</strong><span>Alertas por gestionar</span></div>
         <small>{{ page_summary.escalados }} escalada{{ '' if page_summary.escalados == 1 else 's' }} a comité</small>
     </div>
     <div class="followup-summary-card is-success">
-        <span class="followup-summary-icon">📋</span>
+        <span class="followup-summary-icon" aria-hidden="true"><i data-lucide="clipboard-list" class="icon-md"></i></span>
         <div><strong>{{ page_summary.planes_pendientes }}</strong><span>Planes pendientes</span></div>
         <small>{{ page_summary.planes_vencidos }} vencido{{ '' if page_summary.planes_vencidos == 1 else 's' }}</small>
     </div>
 </section>
 
-<details class="card settings-card followup-settings">
-    <summary>
-        <span>⚙️ Parámetros de seguimiento de la ficha</span>
-        <small>Editables · última actualización: {{ config_comite.actualizada_en.strftime('%d/%m/%Y %H:%M') if config_comite.actualizada_en else 'sin registro' }}</small>
-    </summary>
-    <form method="POST" action="{{ url_for('seguimiento.configurar_alertas_comite', ficha_id=ficha.id) }}" class="followup-settings-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="followup-settings-grid">
-            <div class="form-group">
-                <label for="umbral_fallas_consecutivas">Faltas consecutivas</label>
-                <input id="umbral_fallas_consecutivas" name="umbral_fallas_consecutivas" type="number" min="1" max="30" value="{{ config_comite.umbral_fallas_consecutivas }}" required>
-                <small>Activa causal de comité.</small>
-            </div>
-            <div class="form-group">
-                <label for="umbral_fallas_acumuladas">Faltas acumuladas</label>
-                <input id="umbral_fallas_acumuladas" name="umbral_fallas_acumuladas" type="number" min="1" max="100" value="{{ config_comite.umbral_fallas_acumuladas }}" required>
-                <small>Activa seguimiento preventivo.</small>
-            </div>
-            <div class="form-group">
-                <label for="umbral_tareas_incumplidas">Tareas incumplidas</label>
-                <input id="umbral_tareas_incumplidas" name="umbral_tareas_incumplidas" type="number" min="1" max="100" value="{{ config_comite.umbral_tareas_incumplidas }}" required>
-                <small>Activa plan de mejoramiento.</small>
-            </div>
-            <div class="form-group">
-                <label for="porcentaje_minimo_asistencia">Asistencia mínima (%)</label>
-                <input id="porcentaje_minimo_asistencia" name="porcentaje_minimo_asistencia" type="number" min="1" max="100" value="{{ config_comite.porcentaje_minimo_asistencia }}" required>
-                <small>Por debajo, prioriza el caso.</small>
-            </div>
-            <div class="form-group">
-                <label for="auto_escalar_dias">Recordar casos abiertos después de</label>
-                <input id="auto_escalar_dias" name="auto_escalar_dias" type="number" min="1" max="365" value="{{ config_comite.auto_escalar_dias }}" required>
-                <small>Días sin cierre. El sistema avisa; usted decide si remite a comité.</small>
-            </div>
-            <div class="form-group">
-                <label for="umbral_notas_negativas">Llamados de atención</label>
-                <input id="umbral_notas_negativas" name="umbral_notas_negativas" type="number" min="0" max="50" value="{{ config_comite.umbral_notas_negativas }}" required>
-                <small>Notas negativas del observador que abren caso. 0 desactiva la regla.</small>
-            </div>
-            <div class="form-group">
-                <label for="periodo_dias_notas">Ventana del observador</label>
-                <input id="periodo_dias_notas" name="periodo_dias_notas" type="number" min="1" max="365" value="{{ config_comite.periodo_dias_notas }}" required>
-                <small>Días hacia atrás que se cuentan.</small>
-            </div>
-            <div class="form-group">
-                <label for="dias_plazo_justificacion">Plazo de justificación (días hábiles; el reglamento fija 5)</label>
-                <input id="dias_plazo_justificacion" name="dias_plazo_justificacion" type="number" min="5" max="30" value="{{ config_comite.dias_plazo_justificacion }}" required>
-                <small>Mínimo 5. Se comunica al aprendiz.</small>
-            </div>
-        </div>
-        <label class="followup-checkbox">
-            <input type="checkbox" name="correo_habilitado" {% if config_comite.correo_habilitado %}checked{% endif %}>
-            <span>Habilitar notificaciones por correo cuando exista configuración SMTP.</span>
-        </label>
-        <div class="followup-settings-footer">
-            <p class="text-muted">Ajusta estos valores según el protocolo del Centro. El registro de cambios queda asociado a la ficha.</p>
-            <button type="submit" class="btn btn-primary">Guardar parámetros</button>
-        </div>
-    </form>
-</details>
 
 <section class="followup-workspace" aria-labelledby="followup-cases-title">
     <div class="followup-toolbar" data-filter-region="casos-seguimiento-filters">
@@ -387,6 +318,66 @@
     </div>
     {% endif %}
 </section>
+
+<details class="card settings-card followup-settings">
+    <summary>
+        <span>Ajustar parámetros del seguimiento</span>
+        <small>Editables · última actualización: {{ config_comite.actualizada_en.strftime('%d/%m/%Y %H:%M') if config_comite.actualizada_en else 'sin registro' }}</small>
+    </summary>
+    <form method="POST" action="{{ url_for('seguimiento.configurar_alertas_comite', ficha_id=ficha.id) }}" class="followup-settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="followup-settings-grid">
+            <div class="form-group">
+                <label for="umbral_fallas_consecutivas">Faltas consecutivas</label>
+                <input id="umbral_fallas_consecutivas" name="umbral_fallas_consecutivas" type="number" min="1" max="30" value="{{ config_comite.umbral_fallas_consecutivas }}" required>
+                <small>Activa causal de comité.</small>
+            </div>
+            <div class="form-group">
+                <label for="umbral_fallas_acumuladas">Faltas acumuladas</label>
+                <input id="umbral_fallas_acumuladas" name="umbral_fallas_acumuladas" type="number" min="1" max="100" value="{{ config_comite.umbral_fallas_acumuladas }}" required>
+                <small>Activa seguimiento preventivo.</small>
+            </div>
+            <div class="form-group">
+                <label for="umbral_tareas_incumplidas">Tareas incumplidas</label>
+                <input id="umbral_tareas_incumplidas" name="umbral_tareas_incumplidas" type="number" min="1" max="100" value="{{ config_comite.umbral_tareas_incumplidas }}" required>
+                <small>Activa plan de mejoramiento.</small>
+            </div>
+            <div class="form-group">
+                <label for="porcentaje_minimo_asistencia">Asistencia mínima (%)</label>
+                <input id="porcentaje_minimo_asistencia" name="porcentaje_minimo_asistencia" type="number" min="1" max="100" value="{{ config_comite.porcentaje_minimo_asistencia }}" required>
+                <small>Por debajo, prioriza el caso.</small>
+            </div>
+            <div class="form-group">
+                <label for="auto_escalar_dias">Recordar casos abiertos después de</label>
+                <input id="auto_escalar_dias" name="auto_escalar_dias" type="number" min="1" max="365" value="{{ config_comite.auto_escalar_dias }}" required>
+                <small>Días sin cierre. El sistema avisa; usted decide si remite a comité.</small>
+            </div>
+            <div class="form-group">
+                <label for="umbral_notas_negativas">Notas negativas en el observador</label>
+                <input id="umbral_notas_negativas" name="umbral_notas_negativas" type="number" min="0" max="50" value="{{ config_comite.umbral_notas_negativas }}" required>
+                <small>Cuántas abren un caso. 0 desactiva la regla.</small>
+            </div>
+            <div class="form-group">
+                <label for="periodo_dias_notas">Ventana del observador</label>
+                <input id="periodo_dias_notas" name="periodo_dias_notas" type="number" min="1" max="365" value="{{ config_comite.periodo_dias_notas }}" required>
+                <small>Días hacia atrás que se cuentan.</small>
+            </div>
+            <div class="form-group">
+                <label for="dias_plazo_justificacion">Plazo de justificación (días hábiles; el reglamento fija 5)</label>
+                <input id="dias_plazo_justificacion" name="dias_plazo_justificacion" type="number" min="5" max="30" value="{{ config_comite.dias_plazo_justificacion }}" required>
+                <small>Mínimo 5. Se comunica al aprendiz.</small>
+            </div>
+        </div>
+        <label class="followup-checkbox">
+            <input type="checkbox" name="correo_habilitado" {% if config_comite.correo_habilitado %}checked{% endif %}>
+            <span>Habilitar notificaciones por correo cuando exista configuración SMTP.</span>
+        </label>
+        <div class="followup-settings-footer">
+            <p class="text-muted">Ajusta estos valores según el protocolo del Centro. El registro de cambios queda asociado a la ficha.</p>
+            <button type="submit" class="btn btn-primary">Guardar parámetros</button>
+        </div>
+    </form>
+</details>
 {% endblock %}
 
 {% block scripts %}

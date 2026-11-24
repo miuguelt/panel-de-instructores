@@ -1,5 +1,35 @@
 # Diseño de SENA Control
 
+## Contrato de diseño — cada dato en un solo lugar y módulos sin solapamientos (24 de noviembre de 2026)
+
+Resultado de la auditoría de usabilidad de noviembre de 2026. Complementa el contrato del 21 de noviembre.
+
+- Navegación:
+  - Barra superior: «Mis fichas» (única lista de fichas; crear o importar se hace en un diálogo de esa página), «Fichas por certificar», «Programación» y «Administración». `GET /instructor/fichas` responde 302 hacia «Mis fichas».
+  - Barra de la ficha: Visión general, Asistencia, Tareas, Aprendices, Juicios, Planeación y Seguimiento, más el distintivo de Alertas. «Más módulos» agrupa «Participación» (Aseo, Ranking, Grupos y Fila de atención) y «Informes y recursos» (Estadísticas, Pruebas Saber TyT y Materiales). Fuente: `app/navegacion.py`.
+  - El regreso a la ficha es su barra; las páginas de la ficha no llevan botones «Volver» ni repiten accesos que ya están en ella.
+  - Módulos con varias vistas usan pestañas comunes: «Seguimiento» (Casos, Planes de mejoramiento, Novedades y Observador; `_seguimiento_pestanas.html`) y «Tareas» (Por tarea y Por aprendiz; `_tareas_pestanas.html`). Las direcciones no cambian.
+- Dónde vive cada dato (en los demás sitios, un enlace):
+
+| Dato | Lugar único |
+|---|---|
+| Fase esperada, fase real y retraso | Visión general (fila de fechas y línea de salud); el panel de fases no los repite (`tracker_modo = 'vision'`) |
+| Semáforo agregado del grupo | Visión general; Alertas filtra la lista por nivel |
+| Estado de los aprendices | Fichas de filtro de Aprendices |
+| Competencias con menor aprobación | Juicios; Visión general muestra tres y Estadísticas las compara |
+| Cronograma y tarjeta TyT | Visión general y Pruebas Saber TyT |
+| Parámetros del Acuerdo 009 | Un bloque plegado al final de Alertas; los de seguimiento, al final de Casos |
+| RAPs del aprendiz | Indicador de la cabecera del panel; detalle por competencia en la pestaña Juicios |
+| Puesto, puntos e insignias del aprendiz | Pestaña «Logros» |
+| Generar y ajustar turnos de aseo | Gestión de aseo; el panel y la vista de consulta enlazan |
+| Rol de aprendiz administrador | Su página de configuración; habilitar o deshabilitar, en cada aprendiz del directorio |
+
+- Cifras veraces: sin sesiones, «Sin datos»; «X de Y sesiones» usa las sesiones cumplidas; un juicio cuenta como aprobado solo si dice «APROBADO» (también en plantillas, filtro `juicio_aprobado`); el puesto se expresa como «Puesto N de M» y el puntaje en puntos, nunca como porcentaje.
+- Umbrales: las plantillas no escriben cortes; usan `viz_estado`, `viz_nivel` o `viz_color` (`tests/test_umbrales_unicos.py`).
+- Vocabulario: «insignia» (individual), «reconocimiento de grupo» (no medalla ni condecoración), «grupo» (no escuadrón; «equipo» queda para los equipos de instructores), «nota negativa» del observador frente a «llamado de atención escrito», «Riesgo alto / En seguimiento / Al día» para el semáforo y «Rendimiento académico bajo» para los juicios (`tests/test_vocabulario_reconocimiento.py`).
+- Una acción principal por cabecera como máximo; las acciones de mantenimiento (actualizar archivos, imprimir) son secundarias.
+- Toda plantilla se usa (`tests/test_plantillas_en_uso.py`).
+
 ## Contrato de diseño — primero lo importante y biblioteca de visualización (21 de noviembre de 2026)
 
 - Principio rector: pirámide invertida. Cada pantalla responde en este orden: ¿qué requiere mi acción hoy?, ¿cómo va la ficha o mi proceso?, y el detalle bajo demanda (`<details>`).
@@ -20,7 +50,7 @@
 - Jerarquía por pantalla:
   - «Mis fichas»: «Hoy en tus fichas» → tarjetas ordenadas por urgencia (`prioridad_fichas.ordenar_por_urgencia`) → en cada tarjeta, identidad con un solo hito de calendario, pendientes con enlace directo, RAPs frente al tiempo, grupo y detalle plegado.
   - Visión general: atención inmediata → salud de la ficha → tres recomendaciones (el resto plegado) → competencias y vencimientos. La barra de la ficha ya ofrece los módulos; la página no los repite.
-  - Páginas de la ficha: «Visión general» como enlace de regreso, resumen visual arriba, configuración y reglamento plegados al final, y alertas ordenadas por riesgo.
+  - Páginas de la ficha: la barra de la ficha es el regreso (sin enlaces «Volver»), resumen visual arriba, configuración y reglamento plegados al final, y alertas ordenadas por riesgo.
   - Panel del aprendiz: indicadores clave (asistencia, RAPs y evidencias) → siguiente paso → alertas → aseo → turno con el instructor. El porcentaje de asistencia y el texto «X de Y sesiones» salen de la misma fórmula (`resumen_asistencia_aprendiz`).
 - Verificación: `tests/test_visualizacion.py` (100 % de líneas y ramas del servicio), `test_prioridad_fichas.py`, `test_dashboard_render.py`, `test_vision_general_orden.py`, `test_panel_aprendiz_inicio.py`, `test_serie_asistencia.py`, `test_metricas_tareas.py`, `test_estadisticas_render.py`, `test_volver_a_la_ficha.py` y `test_semaforo_unico.py`; revisión en navegador sin desbordamiento horizontal a 320, 390, 768, 1440, 1920 y 2560 px.
 
@@ -166,7 +196,7 @@ La interfaz usa un tablero operativo de inspiración Bento: superficies agrupada
 
 ### Criterios BDD
 
-- Dado un instructor autenticado, cuando despliega “Herramientas de Gestión y Carga de Archivos”, entonces distingue las áreas “Actualizar información del grupo” y “Compartir acceso con aprendices”, cada una con su acción principal.
+- Dado un instructor autenticado, cuando despliega “Actualizar el grupo y compartir el acceso”, entonces distingue las áreas “Actualizar información del grupo” y “Compartir acceso con aprendices”, cada una con su acción principal. El rol de aprendiz administrador se asigna en su página de configuración, no al subir un archivo.
 - Dado que no se ha seleccionado un archivo, cuando intenta enviar el formulario, entonces la validación nativa bloquea el envío y conserva el contexto.
 - Dado que el navegador permite el portapapeles, cuando copia el enlace, entonces recibe una confirmación accesible; si el permiso falla, el enlace queda seleccionado y se indica `Ctrl+C`.
 - Dado un ancho de 320 px o un zoom de 200 %, cuando el panel está abierto, entonces los controles se apilan sin desbordamiento horizontal ni pérdida de texto esencial.

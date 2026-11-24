@@ -18,29 +18,6 @@
     <p><strong>Reconocimientos de participación.</strong> Las insignias son permanentes, motivacionales y están separadas de la evaluación oficial.</p>
 </div>
 
-<section class="badge-catalog">
-    {% for insignia in catalogo %}
-    <article class="badge-admin-card {% if not insignia.activa %}badge-inactive{% endif %}">
-        <span class="badge-large">{{ insignia.icono }}</span>
-        <div class="badge-admin-content">
-            <div class="badge-title-row">
-                <h3>{{ insignia.nombre }}</h3>
-                <span class="badge badge-{{ 'info' if insignia.tipo == 'automatica' else 'warning' }}">
-                    {{ insignia.tipo }}
-                </span>
-            </div>
-            <p>{{ insignia.descripcion }}</p>
-            <form method="POST" action="{{ url_for('ranking.cambiar_estado_insignia', ficha_id=ficha.id, insignia_id=insignia.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-sm btn-outline">
-                    {{ 'Activar' if not insignia.activa else 'Desactivar' }}
-                </button>
-            </form>
-        </div>
-    </article>
-    {% endfor %}
-</section>
-
 <div class="two-column-layout">
     <section class="card form-card">
         <h2>Crear insignia personalizada</h2>
@@ -93,6 +70,29 @@
         </form>
     </section>
 </div>
+
+<section class="badge-catalog">
+    {% for insignia in catalogo %}
+    <article class="badge-admin-card {% if not insignia.activa %}badge-inactive{% endif %}">
+        <span class="badge-large">{{ insignia.icono }}</span>
+        <div class="badge-admin-content">
+            <div class="badge-title-row">
+                <h3>{{ insignia.nombre }}</h3>
+                <span class="badge badge-{{ 'info' if insignia.tipo == 'automatica' else 'warning' }}">
+                    {{ insignia.tipo }}
+                </span>
+            </div>
+            <p>{{ insignia.descripcion }}</p>
+            <form method="POST" action="{{ url_for('ranking.cambiar_estado_insignia', ficha_id=ficha.id, insignia_id=insignia.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline">
+                    {{ 'Activar' if not insignia.activa else 'Desactivar' }}
+                </button>
+            </form>
+        </div>
+    </article>
+    {% endfor %}
+</section>
 
 <section>
     <div class="section-header">

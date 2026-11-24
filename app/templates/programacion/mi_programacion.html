@@ -2,14 +2,14 @@
 {% from "components/_ui.html" import page_header %}
 {% from "components/_viz.html" import barra, semaforo, vacio %}
 {% from "programacion/_celda.html" import celda with context %}
-{% block title %}Programación - SENA Control{% endblock %}
+{% block title %}Mi programación - SENA Control{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/programacion.css') }}">
 {% endblock %}
 
 {% block content %}
 {% set niveles = {'sin_programacion': 'danger', 'parcial': 'warning', 'completo': 'success', 'sin_dias_habiles': 'neutral'} %}
-{{ page_header('Programación', subtitulo='Tu semana: fichas, competencias y jornadas que te asignó coordinación o el líder de tu equipo.', icono='calendar-range') }}
+{{ page_header('Mi programación', subtitulo='Tu semana: fichas, competencias y jornadas que te asignó coordinación o el líder de tu equipo.', icono='calendar-range') }}
 
 <nav class="prg-barra" aria-label="Semana">
     <div class="prg-periodo">

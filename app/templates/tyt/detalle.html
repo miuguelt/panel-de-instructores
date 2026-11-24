@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% from 'tyt/_barra.html' import barra %}
-{% block title %}Seguimiento Saber TyT · {{ ficha.codigo }}{% endblock %}
+{% block title %}Pruebas Saber TyT - {{ ficha.codigo }} - SENA Control{% endblock %}
 {% block content %}
 <div class="tyt-page">
-    <header class="tyt-page-heading"><div><span class="eyebrow">Ficha {{ ficha.codigo }}</span><h1>Seguimiento Saber TyT</h1><p>{{ ficha.nombre_programa }}</p></div><a class="btn btn-outline" href="{{ url_for('instructor.dashboard') }}">Volver al inicio</a></header>
+    <header class="tyt-page-heading"><div><span class="eyebrow">Ficha {{ ficha.codigo }}</span><h1>Pruebas Saber TyT</h1><p>{{ ficha.nombre_programa }}</p></div></header>
     <p class="tyt-intro">Compara el hito del 70% de la etapa lectiva con los resultados de cada aprendiz. Este seguimiento apoya la preparación de Saber TyT; confirma la inscripción con coordinación académica.</p>
     {% include 'tyt/_tarjeta.html' %}
     {% if tyt and not tyt.error %}
@@ -21,7 +21,7 @@
             <td>{% if fila.total %}{{ barra('Aprobación de ' ~ fila.nombre, fila.porcentaje_aprobados) }}<small>{{ fila.aprobados }} de {{ fila.total }}</small>{% else %}Sin datos{% endif %}</td>
             <td>{% if fila.total %}<strong>{{ ('%.1f'|format(fila.porcentaje_evaluados)).replace('.', ',') }}%</strong><br><small>{{ fila.evaluados }} de {{ fila.total }}</small>{% else %}Sin datos{% endif %}</td>
             <td class="tyt-deficit">{{ fila.faltan_evaluar if fila.total else '—' }}</td><td>{{ fila.faltan_aprobar if fila.total else '—' }}</td>
-            <td><span class="tyt-pill">{{ '✓ Meta evaluada' if fila.cumple_evaluacion else ('Pendiente' if fila.total else 'Sin reporte') }}</span>{% if fila.sin_registro %}<small>{{ fila.sin_registro }} sin registro</small>{% endif %}</td>
+            <td><span class="tyt-pill">{{ 'Meta evaluada' if fila.cumple_evaluacion else ('Pendiente' if fila.total else 'Sin reporte') }}</span>{% if fila.sin_registro %}<small>{{ fila.sin_registro }} sin registro</small>{% endif %}</td>
         </tr>
         {% endfor %}
         </tbody></table></div>
