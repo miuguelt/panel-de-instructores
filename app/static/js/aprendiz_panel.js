@@ -24,6 +24,18 @@ function pestanaInicial(ancla, guardada) {
     return PESTANAS.includes(guardada) ? guardada : 'resumen';
 }
 
+/** Pestaña que contiene el destino de un ancla: el mapa fijo o la sección [data-learner-tab] que la envuelve. */
+function pestanaDeAncla(ancla, doc) {
+    if (PESTANA_POR_ANCLA[ancla]) return PESTANA_POR_ANCLA[ancla];
+    if (!ancla || ancla.length < 2 || !doc) return null;
+    let id;
+    try { id = decodeURIComponent(ancla.slice(1)); } catch (_) { return null; }
+    const destino = doc.getElementById(id);
+    const seccion = destino && destino.closest ? destino.closest('[data-learner-tab]') : null;
+    const pestana = seccion ? seccion.getAttribute('data-learner-tab') : null;
+    return PESTANAS.includes(pestana) ? pestana : null;
+}
+
 function aIso(anio, mes, dia) {
     return `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
 }
@@ -379,12 +391,19 @@ function initPanelAprendiz(doc = document, win = window) {
 
     let guardada = null;
     try { guardada = win.localStorage.getItem(claveTab); } catch (_) { /* Sin preferencia guardada se abre el resumen. */ }
-    activarPestana(pestanaInicial(win.location.hash, guardada), false);
+    // Un enlace interno (recomendaciones, avisos) abre la pestaña donde está su destino.
+    doc.addEventListener('click', evento => {
+        const enlace = evento.target && evento.target.closest ? evento.target.closest('a[href^="#"]') : null;
+        if (!enlace || enlace.classList.contains('learner-bottom-link')) return;
+        const pestana = pestanaDeAncla(enlace.getAttribute('href'), doc);
+        if (pestana) activarPestana(pestana, false);
+    });
+    activarPestana(pestanaDeAncla(win.location.hash, doc) || pestanaInicial(win.location.hash, guardada), false);
     return { activarPestana, aplicarFiltros, modoCascada, actualizarInspector, filtro: () => filtro, busqueda: () => busqueda };
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { pestanaInicial, aIso, formatoFecha, datosEvidencia, coincideEvidencia, contarChips, initCalendarioAsistencia, initPanelAprendiz };
+    module.exports = { pestanaInicial, pestanaDeAncla, aIso, formatoFecha, datosEvidencia, coincideEvidencia, contarChips, initCalendarioAsistencia, initPanelAprendiz };
 }
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     window.panelAprendiz = initPanelAprendiz(document, window);

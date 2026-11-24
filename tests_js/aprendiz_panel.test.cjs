@@ -106,6 +106,21 @@ test('la pestaña inicial respeta el ancla, luego la guardada y por último el r
     assert.equal(panel.pestanaInicial('', null), 'resumen');
 });
 
+test('un ancla abre la pestaña que contiene su destino', () => {
+    const seccion = { getAttribute: nombre => (nombre === 'data-learner-tab' ? 'evidencias' : null) };
+    const destinos = {
+        'experiencia-tarea-7': { closest: () => seccion },
+        'suelto': { closest: () => null },
+    };
+    const doc = { getElementById: id => destinos[id] || null };
+    assert.equal(panel.pestanaDeAncla('#seccion-juicios', doc), 'juicios');
+    assert.equal(panel.pestanaDeAncla('#experiencia-tarea-7', doc), 'evidencias');
+    assert.equal(panel.pestanaDeAncla('#suelto', doc), null);
+    assert.equal(panel.pestanaDeAncla('#no-existe', doc), null);
+    assert.equal(panel.pestanaDeAncla('#', doc), null);
+    assert.equal(panel.pestanaDeAncla('#%E0', doc), null);
+});
+
 test('las fechas se convierten a ISO y al formato colombiano', () => {
     assert.equal(panel.aIso(2026, 0, 5), '2026-01-05');
     assert.equal(panel.formatoFecha('2026-11-21'), '21/11/2026');

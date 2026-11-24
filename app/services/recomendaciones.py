@@ -92,6 +92,19 @@ class LogroAprendiz:
 # EVALUADORES PARA EL INSTRUCTOR
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _fases_con_datos(fase_esperada, fase_real):
+    """Hay con qué comparar: fase esperada por fechas y fase real con RAPs registrados.
+
+    Mismo criterio que el panel de fases: los nombres provisionales del servicio
+    («Fechas pendientes», «Sin definir») y una fase real sin RAPs no son datos.
+    """
+    esperada = (fase_esperada or {}).get('nombre')
+    real = fase_real or {}
+    return (bool(esperada) and esperada not in ('Fechas pendientes', 'Sin definir')
+            and bool(real.get('nombre')) and real.get('nombre') != 'Sin definir'
+            and bool(real.get('resultados_total')))
+
+
 def _evaluar_ritmo_fases_instructor(
     ficha: Ficha,
     fases_data: Dict[str, Any],
@@ -153,13 +166,13 @@ def _evaluar_ritmo_fases_instructor(
                     f'con aprobación anticipada de resultados de aprendizaje.'
                 ),
                 accion_texto='Ver progreso pedagógico',
-                accion_url=f'/instructor/fichas/{ficha.id}/vision-general',
+                accion_url=f'/instructor/fichas/{ficha.id}',
                 metrica_destacada='Ritmo adelantado',
                 prioridad=8,
             )
         )
-    elif cronograma.get('configurado'):
-        # Al día
+    elif cronograma.get('configurado') and _fases_con_datos(fase_esperada, fase_real):
+        # Al día: solo si hay fase esperada por fechas y fase real con RAPs (sin datos no se afirma)
         recomendaciones.append(
             Recomendacion(
                 id=f'fase_al_dia_{ficha.id}',
@@ -172,7 +185,7 @@ def _evaluar_ritmo_fases_instructor(
                     f'en fase de {nombre_esperada}.'
                 ),
                 accion_texto='Ver detalles',
-                accion_url=f'/instructor/fichas/{ficha.id}/vision-general',
+                accion_url=f'/instructor/fichas/{ficha.id}',
                 metrica_destacada='Al día con el cronograma',
                 prioridad=9,
             )
@@ -422,7 +435,7 @@ def _evaluar_asistencia_comite_instructor(
                     f'por encima del umbral de alerta. Conviene coordinar un plan de apoyo preventivo.'
                 ),
                 accion_texto='Ver semáforo',
-                accion_url=f'/instructor/fichas/{ficha.id}/vision-general',
+                accion_url=f'/instructor/fichas/{ficha.id}',
                 metrica_destacada=f'{total_rojo} en riesgo',
                 prioridad=2,
             )
@@ -591,7 +604,7 @@ def obtener_recomendaciones_aprendiz(
                 titulo=f'Entrega pendiente: {t.titulo[:35]}',
                 mensaje=f'Esta actividad vence en {horas} horas. Prepara tu evidencia y envíala antes del cierre.',
                 accion_texto='Subir evidencia',
-                accion_url=f'#tarea-{t.id}',
+                accion_url=f'#experiencia-tarea-{t.id}',
                 metrica_destacada=f'{horas}h restantes',
                 destinatario='aprendiz',
                 prioridad=1,
@@ -617,7 +630,7 @@ def obtener_recomendaciones_aprendiz(
                     f'Revisa las observaciones y carga nuevamente tu trabajo.'
                 ),
                 accion_texto='Ver retroalimentación',
-                accion_url=f'#tarea-{ent.tarea_id}',
+                accion_url=f'#experiencia-tarea-{ent.tarea_id}',
                 metrica_destacada='Ajuste pendiente',
                 destinatario='aprendiz',
                 prioridad=2,
