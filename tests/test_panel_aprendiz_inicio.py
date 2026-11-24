@@ -62,6 +62,21 @@ class PanelAprendizInicioTest(unittest.TestCase):
         # 70 % de asistencia: por debajo del umbral verde (80) y sobre el amarillo (60).
         self.assertIn('viz-donut viz-donut--warning', self.cabecera(html))
 
+    def test_la_pestana_de_evidencias_cuenta_lo_mismo_que_la_cabecera(self):
+        html, _ = self.panel()
+        kpi = re.search(r'Evidencias por entregar\s*</span>\s*<strong class="viz-kpi-value">(\d+)', self.cabecera(html))
+        self.assertIsNotNone(kpi)
+        insignia = re.search(r'id="tab-evidencias-counter"[^>]*>(\d+)<', html)
+        if int(kpi.group(1)):
+            self.assertEqual(insignia.group(1), kpi.group(1))
+        else:
+            self.assertIsNone(insignia)
+
+    def test_estado_del_aprendiz_usa_el_vocabulario_del_semaforo(self):
+        html, _ = self.panel()
+        estado = re.search(r'learner-status-pill">([^<]+)<', html).group(1)
+        self.assertIn(estado, ('Excelente', 'Al día', 'En seguimiento', 'Riesgo alto'))
+
 
 def test_flujo_de_evidencias_en_barra_apilada():
     caso = PanelAprendizInicioTest('test_umbrales_de_color_unicos')

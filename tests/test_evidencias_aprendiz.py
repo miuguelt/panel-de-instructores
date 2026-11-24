@@ -81,6 +81,21 @@ class SaludoTest(unittest.TestCase):
         self.assertEqual(saludo_por_hora(3), '¡Buenas noches')
 
 
+class ContarEvidenciasPendientesTest(unittest.TestCase):
+    """Una sola fuente para «por entregar»: cabecera, pestaña Evidencias y pestaña Mi grupo."""
+
+    def test_separa_individuales_y_grupales(self):
+        from app.services.evidencias_aprendiz import contar_evidencias_pendientes
+        individuales = [{'estado': e} for e in ('pendiente', 'correccion', 'vencida', 'entregada', 'aprobada')]
+        grupales = [{'estado': 'pendiente'}, {'estado': 'retraso'}]
+        self.assertEqual(contar_evidencias_pendientes(individuales, grupales),
+                         {'individuales': 3, 'grupales': 1, 'total': 4})
+
+    def test_sin_tareas(self):
+        from app.services.evidencias_aprendiz import contar_evidencias_pendientes
+        self.assertEqual(contar_evidencias_pendientes([], None), {'individuales': 0, 'grupales': 0, 'total': 0})
+
+
 if __name__ == '__main__':
     unittest.main()
 

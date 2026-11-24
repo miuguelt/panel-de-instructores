@@ -109,3 +109,17 @@ def saludo_por_hora(hora):
     if 12 <= hora < 19:
         return '¡Buenas tardes'
     return '¡Buenas noches'
+
+
+ESTADOS_POR_ENTREGAR = ('pendiente', 'correccion', 'vencida')
+
+
+def contar_evidencias_pendientes(individuales, grupales):
+    """Evidencias por entregar (pendientes, con ajustes o vencidas), por tipo y en total.
+
+    Es la única cuenta que usan la cabecera del panel y las pestañas
+    «Mis evidencias» y «Mi grupo», para que la cifra coincida en todas.
+    """
+    n_ind = sum(1 for t in individuales or [] if t['estado'] in ESTADOS_POR_ENTREGAR)
+    n_grp = sum(1 for t in grupales or [] if t['estado'] in ESTADOS_POR_ENTREGAR)
+    return {'individuales': n_ind, 'grupales': n_grp, 'total': n_ind + n_grp}

@@ -69,11 +69,17 @@ class DetalleAsistenciaTest(unittest.TestCase):
         self.assertEqual((estados['ASISTE']['count'], estados['SIN_REGISTRO']['count']), (1, 1))
         self.assertEqual((detalle['faltas_injustificadas'], detalle['faltas_justificadas']), (1, 2))
         self.assertEqual(detalle['mensual'], [
-            ('2026-05', {'total': 2, 'asistio': 1, 'tardanzas': 1, 'faltas': 0, 'justificadas': 0}),
-            ('2026-04', {'total': 3, 'asistio': 0, 'tardanzas': 0, 'faltas': 1, 'justificadas': 1})])
+            ('2026-05', {'total': 2, 'asistio': 1, 'tardanzas': 1, 'faltas': 0, 'justificadas': 0, 'pct': 100}),
+            ('2026-04', {'total': 3, 'asistio': 0, 'tardanzas': 0, 'faltas': 1, 'justificadas': 1, 'pct': 67})])
         self.assertEqual(detalle['registros'][3], {'fecha': date(2026, 4, 2), 'estado': 'EXCUSA_MEDICA', 'causal': 'CITA',
                                                    'nota': None, 'soporte': True, 'observaciones_sesion': 'Clase'})
         self.assertEqual(detalle['registros'][4]['fecha'], None)
+
+    def test_porcentaje_mensual_solo_resta_faltas_sin_justificar(self):
+        # Mismo criterio que el KPI del historial: la excusa médica no baja el porcentaje del mes.
+        registros = [self.registro('ASISTE', date(2026, 6, 1)), self.registro('EXCUSA_MEDICA', date(2026, 6, 2)),
+                     self.registro('FALTA_JUSTIFICADA', date(2026, 6, 3)), self.registro('FALTA', date(2026, 6, 4))]
+        self.assertEqual(detalle_asistencia(registros)['mensual'][0][1]['pct'], 75)
 
     def test_vacio(self):
         detalle = detalle_asistencia([])

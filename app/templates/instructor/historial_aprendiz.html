@@ -377,8 +377,7 @@
                     {% if asistencia_mensual %}
                     <div class="report-month-list">
                         {% for mes, data in asistencia_mensual %}
-                        {% set pct_mes = (((data.asistio + data.tardanzas) / data.total) * 100)|round|int if data.total else 0 %}
-                        <div class="report-month-row"><div><strong>{{ mes }}</strong><small>{{ data.total }} registros</small></div><div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ 'success' if pct_mes >= 80 else ('warning' if pct_mes >= 60 else 'danger') }}" style="width: {{ pct_mes }}%"></span></div><strong>{{ pct_mes }}%</strong></div>
+                        <div class="report-month-row"><div><strong>{{ mes }}</strong><small>{{ data.total }} registros</small></div><div class="report-meter"><span class="report-meter__fill report-meter__fill--{{ viz_estado(data.pct) }}" style="width: {{ data.pct }}%"></span></div><strong>{{ data.pct }}%</strong></div>
                         {% endfor %}
                     </div>
                     {% else %}<div class="report-empty">No hay registros de asistencia para este aprendiz.</div>{% endif %}

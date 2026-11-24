@@ -1,13 +1,11 @@
 {% if filas %}
 {# =============================================
    MACRO: chip de estadística con color semántico
-   pct >= 80 → verde (high), 50-79 → amarillo (mid), < 50 → rojo (low)
+   Umbrales únicos (viz_nivel): verde desde 80, amarillo desde 60 y rojo por debajo
    ============================================= #}
 {% macro stat_chip(icon, value, title, short_title) %}
 {% set pct = value | float %}
-{% if pct >= 80 %}{% set level = 'high' %}
-{% elif pct >= 50 %}{% set level = 'mid' %}
-{% else %}{% set level = 'low' %}{% endif %}
+{% set level = viz_nivel(pct) %}
 <span class="stat-chip stat-chip-{{ level }} ranking-mobile-stat"
       title="{{ title }}" aria-label="{{ title }}: {{ '%.0f'|format(pct) }} %">
     <span aria-hidden="true">{{ icon }}</span>
@@ -188,19 +186,19 @@
 
                 {# Stat chips con color semántico #}
                 <td data-label="Asistencia" class="td-count ranking-stat">
-                    <span class="stat-chip stat-chip-{% if pct_a >= 80 %}high{% elif pct_a >= 50 %}mid{% else %}low{% endif %}"
+                    <span class="stat-chip stat-chip-{{ viz_nivel(pct_a) }}"
                           title="Asistencias con puntualidad">
                         📅 {{ '%.0f'|format(pct_a) }}%
                     </span>
                 </td>
                 <td data-label="Evidencias" class="td-count ranking-stat">
-                    <span class="stat-chip stat-chip-{% if pct_e >= 80 %}high{% elif pct_e >= 50 %}mid{% else %}low{% endif %}"
+                    <span class="stat-chip stat-chip-{{ viz_nivel(pct_e) }}"
                           title="Cumplimiento y calidad de evidencias">
                         🗂️ {{ '%.0f'|format(pct_e) }}%
                     </span>
                 </td>
                 <td data-label="Juicios" class="td-count ranking-stat">
-                    <span class="stat-chip stat-chip-{% if pct_j >= 80 %}high{% elif pct_j >= 50 %}mid{% else %}low{% endif %}"
+                    <span class="stat-chip stat-chip-{{ viz_nivel(pct_j) }}"
                           title="Resultados de aprendizaje aprobados">
                         ✅ {{ '%.0f'|format(pct_j) }}%
                     </span>

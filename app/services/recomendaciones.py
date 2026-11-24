@@ -1019,3 +1019,26 @@ def obtener_logros_aprendiz(
         'porcentaje_global': round((total_desbloqueados / len(logros)) * 100) if logros else 0,
         'rango': rango,
     }
+
+
+def separar_recomendaciones(recomendaciones):
+    """Reparte las recomendaciones del aprendiz en advertencias y mejoras, sin repetir ninguna.
+
+    Lo crítico y lo preventivo es advertencia; el resto (sugerencias y logros
+    positivos) es mejora. Antes una recomendación crítica de rendimiento
+    académico entraba en las dos listas y el aprendiz la leía dos veces.
+    """
+    advertencias, mejoras = [], []
+    for recomendacion in recomendaciones or []:
+        destino = advertencias if recomendacion.severidad in ('critica', 'preventiva') else mejoras
+        destino.append(recomendacion)
+    return advertencias, mejoras
+
+
+def es_desempeno_excelente(nivel_alerta, vencidas, alertas, planes):
+    """El mensaje «¡Excelente desempeño!» exige que no quede nada pendiente.
+
+    Sin faltas en riesgo (semáforo verde), sin evidencias vencidas, sin alertas
+    activas y sin planes de mejoramiento abiertos.
+    """
+    return nivel_alerta == 'verde' and not vencidas and not alertas and not planes

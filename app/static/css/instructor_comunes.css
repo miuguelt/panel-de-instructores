@@ -583,8 +583,24 @@
     margin-block: 1rem;
 }
 
+.alertas-abiertas {
+    margin-block: 0.5rem 1rem;
+    color: var(--text-main);
+}
+
+.alertas-card-abiertas {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.alertas-configuracion .alertas-hero-title {
+    margin-block: 1.25rem 0.25rem;
+    font-size: 1rem;
+}
+
 .alertas-resumen-nota {
-    margin: 0;
+    margin: 0 0 1rem;
     font-size: 0.875rem;
     color: var(--text-muted);
 }
@@ -643,4 +659,21 @@
 
 .cronograma-plegado {
     margin-block-start: 1rem;
+}
+
+/* Estadísticas: tabla de competencias plegada y títulos por tipo. */
+.estadisticas-detalle > summary {
+    padding-inline: 1rem;
+}
+
+.estadisticas-tipo-titulo {
+    margin-block: 1.5rem 0.75rem;
+    padding-block-end: 0.5rem;
+    border-block-end: 1px solid var(--border-divider);
+    font-size: 1rem;
+    color: var(--text-strong);
+}
+
+.estadisticas-tipo-titulo:first-child {
+    margin-block-start: 0;
 }

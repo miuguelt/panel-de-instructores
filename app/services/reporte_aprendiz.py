@@ -32,6 +32,9 @@ def detalle_asistencia(registros):
             mes['total'] += 1
             if estado in CAMPO_MENSUAL:
                 mes[CAMPO_MENSUAL[estado]] += 1
+    # Mismo criterio que el resto de la app: solo la falta sin justificar resta.
+    for mes in mensual.values():
+        mes['pct'] = round((mes['total'] - mes['faltas']) / mes['total'] * 100)
     return {
         'estados': estados,
         'mensual': sorted(mensual.items(), reverse=True),

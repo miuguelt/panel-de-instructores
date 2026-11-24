@@ -23,7 +23,7 @@ from app.models.observador import NotaObservador
 from app.services.cronograma import obtener_cronograma
 from app.services.fases_dashboard import obtener_seguimiento_fases_dashboard
 from app.services.permisos import tareas_visibles
-from app.services.asistencia import contar_sesiones_registradas
+from app.services.asistencia import contar_sesiones_registradas, resumen_asistencia_aprendiz
 from app.services.trabajos_grupales import obtener_destinatarios_y_entregas_grupales
 from app.services.emparejamiento_juicios import es_aprobado as juicio_aprobado
 
@@ -95,11 +95,9 @@ def calcular_semaforo(ficha_id: int, aprendices: List[Aprendiz], config: Configu
         faltas_no_justificadas = conteo.get('FALTA', 0)
         total_faltas = sum(conteo.values())
         faltas_justificadas = total_faltas - faltas_no_justificadas
-        # Solo las faltas sin justificar restan (mismo criterio en toda la app).
-        pct_asistencia = (
-            (total_sesiones - faltas_no_justificadas) / total_sesiones * 100
-            if total_sesiones > 0 else 100.0
-        )
+        # Solo las faltas sin justificar restan (mismo criterio en toda la app);
+        # sin sesiones no hay porcentaje (None), nunca un 100 % no medido.
+        asistencia = resumen_asistencia_aprendiz(total_sesiones, faltas_no_justificadas)
 
         tareas_pendientes = 0
         for tarea in tareas_ficha:
@@ -127,7 +125,8 @@ def calcular_semaforo(ficha_id: int, aprendices: List[Aprendiz], config: Configu
         stats_map[aprendiz.id] = {
             'faltas_no_justificadas': faltas_no_justificadas,
             'faltas_justificadas': faltas_justificadas,
-            'pct_asistencia': round(pct_asistencia, 1),
+            'pct_asistencia': asistencia['pct'],
+            'sesiones_cumplidas': asistencia['sesiones_cumplidas'],
             'tareas_pendientes': tareas_pendientes,
             'nivel': nivel,
         }

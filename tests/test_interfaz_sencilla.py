@@ -67,10 +67,9 @@ class BotonesMayusculaInicialTest(unittest.TestCase):
     def test_los_botones_senalados_quedan_en_mayuscula_inicial(self):
         self.assertIn('Nueva tarea', leer('instructor/tareas.html'))
         self.assertIn('Cargar juicios', leer('instructor/juicios.html'))
-        self.assertIn('Tomar asistencia hoy', leer('instructor/alertas.html'))
         for viejo, archivo in (('Nueva Tarea', 'instructor/tareas.html'),
                                ('Cargar Juicios', 'instructor/juicios.html'),
-                               ('Tomar Asistencia Hoy', 'instructor/alertas.html')):
+                               ('Casos De Seguimiento', 'instructor/alertas.html')):
             self.assertNotIn(viejo, leer(archivo))
 
 
@@ -78,7 +77,8 @@ class SiglasExplicadasTest(unittest.TestCase):
     def test_siglas_con_abbr(self):
         alertas = leer('instructor/alertas.html')
         self.assertRegex(alertas, r'<abbr title="[^"]+">CC/TI</abbr>')
-        self.assertRegex(alertas, r'<abbr title="[^"]*Saber TyT[^"]*">TyT</abbr>')
+        self.assertRegex(leer('tyt/_tarjeta.html'),
+                         r'<abbr title="[^"]*Saber TyT[^"]*">TyT</abbr>')
         self.assertRegex(leer('instructor/juicios.html'), r'<abbr title="Resultados de aprendizaje">RAP</abbr>')
 
     def test_corte_de_trabajo_tiene_un_texto_visible_claro(self):
@@ -91,18 +91,32 @@ class SiglasExplicadasTest(unittest.TestCase):
 
 class VocabularioDeRiesgoTest(unittest.TestCase):
     def test_alertas_y_vision_general_usan_las_mismas_tres_etiquetas(self):
+        # Visión general muestra el semáforo agregado; Alertas, los filtros de la lista.
         segmentos = re.compile(r"apilada\(\[\('([^']+)'[^)]*\), \('([^']+)'[^)]*\), \('([^']+)'")
-        alertas = segmentos.search(leer('instructor/alertas.html'))
         vision = segmentos.search(leer('instructor/vision_general.html'))
+        filtros = re.compile(r"\('rojo', '([^']+)', 'danger'\), \('amarillo', '([^']+)', 'warning'\), \('verde', '([^']+)'")
+        alertas = filtros.search(leer('instructor/alertas.html'))
         self.assertIsNotNone(alertas)
         self.assertEqual(alertas.groups(), ('Riesgo alto', 'En seguimiento', 'Al día'))
         self.assertEqual(alertas.groups(), vision.groups())
+        self.assertNotIn('apilada(', leer('instructor/alertas.html'))
 
     def test_las_insignias_de_alertas_no_usan_el_vocabulario_anterior(self):
         html = leer('instructor/alertas.html')
         self.assertIn("{% if d.nivel == 'rojo' %}Riesgo alto{% elif d.nivel == 'amarillo' %}En seguimiento{% else %}Al día{% endif %}", html)
         for viejo in ("'En alerta'", "'En riesgo'", '</span> Riesgo</span>', '</span> Alerta</span>'):
             self.assertNotIn(viejo, html)
+
+
+class EntregasSinRepetirTest(unittest.TestCase):
+    def test_entregas_muestra_por_calificar_y_cada_cifra_una_vez(self):
+        html = leer('instructor/entregas.html')
+        # «Por calificar» es la acción de esta pantalla: antes se calculaba y no se mostraba.
+        self.assertRegex(html, r"kpi\('Por calificar', stats\.sin_calificar")
+        # «Participación» y «Puntualidad» repetían las tarjetas de entregas y a tiempo.
+        self.assertNotIn('Resumen de Progreso', html)
+        self.assertNotIn('Participación (Aprendices con evidencia subida)', html)
+        self.assertEqual(html.count('stats.a_tiempo }}'), 0)
 
 
 if __name__ == '__main__':

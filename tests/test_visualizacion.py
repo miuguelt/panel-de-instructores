@@ -31,6 +31,22 @@ class EstadoPorUmbralTest(unittest.TestCase):
         self.assertEqual(viz.estado_por_umbral(25, verde=10, amarillo=20, invertido=True), 'danger')
 
 
+class NivelYColorTest(unittest.TestCase):
+    """Traducciones de viz_estado para las clases y colores que ya existen en el CSS."""
+
+    def test_nivel_alto_medio_bajo_con_los_umbrales_unicos(self):
+        self.assertEqual(viz.nivel_por_umbral(80), 'high')
+        self.assertEqual(viz.nivel_por_umbral(60), 'mid')
+        self.assertEqual(viz.nivel_por_umbral(59), 'low')
+        self.assertEqual(viz.nivel_por_umbral(None), 'low')
+
+    def test_color_por_estado(self):
+        self.assertEqual(viz.color_por_umbral(95), 'var(--success)')
+        self.assertEqual(viz.color_por_umbral(65), 'var(--warning)')
+        self.assertEqual(viz.color_por_umbral(10), 'var(--danger)')
+        self.assertEqual(viz.color_por_umbral(None), 'var(--text-muted)')
+
+
 class PorcentajeTest(unittest.TestCase):
     def test_acota_entre_cero_y_cien(self):
         self.assertEqual(viz.acotar_pct(-5), 0)

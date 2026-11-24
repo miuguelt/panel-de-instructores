@@ -69,11 +69,11 @@
         </div>
         <div class="juicios-resumen-grid">
             {{ dona(pct_global_juicios if estadisticas.total else none, 'Juicios aprobados',
-                    estado=viz_estado(pct_global_juicios, verde=80, amarillo=50),
+                    estado=viz_estado(pct_global_juicios),
                     detalle=(estadisticas.aprobados ~ ' de ' ~ estadisticas.total ~ ' juicios')) }}
             <div class="juicios-resumen-bars">
                 {{ barra(pct_competencias_curso if total_competencias_curso else none, 'Competencias completas al 100%',
-                         estado=viz_estado(pct_competencias_curso, verde=80, amarillo=50),
+                         estado=viz_estado(pct_competencias_curso),
                          comparar=pct_tiempo, comparar_label='Tiempo lectivo transcurrido',
                          detalle=(competencias_aprobadas_curso ~ ' de ' ~ total_competencias_curso ~ ' competencias')) }}
                 {{ apilada([('Técnicas', estadisticas.tecnica, 'info'), ('Transversales', estadisticas.transversal, 'success'),
@@ -201,7 +201,7 @@
     {% set comp_tipo = comp.tipo or 'tecnica' %}
     {% set tipo_label = 'Inglés' if comp_tipo == 'ingles' else ('Transversal' if comp_tipo == 'transversal' else 'Técnica') %}
     {% set badge_cls = 'badge-ingles' if comp_tipo == 'ingles' else ('badge-transversal' if comp_tipo == 'transversal' else 'badge-tech') %}
-    {% set bar_color = '#059669' if comp.pct == 100 else ('#d97706' if comp.pct >= 50 else '#dc2626') %}
+    {% set bar_color = viz_color(comp.pct) %}
     {% set is_sel = comp.esta_seleccionada %}
     {% set sel_info = comp.seleccionada_por %}
     {% set is_own = sel_info and sel_info.es_propia %}
@@ -322,9 +322,9 @@
                             <td>
                                 <div style="display:flex; align-items:center; gap:.5rem;">
                                     <div style="flex:1; height:6px; background:var(--border-divider); border-radius:3px; overflow:hidden;">
-                                        <div style="width:{{ stat.pct_total }}%; height:100%; background:{% if stat.pct_total >= 80 %}var(--success){% elif stat.pct_total >= 50 %}var(--sena-yellow){% else %}var(--sena-red){% endif %};"></div>
+                                        <div style="width:{{ stat.pct_total }}%; height:100%; background:{{ viz_color(stat.pct_total) }};"></div>
                                     </div>
-                                    <span class="badge {{ 'badge-solid-success' if stat.pct_total >= 80 else 'badge-solid-warning' }}" style="font-size:.75rem;">{{ stat.pct_total }}%</span>
+                                    <span class="badge badge-solid-{{ viz_estado(stat.pct_total) }}" style="font-size:.75rem;">{{ stat.pct_total }}%</span>
                                 </div>
                                 <small class="text-muted">{{ stat.aprobados }}/{{ stat.total }} aprobados</small>
                             </td>
@@ -547,7 +547,8 @@
     }
 
     function pctColor(pct) {
-        return pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+        // Umbrales únicos de app/services/visualizacion.py (verde desde 80, amarillo desde 60).
+        return pct >= 80 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--danger)';
     }
 
     // ─── Modal DOM refs ─────────────────────────────────────

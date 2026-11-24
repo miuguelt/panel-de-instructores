@@ -96,6 +96,61 @@ class CriterioAsistenciaTest(unittest.TestCase):
         # Por sesión: solo la sesión de la falta sin justificar baja a 0 %.
         self.assertEqual([p['pct'] for p in serie_asistencia(self.ficha.id)], [100.0, 0.0, 100.0, 100.0])
 
+    def test_alertas_cuenta_sesiones_cumplidas_con_el_mismo_criterio(self):
+        # 4 sesiones, 1 sola falta sin justificar: 3 de 4 sesiones cumplidas (75 %).
+        html = self.cliente.get(f'/instructor/fichas/{self.ficha.id}/alertas').get_data(as_text=True)
+        self.assertIn('3 de 4 sesiones', html)
+        self.assertNotIn('1 / 4 asistencias', html)
+
+
+class SinSesionesTest(CriterioAsistenciaTest.__bases__[0]):
+    """Sin sesiones registradas no hay porcentaje: se muestra «Sin datos», nunca 100 %."""
+
+    def setUp(self):
+        self.app = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+                               'SQLALCHEMY_ENGINE_OPTIONS': {}, 'WTF_CSRF_ENABLED': False,
+                               'RATELIMIT_ENABLED': False, 'SECRET_KEY': secrets.token_hex(16)})
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        db.create_all()
+        self.instructor = Instructor(nombre='Instructor', correo='sin-sesiones@example.com')
+        self.instructor.set_password(secrets.token_urlsafe(16))
+        db.session.add(self.instructor)
+        db.session.flush()
+        self.ficha = Ficha(codigo='7070', nombre_programa='ADSO', instructor_id=self.instructor.id)
+        db.session.add(self.ficha)
+        db.session.flush()
+        self.aprendiz = Aprendiz(documento='999', nombre='Luis', apellidos='Mora', ficha_id=self.ficha.id)
+        db.session.add(self.aprendiz)
+        db.session.commit()
+        self.cliente = self.app.test_client()
+        with self.cliente.session_transaction() as sesion:
+            sesion['_user_id'] = str(self.instructor.id)
+            sesion['_fresh'] = True
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        self.ctx.pop()
+
+    def test_semaforo_sin_porcentaje(self):
+        stats, total = calcular_semaforo(self.ficha.id, [self.aprendiz], ConfiguracionAlertas(ficha_id=self.ficha.id))
+        self.assertEqual(total, 0)
+        self.assertIsNone(stats[self.aprendiz.id]['pct_asistencia'])
+
+    def test_pantallas_muestran_sin_datos(self):
+        urls = (f'/instructor/fichas/{self.ficha.id}/alertas',
+                f'/instructor/fichas/{self.ficha.id}/asistencia',
+                f'/instructor/fichas/{self.ficha.id}/asistencia/aprendiz/{self.aprendiz.id}/modal')
+        for url in urls:
+            with self.subTest(url=url):
+                respuesta = self.cliente.get(url)
+                self.assertEqual(respuesta.status_code, 200)
+                html = respuesta.get_data(as_text=True)
+                self.assertIn('Sin datos', html)
+                self.assertNotIn('100.0%', html)
+                self.assertNotIn('(100%)', html)
+
 
 if __name__ == '__main__':
     unittest.main()

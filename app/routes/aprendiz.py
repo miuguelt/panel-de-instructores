@@ -58,7 +58,7 @@ from app.services.permisos import (
     puede_gestionar_ficha,
     puede_gestionar_tarea,
 )
-from app.services.evidencias_aprendiz import saludo_por_hora, tareas_del_aprendiz
+from app.services.evidencias_aprendiz import contar_evidencias_pendientes, saludo_por_hora, tareas_del_aprendiz
 from app.services.juicios_aprendiz import analizar_juicios, deduplicar_juicios
 from datetime import date, datetime, timedelta
 
@@ -299,8 +299,10 @@ def panel(ficha_id):
     cronograma = obtener_cronograma(ficha)
     from app.services.curva_rendimiento import obtener_curva_rendimiento_aprendiz
     from app.services.recomendaciones import (
+        es_desempeno_excelente,
         obtener_recomendaciones_aprendiz,
         obtener_logros_aprendiz,
+        separar_recomendaciones,
     )
     curva_rendimiento = obtener_curva_rendimiento_aprendiz(
         ficha_id=ficha_id,
@@ -312,14 +314,7 @@ def panel(ficha_id):
         aprendiz.id,
         curva_rendimiento=curva_rendimiento,
     )
-    advertencias_rendimiento = [
-        r for r in recomendaciones_aprendiz
-        if r.severidad in ('critica', 'preventiva')
-    ]
-    recomendaciones_mejora = [
-        r for r in recomendaciones_aprendiz
-        if r.severidad in ('sugerencia', 'positiva') or r.categoria == 'rendimiento_academico'
-    ]
+    advertencias_rendimiento, recomendaciones_mejora = separar_recomendaciones(recomendaciones_aprendiz)
     resumen_logros = obtener_logros_aprendiz(ficha_id, aprendiz.id)
 
     # Métricas y contexto personalizado para el aprendiz (hora de Colombia UTC-5)
@@ -346,13 +341,21 @@ def panel(ficha_id):
     if aseo and aseo.get('turno_propio') and aseo['turno_propio'].fecha:
         dias_proximo_aseo = (aseo['turno_propio'].fecha - date.today()).days
 
+    evidencias_pendientes = contar_evidencias_pendientes(tareas_estado, trabajos_grupo)
+    desempeno_excelente = es_desempeno_excelente(
+        nivel_alerta,
+        vencidas=sum(1 for t in tareas_estado if t['estado'] == 'vencida'),
+        alertas=len(alertas_activas),
+        planes=sum(1 for p in planes_mejoramiento if p.estado in ('pendiente', 'vencido')),
+    )
     resumen_rapido = {
         'saludo': saludo_tiempo,
-        'tareas_pendientes_count': len(tareas_pendientes),
+        'tareas_pendientes_count': evidencias_pendientes['total'],
         'tareas_entregadas_count': len(tareas_entregadas),
         'proxima_tarea': proxima_tarea_urgente,
         'dias_proximo_aseo': dias_proximo_aseo,
-        'estado_academico': 'Excelente' if (pct_asistencia or 0) >= 85 and nivel_alerta == 'verde' else ('En Riesgo' if nivel_alerta == 'amarillo' else ('Crítico' if nivel_alerta == 'rojo' else 'Al Día')),
+        # Mismo vocabulario del semáforo del instructor: Riesgo alto / En seguimiento / Al día.
+        'estado_academico': 'Excelente' if desempeno_excelente else ('En seguimiento' if nivel_alerta == 'amarillo' else ('Riesgo alto' if nivel_alerta == 'rojo' else 'Al día')),
         'estado_badge_class': 'badge-success' if nivel_alerta == 'verde' else ('badge-warning' if nivel_alerta == 'amarillo' else 'badge-danger'),
     }
 
@@ -435,7 +438,9 @@ def panel(ficha_id):
                            trabajos_grupo=trabajos_grupo,
                            curva_rendimiento=curva_rendimiento,
                            advertencias_rendimiento=advertencias_rendimiento,
-                           recomendaciones_mejora=recomendaciones_mejora)
+                           recomendaciones_mejora=recomendaciones_mejora,
+                           evidencias_pendientes=evidencias_pendientes,
+                           desempeno_excelente=desempeno_excelente)
 
 
 def _aprendiz_admin_autorizado(ficha_id):

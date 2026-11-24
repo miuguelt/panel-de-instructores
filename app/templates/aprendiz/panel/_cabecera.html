@@ -72,7 +72,7 @@
         </div>
 
         <!-- Indicadores clave: un solo lugar para asistencia, RAPs y evidencias -->
-        {% set evidencias_pendientes = resumen_rapido.tareas_pendientes_count if resumen_rapido else 0 %}
+        {% set por_entregar = evidencias_pendientes or {'individuales': 0, 'grupales': 0, 'total': 0} %}
         <div class="learner-quick-ribbon learner-indicadores" aria-label="Resumen de indicadores clave">
             {{ dona(pct_asistencia, 'Asistencia',
                     detalle=((sesiones_cumplidas ~ ' de ' ~ total_sesiones ~ ' sesiones') if total_sesiones else 'Aún no hay sesiones')) }}
@@ -80,9 +80,9 @@
                     estado=viz_estado(stats_juicios.pct_total, verde=70, amarillo=50),
                     detalle=((stats_juicios.aprobados ~ ' de ' ~ stats_juicios.total ~ ' RAPs') if stats_juicios.total else 'Aún sin juicios')) }}
             <div class="learner-indicadores-acciones">
-                {{ kpi('Evidencias por entregar', evidencias_pendientes,
-                       estado=('warning' if evidencias_pendientes else 'success'),
-                       detalle=('pendientes o con ajustes' if evidencias_pendientes else 'estás al día'), icono='file-check') }}
+                {{ kpi('Evidencias por entregar', por_entregar.total,
+                       estado=('warning' if por_entregar.total else 'success'),
+                       detalle=(((por_entregar.individuales ~ ' tuyas · ' ~ por_entregar.grupales ~ ' del grupo') if por_entregar.grupales else 'pendientes o con ajustes') if por_entregar.total else 'estás al día'), icono='file-check') }}
                 <div class="learner-indicadores-links">
                     <button type="button" class="btn btn-sm btn-outline" data-jump-tab="evidencias">Ver mis evidencias</button>
                     <button type="button" class="btn btn-sm btn-ghost" data-jump-tab="rendimiento" data-jump-target-id="seccion-curva-rendimiento">Ver mi rendimiento</button>

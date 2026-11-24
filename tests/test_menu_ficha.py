@@ -1,6 +1,7 @@
 """Menú de módulos de la ficha: principales visibles y el resto en «Más módulos»."""
 
 import re
+from pathlib import Path
 import tempfile
 import unittest
 from datetime import date, timedelta
@@ -158,6 +159,7 @@ class MenuFichaTestCase(unittest.TestCase):
             f'/instructor/fichas/{fid}/juicios': 'Juicios',
             f'/instructor/fichas/{fid}/planeacion': 'Planeación',
             f'/instructor/fichas/{fid}/alertas': 'Alertas',
+            f'/instructor/fichas/{fid}/estadisticas': 'Estadísticas',
         }
         for ruta, etiqueta in paginas.items():
             with self.subTest(ruta=ruta):
@@ -209,11 +211,14 @@ class MenuFichaTestCase(unittest.TestCase):
         contenido = html[html.index('<h1'):]
         self.assertNotIn(f'href="{notificaciones}"', contenido, 'Notificaciones ya está en la barra superior')
         self.assertNotIn('🔔', html)
+        # Sin aprendices no hay filtros; el vocabulario se comprueba en la plantilla.
+        plantilla = (Path(self.app.root_path) / 'templates' / 'instructor' / 'alertas.html').read_text(encoding='utf-8')
         for texto in ('Riesgo alto', 'En seguimiento', 'Al día'):
-            self.assertIn(texto, contenido)
+            self.assertIn(texto, plantilla)
         for viejo in ("'En alerta'", '> Riesgo<', '> Alerta<', 'Tomar Asistencia Hoy'):
             self.assertNotIn(viejo, contenido)
-        self.assertIn('Tomar asistencia hoy', contenido)
+        # Asistencia ya está en la barra de la ficha: Alertas no repite el acceso.
+        self.assertNotIn('Tomar asistencia hoy', contenido)
 
     def test_aseo_sin_sesiones_muestra_el_estado_vacio_comun(self):
         html = self._pagina(f'/instructor/fichas/{self.ficha.id}/turnos-aseo')

@@ -8,7 +8,6 @@ from app.models.aprendiz import Aprendiz
 from app.models.ficha import Ficha
 from app.models.juicio import JuicioEvaluativo
 from app.services.analisis_juicios_ficha import analizar_juicios_ficha
-from app.services.cronograma import obtener_cronograma
 from app.services.permisos import puede_gestionar_ficha
 
 from . import instructor_bp
@@ -24,5 +23,5 @@ def estadisticas(ficha_id):
 
     aprendices = Aprendiz.query.filter_by(ficha_id=ficha_id).all()
     juicios = JuicioEvaluativo.query.filter_by(ficha_id=ficha_id).all()
-    return render_template('estadisticas.html', ficha=ficha, cronograma=obtener_cronograma(ficha),
+    return render_template('estadisticas.html', ficha=ficha,
                            **analizar_juicios_ficha(juicios, aprendices))

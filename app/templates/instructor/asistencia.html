@@ -83,7 +83,7 @@
         <div class="asistencia-list">
             {% for ap in aprendices %}
             {% set registro = registros_map.get(ap.id) %}
-            {% set stats = stats_map.get(ap.id) if stats_map.get(ap.id) else {'faltas_no_justificadas': 0, 'faltas_justificadas': 0, 'pct_asistencia': 100, 'tareas_pendientes': 0, 'nivel': 'verde'} %}
+            {% set stats = stats_map.get(ap.id) if stats_map.get(ap.id) else {'faltas_no_justificadas': 0, 'faltas_justificadas': 0, 'pct_asistencia': none, 'tareas_pendientes': 0, 'nivel': 'verde'} %}
             {% set base_faltas_nj = stats.faltas_no_justificadas %}
             {% set base_faltas_j = stats.faltas_justificadas %}
             {% if registro %}
@@ -115,9 +115,9 @@
                 <div class="col-stats">
                     <div class="stats-inline">
                         <div class="bar-wrap">
-                            <div class="stat-progress-bar" style="width: {{ stats.pct_asistencia }}%;"></div>
+                            <div class="stat-progress-bar" style="width: {{ stats.pct_asistencia or 0 }}%;"></div>
                         </div>
-                        <strong class="stat-pct">{{ stats.pct_asistencia }}%</strong>
+                        <strong class="stat-pct">{% if stats.pct_asistencia is none %}Sin datos{% else %}{{ stats.pct_asistencia }}%{% endif %}</strong>
                         <span class="stat-badge-nj mini-badge {% if stats.faltas_no_justificadas > 0 %}badge-nj-active{% endif %}" title="Faltas sin justificar">{{ stats.faltas_no_justificadas }} {{ 'falta' if stats.faltas_no_justificadas == 1 else 'faltas' }}</span>
                         <span class="stat-badge-j mini-badge badge-j-active" style="display:{% if stats.faltas_justificadas > 0 %}inline-flex{% else %}none{% endif %};" title="Faltas justificadas">{{ stats.faltas_justificadas }} {{ 'justificada' if stats.faltas_justificadas == 1 else 'justificadas' }}</span>
                         <span class="stat-badge-tareas mini-badge badge-t-active" style="display:{% if stats.tareas_pendientes > 0 %}inline-flex{% else %}none{% endif %};" title="Tareas pendientes">{{ stats.tareas_pendientes }} {{ 'tarea' if stats.tareas_pendientes == 1 else 'tareas' }}</span>

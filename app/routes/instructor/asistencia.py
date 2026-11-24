@@ -30,6 +30,7 @@ from app.services.asistencia import (
     guardar_asistencia,
     mapa_asistencia_por_fecha,
     mes_inicial_calendario,
+    resumen_asistencia_aprendiz,
     serie_asistencia,
 )
 from app.services.cortes import corte_actual, cortes_visibles
@@ -315,7 +316,7 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
 
     total_sesiones = contar_sesiones_registradas(ficha_id, corte_id=corte_id)
     total_faltas = total_faltas_nj + total_faltas_j
-    pct_asistencia = ((total_sesiones - total_faltas_nj) / total_sesiones * 100) if total_sesiones > 0 else 100.0
+    pct_asistencia = resumen_asistencia_aprendiz(total_sesiones, total_faltas_nj)['pct']
 
     # El mes visible se arma en el servidor: la primera pintura ya sale con los
     # colores de este aprendiz, sin esperar a JavaScript.
@@ -334,7 +335,7 @@ def asistencia_aprendiz_modal(ficha_id, aprendiz_id):
                            total_faltas_j=total_faltas_j,
                            total_faltas=total_faltas,
                            total_sesiones=total_sesiones,
-                           pct_asistencia=round(pct_asistencia, 1),
+                           pct_asistencia=pct_asistencia,
                            racha_actual=racha_actual,
                            dia_mas_inasistencias=dia_mas_inasistencias,
                            max_faltas_dia=max_faltas_dia,

@@ -338,3 +338,8 @@
 }
 :where(dd, blockquote) { margin-inline: 0; }
 /* devbrain-prose-contract:end */
+
+/* Resumen de entregas: indicadores con la biblioteca de visualización. */
+.entregas-resumen {
+    margin-block: 1rem 1.5rem;
+}

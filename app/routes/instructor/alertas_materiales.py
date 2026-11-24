@@ -18,6 +18,7 @@ from app.models.ficha import Ficha
 from app.models.material import MaterialFicha
 from app.services.alertas import actualizar_alertas_ficha
 from app.services.archivos import ArchivoService, ErrorArchivo, TiposCarpeta
+from app.navegacion import contar_alertas_activas
 from app.services.cronograma import obtener_cronograma
 from app.services.permisos import puede_gestionar_ficha
 from app.services.prioridad_fichas import ordenar_por_riesgo
@@ -56,12 +57,29 @@ def alertas(ficha_id):
             'pct_asistencia': stats['pct_asistencia'],
             'tareas_pendientes': stats['tareas_pendientes'],
             'total_faltas': stats['faltas_no_justificadas'] + stats['faltas_justificadas'],
+            'sesiones_cumplidas': stats['sesiones_cumplidas'],
             'no_justificadas': stats['faltas_no_justificadas'],
             'justificadas': stats['faltas_justificadas'],
             'nivel': stats['nivel'],
         })
 
     datos_alertas = ordenar_por_riesgo(datos_alertas)
+
+    # Alertas abiertas por aprendiz: la misma consulta que el distintivo de la barra.
+    abiertas_por_aprendiz = dict(
+        db.session.query(Alerta.aprendiz_id, db.func.count(Alerta.id))
+        .filter(Alerta.ficha_id == ficha_id, Alerta.estado == 'activa', Alerta.aprendiz_id.isnot(None))
+        .group_by(Alerta.aprendiz_id).all()
+    )
+    for dato in datos_alertas:
+        dato['alertas_abiertas'] = abiertas_por_aprendiz.get(dato['aprendiz'].id, 0)
+    conteo_niveles = {nivel: sum(1 for d in datos_alertas if d['nivel'] == nivel)
+                      for nivel in ('rojo', 'amarillo', 'verde')}
+    nivel_filtro = request.args.get('nivel')
+    if nivel_filtro in conteo_niveles:
+        datos_alertas = [d for d in datos_alertas if d['nivel'] == nivel_filtro]
+    else:
+        nivel_filtro = 'todos'
 
     from app.services.alertas import obtener_config_comite
     alertas_cronograma = Alerta.query.filter_by(
@@ -71,7 +89,9 @@ def alertas(ficha_id):
                            config_comite=obtener_config_comite(ficha_id),
                            datos_alertas=datos_alertas,
                            alertas_cronograma=alertas_cronograma,
-                           cronograma=obtener_cronograma(ficha))
+                           alertas_abiertas=contar_alertas_activas(ficha_id),
+                           conteo_niveles=conteo_niveles,
+                           nivel_filtro=nivel_filtro)
 
 
 @instructor_bp.route('/fichas/<int:ficha_id>/alertas/config', methods=['POST'])

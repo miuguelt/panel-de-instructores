@@ -103,12 +103,12 @@
                     </thead>
                     <tbody>
                         {% for func, stats in instructores_aprendiz.items() %}
-                        <tr class="{% if stats.pct >= 80 %}row-success{% elif stats.pct >= 50 %}row-warning{% endif %}">
+                        <tr class="row-{{ viz_estado(stats.pct) }}">
                             <td data-label="Instructor"><strong>{{ func|strip_document_id }}</strong></td>
                             <td data-label="Aprobados" class="text-center cell-success">{{ stats.aprobados }}</td>
                             <td data-label="Pendientes" class="text-center cell-danger">{{ stats.pendientes }}</td>
                             <td data-label="Efectividad" class="text-center">
-                                <span class="badge {% if stats.pct >= 80 %}badge-solid-success{% elif stats.pct >= 50 %}badge-solid-warning{% else %}badge-solid-danger{% endif %}">{{ stats.pct }}%</span>
+                                <span class="badge badge-solid-{{ viz_estado(stats.pct) }}">{{ stats.pct }}%</span>
                             </td>
                         </tr>
                         {% endfor %}

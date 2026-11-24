@@ -27,7 +27,7 @@ test('F07: adaptación y contención de cabecera en .nav-shell para viewports m�
 
 test('F06: encapsulación accesible en .table-responsive de tablas del panel de instructores', () => {
     // 1. Alertas: la tabla de reglas de resolución está envuelta en table-responsive accesible
-    assert.match(alertasHtml, /<div\s+class="table-responsive"\s+tabindex="0"\s+role="region"\s+aria-label="Tabla de reglas automáticas de resolución">[\s\S]*?<table/);
+    assert.match(alertasHtml, /<div\s+class="table-responsive"\s+tabindex="0"\s+role="region"\s+aria-label="Reglas automáticas del Acuerdo 009 de 2024">[\s\S]*?<table/);
 
     // 2. Observador: la tabla de resumen por aprendiz cuenta con contenedor accesible
     assert.match(observadorHtml, /<div\s+class="table-responsive"\s+tabindex="0"\s+role="region"\s+aria-label="Tabla de resumen por aprendiz">[\s\S]*?<table\s+class="resumen-tabla">/);

@@ -71,8 +71,9 @@ const TOKENS_DINAMICOS = new Set([
 // Presupuesto máximo de atributos style= en plantillas. Es un ratchet: solo
 // puede bajar. Tras la migración de los frentes de plantillas (instructor y
 // aprendiz/grupos) el total real quedó en 695, así que se fija en 720 para dar
-// un margen pequeño sin permitir que vuelva a crecer.
-const MAX_ATRIBUTOS_STYLE = 720;
+// un margen pequeño sin permitir que vuelva a crecer. La auditoría de
+// usabilidad de noviembre de 2026 lo bajó a 660 (total real: 648).
+const MAX_ATRIBUTOS_STYLE = 660;
 
 const PREFIJOS_VARIANTE_BTN = /^btn-(primary|secondary|outline|ghost|link|danger|success|warning|info|icon|sm|xs|lg|full|group)/;
 

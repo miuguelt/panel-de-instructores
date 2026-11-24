@@ -53,6 +53,21 @@ def estado_por_umbral(pct, verde=UMBRAL_VERDE, amarillo=UMBRAL_AMARILLO, inverti
     return 'warning' if valor >= amarillo else 'danger'
 
 
+NIVEL_POR_ESTADO = {'success': 'high', 'warning': 'mid', 'danger': 'low', 'neutral': 'low'}
+COLOR_POR_ESTADO = {'success': 'var(--success)', 'warning': 'var(--warning)',
+                    'danger': 'var(--danger)', 'neutral': 'var(--text-muted)'}
+
+
+def nivel_por_umbral(pct):
+    """Clase high/mid/low de los chips y medidores, con los mismos umbrales que viz_estado."""
+    return NIVEL_POR_ESTADO[estado_por_umbral(pct)]
+
+
+def color_por_umbral(pct):
+    """Color CSS del estado de un porcentaje, con los mismos umbrales que viz_estado."""
+    return COLOR_POR_ESTADO[estado_por_umbral(pct)]
+
+
 def acotar_pct(pct):
     """Porcentaje entre 0 y 100 con un decimal (entero si no tiene fracción).
 
@@ -213,6 +228,8 @@ def registrar(app):
     app.jinja_env.globals.update({
         'viz_pendientes': pendientes_de_hoy,
         'viz_estado': estado_por_umbral,
+        'viz_nivel': nivel_por_umbral,
+        'viz_color': color_por_umbral,
         'viz_pct': acotar_pct,
         'viz_porcentaje': porcentaje,
         'viz_segmentos': segmentos,

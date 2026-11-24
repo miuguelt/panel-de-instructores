@@ -8,7 +8,8 @@
 {% from 'components/_viz.html' import kpi, barra, dona, apilada %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <h1>Estadísticas de la ficha {{ ficha.codigo }}</h1>
+        <span class="eyebrow">Ficha {{ ficha.codigo }}</span>
+        <h1>Estadísticas</h1>
     </div>
 </div>
 
@@ -19,8 +20,8 @@
 <section class="viz-panel estadisticas-resumen" aria-labelledby="estadisticas-resumen-title">
     <h2 class="viz-panel-title" id="estadisticas-resumen-title"><i data-lucide="bar-chart-3" class="icon-md" aria-hidden="true"></i> Resumen de la ficha</h2>
     <div class="estadisticas-resumen-grid">
-        {{ dona(pct_global if (resumen and resumen.total_resultados) else none, 'Juicios aprobados',
-                estado=viz_estado(pct_global, verde=80, amarillo=50),
+        {{ dona(pct_global if (resumen and resumen.total_resultados) else none, 'RAPs aprobados',
+                estado=viz_estado(pct_global),
                 detalle=((resumen.total_aprendices_con_juicios ~ ' aprendices evaluados') if resumen else none)) }}
         <div class="estadisticas-resumen-bars">
             {% if resumen %}
@@ -46,26 +47,16 @@
                 ('51 a 75%', distribucion_aprobacion['51-75'], 'warning'), ('26 a 50%', distribucion_aprobacion['26-50'], 'danger'),
                 ('0 a 25%', distribucion_aprobacion['0-25'], 'danger')], 'Aprendices por porcentaje de aprobación') }}
     {% endif %}
-    {{ apilada(viz_estados_aprendiz(estados), 'Estado de los aprendices (' ~ total_aprendices ~ ')') }}
 </section>
 
-{% if mejores_competencias or peores_competencias %}
-<div class="viz-grid viz-grid--wide estadisticas-competencias">
-    <section class="viz-panel" aria-labelledby="peores-competencias-title">
-        <h2 class="viz-panel-title" id="peores-competencias-title"><i data-lucide="trending-down" class="icon-md" aria-hidden="true"></i> Competencias con menor aprobación</h2>
-        {% for comp in peores_competencias %}
-        {{ barra(comp.pct, comp.nombre, meta=VIZ_META_TYT, estado=viz_estado(comp.pct, verde=70, amarillo=50),
-                 detalle=(comp.aprobados ~ ' de ' ~ comp.total ~ ' juicios aprobados')) }}
-        {% endfor %}
-    </section>
-    <section class="viz-panel" aria-labelledby="mejores-competencias-title">
-        <h2 class="viz-panel-title" id="mejores-competencias-title"><i data-lucide="trending-up" class="icon-md" aria-hidden="true"></i> Competencias con mayor aprobación</h2>
-        {% for comp in mejores_competencias %}
-        {{ barra(comp.pct, comp.nombre, meta=VIZ_META_TYT, estado=viz_estado(comp.pct, verde=70, amarillo=50),
-                 detalle=(comp.aprobados ~ ' de ' ~ comp.total ~ ' juicios aprobados')) }}
-        {% endfor %}
-    </section>
-</div>
+{% if peores_competencias %}
+<section class="viz-panel estadisticas-competencias" aria-labelledby="peores-competencias-title">
+    <h2 class="viz-panel-title" id="peores-competencias-title"><i data-lucide="trending-down" class="icon-md" aria-hidden="true"></i> Competencias con menor aprobación</h2>
+    {% for comp in peores_competencias %}
+    {{ barra(comp.pct, comp.nombre, meta=VIZ_META_TYT, estado=viz_estado(comp.pct, verde=70, amarillo=50),
+             detalle=(comp.aprobados ~ ' de ' ~ comp.total ~ ' juicios aprobados')) }}
+    {% endfor %}
+</section>
 {% endif %}
 
 <div class="dashboard-cards metricas-grid">
@@ -109,13 +100,10 @@
     </article>
     {% endif %}
 
-    <!-- Tabla de Competencias -->
+    <!-- Tabla de competencias: detalle bajo demanda -->
     {% if competencias_stats %}
-    <article class="card span-full">
-        <header class="card-header">
-            <h2>Rendimiento por Competencia</h2>
-            <p>Tasa de aprobación detallada por cada competencia de la ficha</p>
-        </header>
+    <details class="card span-full estadisticas-detalle">
+        <summary class="alertas-reglas-summary">Ver todas las competencias ({{ competencias_stats|length }})</summary>
         <div class="card-body">
             {% set tipos_orden = ['tecnica', 'transversal', 'ingles'] %}
             {% set tipos_nombres = {'tecnica': 'Técnica', 'transversal': 'Transversal', 'ingles': 'Inglés'} %}
@@ -123,7 +111,7 @@
             {% for tipo_actual in tipos_orden %}
                 {% set comps_tipo = competencias_stats | selectattr('tipo', 'equalto', tipo_actual) | list %}
                 {% if comps_tipo %}
-                <h3 style="margin-top: {{ '0' if loop.first else '24px' }}; margin-bottom: 12px; font-size: 16px; color: var(--text-primary); border-bottom: 1px solid var(--border-divider); padding-bottom: 8px;">Competencias: {{ tipos_nombres[tipo_actual] }}</h3>
+                <h3 class="estadisticas-tipo-titulo">Competencias: {{ tipos_nombres[tipo_actual] }}</h3>
                 <div class="table-container" data-filter-region="estadisticas-competencias-tabla">
                 <div class="table-responsive">
                     <table class="table table-sena table-striped">
@@ -149,7 +137,7 @@
                                 <td data-label="Aprobación">
                                     <div class="progress-inline">
                                         <div class="progress-track-inline">
-                                            {% if comp.pct > 0 %}<div class="progress-fill-inline" style="width: {{ comp.pct }}%; background: {% if comp.pct >= 80 %}var(--success){% elif comp.pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>{% endif %}
+                                            {% if comp.pct > 0 %}<div class="progress-fill-inline" style="width: {{ comp.pct }}%; background: {{ viz_color(comp.pct) }};"></div>{% endif %}
                                         </div>
                                         <span class="progress-label">{{ comp.pct }}%</span>
                                     </div>
@@ -163,7 +151,7 @@
                 {% endif %}
             {% endfor %}
         </div>
-    </article>
+    </details>
     {% endif %}
 
     <!-- Tarjeta de Historial por Instructor -->
@@ -208,7 +196,7 @@
                                 {% set pct = (stats.aprobados / stats.total * 100)|round|int if stats.total > 0 else 0 %}
                                 <div class="progress-inline">
                                     <div class="progress-track-inline">
-                                        {% if pct > 0 %}<div class="progress-fill-inline" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>{% endif %}
+                                        {% if pct > 0 %}<div class="progress-fill-inline" style="width: {{ pct }}%; background: {{ viz_color(pct) }};"></div>{% endif %}
                                     </div>
                                     <span class="progress-label">{{ pct }}%</span>
                                 </div>
@@ -221,20 +209,20 @@
             </div>
             {% else %}
             <div class="empty-state">
-                <div class="empty-icon">📊</div>
+                <div class="empty-icon" aria-hidden="true"><i data-lucide="bar-chart-3" class="icon-lg"></i></div>
                 <h3>No hay datos de juicios</h3>
-                <p>Importa el "Reporte de Juicios Evaluativos.xls" en la vista de aprendices para generar estas estadísticas.</p>
-                <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="btn btn-primary" style="margin-top: 16px;">Ir a vista de aprendices</a>
+                <p>Carga el reporte de juicios evaluativos de SOFIA Plus para generar estas estadísticas.</p>
+                <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-primary">Ir a Juicios</a>
             </div>
             {% endif %}
         </div>
     </article>
 
-    <!-- Aprendices en Riesgo -->
+    <!-- Rendimiento académico bajo (juicios) -->
     <article class="card span-full">
         <header class="card-header">
-            <h2>Alerta Académica: Aprendices en Riesgo</h2>
-            <p>Aprendices con mayor cantidad de resultados "Aún no Aprobados" o "Por Evaluar"</p>
+            <h2>Rendimiento académico bajo</h2>
+            <p>Aprendices con más resultados de aprendizaje pendientes o no aprobados. No es el semáforo de faltas de Alertas.</p>
         </header>
         <div class="card-body">
             {% if top_aprendices %}
@@ -244,9 +232,9 @@
                     <a href="{{ url_for('instructor.historial_aprendiz', ficha_id=ficha.id, aprendiz_id=item.aprendiz.id) }}" class="hover-link link-plain">
                         <h3 class="riesgo-card-title">{{ item.aprendiz.nombre }} {{ item.aprendiz.apellidos }}</h3>
                     </a>
-                    <p class="riesgo-card-meta">CC: {{ item.aprendiz.documento }} - Estado: <span style="font-weight: 600; color: {% if item.aprendiz.estado == 'CANCELADO' %}var(--danger){% else %}var(--info){% endif %};">{{ item.aprendiz.estado }}</span></p>
+                    <p class="riesgo-card-meta"><span class="badge badge-{{ item.aprendiz.estado|tono_estado }}">{{ item.aprendiz.estado|etiqueta_estado }}</span></p>
                     <div class="riesgo-card-row">
-                        <span class="text-muted">Pendientes/No Aprobados:</span>
+                        <span class="text-muted">RAPs pendientes o no aprobados:</span>
                         <span class="badge riesgo-pendientes-badge">{{ item.pendientes }}</span>
                     </div>
                 </div>
@@ -254,7 +242,7 @@
             </div>
             {% else %}
             <div class="empty-state">
-                <p>No hay aprendices en riesgo detectados.</p>
+                <p>Ningún aprendiz tiene resultados pendientes o no aprobados.</p>
             </div>
             {% endif %}
         </div>
@@ -312,10 +300,6 @@
 </dialog>
 
 
-<details class="card cronograma-plegado">
-    <summary class="alertas-reglas-summary">Etapa lectiva, hito <abbr title="Pruebas Saber TyT para técnicos y tecnólogos">TyT</abbr> y resultados del grupo</summary>
-    {% include '_cronograma.html' %}
-</details>
 
 <script>
 function abrirModalCompetencia(rowEl) {

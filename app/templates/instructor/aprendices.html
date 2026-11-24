@@ -43,7 +43,7 @@
    ============================================================ #}
 <section class="aprendices-kpi-grid aprendices-resumen" aria-label="Resumen de rendimiento de la ficha">
     {{ barra(pct_global if total_juicios_ficha else none, 'Avance académico de la ficha', meta=VIZ_META_TYT,
-             estado=viz_estado(pct_global, verde=80, amarillo=50),
+             estado=viz_estado(pct_global),
              detalle=(total_aprobados_ficha ~ ' de ' ~ total_juicios_ficha ~ ' juicios aprobados')) }}
     {{ apilada([('Al día (80% o más)', al_dia_count, 'success'), ('En proceso (50 a 79%)', en_proceso_count, 'warning'),
                 ('En rezago (menos de 50%)', en_riesgo_count, 'danger')], 'Avance académico por aprendiz') }}
@@ -255,18 +255,18 @@
         <div class="learner-progress-section">
             <div class="learner-progress-header">
                 <span class="learner-progress-title">Juicios Evaluativos</span>
-                <span class="pct-badge pct-badge-{% if pct >= 80 %}high{% elif pct >= 50 %}mid{% else %}low{% endif %}">
+                <span class="pct-badge pct-badge-{{ viz_nivel(pct) }}">
                     {{ pct }}%
                 </span>
             </div>
             <div class="learner-progress-track">
-                <div class="learner-progress-fill" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>
+                <div class="learner-progress-fill" style="width: {{ pct }}%; background: {{ viz_color(pct) }};"></div>
             </div>
             <div class="learner-progress-footer">
                 {% if js and js.total > 0 %}
                 <span><strong>{{ js.aprobados }}</strong> de {{ js.total }} aprobados</span>
                 <span class="progress-status-indicator">
-                    {% if pct >= 80 %}&#9679; Al día{% elif pct >= 50 %}&#9679; En proceso{% else %}&#9679; Bajo avance{% endif %}
+                    {% set nivel_pct = viz_nivel(pct) %}{% if nivel_pct == 'high' %}&#9679; Al día{% elif nivel_pct == 'mid' %}&#9679; En proceso{% else %}&#9679; Bajo avance{% endif %}
                 </span>
                 {% else %}
                 <span class="text-muted">Sin juicios evaluativos</span>
@@ -353,13 +353,13 @@
                             {% if js and js.total > 0 %}
                             <div class="table-progress-cell">
                                 <div class="table-progress-meta">
-                                    <span class="pct-badge pct-badge-{% if pct >= 80 %}high{% elif pct >= 50 %}mid{% else %}low{% endif %}">
+                                    <span class="pct-badge pct-badge-{{ viz_nivel(pct) }}">
                                         {{ pct }}%
                                     </span>
                                     <span class="table-progress-counts">{{ js.aprobados }}/{{ js.total }}</span>
                                 </div>
                                 <div class="table-progress-track">
-                                    <div class="table-progress-fill" style="width: {{ pct }}%; background: {% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>
+                                    <div class="table-progress-fill" style="width: {{ pct }}%; background: {{ viz_color(pct) }};"></div>
                                 </div>
                             </div>
                             {% else %}

@@ -8,6 +8,7 @@
 
 
 {% block content %}
+{% from 'components/_viz.html' import kpi, barra, apilada %}
 <div class="page-header">
     <div class="page-title-cluster">
         <a href="{{ url_for('instructor.tareas', ficha_id=ficha.id, corte_id=corte_actual.id if corte_actual else None) }}" class="btn-back" title="Volver a Tareas">&larr; Volver</a>
@@ -268,59 +269,21 @@
     {% endif %}
 {% endfor %}
 
-<div class="stats-container">
-    <div class="stat-card">
-        <span class="stat-title">Entregas</span>
-        <span class="stat-value">{{ entregas_map|length }} <small style="font-size: 14px; color: var(--gray-500);">/ {{ aprendices|length }}</small></span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-title">Aprobadas</span>
-        <span class="stat-value stat-success">{{ stats.aprobadas }}</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-title">Ajustes</span>
-        <span class="stat-value stat-danger">{{ stats.rechazadas }}</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-title">A tiempo</span>
-        <span class="stat-value stat-success">{{ stats.a_tiempo }}</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-title">Con retraso</span>
-        <span class="stat-value stat-warning">{{ stats.retraso }}</span>
-    </div>
-</div>
-
 {% set total_ap = aprendices|length %}
 {% set total_ent = entregas_map|length %}
-{% set pct_entregas = (total_ent / total_ap * 100)|round|int if total_ap > 0 else 0 %}
-{% set pct_a_tiempo = (stats.a_tiempo / total_ent * 100)|round|int if total_ent > 0 else 0 %}
-
-<div class="progress-section resumen-progreso-card">
-    <h3 class="resumen-progreso-title">Resumen de Progreso</h3>
-    
-    <div class="resumen-bloque">
-        <div class="progreso-entregas">
-            <span class="progreso-entregas-label">Participación (Aprendices con evidencia subida)</span>
-            <span style="font-weight: 800; color: {% if pct_entregas >= 80 %}var(--sena-green){% elif pct_entregas >= 50 %}var(--sena-orange){% else %}var(--sena-red){% endif %};">{{ pct_entregas }}%</span>
-        </div>
-        <div class="progreso-track">
-            {% if pct_entregas > 0 %}<div style="width: {{ pct_entregas }}%; background-color: {% if pct_entregas >= 80 %}var(--sena-green){% elif pct_entregas >= 50 %}var(--sena-orange){% else %}var(--sena-red){% endif %}; height: 100%; border-radius: 8px; transition: width 0.8s ease-out;"></div>{% endif %}
-        </div>
-        <small class="progreso-nota">{{ total_ent }} de {{ total_ap }} aprendices han entregado la tarea</small>
+{#- Cada cifra una vez: lo que falta calificar primero, luego cobertura, puntualidad y revisión. -#}
+<section class="viz-panel entregas-resumen" aria-label="Resumen de las entregas de esta tarea">
+    <div class="viz-grid">
+        {{ kpi('Por calificar', stats.sin_calificar, estado=('warning' if stats.sin_calificar else 'success'),
+               detalle=('entregas esperan revisión' if stats.sin_calificar else 'todo está calificado'), icono='clipboard-check') }}
+        {{ barra(viz_porcentaje(total_ent, total_ap), 'Entregas recibidas',
+                 detalle=(total_ent ~ ' de ' ~ total_ap ~ ' aprendices')) }}
+        {{ barra(viz_porcentaje(stats.a_tiempo, total_ent), 'Entregadas a tiempo',
+                 detalle=((stats.retraso ~ ' con retraso') if total_ent else 'Aún no hay entregas')) }}
     </div>
-
-    <div>
-        <div class="progreso-entregas">
-            <span class="progreso-entregas-label">Puntualidad (Entregas a tiempo)</span>
-            <span style="font-weight: 800; color: {% if pct_a_tiempo >= 80 %}var(--sena-green){% elif pct_a_tiempo >= 50 %}var(--sena-orange){% else %}var(--sena-red){% endif %};">{{ pct_a_tiempo }}%</span>
-        </div>
-        <div class="progreso-track">
-            {% if pct_a_tiempo > 0 %}<div style="width: {{ pct_a_tiempo }}%; background-color: {% if pct_a_tiempo >= 80 %}var(--sena-green){% elif pct_a_tiempo >= 50 %}var(--sena-orange){% else %}var(--sena-red){% endif %}; height: 100%; border-radius: 8px; transition: width 0.8s ease-out; transition-delay: 0.2s;"></div>{% endif %}
-        </div>
-        <small class="progreso-nota">{{ stats.a_tiempo }} de {{ total_ent }} entregas fueron enviadas antes de la fecha límite</small>
-    </div>
-</div>
+    {{ apilada([('Aprobadas', stats.aprobadas, 'success'), ('Con ajustes', stats.rechazadas, 'danger'),
+                ('Por calificar', stats.sin_calificar, 'warning')], 'Revisión de las entregas') }}
+</section>
 
 {% if puede_editar_tarea %}<form id="evaluacion-masiva" method="POST"
       action="{{ url_for('instructor.evaluar_entregas_en_bloque', tarea_id=tarea.id) }}"

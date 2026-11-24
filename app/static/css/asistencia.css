@@ -218,6 +218,15 @@
 .text-amber { color: var(--status-warning-text) !important; }
 .text-purple { color: var(--accent-primary) !important; }
 
+/* Tono del KPI según los umbrales únicos (viz_estado): success, warning, danger o neutral. */
+.kpi-tono-success { color: var(--status-success-text); }
+.kpi-tono-warning { color: var(--status-warning-text); }
+.kpi-tono-danger { color: var(--status-danger-text); }
+.kpi-tono-neutral { color: var(--text-muted); }
+.kpi-progress-bar--success { background: var(--success); }
+.kpi-progress-bar--warning { background: var(--sena-yellow); }
+.kpi-progress-bar--danger { background: var(--sena-red); }
+
 .kpi-subtext {
     font-size: 0.8rem;
     color: var(--text-muted);

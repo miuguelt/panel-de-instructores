@@ -293,3 +293,40 @@ class RecomendacionesTestCase(unittest.TestCase):
         self.assertIn('learner-curve-svg', html)
         self.assertIn('Meta Mínima Aprobatoria', html)
 
+
+
+class SepararRecomendacionesTest(unittest.TestCase):
+    """Cada recomendación aparece en una sola lista del panel del aprendiz."""
+
+    @staticmethod
+    def rec(severidad, categoria='general'):
+        from types import SimpleNamespace
+        return SimpleNamespace(severidad=severidad, categoria=categoria)
+
+    def test_listas_disjuntas(self):
+        from app.services.recomendaciones import separar_recomendaciones
+        critica_academica = self.rec('critica', 'rendimiento_academico')
+        sugerencia_academica = self.rec('sugerencia', 'rendimiento_academico')
+        preventiva_academica = self.rec('preventiva', 'rendimiento_academico')
+        positiva = self.rec('positiva')
+        advertencias, mejoras = separar_recomendaciones(
+            [critica_academica, sugerencia_academica, preventiva_academica, positiva])
+        self.assertEqual(advertencias, [critica_academica, preventiva_academica])
+        self.assertEqual(mejoras, [sugerencia_academica, positiva])
+        self.assertFalse(set(map(id, advertencias)) & set(map(id, mejoras)))
+
+    def test_lista_vacia(self):
+        from app.services.recomendaciones import separar_recomendaciones
+        self.assertEqual(separar_recomendaciones([]), ([], []))
+
+
+class DesempenoExcelenteTest(unittest.TestCase):
+    """«¡Excelente desempeño!» solo sale si no hay nada pendiente con el instructor."""
+
+    def test_reglas(self):
+        from app.services.recomendaciones import es_desempeno_excelente
+        self.assertTrue(es_desempeno_excelente('verde', vencidas=0, alertas=0, planes=0))
+        self.assertFalse(es_desempeno_excelente('amarillo', vencidas=0, alertas=0, planes=0))
+        self.assertFalse(es_desempeno_excelente('verde', vencidas=1, alertas=0, planes=0))
+        self.assertFalse(es_desempeno_excelente('verde', vencidas=0, alertas=2, planes=0))
+        self.assertFalse(es_desempeno_excelente('verde', vencidas=0, alertas=0, planes=1))

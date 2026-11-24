@@ -12,12 +12,12 @@
                 <button type="button" class="learner-tab-btn" data-tab-target="evidencias" role="tab" aria-selected="false" id="btn-tab-evidencias-main">
                     <i data-lucide="file-check" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Mis evidencias</span>
-                    <span class="tab-pill-badge" id="tab-evidencias-counter">{{ tareas_individuales|length }}</span>
+                    {% if evidencias_pendientes and evidencias_pendientes.individuales %}<span class="tab-pill-badge" id="tab-evidencias-counter" title="Evidencias por entregar">{{ evidencias_pendientes.individuales }}</span>{% endif %}
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="grupo" role="tab" aria-selected="false" id="btn-tab-grupo-main">
                     <i data-lucide="users-2" class="tab-icon" aria-hidden="true"></i>
                     <span class="tab-label">Mi grupo</span>
-                    {% if trabajos_grupo %}<span class="tab-pill-badge">{{ trabajos_grupo|length }}</span>{% endif %}
+                    {% if evidencias_pendientes and evidencias_pendientes.grupales %}<span class="tab-pill-badge" title="Trabajos del grupo por entregar">{{ evidencias_pendientes.grupales }}</span>{% endif %}
                 </button>
                 <button type="button" class="learner-tab-btn" data-tab-target="juicios" role="tab" aria-selected="false" id="btn-tab-juicios-main">
                     <i data-lucide="graduation-cap" class="tab-icon" aria-hidden="true"></i>

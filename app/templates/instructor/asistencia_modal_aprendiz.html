@@ -61,14 +61,15 @@
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </div>
                     </div>
+                    {% set tono_asis = viz_estado(pct_asistencia) %}
                     <div class="kpi-value-row">
-                        <span class="kpi-big-value {{ 'text-emerald' if pct_asistencia >= 85 else ('text-amber' if pct_asistencia >= 70 else 'text-red') }}">
-                            {{ '%.1f'|format(pct_asistencia) }}%
+                        <span class="kpi-big-value kpi-tono-{{ tono_asis }}">
+                            {% if pct_asistencia is none %}Sin datos{% else %}{{ viz_pct(pct_asistencia) }}%{% endif %}
                         </span>
-                        <small class="kpi-subtext">{{ total_asistencias }}/{{ total_sesiones }} clases</small>
+                        <small class="kpi-subtext">{% if total_sesiones %}{{ total_sesiones - total_faltas_nj }} de {{ total_sesiones }} sesiones{% else %}Sin sesiones registradas{% endif %}</small>
                     </div>
                     <div class="kpi-progress-track mt-2">
-                        <div class="kpi-progress-bar" style="width: {{ pct_asistencia }}%; background: {% if pct_asistencia >= 85 %}var(--success){% elif pct_asistencia >= 70 %}var(--sena-yellow){% else %}var(--sena-red){% endif %};"></div>
+                        {% if pct_asistencia is not none %}<div class="kpi-progress-bar kpi-progress-bar--{{ tono_asis }}" style="width: {{ viz_pct(pct_asistencia) }}%;"></div>{% endif %}
                     </div>
                 </div>
 

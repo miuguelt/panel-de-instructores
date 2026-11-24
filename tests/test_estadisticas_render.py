@@ -1,4 +1,4 @@
-"""Estadísticas: resumen visual y competencias con menor y mayor aprobación."""
+"""Estadísticas: resumen visual, competencias con menor aprobación y el resto plegado."""
 
 import unittest
 from types import SimpleNamespace
@@ -39,20 +39,25 @@ class EstadisticasRenderTest(unittest.TestCase):
 
     def test_resumen_visual(self):
         html = self.render()
-        self.assertIn('aria-label="Juicios aprobados: 55%"', html)
+        self.assertIn('aria-label="RAPs aprobados: 55%"', html)
         self.assertIn('aria-label="Transversales aprobadas"', html)
         self.assertIn('aria-valuenow="60"', html)
         self.assertIn('aria-label="Inglés aprobado"', html)
         self.assertIn('aria-valuenow="75"', html)
         self.assertIn('Aprendices según sus juicios aprobados: Con el 100% 5, En curso 13, Sin aprobados 2', html)
         self.assertIn('Aprendices por porcentaje de aprobación: 100% 5', html)
-        self.assertIn('Estado de los aprendices (20): En formación 18, Cancelados 2', html)
+        # El estado de los aprendices vive en Aprendices (fichas de filtro).
+        self.assertNotIn('Estado de los aprendices', html)
         self.assertNotIn('stats-overview-grid', html)
 
-    def test_competencias_con_menor_y_mayor_aprobacion(self):
-        html = self.render()
-        menor = html.index('Competencias con menor aprobación')
-        self.assertLess(menor, html.index('Competencias con mayor aprobación'))
+    def test_competencias_con_menor_aprobacion_y_el_resto_plegado(self):
+        html = self.render(competencias_stats=[{'nombre': 'Programar software', 'tipo': 'tecnica', 'total': 20,
+                                                'aprobados': 18, 'pendientes': 2, 'num_aprendices': 20, 'pct': 90,
+                                                'resultados_lista': [], 'aprendices_aprobados_lista': []}])
+        self.assertIn('Competencias con menor aprobación', html)
+        # La tabla completa ya ordena todas: el panel de «mayor aprobación» la repetía.
+        self.assertNotIn('Competencias con mayor aprobación', html)
+        self.assertLess(html.index('Competencias con menor aprobación'), html.index('Ver todas las competencias'))
         self.assertIn('Inglés técnico', html)
         self.assertIn('6 de 20 juicios aprobados', html)
         self.assertIn('viz-bar--danger', html)
@@ -60,8 +65,19 @@ class EstadisticasRenderTest(unittest.TestCase):
     def test_sin_juicios_no_inventa_porcentajes(self):
         html = self.render(resumen=None, distribucion_aprobacion={}, mejores_competencias=[],
                            peores_competencias=[], pct_global=0)
-        self.assertIn('Juicios aprobados: sin datos', html)
+        self.assertIn('RAPs aprobados: sin datos', html)
+        self.assertIn('Ir a Juicios', html)
         self.assertNotIn('Competencias con menor aprobación', html)
+
+    def test_vocabulario_y_sin_repetir_otras_pantallas(self):
+        from types import SimpleNamespace as N
+        alumno = N(id=3, nombre='Ana', apellidos='Ruiz', documento='123', estado='EN_FORMACION')
+        html = self.render(top_aprendices=[{'aprendiz': alumno, 'pendientes': 4}])
+        self.assertIn('Rendimiento académico bajo', html)
+        self.assertNotIn('Aprendices en Riesgo', html)
+        self.assertNotIn('cronograma-plegado', html)
+        self.assertNotIn('CC: 123', html)
+        self.assertRegex(html, r'<h1[^>]*>\s*Estadísticas\s*</h1>')
 
 
 if __name__ == '__main__':

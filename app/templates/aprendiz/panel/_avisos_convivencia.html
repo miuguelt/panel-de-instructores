@@ -228,7 +228,7 @@
         <div class="alert alert-warning">
             <strong class="alert-lead">⚠️ Estás en riesgo.</strong> Tienes fallas no justificadas ({{ faltas_no_justificadas }}). Cuida tu asistencia para no afectar tu proceso.
         </div>
-        {% elif not (tareas_individuales|selectattr('estado', 'equalto', 'vencida')|list) %}
+        {% elif desempeno_excelente %}
         <div class="alert alert-success">
             <strong class="alert-lead">🌟 ¡Excelente desempeño!</strong> Tu asistencia es constante y estás al día. ¡Sigue así!
         </div>
