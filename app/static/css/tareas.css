@@ -355,3 +355,42 @@
         grid-column: auto;
     }
 }
+
+/* Crear tarea: plegado al cargar y con las opciones poco frecuentes agrupadas. */
+.tarea-crear-card {
+    margin-block-end: 1.5rem;
+}
+
+.tarea-opciones-avanzadas {
+    margin-block: 0.5rem 1rem;
+}
+
+.tarea-opciones-avanzadas > summary {
+    min-block-size: var(--control-h-sm);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    cursor: pointer;
+}
+
+/* Tarjeta: eliminar queda al final del panel de edición, separado de guardar. */
+.task-danger-zone {
+    margin-block-start: 1rem;
+    padding-block-start: 0.75rem;
+    border-block-start: 1px solid var(--border-divider);
+}
+
+.task-delete-form {
+    display: inline;
+}
+
+.task-edited-note {
+    margin-block-start: 0.4rem;
+    font-size: 0.75rem;
+}
+
+.material-actual {
+    margin-block-start: 0.5rem;
+}

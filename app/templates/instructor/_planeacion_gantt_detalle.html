@@ -19,10 +19,12 @@
         <div id="{{ evento }}" data-gantt-detalle
              data-nombre="{{ competencia.nombre }}" data-contexto="{{ fase.nombre }} · {{ competencia.etiqueta_trimestre }}" hidden>
             <div class="pl-gantt-tabs" role="tablist" aria-label="Información de la competencia">
-                {% for clave, nombre in [('resumen', 'Resumen'), ('resultados', 'Resultados'), ('aprendices', 'Aprendices'), ('pedagogia', 'Ficha pedagógica')] %}
+                {% for clave, nombre in [('resumen', 'Resumen'), ('resultados', 'Resultados'), ('aprendices', 'Aprendices')] %}
                 <button id="{{ evento }}-{{ clave }}-tab" type="button" role="tab" data-gantt-tab="{{ clave }}" aria-controls="{{ evento }}-{{ clave }}-pane" aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ 0 if loop.first else -1 }}">{{ nombre }}</button>
                 {% endfor %}
             </div>
+            {#- La ficha pedagógica tiene una sola ventana (#modal-pedagogico): aquí solo se abre. -#}
+            <button type="button" class="pl-btn-pedagogico pl-gantt-ficha-btn" data-pedagogico-target="{{ competencia.nombre }}" aria-label="Abrir la ficha pedagógica de {{ competencia.nombre }}"><i data-lucide="book-open" class="icon-sm" aria-hidden="true"></i> Ficha pedagógica</button>
 
             {# Pestaña 1: Resumen con Bento Grid y Barras de Progreso #}
             <section id="{{ evento }}-resumen-pane" role="tabpanel" aria-labelledby="{{ evento }}-resumen-tab" data-gantt-pane="resumen" tabindex="0">
@@ -178,13 +180,6 @@
             </section>
 
             {# Pestaña 4: Ficha Pedagógica Oficial #}
-            <section id="{{ evento }}-pedagogia-pane" role="tabpanel" aria-labelledby="{{ evento }}-pedagogia-tab" data-gantt-pane="pedagogia" tabindex="0" hidden>
-                {% set pedagogia = (catalogo_pedagogico|default({})).get(competencia.nombre, {}) %}
-                {% include 'instructor/_planeacion_gantt_pedagogia.html' %}
-                <div class="pl-gantt-acciones">
-                    <button type="button" class="pl-btn-pedagogico" data-pedagogico-target="{{ competencia.nombre }}" aria-label="Abrir ficha pedagógica completa de {{ competencia.nombre }}">Ver ficha completa</button>
-                </div>
-            </section>
         </div>
         {% endfor %}
         {% endfor %}

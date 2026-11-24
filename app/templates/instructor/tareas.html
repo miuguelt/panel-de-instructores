@@ -17,7 +17,7 @@
     </div>
     <div class="page-header-actions">
         {% if puede_editar_corte %}
-        <button type="button" class="btn btn-primary" id="btn-toggle-crear-tarea" aria-expanded="false" onclick="toggleFormularioCrear()">
+        <button type="button" class="btn btn-primary" id="btn-toggle-crear-tarea" aria-expanded="false" aria-controls="contenedor-formulario-tarea" onclick="toggleFormularioCrear()">
             <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i> Nueva tarea
         </button>
         {% endif %}
@@ -119,7 +119,7 @@
 {% endif %}
 
 {% if puede_editar_corte %}
-<div class="card form-card" id="contenedor-formulario-tarea" style="margin-bottom: 22px;">
+<div class="card form-card tarea-crear-card" id="contenedor-formulario-tarea" hidden>
     <h2>Crear nueva tarea</h2>
     <form method="POST" enctype="multipart/form-data" data-form-tarea>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -146,6 +146,33 @@
             <textarea id="descripcion" name="descripcion" rows="3" placeholder="Describe los entregables y lineamientos pedagógicos..."></textarea>
         </div>
 
+        <div class="form-group">
+            <label>Modalidad de la actividad</label>
+            <div class="modalidad-opciones">
+                <label class="modalidad-opcion">
+                    <input type="radio" name="modalidad" value="evidencia" checked data-modalidad>
+                    <span>
+                        <strong>Con evidencia</strong>
+                        <small>El aprendiz sube archivo o enlace desde su panel.</small>
+                    </span>
+                </label>
+                <label class="modalidad-opcion">
+                    <input type="radio" name="modalidad" value="clase" data-modalidad>
+                    <span>
+                        <strong>Se revisa en clase</strong>
+                        <small>El aprendiz no sube nada; tú apruebas el cumplimiento aquí.</small>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="fecha_limite">Fecha límite</label>
+            <input type="datetime-local" id="fecha_limite" name="fecha_limite">
+        </div>
+
+        <details class="tarea-opciones-avanzadas">
+            <summary><i data-lucide="chevrons-up-down" class="icon-sm" aria-hidden="true"></i> Más opciones: grupos, enlace, material y archivo obligatorio</summary>
         <fieldset class="form-group assignment-type-fieldset">
             <legend>¿A quién se asigna?</legend>
             <div class="assignment-type-grid">
@@ -174,34 +201,10 @@
             <small class="form-hint">Selecciona uno o varios grupos. Cada grupo tendrá una sola entrega compartida.</small>
         </div>
 
-        <div class="form-group">
-            <label>Modalidad de la actividad</label>
-            <div class="modalidad-opciones">
-                <label class="modalidad-opcion">
-                    <input type="radio" name="modalidad" value="evidencia" checked data-modalidad>
-                    <span>
-                        <strong>Con evidencia</strong>
-                        <small>El aprendiz sube archivo o enlace desde su panel.</small>
-                    </span>
-                </label>
-                <label class="modalidad-opcion">
-                    <input type="radio" name="modalidad" value="clase" data-modalidad>
-                    <span>
-                        <strong>Se revisa en clase</strong>
-                        <small>El aprendiz no sube nada; tú apruebas el cumplimiento aquí.</small>
-                    </span>
-                </label>
-            </div>
-        </div>
-
         <div class="form-row">
             <div class="form-group flex-grow">
                 <label for="enlace_externo">Enlace externo (opcional)</label>
                 <input type="url" id="enlace_externo" name="enlace_externo" placeholder="https://meet.google.com/...">
-            </div>
-            <div class="form-group">
-                <label for="fecha_limite">Fecha límite</label>
-                <input type="datetime-local" id="fecha_limite" name="fecha_limite">
             </div>
         </div>
 
@@ -216,6 +219,8 @@
                 Los aprendices deben subir archivo como evidencia
             </label>
         </div>
+
+        </details>
 
         <button type="submit" class="btn btn-primary">Crear tarea</button>
     </form>
@@ -350,13 +355,13 @@
         var form = document.getElementById('contenedor-formulario-tarea');
         if (!form) return;
         var btn = document.getElementById('btn-toggle-crear-tarea');
-        if (form.style.display === 'none') {
-            form.style.display = 'block';
-            if (btn) btn.setAttribute('aria-expanded', 'true');
+        var abrir = form.hidden;
+        form.hidden = !abrir;
+        if (btn) btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+        if (abrir) {
             form.scrollIntoView({ behavior: 'smooth' });
-        } else {
-            form.style.display = 'none';
-            if (btn) btn.setAttribute('aria-expanded', 'false');
+            var titulo = form.querySelector('input[name="titulo"]');
+            if (titulo) titulo.focus();
         }
     }
 

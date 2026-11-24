@@ -6,30 +6,12 @@
         <div class="task-badges-cluster">
             {% if tarea.es_grupal %}
             <span class="badge badge-info"><i data-lucide="users" class="icon-sm" aria-hidden="true"></i> Entrega grupal</span>
-            {% else %}
-            <span class="badge badge-secondary"><i data-lucide="user" class="icon-sm" aria-hidden="true"></i> Entrega individual</span>
             {% endif %}
-
             {% if tarea.es_actividad_clase %}
             <span class="badge badge-info"><i data-lucide="school" class="icon-sm" aria-hidden="true"></i> Se revisa en clase</span>
-            {% else %}
-            <span class="badge badge-secondary"><i data-lucide="file-text" class="icon-sm" aria-hidden="true"></i> Con evidencia</span>
             {% endif %}
-
             {% if tarea.corte %}
             <span class="badge badge-outline"><i data-lucide="folder" class="icon-sm" aria-hidden="true"></i> {{ tarea.corte.nombre }}</span>
-            {% endif %}
-
-            {% if p.estado == 'vencida' %}
-            <span class="badge badge-danger"><i data-lucide="octagon-x" class="icon-sm" aria-hidden="true"></i> Vencida</span>
-            {% elif p.estado == 'urgente' %}
-            <span class="badge badge-danger"><i data-lucide="alarm-clock" class="icon-sm" aria-hidden="true"></i> Urgente (&lt; 24 h)</span>
-            {% elif p.estado == 'atencion' %}
-            <span class="badge badge-warning"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> Atención (&lt; 48 h)</span>
-            {% elif p.estado == 'sin_limite' %}
-            <span class="badge badge-secondary"><i data-lucide="infinity" class="icon-sm" aria-hidden="true"></i> Sin fecha límite</span>
-            {% else %}
-            <span class="badge badge-success"><i data-lucide="check-circle-2" class="icon-sm" aria-hidden="true"></i> En plazo</span>
             {% endif %}
         </div>
     </div>
@@ -122,24 +104,13 @@
     </div>
 
     {% if tarea.actualizada_en %}
-    <p class="text-muted" style="font-size: 12px; margin-top: 6px;">Editada el {{ tarea.actualizada_en.strftime('%d/%m/%Y %H:%M') }}</p>
+    <p class="text-muted task-edited-note">Editada el {{ tarea.actualizada_en.strftime('%d/%m/%Y %H:%M') }}</p>
     {% endif %}
 
     <div class="task-card-footer">
         <a href="{{ url_for('instructor.ver_entregas', tarea_id=tarea.id) }}" class="btn btn-sm btn-primary">
             {% if tarea.es_actividad_clase %}Aprobar cumplimiento{% else %}Ver entregas{% endif %}
         </a>
-        {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}
-        <form method="POST"
-              action="{{ url_for('instructor.eliminar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
-              data-confirm="Se eliminará la tarea «{{ tarea.titulo|e }}» junto con sus entregas, calificaciones y archivos. Esta acción no se puede deshacer. ¿Desea continuar?"
-              data-confirm-title="Eliminar tarea" data-confirm-label="Eliminar tarea" data-confirm-intent="danger"
-              style="display: inline;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            {% if tarea.corte_id %}<input type="hidden" name="corte_id" value="{{ tarea.corte_id }}">{% endif %}
-            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-        </form>
-        {% endif %}
     </div>
 
     {% if (current_user.es_admin or tarea.instructor_id == current_user.id) and (not tarea.corte or tarea.corte.esta_activo) %}
@@ -224,7 +195,7 @@
                 <label for="material-{{ tarea.id }}">Reemplazar material de apoyo</label>
                 <input type="file" id="material-{{ tarea.id }}" name="material_apoyo" accept="{{ extensiones_carga }}">
                 {% if tarea.material_apoyo_url %}
-                <div class="material-actual" style="margin-top: 8px;">
+                <div class="material-actual">
                     <span>Material actual cargado.</span>
                     <label class="checkbox-label">
                         <input type="checkbox" name="quitar_material">
@@ -243,6 +214,17 @@
 
             <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
         </form>
+        <div class="task-danger-zone">
+            <form method="POST"
+                  action="{{ url_for('instructor.eliminar_tarea', ficha_id=ficha.id, tarea_id=tarea.id) }}"
+                  data-confirm="Se eliminará la tarea «{{ tarea.titulo|e }}» junto con sus entregas, calificaciones y archivos. Esta acción no se puede deshacer. ¿Desea continuar?"
+                  data-confirm-title="Eliminar tarea" data-confirm-label="Eliminar tarea" data-confirm-intent="danger"
+                  class="task-delete-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if tarea.corte_id %}<input type="hidden" name="corte_id" value="{{ tarea.corte_id }}">{% endif %}
+                <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar tarea</button>
+            </form>
+        </div>
     </details>
     {% else %}
     <small class="text-muted">Solo lectura para instructores vinculados.</small>

@@ -29,7 +29,7 @@ function entorno() {
     const paneles = [new Elemento({ nombre: '<img src=x> Inducción', contexto: 'ANÁLISIS · T1' }), new Elemento({ nombre: 'Competencia transversal', contexto: 'PLANEACIÓN · T2' })];
     paneles.forEach((panel, i) => {
         panel.id = 'evento-' + i; panel.hidden = true;
-        panel.tabs = ['resumen', 'resultados', 'aprendices', 'pedagogia'].map(ganttTab => new Elemento({ ganttTab }));
+        panel.tabs = ['resumen', 'resultados', 'aprendices'].map(ganttTab => new Elemento({ ganttTab }));
         panel.panes = panel.tabs.map(tab => new Elemento({ ganttPane: tab.dataset.ganttTab }));
         panel.querySelectorAll = selector => selector === '[data-gantt-tab]' ? panel.tabs : panel.panes;
     });
@@ -104,26 +104,26 @@ test('Las pestañas muestran solo su contenido y admiten flechas, Inicio y Fin',
     initPlaneacionGantt(e.doc);
     e.abrir[0].dispatch('click');
     const { tabs, panes } = e.paneles[0];
-    assert.deepEqual(panes.map(p => p.hidden), [false, true, true, true]);
+    assert.deepEqual(panes.map(p => p.hidden), [false, true, true]);
     tabs[2].dispatch('click');
-    assert.deepEqual(panes.map(p => p.hidden), [true, true, false, true]);
+    assert.deepEqual(panes.map(p => p.hidden), [true, true, false]);
     assert.equal(tabs[2].attrs['aria-selected'], 'true');
     assert.equal(tabs[0].tabIndex, -1);
-    for (const [desde, key, destino] of [[2, 'ArrowRight', 3], [3, 'ArrowRight', 0], [0, 'ArrowLeft', 3], [3, 'Home', 0], [0, 'End', 3]]) {
+    for (const [desde, key, destino] of [[1, 'ArrowRight', 2], [2, 'ArrowRight', 0], [0, 'ArrowLeft', 2], [2, 'Home', 0], [0, 'End', 2]]) {
         tabs[desde].dispatch('keydown', tabs[desde], { key });
         assert.equal(tabs[destino].attrs['aria-selected'], 'true');
         assert.equal(tabs[destino].tabIndex, 0);
         assert.equal(tabs[destino].focused, true);
         assert.equal(panes[destino].hidden, false);
     }
-    tabs[3].dispatch('keydown', tabs[3], { key: 'Tab' });
-    assert.equal(tabs[3].attrs['aria-selected'], 'true');
+    tabs[2].dispatch('keydown', tabs[2], { key: 'Tab' });
+    assert.equal(tabs[2].attrs['aria-selected'], 'true');
     e.ids['pl-gantt-evento-cerrar'].dispatch('click');
     e.abrir[1].dispatch('click');
-    assert.deepEqual(e.paneles[1].panes.map(p => p.hidden), [false, true, true, true]);
+    assert.deepEqual(e.paneles[1].panes.map(p => p.hidden), [false, true, true]);
     e.ids['pl-gantt-evento-cerrar'].dispatch('click');
     e.abrir[0].dispatch('click');
-    assert.deepEqual(panes.map(p => p.hidden), [false, true, true, true]);
+    assert.deepEqual(panes.map(p => p.hidden), [false, true, true]);
 });
 
 test('Los filtros ocultan fases vacías, anuncian el conteo y permiten restablecer', () => {
@@ -204,56 +204,3 @@ test('El cronograma se inicializa al cargarlo en el navegador', () => {
     assert.equal(e.ids['pl-gantt-evento'].open, true);
 });
 
-test('El buscador y filtros pedagógicos actualizan visibilidad y anuncian coincidencias', () => {
-    const e = entorno();
-    initPlaneacionGantt(e.doc);
-    e.abrir[0].dispatch('click');
-
-    const item1 = new Elemento();
-    item1.classList.toggle('pl-pedagogia-item', true);
-    item1.textContent = 'Bases de datos SQL y PostgreSQL';
-
-    const item2 = new Elemento();
-    item2.classList.toggle('pl-pedagogia-item', true);
-    item2.textContent = 'Algoritmos y estructuras de datos';
-
-    const contador = new Elemento();
-    const input = new Elemento();
-    input.classList.toggle('pl-pedagogia-search', true);
-    input.value = 'sql';
-
-    const panel = e.paneles[0];
-    panel.querySelectorAll = selector => selector === '.pl-pedagogia-item' ? [item1, item2] : [];
-    panel.querySelector = selector => selector === '.pl-pedagogia-match-count' ? contador : null;
-
-    e.ids['pl-gantt-evento'].dispatch('input', input);
-    assert.equal(item1.hidden, false);
-    assert.equal(item2.hidden, true);
-    assert.equal(contador.textContent, '1 coincidencias');
-
-    input.value = '';
-    e.ids['pl-gantt-evento'].dispatch('input', input);
-    assert.equal(item1.hidden, false);
-    assert.equal(item2.hidden, false);
-    assert.equal(contador.textContent, '');
-
-    const btnTodos = new Elemento({ pedagogiaFiltro: 'todos' });
-    const btnCriterios = new Elemento({ pedagogiaFiltro: 'criterios' });
-    const secCriterios = new Elemento({ pedagogiaSeccion: 'criterios' });
-    const secProcesos = new Elemento({ pedagogiaSeccion: 'procesos' });
-
-    panel.querySelectorAll = selector => {
-        if (selector === '[data-pedagogia-filtro]') return [btnTodos, btnCriterios];
-        if (selector === '[data-pedagogia-seccion]') return [secCriterios, secProcesos];
-        return [];
-    };
-
-    e.ids['pl-gantt-evento'].dispatch('click', btnCriterios);
-    assert.equal(secCriterios.hidden, false);
-    assert.equal(secProcesos.hidden, true);
-    assert.equal(btnCriterios.attrs['aria-pressed'], 'true');
-
-    e.ids['pl-gantt-evento'].dispatch('click', btnTodos);
-    assert.equal(secCriterios.hidden, false);
-    assert.equal(secProcesos.hidden, false);
-});

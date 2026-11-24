@@ -103,46 +103,6 @@ function initPlaneacionGantt(doc = document) {
             return;
         }
 
-        const botonFiltro = evento.target.closest ? evento.target.closest('[data-pedagogia-filtro]') : null;
-        if (botonFiltro && botonFiltro.dataset && botonFiltro.dataset.pedagogiaFiltro) {
-            const panel = paneles.find(p => !p.hidden);
-            if (!panel) return;
-            const filtro = botonFiltro.dataset.pedagogiaFiltro;
-            const botones = panel.querySelectorAll?.('[data-pedagogia-filtro]') || [];
-            for (const b of botones) {
-                if (b.classList && b.dataset?.pedagogiaFiltro) {
-                    const activo = b === botonFiltro;
-                    b.classList.toggle('is-active', activo);
-                    b.setAttribute?.('aria-pressed', String(activo));
-                }
-            }
-            const secciones = panel.querySelectorAll?.('[data-pedagogia-seccion]') || [];
-            for (const sec of secciones) {
-                if (sec.dataset?.pedagogiaSeccion) {
-                    sec.hidden = filtro !== 'todos' && sec.dataset.pedagogiaSeccion !== filtro;
-                }
-            }
-        }
-    });
-    dialogo.addEventListener('input', function (evento) {
-        const input = (evento.target?.classList?.contains && evento.target.classList.contains('pl-pedagogia-search')) ? evento.target : null;
-        if (!input) return;
-        const panel = paneles.find(p => !p.hidden);
-        if (!panel) return;
-        const termino = (input.value || '').trim().toLowerCase();
-        const items = panel.querySelectorAll?.('.pl-pedagogia-item') || [];
-        let coincidencias = 0;
-        for (const item of items) {
-            if (!item.classList?.contains?.('pl-pedagogia-item')) continue;
-            const texto = (item.textContent || '').toLowerCase();
-            const coincide = !termino || texto.includes(termino);
-            item.hidden = !coincide;
-            if (coincide && termino) coincidencias++;
-        }
-        const contador = panel.querySelector?.('.pl-pedagogia-match-count');
-        if (contador) {
-            contador.textContent = termino ? `${coincidencias} coincidencias` : '';
-        }
     });
     dialogo.addEventListener('close', function () {
         if (botonFicha) {

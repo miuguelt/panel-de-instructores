@@ -82,6 +82,9 @@ class SiglasExplicadasTest(unittest.TestCase):
         self.assertRegex(leer('tyt/_tarjeta.html'),
                          r'<abbr title="[^"]*Saber TyT[^"]*">TyT</abbr>')
         self.assertRegex(leer('instructor/juicios.html'), r'<abbr title="Resultados de aprendizaje">RAP</abbr>')
+        panorama = leer('instructor/_planeacion_panorama.html')
+        self.assertRegex(panorama, r'<abbr title="[^"]+">EVM</abbr>')
+        self.assertRegex(panorama, r'<abbr title="[^"]+">CFD</abbr>')
 
     def test_corte_de_trabajo_tiene_un_texto_visible_claro(self):
         for relativa in ('instructor/asistencia.html', 'instructor/tareas.html', 'instructor/ranking.html'):
@@ -145,6 +148,33 @@ class AseoEnUnSoloLugarTest(unittest.TestCase):
         aseo = leer('aprendiz/panel/_aseo.html')
         self.assertNotIn('generar_como_aprendiz', aseo)
         self.assertIn("url_for('aseo_aprendiz.gestionar'", aseo)
+
+
+class TareasSencillasTest(unittest.TestCase):
+    def test_eliminar_no_compite_con_la_accion_principal_de_la_tarjeta(self):
+        tarjeta = leer('instructor/_tarea_card.html')
+        pie = tarjeta[tarjeta.index('class="task-card-footer"'):tarjeta.index('</div>', tarjeta.index('class="task-card-footer"'))]
+        self.assertNotIn('eliminar_tarea', pie)
+        self.assertNotIn('btn-danger', pie)
+        # Eliminar vive al final del panel de edición, separado de «Guardar cambios».
+        edicion = tarjeta[tarjeta.index('data-form-tarea'):]
+        self.assertLess(edicion.index('Guardar cambios'), edicion.index('Eliminar tarea'))
+
+    def test_la_tarjeta_no_repite_el_plazo_en_insignias(self):
+        tarjeta = leer('instructor/_tarea_card.html')
+        cabecera = tarjeta[tarjeta.index('task-badges-cluster'):tarjeta.index('tarea-progreso-tiempo-box')]
+        for repetido in ('Vencida', 'Urgente', 'En plazo', 'Sin fecha límite'):
+            self.assertNotIn(repetido, cabecera)
+
+    def test_crear_tarea_arranca_plegado_y_muestra_lo_esencial(self):
+        html = leer('instructor/tareas.html')
+        self.assertRegex(html, r'id="contenedor-formulario-tarea"[^>]*\bhidden\b')
+        formulario = html[html.index('id="contenedor-formulario-tarea"'):html.index('Crear tarea</button>')]
+        avanzadas = formulario[formulario.index('tarea-opciones-avanzadas'):]
+        for esencial in ('name="titulo"', 'name="fecha_limite"', 'name="modalidad"'):
+            self.assertNotIn(esencial, avanzadas)
+        for opcional in ('name="enlace_externo"', 'name="material_apoyo"', 'name="tipo_asignacion"'):
+            self.assertIn(opcional, avanzadas)
 
 
 if __name__ == '__main__':

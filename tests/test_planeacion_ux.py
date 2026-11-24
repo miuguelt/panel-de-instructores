@@ -135,7 +135,7 @@ class PlaneacionUXTestCase(PlaneacionBase):
         self.assertIn('Periodo planeado', html)
         self.assertIn('Primera aprobación', html)
         self.assertIn('Ver aprendices', html)
-        self.assertIn('Ver ficha', html)
+        self.assertIn('Ficha pedagógica', html)
         self.assertIn('data-gantt-reset', html)
         self.assertRegex(html, r'data-filter="all"[^>]*aria-pressed="true"')
         self.assertRegex(html, r'id="pl-gantt-contador"[^>]*role="status"')
@@ -165,14 +165,16 @@ class PlaneacionUXTestCase(PlaneacionBase):
         self.assertIn('class="pl-gantt-evento-nombre"', html)
         destinos = re.findall(r'data-gantt-target="([^"]+)"', html)
         for destino in destinos:
-            for pestana in ['resumen', 'resultados', 'aprendices', 'pedagogia']:
+            for pestana in ['resumen', 'resultados', 'aprendices']:
                 identificador = f'{destino}-{pestana}'
                 self.assertIn(f'id="{identificador}-tab"', html)
                 self.assertIn(f'aria-controls="{identificador}-pane"', html)
                 self.assertRegex(html, rf'id="{identificador}-pane"[^>]*role="tabpanel"[^>]*aria-labelledby="{identificador}-tab"')
-        self.assertIn('El programa de formación no tiene información pedagógica asociada a esta competencia.', html)
+        # La ficha pedagógica no se repite en cada evento: un botón abre la ventana única.
+        self.assertNotIn('-pedagogia-pane', html)
+        self.assertEqual(len(re.findall(r'class="pl-btn-pedagogico pl-gantt-ficha-btn"', html)), len(destinos))
 
-    def test_pestana_pedagogica_conserva_los_datos_oficiales_y_escapa_el_contenido(self):
+    def test_el_catalogo_pedagogico_se_entrega_una_vez_y_escapado(self):
         from flask import render_template, template_rendered
         contexto = {}
         def capturar(sender, template, context, **extra):
@@ -181,17 +183,13 @@ class PlaneacionUXTestCase(PlaneacionBase):
             self.pagina(con_planeacion=True)
         nombre = contexto['linea']['fases'][0]['competencias'][0]['nombre']
         contexto['catalogo_pedagogico'] = {nombre: {
-            'norma': 'Norma oficial de prueba', 'codigo_norma': '123456789', 'horas_programa': 48,
-            'conocimientos_proceso': ['Proceso <script>alert(1)</script>'],
-            'conocimientos_saber': ['Saber de prueba'], 'criterios_evaluacion': ['Criterio de prueba'],
-            'perfil_instructor': {'requisitos_academicos': 'Formación de prueba'},
+            'norma': 'Norma oficial de prueba', 'conocimientos_proceso': ['Proceso <script>alert(1)</script>'],
         }}
         with self.app.test_request_context():
-            html = render_template('instructor/_planeacion_gantt_detalle.html', **contexto)
-        for dato in ['Norma oficial de prueba', '123456789', '48 h', 'Saber de prueba', 'Criterio de prueba', 'Formación de prueba']:
-            self.assertIn(dato, html)
-        self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', html)
-        self.assertNotIn('<script>alert(1)</script>', html)
+            detalle = render_template('instructor/_planeacion_gantt_detalle.html', **contexto)
+        # El evento ya no copia la ficha: la ventana única la arma desde pl-catalogo-json.
+        self.assertNotIn('Norma oficial de prueba', detalle)
+        self.assertNotIn('<script>alert(1)</script>', detalle)
 
     def test_cronograma_ofrece_rap_con_conteos_y_detalle_por_aprendiz(self):
         self.pagina(con_planeacion=True)
@@ -288,7 +286,7 @@ class PlaneacionUXTestCase(PlaneacionBase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(ResultadoCalculadoFicha.query.filter_by(tipo='panorama').count(), 1)
 
-    def test_detalle_competencia_ofrece_barras_de_progreso_y_herramientas_pedagogicas(self):
+    def test_detalle_competencia_ofrece_barras_de_progreso(self):
         from flask import render_template, template_rendered
         contexto = {}
         def capturar(sender, template, context, **extra):
@@ -307,12 +305,7 @@ class PlaneacionUXTestCase(PlaneacionBase):
             html = render_template('instructor/_planeacion_gantt_detalle.html', **contexto)
         self.assertIn('role="progressbar"', html)
         self.assertIn('class="pl-gantt-bar-split"', html)
-        self.assertIn('class="pl-pedagogia-search"', html)
-        self.assertIn('data-pedagogia-filtro="criterios"', html)
-        self.assertIn('pl-pedagogia-criterio-card', html)
-        self.assertIn('Criterio 1', html)
-        self.assertIn('Aplica estándares de codificación limpios.', html)
-        self.assertIn('Planear arquitectura de software:', html)
+        self.assertIn('data-pedagogico-target=', html)
 
     def test_tarjeta_competencia_vencida_muestra_fechas_debajo_de_progreso(self):
         from flask import render_template
