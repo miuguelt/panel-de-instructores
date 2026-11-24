@@ -6,12 +6,10 @@
                     <h2 class="metric-card-title">Juicios de Evaluación Oficiales</h2>
                     <p class="metric-card-subtitle">Progreso académico certificado</p>
                 </div>
-                <span class="badge badge-success metric-card-score">{{ stats_juicios.pct_total }}% Global</span>
             </div>
             
             <div class="juicio-tabs" role="tablist" aria-label="Vistas de juicios">
                 <button onclick="openJuicioTab('competencias')" id="btn-tab-competencias" class="juicio-tab-active">Por Competencia ({{ competencias_aprendiz|length }})</button>
-                <button onclick="openJuicioTab('resumen')" id="btn-tab-resumen" class="juicio-tab-inactive">Resumen</button>
                 <button onclick="openJuicioTab('pendientes')" id="btn-tab-pendientes" class="juicio-tab-inactive">Por Aprobar ({{ juicios_pendientes|length }})</button>
                 <button onclick="openJuicioTab('aprobados')" id="btn-tab-aprobados" class="juicio-tab-inactive">Aprobados ({{ juicios_aprobados|length }})</button>
             </div>
@@ -64,33 +62,6 @@
                     {% else %}
                         <div class="panel-empty-message">No hay competencias registradas para esta ficha.</div>
                     {% endif %}
-                </div>
-            </div>
-
-            <div id="tab-resumen" class="juicio-tab-content" hidden>
-                <div class="juicio-summary-grid">
-                    <div class="juicio-donut-wrap">
-                        <div class="juicio-donut" style="--summary-value: {{ stats_juicios.pct_total }}%;">
-                            <div class="juicio-donut-hole">
-                                <span>{{ stats_juicios.pct_total }}%</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="juicio-summary-bars">
-                        <div class="juicio-summary-bar">
-                            <div class="juicio-summary-bar-label"><span>Técnicas</span><strong>{{ stats_juicios.tecnica_aprobada }}/{{ stats_juicios.tecnica }}</strong></div>
-                            <progress value="{{ stats_juicios.pct_tecnica }}" max="100" class="progress-tech"></progress>
-                        </div>
-                        <div class="juicio-summary-bar">
-                            <div class="juicio-summary-bar-label"><span>Transversales</span><strong>{{ stats_juicios.transversal_aprobada }}/{{ stats_juicios.transversal }}</strong></div>
-                            <progress value="{{ stats_juicios.pct_transversal }}" max="100" class="progress-transversal"></progress>
-                        </div>
-                        <div class="juicio-summary-bar">
-                            <div class="juicio-summary-bar-label"><span>Inglés</span><strong>{{ stats_juicios.ingles_aprobada }}/{{ stats_juicios.ingles }}</strong></div>
-                            <progress value="{{ stats_juicios.pct_ingles }}" max="100" class="progress-ingles"></progress>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -165,18 +136,4 @@
             </script>
         </div>
 
-        {% if evaluadores %}
-        <div class="evaluators-block">
-            <p class="evaluators-title">
-                <span>👨‍🏫</span> Instructores que te han evaluado ({{ evaluadores|length }})
-            </p>
-            <div class="evaluators-list">
-                {% for eval in evaluadores %}
-                <span class="evaluator-chip">
-                    {{ eval|strip_document_id }}
-                </span>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
     </section>

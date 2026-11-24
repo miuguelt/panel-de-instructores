@@ -2,13 +2,13 @@
     <!-- ============================================================ -->
     <!-- RESUMEN PRIORIZADO: ASEO, RENDIMIENTO Y ALERTAS              -->
     <!-- ============================================================ -->
-    {% if experiencia_data %}{% include 'aprendiz/_experiencia.html' %}{% endif %}
-
     {% if solo_lectura %}
     <div class="alert alert-warning" role="status">
         Tu matrícula ya no está en formación. Puedes consultar tu historial y descargar tu reporte, pero no enviar soportes, evidencias ni solicitudes.
     </div>
     {% endif %}
+
+    {% if experiencia_data %}{% include 'aprendiz/_experiencia.html' %}{% endif %}
     <section class="learner-priority-dashboard" aria-labelledby="priority-dashboard-title">
         <div class="priority-dashboard-heading">
             <div>
@@ -36,7 +36,6 @@
                 {% else %}
                     <p class="priority-card-copy">No hay novedades académicas o de asistencia que requieran tu atención.</p>
                     <p class="priority-card-meta">Tu estado actual es <strong>{{ resumen_rapido.estado_academico|lower }}</strong>.</p>
-                    <button type="button" class="btn btn-sm btn-outline priority-action" data-jump-tab="resumen">Ver resumen de la ficha</button>
                 {% endif %}
             </article>
             <article class="priority-card priority-card-cleaning" aria-labelledby="priority-cleaning-title">

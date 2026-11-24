@@ -33,15 +33,6 @@
                     <span class="ficha-code-badge">{{ ficha.codigo }}</span> · {{ ficha.nombre_programa }}
                 </p>
 
-                {% if fila_propia and fila_propia.posicion in [1, 2, 3] %}
-                <p data-experience-ranking class="learner-podium-badge podium-{{ ['gold', 'silver', 'bronze'][fila_propia.posicion - 1] }}" aria-label="Reconocimiento por posición {{ fila_propia.posicion }} en el ranking de la ficha">
-                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" />
-                        <path d="M7 7H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4" />
-                    </svg>
-                    {{ ['Oro', 'Plata', 'Bronce'][fila_propia.posicion - 1] }} · Puesto {{ fila_propia.posicion }} de la ficha
-                </p>
-                {% endif %}
 
                 <!-- Lema o frase personal editable -->
                 <div class="learner-motto-wrapper" id="learner-motto-wrapper" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="personalizacion-modal" title="Haz clic para cambiar tu lema">
@@ -53,21 +44,26 @@
 
             <!-- Acciones rápidas de la cabecera -->
             <div class="header-actions learner-hero-actions">
-                <button type="button" class="btn btn-sm btn-primary-gradient btn-customize-hub" id="btn-open-customizer" aria-haspopup="dialog" aria-controls="personalizacion-modal">
-                    🎨 Personalizar mi espacio
-                </button>
-                <button type="button" class="btn btn-sm btn-outline btn-open-portafolio-modal" id="btn-open-portafolio-modal" title="Gestionar enlaces de GitHub y Notion">
-                    💼 Mi Portafolio Digital{% if aprendiz.tiene_enlaces_portafolio %} <span class="badge-dot-success" title="Enlaces configurados">●</span>{% endif %}
-                </button>
-                <a href="{{ url_for('aprendiz.descargar_reporte', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline" title="Descargar reporte académico oficial en PDF">
-                    📄 Reporte PDF
-                </a>
                 <a href="{{ url_for('aprendiz_seguimiento.notificaciones_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline" title="Ver notificaciones">
-                    🔔 Notificaciones{% if notificaciones %} <span class="badge badge-danger">({{ notificaciones|length }})</span>{% endif %}
+                    <i data-lucide="bell" class="icon-sm" aria-hidden="true"></i> Notificaciones{% if notificaciones %} <span class="badge badge-danger">{{ notificaciones|length }}</span>{% endif %}
                 </a>
-                <a href="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="btn btn-sm btn-ghost" title="Cambiar usuario o salir">
-                    Cerrar sesión
+                <a href="{{ url_for('aprendiz.descargar_reporte', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline" title="Descargar tu reporte académico en PDF">
+                    <i data-lucide="file-down" class="icon-sm" aria-hidden="true"></i> Reporte PDF
                 </a>
+                <button type="button" class="btn btn-sm btn-ghost btn-icon" popovertarget="aprendiz-mas-acciones" aria-haspopup="true" aria-label="Más acciones" title="Más acciones">
+                    <i data-lucide="more-horizontal" class="icon-sm" aria-hidden="true"></i>
+                </button>
+                <div id="aprendiz-mas-acciones" popover class="app-popover acciones-mas-popover" aria-label="Más acciones">
+                    <button type="button" class="app-popover-item btn-customize-hub" id="btn-open-customizer" aria-haspopup="dialog" aria-controls="personalizacion-modal">
+                        <i data-lucide="palette" class="icon-sm" aria-hidden="true"></i> <span>Personalizar mi espacio</span>
+                    </button>
+                    <button type="button" class="app-popover-item btn-open-portafolio-modal" id="btn-open-portafolio-modal" title="Gestionar enlaces de GitHub y Notion">
+                        <i data-lucide="briefcase" class="icon-sm" aria-hidden="true"></i> <span>Mi portafolio digital</span>{% if aprendiz.tiene_enlaces_portafolio %} <span class="badge-dot-success" title="Enlaces configurados">●</span>{% endif %}
+                    </button>
+                    <a href="{{ url_for('aprendiz.vista_aprendiz', ficha_id=ficha.id) }}" class="app-popover-item" title="Cambiar usuario o salir">
+                        <i data-lucide="log-out" class="icon-sm" aria-hidden="true"></i> <span>Cerrar sesión</span>
+                    </a>
+                </div>
             </div>
         </div>
 

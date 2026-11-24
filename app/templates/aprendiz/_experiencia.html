@@ -38,24 +38,8 @@
                    'Tus ' ~ experiencia_data.evidence.submitted ~ ' evidencias entregadas') }}
     </div>
     <details class="experience-insights">
-        <summary>Ver competencias, avance del grupo e hitos</summary>
+        <summary>Ver avance del grupo e hitos</summary>
         <div class="experience-insight-grid">
-            <article class="experience-card" aria-labelledby="experience-competencies-title">
-                <h3 id="experience-competencies-title">Tu avance por competencia</h3>
-                {% if experiencia_data.competencies %}
-                <ul class="experience-competency-list">
-                    {% for competency in experiencia_data.competencies %}
-                    <li>
-                        <strong>{{ competency.name }}</strong>
-                        <span>{{ competency.approved }} de {{ competency.total }} resultados aprobados · {{ competency.pct }} %</span>
-                        <div class="experience-progress" role="progressbar" aria-label="Avance en {{ competency.name }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ competency.pct }}" style="--experience-percent: {{ competency.pct }}%;"><span aria-hidden="true"></span></div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p class="experience-empty"><span aria-hidden="true">📘</span> Aún no hay resultados por competencia para mostrar. Aquí verás tu avance cuando estén registrados.</p>
-                {% endif %}
-            </article>
             <article class="experience-card" aria-labelledby="experience-team-title">
                 <h3 id="experience-team-title">Avanzamos en equipo</h3>
                 {% if experiencia_data.team %}

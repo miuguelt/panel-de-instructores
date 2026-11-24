@@ -77,6 +77,18 @@ class PanelAprendizInicioTest(unittest.TestCase):
         estado = re.search(r'learner-status-pill">([^<]+)<', html).group(1)
         self.assertIn(estado, ('Excelente', 'Al día', 'En seguimiento', 'Riesgo alto'))
 
+    def test_pestanas_y_barra_movil_usan_las_mismas_etiquetas(self):
+        html, _ = self.panel()
+        pestanas = re.findall(r'<span class="tab-label">([^<]+)</span>', html)
+        barra = re.search(r'<nav class="learner-bottom-nav"[\s\S]*?</nav>', html).group(0)
+        self.assertEqual(pestanas, re.findall(r'<span>([^<]+)</span>', barra))
+
+    def test_cabecera_sin_ranking_y_con_acciones_secundarias_plegadas(self):
+        cabecera = self.cabecera(self.panel()[0])
+        self.assertNotIn('learner-podium-badge', cabecera)
+        self.assertIn('popovertarget="aprendiz-mas-acciones"', cabecera)
+        self.assertNotIn('% Global', self.panel()[0])
+
 
 def test_flujo_de_evidencias_en_barra_apilada():
     caso = PanelAprendizInicioTest('test_umbrales_de_color_unicos')

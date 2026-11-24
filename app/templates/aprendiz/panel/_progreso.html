@@ -1,25 +1,16 @@
 {#- Mi progreso y calendario de asistencia. Parcial de aprendiz/panel.html: usa su mismo contexto. -#}
     <section class="section-container" id="seccion-progreso" data-learner-tab="resumen">
         <div class="section-title-row">
-            <h2 class="section-title">Mi Progreso</h2>
-            <span class="badge badge-secondary">Panorama general</span>
+            <h2 class="section-title">Mi progreso</h2>
         </div>
 
         <div class="progress-dashboard">
             {# ── Juicios Global ── #}
             <div class="progress-card">
-                {% set c_jui = viz_color(stats_juicios.pct_total) %}
                 <div class="progress-card-header">
-                    <span class="progress-card-label"><i data-lucide="graduation-cap" class="icon-sm" aria-hidden="true"></i> Juicios evaluativos</span>
-                    <span class="progress-card-value" style="--metric-color: {{ c_jui }};">{{ stats_juicios.pct_total }}%</span>
+                    <span class="progress-card-label"><i data-lucide="graduation-cap" class="icon-sm" aria-hidden="true"></i> RAPs por tipo de competencia</span>
                 </div>
-                <div class="progress-card-track">
-                    {% if stats_juicios.pct_total > 0 %}<div class="progress-card-fill" style="--progress-value: {{ stats_juicios.pct_total }}%; --metric-color: var(--accent-primary);"></div>{% endif %}
-                </div>
-                <div class="progress-card-footer">
-                    <span>{{ stats_juicios.aprobados }} de {{ stats_juicios.total }} aprobados</span>
-                    <span>{{ stats_juicios.total - stats_juicios.aprobados }} pendientes</span>
-                </div>
+                {% if not stats_juicios.total %}<p class="progress-card-footer">Aún no hay juicios registrados.</p>{% endif %}
                 {% if stats_juicios.total > 0 %}
                 <div class="progress-detail">
                     <div class="progress-detail-row">
@@ -65,32 +56,11 @@
                 </div>
             </div>
 
-            {# ── Ranking ── #}
-            <div class="progress-card" data-experience-ranking>
-                {% set pct_rank = fila_propia.barra_puntaje if fila_propia else 0 %}
-                {% set c_rank = viz_color(pct_rank) %}
-                <div class="progress-card-header">
-                    <span class="progress-card-label"><i data-lucide="trophy" class="icon-sm" aria-hidden="true"></i> Ranking</span>
-                    <span class="progress-card-value" style="--metric-color: {{ c_rank }};">{{ '%.1f'|format(pct_rank) }}%</span>
-                </div>
-                <div class="progress-card-track">
-                    {% if pct_rank > 0 %}<div class="progress-card-fill" style="--progress-value: {{ pct_rank }}%; --metric-color: {{ c_rank }};"></div>{% endif %}
-                </div>
-                <div class="progress-card-footer">
-                    {% if fila_propia %}
-                    <span>Puesto #{{ fila_propia.posicion }} de {{ total_ranking }}</span>
-                    <span>{{ '%.1f'|format(fila_propia.puntaje_total) }} pts</span>
-                    {% else %}
-                    <span>Participación</span>
-                    {% endif %}
-                </div>
-            </div>
-
             {% include 'aprendiz/_avance_lectivo.html' %}
 
             {# ── Asistencia por sesión: cumplidas, justificadas y sin justificar ── #}
             <div class="progress-card progress-card--viz">
-                {{ apilada([('Sin falta injustificada', [sesiones_cumplidas - faltas_justificadas, 0]|max, 'success'),
+                {{ apilada([('Asistidas', [sesiones_cumplidas - faltas_justificadas, 0]|max, 'success'),
                             ('Justificadas', faltas_justificadas, 'info'),
                             ('Sin justificar', faltas_no_justificadas, 'danger')], 'Tus sesiones') }}
             </div>

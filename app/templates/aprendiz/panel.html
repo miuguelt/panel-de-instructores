@@ -29,7 +29,6 @@
     {% include 'aprendiz/panel/_cabecera.html' %}
     {% include 'aprendiz/panel/_prioridades.html' %}
     {% include 'aprendiz/panel/_pestanas.html' %}
-    {% include 'aprendiz/panel/_resumen_herramientas.html' %}
 
     {# Compute evidence progress for unified section #}
     {% if tareas_individuales %}
@@ -43,17 +42,18 @@
     {% set pct_evidencias = (_entregadas|length / total_tareas * 100)|round|int if total_tareas > 0 else 0 %}
     {% endif %}
 
-    {% include 'aprendiz/panel/_grupo.html' %}
-    {# ── Consolidated Progress Dashboard ── #}
+    {#- Resumen: avisos y alertas primero, luego el progreso y al final las herramientas y el portafolio. -#}
+    {% include 'aprendiz/panel/_avisos_convivencia.html' %}
     {% include 'aprendiz/panel/_progreso.html' %}
+    {% include 'aprendiz/panel/_resumen_herramientas.html' %}
+
+    {% include 'aprendiz/panel/_grupo.html' %}
 
     {% include 'aprendiz/panel/_juicios_oficiales.html' %}
 
-    {% include 'aprendiz/panel/_aseo.html' %}
-
-    {% include 'aprendiz/panel/_avisos_convivencia.html' %}
-
     {% include 'aprendiz/panel/_juicios_detalle.html' %}
+
+    {% include 'aprendiz/panel/_aseo.html' %}
 
     {% include 'aprendiz/panel/_rendimiento.html' %}
 
@@ -91,7 +91,7 @@
             <i data-lucide="graduation-cap" class="bottom-nav-icon" aria-hidden="true"></i>
             <span>Juicios</span>
         </a>
-        <a href="#seccion-ranking" class="learner-bottom-link" aria-label="Rendimiento y logros">
+        <a href="#seccion-ranking" class="learner-bottom-link">
             <i data-lucide="trophy" class="bottom-nav-icon" aria-hidden="true"></i>
             <span>Logros</span>
         </a>
