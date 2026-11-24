@@ -9,7 +9,11 @@
 
 {% block content %}
 {% set compacta = params.vista == 'mes' %}
+{% set ruta = ruta or 'programacion.calendario' %}
 {% set niveles = {'sin_programacion': 'danger', 'parcial': 'warning', 'completo': 'success', 'sin_dias_habiles': 'neutral'} %}
+{% if solo_lectura %}
+{{ page_header('Equipo ' ~ equipo_vista.nombre, subtitulo='Qué le toca a cada compañero, quién viene de otro equipo a orientar transversales y quién falta por programar.', icono='users') }}
+{% else %}
 {% call page_header('Programación', subtitulo='Dónde está cada instructor y quién tiene días sin programar.', icono='calendar-range') %}
     <button type="button" class="btn btn-primary" data-prg-programar aria-haspopup="dialog" aria-controls="modal-asignacion">
         <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i><span>Programar instructor</span>
@@ -20,25 +24,28 @@
     </a>
     {% endif %}
 {% endcall %}
+{% endif %}
+{% set programacion_activa = 'equipo' if solo_lectura else 'calendario' %}
+{% include 'programacion/_pestanas.html' %}
 
 <nav class="prg-barra" aria-label="Periodo del calendario">
     <div class="prg-periodo">
-        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.calendario', vista=params.vista, fecha=anterior.isoformat(), equipo=params.equipo) }}">
+        <a class="btn btn-outline btn-sm" href="{{ url_for(ruta, vista=params.vista, fecha=anterior.isoformat(), equipo=params.equipo) }}">
             <i data-lucide="chevron-left" class="icon-sm" aria-hidden="true"></i><span class="sr-only">{{ 'Mes' if compacta else 'Semana' }} anterior</span>
         </a>
-        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.calendario', vista=params.vista, equipo=params.equipo) }}">Hoy</a>
-        <a class="btn btn-outline btn-sm" href="{{ url_for('programacion.calendario', vista=params.vista, fecha=siguiente.isoformat(), equipo=params.equipo) }}">
+        <a class="btn btn-outline btn-sm" href="{{ url_for(ruta, vista=params.vista, equipo=params.equipo) }}">Hoy</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for(ruta, vista=params.vista, fecha=siguiente.isoformat(), equipo=params.equipo) }}">
             <i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i><span class="sr-only">{{ 'Mes' if compacta else 'Semana' }} siguiente</span>
         </a>
         <h2 class="prg-periodo-titulo">{{ titulo_rango }}</h2>
     </div>
     <div class="prg-vistas" role="group" aria-label="Tipo de vista">
         <a class="btn btn-sm {{ 'btn-primary' if not compacta else 'btn-outline' }}"{% if not compacta %} aria-current="true"{% endif %}
-           href="{{ url_for('programacion.calendario', vista='semana', fecha=params.fecha.isoformat(), equipo=params.equipo) }}">Semana</a>
+           href="{{ url_for(ruta, vista='semana', fecha=params.fecha.isoformat(), equipo=params.equipo) }}">Semana</a>
         <a class="btn btn-sm {{ 'btn-primary' if compacta else 'btn-outline' }}"{% if compacta %} aria-current="true"{% endif %}
-           href="{{ url_for('programacion.calendario', vista='mes', fecha=params.fecha.isoformat(), equipo=params.equipo) }}">Mes</a>
+           href="{{ url_for(ruta, vista='mes', fecha=params.fecha.isoformat(), equipo=params.equipo) }}">Mes</a>
     </div>
-    {% if equipos|length > 1 %}
+    {% if not solo_lectura and equipos|length > 1 %}
     <form method="GET" class="prg-filtro">
         <input type="hidden" name="vista" value="{{ params.vista }}">
         <input type="hidden" name="fecha" value="{{ params.fecha.isoformat() }}">
@@ -61,7 +68,7 @@
 
 {% if resumen.instructores %}
 <section class="card prg-alertas" aria-labelledby="prg-alertas-titulo">
-    <h2 id="prg-alertas-titulo">Alertas {{ 'del mes' if compacta else 'de la semana' }}</h2>
+    <h2 id="prg-alertas-titulo">{{ 'Falta por programar' if solo_lectura else 'Alertas' }} {{ 'en el mes' if solo_lectura and compacta else ('en la semana' if solo_lectura else ('del mes' if compacta else 'de la semana')) }}</h2>
     {% if alertas %}
     <ul class="prg-alertas-lista">
         {% for f in alertas %}
@@ -75,8 +82,10 @@
                     {% else %}{{ f.dias_libres|length }} de {{ f.dias_laborables }} días hábiles libres{% if not compacta %}: {% for d in f.dias_libres %}{{ dias_semana[d.weekday()][2]|lower }} {{ d.day }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}.{% endif %}
                 </span>
             </span>
+            {% if not solo_lectura %}
             <button type="button" class="btn btn-outline btn-sm" data-prg-programar aria-haspopup="dialog" aria-controls="modal-asignacion"
                     data-instructor="{{ f.instructor.id }}" data-inicio="{{ f.dias_libres[0].isoformat() }}">Programar</button>
+            {% endif %}
         </li>
         {% endfor %}
     </ul>
@@ -128,7 +137,9 @@
 </section>
 {% else %}
 <section class="card">
-    {% if current_user.es_coordinacion %}
+    {% if solo_lectura %}
+    {{ vacio('Tu equipo aún no tiene instructores activos', 'Coordinación asigna los instructores a cada equipo ejecutor.', icono='users') }}
+    {% elif current_user.es_coordinacion %}
     {{ vacio('Aún no hay instructores para mostrar', 'Crea los equipos ejecutores y asigna a cada instructor su equipo.', url=url_for('equipos.listar'), accion='Ir a equipos', icono='users') }}
     {% else %}
     {{ vacio('Tu equipo aún no tiene instructores', 'Pide a coordinación que asigne los instructores a tu equipo.', icono='users') }}
@@ -143,9 +154,9 @@
     El sábado se muestra, pero no cuenta en el porcentaje.
 </p>
 
-{% include "programacion/_formulario.html" %}
+{% if not solo_lectura %}{% include "programacion/_formulario.html" %}{% endif %}
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/programacion.js') }}" defer></script>
+{% if not solo_lectura %}<script src="{{ url_for('static', filename='js/programacion.js') }}" defer></script>{% endif %}
 {% endblock %}

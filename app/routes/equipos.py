@@ -8,7 +8,9 @@ from sqlalchemy import func
 
 from app import db
 from app.models.equipo import EquipoEjecutor
+from app.models.ficha import Ficha
 from app.models.instructor import Instructor
+from app.services.programacion_instructores import asignaciones_fuera_de_equipo
 from app.services.permisos import coordinacion_required
 
 equipos_bp = Blueprint('equipos', __name__)
@@ -51,8 +53,14 @@ def _aplicar_lider(equipo: EquipoEjecutor) -> None:
 def listar():
     equipos = EquipoEjecutor.query.order_by(EquipoEjecutor.activo.desc(), EquipoEjecutor.nombre).all()
     instructores = Instructor.query.filter_by(activo=True).order_by(Instructor.nombre).all()
+    fichas = Ficha.query.order_by(Ficha.codigo).all()
+    fichas_por_equipo: dict[int | None, list[Ficha]] = {}
+    for ficha in fichas:
+        fichas_por_equipo.setdefault(ficha.equipo_id, []).append(ficha)
     return render_template('programacion/equipos.html', equipos=equipos, instructores=instructores,
-                           sin_equipo=[i for i in instructores if not i.equipo_id])
+                           sin_equipo=[i for i in instructores if not i.equipo_id],
+                           fichas=fichas, fichas_por_equipo=fichas_por_equipo,
+                           fichas_sin_equipo=fichas_por_equipo.get(None, []))
 
 
 @equipos_bp.route('/', methods=['POST'])
@@ -77,6 +85,14 @@ def crear():
     db.session.commit()
     flash(f'Creaste el equipo {equipo.nombre}.', 'success')
     return redirect(url_for('equipos.listar'))
+
+
+def _equipo_activo_elegido(valor: str | None) -> tuple[bool, EquipoEjecutor | None]:
+    """(válido, equipo): un valor vacío deja sin equipo; si no, debe ser un equipo activo."""
+    if not valor:
+        return True, None
+    equipo = db.session.get(EquipoEjecutor, int(valor)) if valor.isdigit() else None
+    return bool(equipo and equipo.activo), equipo
 
 
 def _equipo(equipo_id: int) -> EquipoEjecutor:
@@ -128,21 +144,48 @@ def asignar_miembro():
     if instructor is None:
         flash('Elige un instructor activo.', 'error')
         return redirect(url_for('equipos.listar'))
-    valor = request.form.get('equipo_id')
-    if valor:
-        equipo = db.session.get(EquipoEjecutor, int(valor)) if valor.isdigit() else None
-        if not equipo or not equipo.activo:
-            flash('Elige un equipo activo.', 'error')
-            return redirect(url_for('equipos.listar'))
-        instructor.equipo_id = equipo.id
-        destino = f'al equipo {equipo.nombre}'
-    else:
-        instructor.equipo_id = None
-        destino = 'sin equipo'
+    valido, equipo = _equipo_activo_elegido(request.form.get('equipo_id'))
+    if not valido:
+        flash('Elige un equipo activo.', 'error')
+        return redirect(url_for('equipos.listar'))
+    instructor.equipo_id = equipo.id if equipo else None
+    destino = f'al equipo {equipo.nombre}' if equipo else 'sin equipo'
     # Quien lidera un equipo y sale de él deja de liderarlo.
     for liderado in EquipoEjecutor.query.filter_by(lider_id=instructor.id).all():
         if liderado.id != instructor.equipo_id:
             liderado.lider_id = None
     db.session.commit()
     flash(f'{instructor.nombre} quedó {destino}.', 'success')
+    _avisar_asignaciones_fuera_de_equipo(instructor)
+    return redirect(url_for('equipos.listar'))
+
+
+def _avisar_asignaciones_fuera_de_equipo(instructor: Instructor) -> None:
+    """Las asignaciones técnicas que quedan en fichas de otro equipo no se borran: se avisan."""
+    pendientes = asignaciones_fuera_de_equipo(instructor)
+    if not pendientes:
+        return
+    fichas = ', '.join(sorted({a.ficha.codigo for a in pendientes}))
+    flash(f'{instructor.nombre} tiene {len(pendientes)} asignación(es) vigente(s) de competencias '
+          f'técnicas en fichas de otro equipo ({fichas}). Revísalas en el calendario: entre equipos '
+          'solo se programan transversales.', 'warning')
+
+
+@equipos_bp.route('/fichas', methods=['POST'])
+@coordinacion_required
+def asignar_ficha():
+    """Define el equipo ejecutor que orienta una ficha (o la deja sin equipo)."""
+    valor = request.form.get('ficha_id') or ''
+    ficha = db.session.get(Ficha, int(valor)) if valor.isdigit() else None
+    if ficha is None:
+        flash('Elige una ficha.', 'error')
+        return redirect(url_for('equipos.listar'))
+    valido, equipo = _equipo_activo_elegido(request.form.get('equipo_id'))
+    if not valido:
+        flash('Elige un equipo activo.', 'error')
+        return redirect(url_for('equipos.listar'))
+    ficha.equipo_id = equipo.id if equipo else None
+    db.session.commit()
+    destino = f'en el equipo {equipo.nombre}' if equipo else 'sin equipo'
+    flash(f'La ficha {ficha.codigo} quedó {destino}.', 'success')
     return redirect(url_for('equipos.listar'))

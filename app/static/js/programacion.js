@@ -92,9 +92,12 @@
 
     function llenarCompetencias(datalist, competencias) {
         datalist.innerHTML = '';
-        (competencias || []).forEach(function (nombre) {
+        (competencias || []).forEach(function (competencia) {
+            // El servidor envía {nombre, tipo, transversal}; se aceptan también nombres sueltos.
+            const datos = typeof competencia === 'string' ? { nombre: competencia } : competencia;
             const opcion = datalist.ownerDocument.createElement('option');
-            opcion.value = nombre;
+            opcion.value = datos.nombre;
+            if (datos.transversal) opcion.label = 'Transversal: se puede programar a otros equipos';
             datalist.appendChild(opcion);
         });
         return datalist;

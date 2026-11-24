@@ -168,7 +168,8 @@ class CalendarioTest(BaseRutas):
     def test_competencias_de_ficha_json(self):
         pi.guardar_asignacion(self.form(), None)
         self.entrar(self.coord)
-        self.assertEqual(self.client.get(f'/programacion/fichas/{self.ficha_sis.id}/competencias').get_json(), [COMP])
+        self.assertEqual(self.client.get(f'/programacion/fichas/{self.ficha_sis.id}/competencias').get_json(),
+                         [{'nombre': COMP, 'tipo': 'tecnica', 'transversal': False}])
         self.assertEqual(self.client.get('/programacion/fichas/999/competencias').status_code, 404)
         self.entrar(self.ana)
         self.assertEqual(self.client.get(f'/programacion/fichas/{self.ficha_sis.id}/competencias').status_code, 403)
@@ -212,7 +213,8 @@ class AsignacionesTest(BaseRutas):
     def test_lider_programa_su_equipo_en_otra_ficha_y_externo_en_su_ficha(self):
         self.entrar(self.lider)
         self.client.post('/programacion/asignaciones', data=self.form(ficha_id=self.ficha_agr.id, competencia='Ética'))
-        self.client.post('/programacion/asignaciones', data=self.form(instructor_id=self.beto.id, jornada='noche'))
+        self.client.post('/programacion/asignaciones',
+                         data=self.form(instructor_id=self.beto.id, competencia='Ética', jornada='noche'))
         self.assertEqual(AsignacionProgramacion.query.count(), 2)
 
     def test_lider_no_programa_externo_en_ficha_ajena(self):

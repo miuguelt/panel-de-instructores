@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block content %}
-{% call page_header('Equipos ejecutores', subtitulo='Cada instructor pertenece a un equipo. El líder ve y programa a su equipo; un instructor puede orientar transversales en fichas de otros equipos.', icono='users', volver=url_for('programacion.calendario')) %}
+{% call page_header('Equipos ejecutores', subtitulo='Cada instructor y cada ficha pertenecen a un equipo. Todo el equipo ve su programación; entre equipos solo se programan transversales.', icono='users', volver=url_for('programacion.calendario')) %}
 {% endcall %}
 
 <div class="prg-equipos-grid">
@@ -56,6 +56,30 @@
             <button type="submit" class="btn btn-primary">Guardar</button>
         </form>
     </section>
+
+    <section class="card" aria-labelledby="prg-asignar-ficha">
+        <h2 id="prg-asignar-ficha">Cambiar el equipo de una ficha</h2>
+        <p class="text-muted">El equipo de la ficha orienta sus competencias técnicas; los instructores de otros equipos solo orientan transversales.</p>
+        {% if fichas_sin_equipo %}<p class="text-muted">{{ fichas_sin_equipo|length }} ficha{{ 's' if fichas_sin_equipo|length != 1 }} sin equipo: {{ fichas_sin_equipo|map(attribute='codigo')|join(', ') }}.</p>{% endif %}
+        <form method="POST" action="{{ url_for('equipos.asignar_ficha') }}" class="prg-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="ficha-equipo-ficha">Ficha</label>
+                <select id="ficha-equipo-ficha" name="ficha_id" class="form-control" required>
+                    <option value="">Elige una ficha</option>
+                    {% for f in fichas %}<option value="{{ f.id }}">{{ f.codigo }} · {{ f.nombre_programa }} · {{ f.equipo.nombre if f.equipo else 'sin equipo' }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="ficha-equipo-equipo">Equipo</label>
+                <select id="ficha-equipo-equipo" name="equipo_id" class="form-control">
+                    <option value="">Sin equipo</option>
+                    {% for e in equipos if e.activo %}<option value="{{ e.id }}">{{ e.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+        </form>
+    </section>
 </div>
 
 {% for e in equipos %}
@@ -67,6 +91,8 @@
     </header>
     {% if e.descripcion %}<p>{{ e.descripcion }}</p>{% endif %}
     {% if e.miembros %}<p class="prg-miembros">{{ e.miembros|map(attribute='nombre')|join(' · ') }}</p>{% endif %}
+    {% set fichas_equipo = fichas_por_equipo.get(e.id, []) %}
+    <p class="text-muted">{% if fichas_equipo %}Fichas: {{ fichas_equipo|map(attribute='codigo')|join(' · ') }}{% else %}Sin fichas asignadas.{% endif %}</p>
     <details class="prg-detalles">
         <summary class="btn btn-sm btn-outline">Editar</summary>
         <form method="POST" action="{{ url_for('equipos.editar', equipo_id=e.id) }}" class="prg-form">

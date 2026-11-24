@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "components/_ui.html" import page_header %}
+{% from "components/_viz.html" import vacio %}
+{% block title %}Mi equipo - SENA Control{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/programacion.css') }}">
+{% endblock %}
+
+{% block content %}
+{{ page_header('Mi equipo', subtitulo='La programación de tu equipo ejecutor: qué le toca a cada compañero y quién falta por programar.', icono='users') }}
+{% set programacion_activa = 'equipo' %}
+{% include 'programacion/_pestanas.html' %}
+<section class="card">
+    {{ vacio('Aún no perteneces a un equipo ejecutor', 'Coordinación te asigna a uno. Mientras tanto, consulta tu semana en «Mi semana».', url=url_for('programacion.mi_programacion'), accion='Ver mi semana', icono='users') }}
+</section>
+{% endblock %}

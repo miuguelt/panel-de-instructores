@@ -22,6 +22,7 @@ from app.models.programacion import (
     DIAS_SEMANA, JORNADAS, MASCARA_MAXIMA, AsignacionProgramacion,
 )
 from app.services.festivos import es_dia_habil, es_festivo_colombia, nombre_festivo_colombia
+from app.services.importacion_ficha import clasificar_competencia
 from app.services.programacion_competencias import guardar_programacion_competencia
 
 MAX_DIAS_ASIGNACION = 366
@@ -101,6 +102,46 @@ class ErrorProgramacion(ValueError):
     """Error de validación con un mensaje listo para mostrar."""
 
 
+# --- Equipos ejecutores y competencias transversales ---
+
+TIPO_TECNICA = 'tecnica'
+TIPO_TRANSVERSAL = 'transversal'
+TIPO_INGLES = 'ingles'
+# Inglés lo orientan instructores de bilingüismo de otras áreas: cuenta como transversal.
+TIPOS_ENTRE_EQUIPOS = {TIPO_TRANSVERSAL, TIPO_INGLES}
+
+
+def tipo_de_competencia(ficha_id: int, competencia: str) -> str:
+    """Tipo registrado en los juicios de la ficha; si no hay, se clasifica por el nombre."""
+    registrado = (db.session.query(JuicioEvaluativo.tipo_competencia)
+                  .filter(JuicioEvaluativo.ficha_id == ficha_id,
+                          JuicioEvaluativo.competencia == competencia,
+                          JuicioEvaluativo.tipo_competencia.isnot(None))
+                  .limit(1).scalar())
+    tipo = registrado or clasificar_competencia(competencia)
+    return tipo if tipo in (TIPO_TECNICA, TIPO_TRANSVERSAL, TIPO_INGLES) else TIPO_TECNICA
+
+
+def es_transversal(ficha_id: int, competencia: str) -> bool:
+    return tipo_de_competencia(ficha_id, competencia) in TIPOS_ENTRE_EQUIPOS
+
+
+def es_cruce_de_equipo(instructor: Instructor, ficha: Ficha) -> bool:
+    """La ficha tiene equipo ejecutor y el instructor no pertenece a él."""
+    return bool(ficha.equipo_id) and instructor.equipo_id != ficha.equipo_id
+
+
+def validar_cruce_de_equipo(instructor: Instructor, ficha: Ficha, competencia: str) -> None:
+    """Entre equipos ejecutores distintos solo se programan competencias transversales."""
+    if not es_cruce_de_equipo(instructor, ficha) or es_transversal(ficha.id, competencia):
+        return
+    equipo = ficha.equipo.nombre if ficha.equipo else 'de la ficha'
+    raise ErrorProgramacion(
+        f'{instructor.nombre} no pertenece al equipo ejecutor {equipo}: entre equipos solo se '
+        'programan competencias transversales. Programa a alguien de ese equipo o pide a '
+        'coordinación que traslade al instructor.')
+
+
 def validar_datos(datos: dict[str, Any]) -> dict[str, Any]:
     """Normaliza y valida los datos del formulario; lanza ErrorProgramacion si algo falla."""
     try:
@@ -115,9 +156,11 @@ def validar_datos(datos: dict[str, Any]) -> dict[str, Any]:
     jornada = datos.get('jornada') or ''
     observacion = ' '.join(str(datos.get('observacion') or '').split())[:300] or None
 
-    if not instructor_id or not db.session.get(Instructor, instructor_id):
+    instructor = db.session.get(Instructor, instructor_id) if instructor_id else None
+    ficha = db.session.get(Ficha, ficha_id) if ficha_id else None
+    if not instructor:
         raise ErrorProgramacion('Elige el instructor que vas a programar.')
-    if not ficha_id or not db.session.get(Ficha, ficha_id):
+    if not ficha:
         raise ErrorProgramacion('Elige la ficha donde se orienta la competencia.')
     if not competencia:
         raise ErrorProgramacion('Escribe o elige la competencia.')
@@ -146,6 +189,7 @@ def validar_datos(datos: dict[str, Any]) -> dict[str, Any]:
         if not dias_semana:
             raise ErrorProgramacion('Marca al menos un día de la semana.')
     dias_semana &= MASCARA_MAXIMA
+    validar_cruce_de_equipo(instructor, ficha, competencia)
 
     return {
         'instructor_id': instructor_id, 'ficha_id': ficha_id, 'competencia': competencia,
@@ -245,13 +289,20 @@ class _Rango:
 
 # --- Consultas para el calendario ---
 
-def competencias_de_ficha(ficha_id: int) -> list[str]:
-    """Competencias conocidas de la ficha (juicios, planeación y asignaciones)."""
+def competencias_de_ficha(ficha_id: int) -> list[dict[str, Any]]:
+    """Competencias conocidas de la ficha (juicios, planeación y asignaciones) con su tipo.
+
+    `transversal` indica si se puede programar a un instructor de otro equipo ejecutor.
+    """
     nombres = set()
     for modelo in (JuicioEvaluativo, FichaCompetenciaProgramacion, AsignacionProgramacion):
         filas = db.session.query(modelo.competencia).filter(modelo.ficha_id == ficha_id).distinct()
         nombres.update(c for (c,) in filas if c)
-    return sorted(nombres)
+    resultado = []
+    for nombre in sorted(nombres):
+        tipo = tipo_de_competencia(ficha_id, nombre)
+        resultado.append({'nombre': nombre, 'tipo': tipo, 'transversal': tipo in TIPOS_ENTRE_EQUIPOS})
+    return resultado
 
 
 def asignaciones_en_rango(instructor_ids: Iterable[int], desde: date, hasta: date) -> list[AsignacionProgramacion]:
@@ -396,18 +447,47 @@ def instructores_visibles(usuario, desde: date, hasta: date, equipo_id: int | No
     else:
         propios_filtro = propios
     miembros = activos.filter(Instructor.equipo_id.in_(propios_filtro)).all() if propios_filtro else []
+    return _con_externos(miembros, propios_filtro, desde, hasta), propios
+
+
+def _con_externos(miembros: list[Instructor], equipos: set[int], desde: date, hasta: date) -> list[Instructor]:
+    """Miembros más los instructores de otros equipos programados en fichas de `equipos`."""
     externos_ids = {
-        a.instructor_id for a in AsignacionProgramacion.query
+        instructor_id for (instructor_id,) in db.session.query(AsignacionProgramacion.instructor_id)
         .join(Ficha, Ficha.id == AsignacionProgramacion.ficha_id)
-        .join(Instructor, Instructor.id == Ficha.instructor_id)
-        .filter(Instructor.equipo_id.in_(propios_filtro),
+        .filter(Ficha.equipo_id.in_(equipos),
                 AsignacionProgramacion.fecha_inicio <= hasta,
                 AsignacionProgramacion.fecha_fin >= desde)
-    } if propios_filtro else set()
+    } if equipos else set()
     ids_miembros = {i.id for i in miembros}
     externos = [i for i in (db.session.get(Instructor, x) for x in externos_ids - ids_miembros)
                 if i and i.activo]
-    return sorted(miembros + externos, key=lambda i: i.nombre), propios
+    return sorted(miembros + externos, key=lambda i: i.nombre)
+
+
+def instructores_del_equipo(equipo_id: int, desde: date, hasta: date) -> list[Instructor]:
+    """Vista del equipo en solo lectura: compañeros activos y quienes vienen de otros equipos
+    a orientar transversales en las fichas del equipo."""
+    miembros = (Instructor.query
+                .filter(Instructor.activo.is_(True), Instructor.rol != 'coordinacion',
+                        Instructor.equipo_id == equipo_id)
+                .order_by(Instructor.nombre).all())
+    return _con_externos(miembros, {equipo_id}, desde, hasta)
+
+
+def asignaciones_fuera_de_equipo(instructor: Instructor, desde: date | None = None) -> list[AsignacionProgramacion]:
+    """Asignaciones vigentes o futuras de competencias no transversales en fichas de otro equipo.
+
+    Sirve para avisar a coordinación cuando traslada a un instructor de equipo.
+    """
+    desde = desde or date.today()
+    vigentes = (AsignacionProgramacion.query
+                .options(joinedload(AsignacionProgramacion.ficha))
+                .filter(AsignacionProgramacion.instructor_id == instructor.id,
+                        AsignacionProgramacion.fecha_fin >= desde)
+                .order_by(AsignacionProgramacion.fecha_inicio).all())
+    return [a for a in vigentes
+            if es_cruce_de_equipo(instructor, a.ficha) and not es_transversal(a.ficha_id, a.competencia)]
 
 
 def contar_alertas_semana(usuario, hoy: date | None = None) -> int:

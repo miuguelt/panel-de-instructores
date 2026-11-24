@@ -264,7 +264,10 @@ def puede_entrar_a_coordinacion(usuario=None):
 
 def puede_programar(instructor, ficha, usuario=None):
     """Coordinación programa a cualquiera; un líder programa a su equipo en cualquier ficha
-    y a instructores de otros equipos en las fichas de su equipo (transversales)."""
+    y a instructores de otros equipos en las fichas de su equipo.
+
+    Que entre equipos solo se programen transversales lo valida el servicio de programación
+    para todos los perfiles, incluida coordinación."""
     usuario = usuario or current_user
     if not instructor or not ficha or not getattr(usuario, 'is_authenticated', False):
         return False
@@ -275,5 +278,4 @@ def puede_programar(instructor, ficha, usuario=None):
         return False
     if instructor.equipo_id in equipos:
         return True
-    duenio = ficha.instructor
-    return bool(duenio and duenio.equipo_id in equipos)
+    return ficha.equipo_id in equipos

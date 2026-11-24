@@ -124,3 +124,29 @@ test('el formulario cubre entrada vacía, inválida, válida y reinicio', async 
     assert.ok(await page.locator('.prg-chip--tarde').count() >= 1);
     await contexto.close();
 });
+
+test('la vista Mi equipo es de solo lectura y no desborda de 320 a 2560 px', async () => {
+    for (const ancho of [320, 390, 768, 1440, 1920, 2560]) {
+        const contexto = await browser.newContext({ viewport: { width: ancho, height: 900 } });
+        const page = await entrarComoCoordinacion(contexto);
+        await page.goto(`${url}/programacion/equipo`);
+        const medidas = await page.evaluate(() => ({
+            pagina: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            titulo: document.querySelector('h1') ? document.querySelector('h1').textContent : '',
+            programar: document.querySelectorAll('[data-prg-programar], [data-prg-editar], #form-asignacion').length,
+        }));
+        assert.ok(medidas.pagina <= 1, `Desborde horizontal de ${medidas.pagina}px a ${ancho}px`);
+        assert.match(medidas.titulo, /Aún no perteneces|Mi equipo/);
+        assert.equal(medidas.programar, 0);
+        await contexto.close();
+    }
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    await page.goto(`${url}/__pruebas__/entrar/3`);
+    await page.goto(`${url}/programacion/equipo`);
+    assert.match(await page.locator('h1').innerText(), /Equipo Sistemas/);
+    assert.equal(await page.locator('[data-prg-programar], [data-prg-editar], #form-asignacion').count(), 0);
+    assert.ok((await page.locator('.prg-chip-competencia').allInnerTexts()).some(t => t.endsWith('metodologías de desarrollo')));
+    await page.screenshot({ path: path.join(resultados, 'programacion-mi-equipo-1440.png'), fullPage: true });
+    await contexto.close();
+});

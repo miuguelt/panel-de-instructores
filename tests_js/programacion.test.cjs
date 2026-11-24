@@ -146,6 +146,17 @@ test('llenarCompetencias reemplaza las opciones del datalist', () => {
     assert.equal(datalist.hijos.length, 2);
 });
 
+test('llenarCompetencias marca las transversales que admiten instructores de otros equipos', () => {
+    const { datalist } = entorno();
+    P.llenarCompetencias(datalist, [
+        { nombre: 'Desarrollar software', tipo: 'tecnica', transversal: false },
+        { nombre: 'Ética', tipo: 'transversal', transversal: true },
+    ]);
+    assert.deepEqual(datalist.hijos.map(h => h.value), ['Desarrollar software', 'Ética']);
+    assert.equal(datalist.hijos[0].label, undefined);
+    assert.equal(datalist.hijos[1].label, 'Transversal: se puede programar a otros equipos');
+});
+
 test('cargarCompetencias consulta la ficha elegida y maneja errores sin inventar datos', async () => {
     const { form, elements, datalist } = entorno();
     const pedidas = [];

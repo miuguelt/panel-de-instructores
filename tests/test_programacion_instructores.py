@@ -163,10 +163,12 @@ class PersistenciaTest(BaseProgramacion):
 
     def test_sincroniza_rango_completo_de_varias_asignaciones(self):
         pi.guardar_asignacion(self.datos(fecha_inicio='2026-11-23', fecha_fin='2026-11-27'), None)
-        pi.guardar_asignacion(self.datos(instructor_id=self.beto.id), None)
+        companera = self._instructor('Eva Sistemas', 'eva', self.sistemas)
+        db.session.commit()
+        pi.guardar_asignacion(self.datos(instructor_id=companera.id), None)
         prog = FichaCompetenciaProgramacion.query.filter_by(competencia=COMP).one()
         self.assertEqual((prog.fecha_inicio, prog.fecha_fin), (LUNES, date(2026, 11, 27)))
-        self.assertEqual(prog.instructor_id, self.beto.id)
+        self.assertEqual(prog.instructor_id, companera.id)
 
     def test_choque_misma_jornada_bloquea_y_otra_jornada_no(self):
         pi.guardar_asignacion(self.datos(), None)
@@ -217,7 +219,10 @@ class PersistenciaTest(BaseProgramacion):
                                         competencia='Inglés', resultado_aprendizaje='RAP 1', juicio='POR EVALUAR'))
         db.session.commit()
         pi.guardar_asignacion(self.datos(), None)
-        self.assertEqual(pi.competencias_de_ficha(self.ficha_sis.id), [COMP, 'Inglés'])
+        self.assertEqual(pi.competencias_de_ficha(self.ficha_sis.id), [
+            {'nombre': COMP, 'tipo': 'tecnica', 'transversal': False},
+            {'nombre': 'Inglés', 'tipo': 'ingles', 'transversal': True},
+        ])
         self.assertEqual(pi.competencias_de_ficha(self.ficha_agr.id), [])
 
 
@@ -281,8 +286,8 @@ class VisibilidadTest(BaseProgramacion):
         inactivo = self._instructor('Dora Inactiva', 'dora', self.agricola)
         inactivo.activo = False
         db.session.commit()
-        pi.guardar_asignacion(self.datos(instructor_id=self.beto.id, competencia='Transversal'), None)
-        pi.guardar_asignacion(self.datos(instructor_id=inactivo.id, competencia='Otra'), None)
+        pi.guardar_asignacion(self.datos(instructor_id=self.beto.id, competencia='Ética'), None)
+        pi.guardar_asignacion(self.datos(instructor_id=inactivo.id, competencia='Comunicación'), None)
         visibles, propios = pi.instructores_visibles(self.ana, LUNES, SABADO)
         self.assertEqual([i.nombre for i in visibles], ['Ana Sistemas', 'Beto Agrícola'])
         self.assertEqual(propios, {self.sistemas.id})

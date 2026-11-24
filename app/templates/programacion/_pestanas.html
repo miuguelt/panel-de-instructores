@@ -1,0 +1,18 @@
+{#- Navegación del módulo Programación.
+
+    Uso: {% set programacion_activa = 'equipo' %}{% include 'programacion/_pestanas.html' %}
+    «Calendario» solo aparece para coordinación, administración y líderes de equipo.
+-#}
+{% set pestanas_programacion = [] %}
+{% if current_user.es_coordinacion or current_user.es_lider %}
+{% set _ = pestanas_programacion.append(('calendario', 'Calendario', 'calendar-range', url_for('programacion.calendario'))) %}
+{% endif %}
+{% set _ = pestanas_programacion.append(('equipo', 'Mi equipo', 'users', url_for('programacion.mi_equipo'))) %}
+{% set _ = pestanas_programacion.append(('mia', 'Mi semana', 'calendar-check', url_for('programacion.mi_programacion'))) %}
+<nav class="seguimiento-pestanas" aria-label="Secciones de programación">
+    {% for clave, etiqueta, icono, url in pestanas_programacion %}
+    <a href="{{ url }}" class="seguimiento-pestana{% if clave == programacion_activa %} is-active{% endif %}"{% if clave == programacion_activa %} aria-current="page"{% endif %}>
+        <i data-lucide="{{ icono }}" class="icon-sm" aria-hidden="true"></i> {{ etiqueta }}
+    </a>
+    {% endfor %}
+</nav>

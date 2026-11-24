@@ -112,6 +112,28 @@ def mi_programacion():
     )
 
 
+@programacion_bp.route('/equipo', methods=['GET'])
+@login_required
+def mi_equipo():
+    """Programación del equipo ejecutor del instructor, en solo lectura, para todo el equipo."""
+    equipo = current_user.equipo if current_user.equipo and current_user.equipo.activo else None
+    if equipo is None:
+        return render_template('programacion/sin_equipo.html')
+    params = _parametros_vista(request.args)
+    params['equipo'] = None
+    desde, hasta, anterior, siguiente = rango_de_vista(params['vista'], params['fecha'])
+    filas = pi.ocupacion(pi.instructores_del_equipo(equipo.id, desde, hasta), desde, hasta)
+    return render_template(
+        'programacion/calendario.html', solo_lectura=True, ruta='programacion.mi_equipo',
+        equipo_vista=equipo,
+        params=params, desde=desde, hasta=hasta, anterior=anterior, siguiente=siguiente,
+        titulo_rango=titulo_de_rango(params['vista'], desde, hasta),
+        dias=pi.dias_del_rango(desde, hasta), grupos=pi.agrupar_por_equipo(filas, {equipo.id}),
+        alertas=pi.alertas(filas), resumen=pi.resumen(filas), equipos=[equipo],
+        dias_semana=DIAS_SEMANA, hoy=date.today(), puede_programar=None,
+    )
+
+
 @programacion_bp.route('/fichas/<int:ficha_id>/competencias', methods=['GET'])
 @login_required
 def competencias_ficha(ficha_id):
@@ -127,8 +149,9 @@ def _autorizar(datos) -> None:
     ficha = db.session.get(Ficha, _entero(datos.get('ficha_id')) or 0)
     if instructor and ficha and not puede_programar(instructor, ficha):
         raise pi.ErrorProgramacion(
-            'Solo puedes programar a instructores de tu equipo, o a otros instructores '
-            'en fichas de tu equipo. Pide a coordinación esta asignación.')
+            'Solo puedes programar a instructores de tu equipo, o a instructores de otros '
+            'equipos en competencias transversales de las fichas de tu equipo. Pide a '
+            'coordinación esta asignación.')
 
 
 def _datos_formulario() -> dict:
