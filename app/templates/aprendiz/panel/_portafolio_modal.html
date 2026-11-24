@@ -15,12 +15,13 @@
                 <button type="button" class="app-modal-close" data-close-portafolio-modal aria-label="Cerrar ventana">&times;</button>
             </header>
 
-            <form id="form-portafolio-aprendiz" method="POST" action="{{ url_for('aprendiz.guardar_portafolio', ficha_id=ficha.id) }}" class="app-modal-body">
+            <form id="form-portafolio-aprendiz" method="POST" action="{{ url_for('aprendiz.guardar_portafolio', ficha_id=ficha.id) }}" class="app-modal-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="app-modal-body">
 
                 <div id="portafolio-feedback-msg" class="alert alert-danger" style="display: none; margin-bottom: 1rem;" role="alert"></div>
 
-                <div class="form-group mb-3">
+                <div class="form-group">
                     <label for="input-enlace-github" class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
                         <span>🐱 Repositorio o Perfil en GitHub</span>
                         <span class="badge badge-secondary" style="font-size: 0.72rem;">Código y Proyectos</span>
@@ -35,7 +36,7 @@
                     </small>
                 </div>
 
-                <div class="form-group mb-3">
+                <div class="form-group">
                     <label for="input-enlace-notion" class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
                         <span>📓 Bitácora o Portafolio en Notion</span>
                         <span class="badge badge-secondary" style="font-size: 0.72rem;">Bitácora de Evidencias</span>
@@ -56,8 +57,9 @@
                         Los instructores revisan estos enlaces al verificar juicios evaluativos y avances de etapa práctica. Mantén tus repositorios y notas organizados.
                     </span>
                 </div>
+                </div>
 
-                <footer class="app-modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-data);">
+                <footer class="app-modal-footer">
                     <button type="button" class="btn btn-ghost" data-close-portafolio-modal>Cancelar</button>
                     <button type="submit" id="btn-save-portafolio" class="btn btn-primary">
                         <span id="btn-save-portafolio-text">Guardar enlaces</span>

@@ -845,6 +845,7 @@ dialog.app-modal-overlay::backdrop {
     border-top: 1px solid var(--border-divider);
 }
 .app-modal-footer--center { justify-content: center; }
+.app-modal-footer--split { justify-content: space-between; flex-wrap: wrap; }
 
 body.modal-open { overflow: hidden; }
 
@@ -11545,12 +11546,22 @@ main#contenido-principal {
     background: var(--surface-3, rgba(0, 0, 0, 0.08));
 }
 
-.portafolio-modal-shell {
-    max-width:100%;
-    width: 92vw;
-    background: var(--card-bg, #ffffff);
-    border-radius: var(--radius, 16px);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+.app-modal-content.portafolio-modal-shell {
+    width: min(100%, 40rem);
+}
+
+.portafolio-modal-shell .app-modal-body .form-group,
+.portafolio-modal-content .app-modal-body .form-group {
+    margin-bottom: 0;
+}
+
+/* Secondary band between header and body (filters, search). Shares the
+   horizontal padding of the other regions so every edge lines up. */
+.app-modal-toolbar {
+    flex-shrink: 0;
+    padding: 0.75rem clamp(1rem, 3vw, 1.5rem);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-divider);
 }
 
 /* =========================================

@@ -299,23 +299,28 @@
             </section>
 
             <!-- Modal Instructor para editar enlaces de portafolio -->
-            <dialog id="dialog-portafolio-instructor" class="app-modal-overlay" aria-modal="true" style="border:none; background:transparent; padding:0;">
-                <div class="app-modal-content portafolio-modal-content">
-                    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                        <h3 style="margin:0; font-size:1.15rem;">💼 Enlaces de Portafolio - {{ aprendiz.nombre }}</h3>
-                        <button type="button" class="app-modal-close" onclick="document.getElementById('dialog-portafolio-instructor').close()" style="background:none; border:none; font-size:1.4rem; cursor:pointer;">&times;</button>
+            <dialog id="dialog-portafolio-instructor" class="app-modal-overlay" aria-modal="true" aria-labelledby="dialog-portafolio-instructor-titulo">
+                <div class="app-modal-content app-modal-content--compact portafolio-modal-content">
+                    <header class="app-modal-header">
+                        <div class="app-modal-header-copy">
+                            <span class="app-modal-eyebrow">Portafolio de Evidencias</span>
+                            <h2 id="dialog-portafolio-instructor-titulo">Enlaces de {{ aprendiz.nombre }}</h2>
+                        </div>
+                        <button type="button" class="app-modal-close" onclick="document.getElementById('dialog-portafolio-instructor').close()" aria-label="Cerrar">&times;</button>
                     </header>
-                    <form method="POST" action="{{ url_for('instructor.guardar_portafolio_instructor', ficha_id=ficha.id, aprendiz_id=aprendiz.id) }}">
+                    <form method="POST" action="{{ url_for('instructor.guardar_portafolio_instructor', ficha_id=ficha.id, aprendiz_id=aprendiz.id) }}" class="app-modal-form">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="form-group mb-3">
-                            <label for="inst-github" style="font-weight:700; font-size:0.88rem; display:block; margin-bottom:4px;">🐱 Repositorio o Perfil en GitHub</label>
-                            <input type="url" id="inst-github" name="enlace_github" class="form-control" value="{{ aprendiz.enlace_github or '' }}" placeholder="https://github.com/..." maxlength="500">
+                        <div class="app-modal-body">
+                            <div class="form-group">
+                                <label for="inst-github">🐱 Repositorio o perfil en GitHub</label>
+                                <input type="url" id="inst-github" name="enlace_github" class="form-control" value="{{ aprendiz.enlace_github or '' }}" placeholder="https://github.com/..." maxlength="500">
+                            </div>
+                            <div class="form-group">
+                                <label for="inst-notion">📓 Bitácora o portafolio en Notion</label>
+                                <input type="url" id="inst-notion" name="enlace_notion" class="form-control" value="{{ aprendiz.enlace_notion or '' }}" placeholder="https://tu-bitacora.notion.site/..." maxlength="500">
+                            </div>
                         </div>
-                        <div class="form-group mb-3">
-                            <label for="inst-notion" style="font-weight:700; font-size:0.88rem; display:block; margin-bottom:4px;">📓 Bitácora o Portafolio en Notion</label>
-                            <input type="url" id="inst-notion" name="enlace_notion" class="form-control" value="{{ aprendiz.enlace_notion or '' }}" placeholder="https://tu-bitacora.notion.site/..." maxlength="500">
-                        </div>
-                        <footer style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.25rem;">
+                        <footer class="app-modal-footer">
                             <button type="button" class="btn btn-outline" onclick="document.getElementById('dialog-portafolio-instructor').close()">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar cambios</button>
                         </footer>

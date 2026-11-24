@@ -1,4 +1,4 @@
-param([switch]$Stop)
+﻿param([switch]$Stop)
 
 $ErrorActionPreference = "Stop"
 
@@ -25,32 +25,89 @@ function Get-ListeningPidsOnPort($TargetPort) {
 # returned too, otherwise it survives the child. Foreign owners of the port
 # are reported and left untouched.
 $script:ForeignPortOwners = @()
+function Get-CanonicalPathRoots($TargetPath) {
+    $full = [IO.Path]::GetFullPath($TargetPath).TrimEnd('\')
+    $roots = [System.Collections.Generic.List[string]]::new()
+    $roots.Add($full + '\')
+    try {
+        $cur = $full
+        $suffix = ''
+        while ($cur -and $cur -ne [IO.Path]::GetPathRoot($cur)) {
+            $item = Get-Item -LiteralPath $cur -Force -ErrorAction SilentlyContinue
+            if ($item -and $item.Target) {
+                $target = @($item.Target)[0]
+                if ($target) {
+                    $resolved = [IO.Path]::GetFullPath((Join-Path $target $suffix)).TrimEnd('\') + '\'
+                    if (-not $roots.Contains($resolved)) { $roots.Add($resolved) }
+                }
+            }
+            $leaf = Split-Path -Leaf $cur
+            $cur = Split-Path -Parent $cur
+            $suffix = if ($suffix) { Join-Path $leaf $suffix } else { $leaf }
+        }
+    } catch {}
+    return @($roots)
+}
+
 function Get-ProjectServerPids($TargetPort) {
     $script:ForeignPortOwners = @()
-    $root = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\') + '\'
+    $roots = Get-CanonicalPathRoots $PSScriptRoot
     $procs = @{}
     foreach ($proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
         $procs[[int]$proc.ProcessId] = $proc
     }
-    $isProject = {
-        param($proc)
-        if (-not $proc -or $proc.Name -ne 'python.exe' -or $proc.CommandLine -notmatch 'wsgi\.py') { return $false }
-        $candidates = @($proc)
-        if ($procs.ContainsKey([int]$proc.ParentProcessId)) { $candidates += $procs[[int]$proc.ParentProcessId] }
-        foreach ($c in $candidates) {
-            if ($c.ExecutablePath -and $c.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    $getWsgiTree = {
+        param($seedProcs)
+        $visited = @{}
+        $queue = [System.Collections.Generic.Queue[object]]::new()
+        foreach ($s in @($seedProcs)) {
+            if ($s -and $s.Name -eq 'python.exe' -and $s.CommandLine -match 'wsgi\.py') {
+                $queue.Enqueue($s)
+            }
+        }
+        $tree = @()
+        while ($queue.Count -gt 0) {
+            $curr = $queue.Dequeue()
+            $currPid = [int]$curr.ProcessId
+            if ($visited.ContainsKey($currPid)) { continue }
+            $visited[$currPid] = $true
+            $tree += $curr
+            $parentId = [int]$curr.ParentProcessId
+            if ($procs.ContainsKey($parentId)) {
+                $parent = $procs[$parentId]
+                if ($parent.Name -eq 'python.exe' -and $parent.CommandLine -match 'wsgi\.py') {
+                    $queue.Enqueue($parent)
+                }
+            }
+            foreach ($cand in $procs.Values) {
+                if ([int]$cand.ParentProcessId -eq $currPid -and $cand.Name -eq 'python.exe' -and $cand.CommandLine -match 'wsgi\.py') {
+                    $queue.Enqueue($cand)
+                }
+            }
+        }
+        return $tree
+    }
+    $isProjectChain = {
+        param($chain)
+        foreach ($c in $chain) {
+            if (-not $c.ExecutablePath) { continue }
+            foreach ($root in $roots) {
+                if ($c.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+            }
         }
         return $false
     }
     $result = @()
     foreach ($ownerPid in (Get-ListeningPidsOnPort $TargetPort)) {
         $proc = $procs[[int]$ownerPid]
-        if (& $isProject $proc) {
-            $result += [int]$ownerPid
-            $parent = $procs[[int]$proc.ParentProcessId]
-            if ($parent -and $parent.Name -eq 'python.exe' -and $parent.CommandLine -match 'wsgi\.py') {
-                $result += [int]$parent.ProcessId
-            }
+        $seeds = if ($proc) {
+            @($proc)
+        } else {
+            @($procs.Values | Where-Object { [int]$_.ParentProcessId -eq [int]$ownerPid -and $_.Name -eq 'python.exe' -and $_.CommandLine -match 'wsgi\.py' })
+        }
+        $tree = if ($seeds.Count -gt 0) { & $getWsgiTree $seeds } else { @() }
+        if ($tree.Count -gt 0 -and (& $isProjectChain $tree)) {
+            foreach ($member in $tree) { $result += [int]$member.ProcessId }
         } elseif ([int]$ownerPid -gt 4) {
             $name = if ($proc) { $proc.Name } else { 'desconocido' }
             $script:ForeignPortOwners += "$ownerPid ($name)"
@@ -159,5 +216,6 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 $env:PORT = "$port"
 $env:HOST = '127.0.0.1'
+if (-not $env:FLASK_DEBUG) { $env:FLASK_DEBUG = '0' }
 Write-Host "=== Iniciando servidor en http://127.0.0.1:8158 ===" -ForegroundColor Green
 python wsgi.py
