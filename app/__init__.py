@@ -544,6 +544,12 @@ def create_app(test_config=None):
             'alertas_aprendiz': _alertas_aprendiz,
         }
 
+    @app.template_filter('juicio_aprobado')
+    def filtro_juicio_aprobado(texto):
+        # Misma regla que los servicios: solo «APROBADO» explícito cuenta.
+        from app.services.emparejamiento_juicios import es_aprobado
+        return bool(texto) and es_aprobado(texto)
+
     @app.template_filter('tipo_competencia')
     def filtro_tipo_competencia(nombre):
         from app.services.importacion_ficha import clasificar_competencia

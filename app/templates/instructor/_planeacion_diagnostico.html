@@ -1,0 +1,18 @@
+{#- Vacíos de datos de los archivos cargados: se leen antes que los gráficos. -#}
+{% if diagnostico %}
+<section class="pl-card" id="seccion-diagnostico">
+    <div class="pl-card-head">
+        <h2>Qué falta para que la línea de tiempo sea exacta</h2>
+        <p>Mientras existan estos vacíos, la ubicación de algunos resultados es una estimación.</p>
+    </div>
+    <div class="pl-gap-list">
+        {% for hallazgo in diagnostico %}
+        <div class="pl-gap pl-tone-{{ hallazgo.tono }}">
+            <strong>{{ hallazgo.titulo }}</strong>
+            <p>{{ hallazgo.detalle }}</p>
+            <em>{{ hallazgo.accion }}</em>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}

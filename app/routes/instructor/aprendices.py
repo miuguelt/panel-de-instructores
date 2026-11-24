@@ -14,6 +14,7 @@ from flask_login import login_required
 from sqlalchemy import case, func
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.services.visualizacion import UMBRAL_AMARILLO, UMBRAL_VERDE
 from app import db
 from app.models.aprendiz import (
     ESTADOS_EN_FORMACION,
@@ -98,9 +99,10 @@ def aprendices(ficha_id):
             s['pct'] = pct
             total_juicios_ficha += t
             total_aprobados_ficha += ap
-            if pct >= 80:
+            # Umbrales únicos (visualizacion.py): verde desde 80, amarillo desde 60.
+            if pct >= UMBRAL_VERDE:
                 al_dia_count += 1
-            elif pct >= 50:
+            elif pct >= UMBRAL_AMARILLO:
                 en_proceso_count += 1
             else:
                 en_riesgo_count += 1

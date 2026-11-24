@@ -174,18 +174,18 @@ class CacheEstaticosTestCase(BaseRendimiento):
         self.assertIn('immutable', cache_control)
 
     def test_las_plantillas_versionan_la_url_del_estatico(self):
-        html = self.cliente.get('/instructor/fichas').get_data(as_text=True)
+        html = self.cliente.get('/instructor/').get_data(as_text=True)
         self.assertIn('/static/css/styles.css?v=', html)
         self.assertIn('/static/js/table-filters.js?v=', html)
 
     def test_paginas_privadas_no_se_precargan_ni_se_guardan_en_cache_http(self):
-        respuesta = self.cliente.get('/instructor/fichas')
+        respuesta = self.cliente.get('/instructor/')
         html = respuesta.get_data(as_text=True)
         self.assertEqual(respuesta.headers['Cache-Control'], 'private, no-store, max-age=0')
         self.assertNotRegex(html, r'<link\b[^>]*rel=["\']prefetch["\']')
 
     def test_dependencias_externas_no_bloquean_la_primera_pintura(self):
-        html = self.cliente.get('/instructor/fichas').get_data(as_text=True)
+        html = self.cliente.get('/instructor/').get_data(as_text=True)
         # La tipografía usa fuentes del sistema: ninguna hoja externa retrasa la primera pintura
         # ni falla sin red (styles.css declara Outfit con respaldo en fuentes locales).
         self.assertNotIn('fonts.googleapis.com', html)
@@ -195,7 +195,7 @@ class CacheEstaticosTestCase(BaseRendimiento):
 
     def test_html_se_entrega_comprimido_para_navegadores_compatibles(self):
         respuesta = self.cliente.get(
-            '/instructor/fichas', headers={'Accept-Encoding': 'gzip'}
+            '/instructor/', headers={'Accept-Encoding': 'gzip'}
         )
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta.headers.get('Content-Encoding'), 'gzip')

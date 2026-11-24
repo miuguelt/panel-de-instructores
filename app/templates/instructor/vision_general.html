@@ -28,7 +28,7 @@
     <!-- 1. CABECERA: identidad, estado y una acción principal -->
     <header class="page-header vision-header">
         <div class="page-title-cluster">
-            <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver al inicio">&larr; Inicio</a>
+            <a href="{{ url_for('instructor.dashboard') }}" class="btn-back" title="Volver a Mis fichas">&larr; Mis fichas</a>
             <div class="vision-title-wrap">
                 <div class="vision-badges-row">
                     <span class="card-badge">Ficha {{ ficha.codigo }}</span>
@@ -202,7 +202,7 @@
             <p class="ficha-card-insight">
                 {% if brecha %}{{ semaforo(brecha.estado, brecha.texto) }}{% endif %}
                 {% if desfase > 0 %}{{ semaforo('warning', 'Retraso de ' ~ desfase ~ (' fase' if desfase == 1 else ' fases')) }}{% elif desfase == 0 and crono.configurado and tiene_fase_real %}{{ semaforo('success', 'Al día con el cronograma') }}{% endif %}
-                {% if crono.dias_totales > 0 %}<span class="vision-health-note">{{ crono.dias_transcurridos }} de {{ crono.dias_totales }} días cursados · faltan {{ crono.dias_restantes_lectiva }} días lectivos</span>{% else %}<span class="vision-health-note">Configura las fechas de inicio y fin de la ficha.</span>{% endif %}
+                {% if not crono.dias_totales %}<span class="vision-health-note">Configura las fechas de inicio y fin de la ficha.</span>{% endif %}
             </p>
         </div>
 
@@ -210,10 +210,6 @@
             {{ dona(resumen.pct_asistencia_global, 'Asistencia', detalle=(resumen.sesiones_asistencia_total ~ ' sesiones · ' ~ resumen.total_faltas_injustificadas ~ ' fallas sin justificar')) }}
             {{ dona(resumen.pct_entregas_global, 'Entregas recibidas', estado=viz_estado(resumen.pct_entregas_global, verde=70, amarillo=50), detalle=(resumen.total_entregas_recibidas ~ ' de ' ~ resumen.tareas_totales ~ ' tareas')) }}
             {{ dona(resumen.pct_meta_tyt if resumen.total_aprendices else none, 'Aprendices con meta TyT', estado='info', detalle=(resumen.aprendices_meta_tyt ~ ' de ' ~ resumen.total_aprendices ~ ' aprendices')) }}
-            <div class="vision-health-stack">
-                {{ apilada(viz_estados_aprendiz(resumen.estados_distribucion), 'Estado de los aprendices') }}
-                <a href="{{ url_for('instructor.aprendices', ficha_id=ficha.id) }}" class="bento-sublink">Directorio completo &rarr;</a>
-            </div>
         </div>
 
         <div class="time-hero-meta-row">
@@ -265,19 +261,9 @@
                     <div class="ficha-phase-summary-copy">
                         <div class="ficha-phase-summary-header-line">
                             <strong class="ficha-phase-title">Desglose de fases del proyecto formativo</strong>
-                            {% if fases_data.planeacion_sincronizada %}
-                            <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">GFPI-F-134</span>
-                            {% endif %}
                         </div>
                         <div class="ficha-phase-summary-meta">
-                            <span class="ficha-phase-subtitle">Avance según la planeación y el reporte de juicios</span>
-                            {% if fases_data.resumen_raps and (fases_data.resumen_raps.raps_vencidos_pendientes|default(0)) > 0 %}
-                            <span class="ficha-phase-sep" aria-hidden="true">·</span>
-                            <button type="button" class="fases-chip-vencidos" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" title="Ver qué RAPs debieron calificarse y sus fechas límite">
-                                <span class="fases-chip-vencidos-text"><strong>{{ fases_data.resumen_raps.raps_vencidos_pendientes }} RAPs</strong> pendientes de fases culminadas</span>
-                                <span class="fases-chip-vencidos-action">Ver fechas</span>
-                            </button>
-                            {% endif %}
+                            <span class="ficha-phase-subtitle">RAPs esperados y aprobados en cada fase</span>
                         </div>
                     </div>
                 </div>
@@ -288,6 +274,7 @@
                 </div>
             </summary>
             <div class="ficha-phase-details-content">
+                {% set tracker_modo = 'vision' %}
                 {% include 'instructor/_ficha_fases_tracker.html' with context %}
             </div>
         </details>
@@ -327,10 +314,10 @@
                         <small class="text-muted">Menor aprobación en el reporte de juicios</small>
                     </div>
                 </div>
-                <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver juicios</a>
+                <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-sm btn-outline">Ver todas</a>
             </div>
             <div class="vision-card-body vision-bars">
-                {% for comp in resumen.competencias_criticas %}
+                {% for comp in resumen.competencias_criticas[:3] %}
                 {{ barra(comp.pct, comp.nombre, meta=VIZ_META_TYT, estado=viz_estado(comp.pct, verde=70, amarillo=50),
                          detalle=(comp.aprobados ~ ' de ' ~ comp.total ~ ' juicios aprobados · ' ~ comp.pendientes ~ ' pendientes')) }}
                 {% else %}

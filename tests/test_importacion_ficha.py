@@ -328,8 +328,8 @@ class ImportacionFichaTestCase(unittest.TestCase):
     def test_ruta_crea_ficha_y_redirige_a_aprendices(self):
         cliente = self.app.test_client()
         cliente.post('/login', data={'correo': self.a.correo, 'password': 'x'})
-        pagina = cliente.get('/instructor/fichas')
-        self.assertIn(b'Crear ficha desde el reporte de juicios', pagina.data)
+        pagina = cliente.get('/instructor/fichas', follow_redirects=True)
+        self.assertIn('Crear o importar ficha'.encode(), pagina.data)
         self.assertIn(b'name="archivo"', pagina.data)
         reporte = self._reporte_para_crear()
 

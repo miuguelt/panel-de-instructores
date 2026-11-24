@@ -13,7 +13,7 @@
     <div class="page-title-cluster">
         <div>
             <span class="eyebrow">Ficha {{ ficha.codigo }} &middot; {{ ficha.nombre_programa }}</span>
-            <h1><i data-lucide="users" class="icon-lg" aria-hidden="true"></i> Directorio de aprendices</h1>
+            <h1><i data-lucide="users" class="icon-lg" aria-hidden="true"></i> Aprendices</h1>
         </div>
     </div>
     <div class="page-header-actions">
@@ -45,16 +45,9 @@
     {{ barra(pct_global if total_juicios_ficha else none, 'Avance académico de la ficha', meta=VIZ_META_TYT,
              estado=viz_estado(pct_global),
              detalle=(total_aprobados_ficha ~ ' de ' ~ total_juicios_ficha ~ ' juicios aprobados')) }}
-    {{ apilada([('Al día (80% o más)', al_dia_count, 'success'), ('En proceso (50 a 79%)', en_proceso_count, 'warning'),
-                ('En rezago (menos de 50%)', en_riesgo_count, 'danger')], 'Avance académico por aprendiz') }}
-    <div class="aprendices-resumen-estados">
-        <span class="viz-stack-label">{{ total_aprendices }} aprendices matriculados</span>
-        <div class="kpi-chip-summary">
-            {% for estado, conteo in estados_disponibles %}
-            <span class="badge badge-{{ estado|tono_estado }} badge-chip">{{ estado|etiqueta_estado }}: <strong>{{ conteo }}</strong></span>
-            {% endfor %}
-        </div>
-    </div>
+    {{ apilada([('Al día (80% o más)', al_dia_count, 'success'), ('En proceso (60 a 79%)', en_proceso_count, 'warning'),
+                ('En rezago (menos de 60%)', en_riesgo_count, 'danger')], 'Avance académico por aprendiz') }}
+    {#- Los conteos por estado viven en los filtros de abajo; aquí no se repiten. -#}
 </section>
 
 {# ============================================================
@@ -63,14 +56,13 @@
 <details class="card tools-accordion" id="herramientas-card">
     <summary class="tools-summary">
         <div class="tools-summary-main">
-            <span class="tools-summary-icon" aria-hidden="true">⚙</span>
+            <span class="tools-summary-icon" aria-hidden="true"><i data-lucide="upload" class="icon-md"></i></span>
             <div>
-                <strong class="tools-summary-title">Herramientas de Gestión y Carga de Archivos</strong>
-                <p class="tools-summary-desc text-muted">Actualiza la información del grupo, asigna permisos operativos y comparte el acceso.</p>
+                <strong class="tools-summary-title">Actualizar el grupo y compartir el acceso</strong>
+                <p class="tools-summary-desc text-muted">Carga la lista o el reporte de juicios y comparte el enlace de ingreso de los aprendices.</p>
             </div>
         </div>
         <span class="tools-summary-action">
-            <span class="tools-accordion-badge">3 herramientas</span>
             <span class="tools-summary-chevron" aria-hidden="true"></span>
         </span>
     </summary>
@@ -103,25 +95,11 @@
                     </button>
                 </div>
 
-                {% if estado_seleccionado == 'todos' %}
-                <div class="form-group tools-admin-field">
-                    <label for="aprendiz-administrativo">Asignar aprendiz administrador <span class="field-optional">Opcional</span></label>
-                    <select id="aprendiz-administrativo" name="aprendiz_administrativo_id" class="form-control" aria-describedby="aprendiz-administrativo-ayuda" title="Selecciona el aprendiz que tendrá permisos operativos">
-                        <option value="">No cambiar el rol actual</option>
-                        {% for aprendiz in aprendices_administrables %}
-                        <option value="{{ aprendiz.id }}" {% if aprendiz.rol_administrativo %}selected{% endif %}>
-                            {{ aprendiz.nombre_completo }} — {{ aprendiz.estado|etiqueta_estado }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <small class="tools-field-help text-muted" id="aprendiz-administrativo-ayuda">Este rol permite registrar el llamado a lista y gestionar los turnos de aseo.</small>
-                </div>
-                {% endif %}
             </form>
 
             <nav class="tools-actions-row" aria-label="Acciones complementarias de actualización">
                 <a href="{{ url_for('instructor.descargar_plantilla', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm"><span aria-hidden="true">↓</span> Descargar plantilla</a>
-                <a href="{{ url_for('instructor.configuracion_aprendices', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm"><span aria-hidden="true">♙</span> Configurar roles</a>
+                <a href="{{ url_for('instructor.configuracion_aprendices', ficha_id=ficha.id) }}" class="btn btn-outline btn-sm"><i data-lucide="user-cog" class="icon-sm" aria-hidden="true"></i> Aprendiz administrador</a>
             </nav>
         </section>
 

@@ -152,9 +152,8 @@ class MenuFichaTestCase(unittest.TestCase):
     def test_titulo_de_pestana_y_h1_coinciden_con_la_etiqueta_del_menu(self):
         fid = self.ficha.id
         paginas = {
-            '/instructor/': 'Inicio',
-            '/instructor/fichas': 'Fichas',
-            '/instructor/comite/fichas-terminadas': 'Comité',
+            '/instructor/': 'Mis fichas',
+            '/instructor/comite/fichas-terminadas': 'Fichas por certificar',
             f'/instructor/fichas/{fid}/asistencia': 'Asistencia',
             f'/instructor/fichas/{fid}/juicios': 'Juicios',
             f'/instructor/fichas/{fid}/planeacion': 'Planeación',
@@ -175,7 +174,7 @@ class MenuFichaTestCase(unittest.TestCase):
         self.assertIn('Alertas', nav)
         general = self._pagina('/instructor/')
         barra = re.search(r'<div class="nav-primary"[\s\S]*?</div>', general).group(0)
-        for etiqueta in ('Inicio', 'Fichas', 'Comité'):
+        for etiqueta in ('Mis fichas', 'Fichas por certificar'):
             self.assertIn(f'<span>{etiqueta}</span>', barra)
 
     def test_juicios_usa_la_cabecera_comun_y_no_la_barra_contextual(self):

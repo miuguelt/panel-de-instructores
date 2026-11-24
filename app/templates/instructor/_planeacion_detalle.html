@@ -1,22 +1,5 @@
-{# Vacíos de datos, detalle por fase y archivos versionados. #}
+{# Detalle por fase. Los vacíos de datos viven en _planeacion_diagnostico.html, junto al veredicto. #}
 
-{% if diagnostico %}
-<section class="pl-card" id="seccion-diagnostico">
-    <div class="pl-card-head">
-        <h2>Qué falta para que la línea de tiempo sea exacta</h2>
-        <p>Vacíos detectados en los archivos cargados. Mientras existan, la ubicación de algunos resultados es una estimación y no un dato del documento.</p>
-    </div>
-    <div class="pl-gap-list">
-        {% for hallazgo in diagnostico %}
-        <div class="pl-gap pl-tone-{{ hallazgo.tono }}">
-            <strong>{{ hallazgo.titulo }}</strong>
-            <p>{{ hallazgo.detalle }}</p>
-            <em>{{ hallazgo.accion }}</em>
-        </div>
-        {% endfor %}
-    </div>
-</section>
-{% endif %}
 
 <section class="pl-card" id="seccion-detalle" data-collapse-default="cerrado">
     <div class="pl-card-head">

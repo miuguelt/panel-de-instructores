@@ -244,9 +244,10 @@ class AprendizAdministradorTestCase(unittest.TestCase):
         )
         self.assertEqual(directorio.status_code, 200)
         self.assertEqual(configuracion.status_code, 200)
-        self.assertIn(b'3 herramientas', directorio.data)
+        self.assertIn('Actualizar el grupo y compartir el acceso'.encode(), directorio.data)
         self.assertIn(b'aria-describedby="archivo-aprendices-ayuda"', directorio.data)
-        self.assertIn(b'aria-describedby="aprendiz-administrativo-ayuda"', directorio.data)
+        # El rol se asigna solo en su página de configuración, no al subir un archivo.
+        self.assertNotIn(b'aria-describedby="aprendiz-administrativo-ayuda"', directorio.data)
         self.assertIn(b'class="qr-loading"', directorio.data)
         self.assertNotIn(b'style="align-self: flex-end;"', directorio.data)
         self.assertIn(b'Guardar aprendiz administrador', configuracion.data)

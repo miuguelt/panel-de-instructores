@@ -1,11 +1,13 @@
 {#- Tarjeta de una ficha en «Mis fichas».
 
     Orden de lectura: identidad y hito más urgente → pendientes de hoy →
-    avance académico frente al tiempo → estado del grupo → detalle bajo demanda.
+    avance académico frente al tiempo → asistencia y entregas → detalle bajo demanda.
+    Cada cifra aparece una vez; el panel de fases completo vive en la Visión general
+    y el estado de los aprendices en Aprendices.
     Variables: ficha, cronograma, extra, stats, fases_data, recs, archivada.
 -#}
 {% from "components/_viz.html" import barra, dona, apilada, semaforo %}
-{% from "components/_ui.html" import acciones %}
+{% from "instructor/_ficha_acciones.html" import acciones_ficha %}
 {% from 'components/_recomendacion_card.html' import render_banner_recomendacion %}
 {% set crono = cronograma or {} %}
 {% set hito = viz_hito(crono) %}
@@ -33,15 +35,7 @@
             <p class="ficha-card-meta">{{ activos }} aprendices activos{% if ficha.codigo_programa %} · Programa {{ ficha.codigo_programa }}{% endif %}</p>
         </div>
         <div class="ficha-header-actions">
-            {{ acciones('ficha-acciones-' ~ ficha.id,
-                principal={'label': 'Abrir ficha', 'icon': 'layout-dashboard', 'url': url_for('instructor.vision_general', ficha_id=ficha.id)},
-                secundarias=[
-                    {'label': 'Llamado a lista', 'icon': 'clipboard-check', 'url': url_for('instructor.asistencia', ficha_id=ficha.id)},
-                    {'label': 'Tareas', 'icon': 'file-check', 'url': url_for('instructor.tareas', ficha_id=ficha.id)},
-                    {'label': 'Juicios', 'icon': 'graduation-cap', 'url': url_for('instructor.juicios', ficha_id=ficha.id)},
-                    {'label': 'Planeación', 'icon': 'compass', 'url': url_for('planeacion.analisis', ficha_id=ficha.id)},
-                    {'label': 'Aprendices', 'icon': 'users', 'url': url_for('instructor.aprendices', ficha_id=ficha.id)},
-                ]) }}
+            {{ acciones_ficha('ficha-acciones-' ~ ficha.id, ficha) }}
         </div>
     </header>
 
@@ -75,7 +69,6 @@
             {% if not archivada %}
             {{ barra(extra.get('pct_entregas'), 'Entregas recibidas', detalle=(extra.get('entregas_totales', 0) ~ ' recibidas de ' ~ extra.get('tareas_totales', 0) ~ ' tareas')) }}
             {% endif %}
-            {{ apilada(viz_estados_aprendiz(stats.estados if stats else {}), 'Estado de los aprendices') }}
         </div>
     </div>
 
@@ -110,29 +103,14 @@
                 {{ barra(viz_porcentaje(tyt.meta_resultados, tyt.total_resultados), 'Hito Saber TyT', meta=VIZ_META_TYT,
                          detalle=(tyt.pendientes_evaluacion ~ ' aprendices por llegar al 70%')) }}
                 {% endif %}
-                {% if activos %}
-                {{ barra(viz_porcentaje(extra.get('aprendices_certificados', 0), activos), 'Aprendices con todos los RAPs aprobados', estado='info',
-                         detalle=(extra.get('aprendices_certificados', 0) ~ ' de ' ~ activos ~ ' aprendices')) }}
-                {% endif %}
-                {{ apilada([('Reconocimientos', extra.get('notas_positivas', 0), 'success'),
-                            ('Llamados de atención', extra.get('notas_negativas', 0), 'danger')], 'Formación integral') }}
+                {{ apilada([('Notas positivas', extra.get('notas_positivas', 0), 'success'),
+                            ('Notas negativas', extra.get('notas_negativas', 0), 'danger')], 'Observador') }}
             </div>
 
-            {% if extra.top_competencias %}
-            <div class="ficha-card-competencias">
-                <h3 class="viz-panel-title">Competencias con menor aprobación</h3>
-                {% for comp_name, comp_data in extra.top_competencias %}
-                {{ barra(viz_porcentaje(comp_data.aprobados, comp_data.total), comp_name, meta=VIZ_META_TYT,
-                         detalle=(comp_data.aprobados ~ ' de ' ~ comp_data.total ~ ' juicios aprobados')) }}
-                {% endfor %}
+            <div class="ficha-card-more-links">
+                <a href="{{ url_for('instructor.vision_general', ficha_id=ficha.id) }}" class="btn btn-ghost btn-sm">Ver fases y competencias en la Visión general</a>
+                <a href="{{ url_for('tyt.detalle', ficha_id=ficha.id) }}" class="btn btn-ghost btn-sm">Ver el avance hacia el hito <abbr title="Pruebas Saber TyT para técnicos y tecnólogos">TyT</abbr></a>
             </div>
-            {% endif %}
-
-            {% if fases_data and fases_data.disponible and fases_data.fase_esperada and fases_data.fase_real %}
-            {% include 'instructor/_ficha_fases_tracker.html' %}
-            {% endif %}
-
-            <a href="{{ url_for('tyt.detalle', ficha_id=ficha.id) }}" class="btn btn-ghost btn-sm">Ver el avance de cada aprendiz hacia el hito TyT</a>
         </div>
     </details>
 </article>

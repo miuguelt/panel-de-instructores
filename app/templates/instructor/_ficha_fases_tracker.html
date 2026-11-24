@@ -1,4 +1,10 @@
-{# Componente visual del Tracker de Fases del Proyecto Formativo #}
+{#- Panel de fases del proyecto formativo.
+
+    Con ``tracker_modo = 'vision'`` (Visión general) omite el estado y la
+    comparación de fases, que esa página ya muestra en la línea de salud y en la
+    fila de fechas: cada dato una sola vez.
+-#}
+{% set tracker_completo = (tracker_modo is not defined) or tracker_modo != 'vision' %}
 {% set fases_data = fases_data if (fases_data is defined and fases_data) else (resumen.fases_data if (resumen is defined and resumen.fases_data) else none) %}
 {% if fases_data and fases_data.disponible %}
 {# Una fase sin fechas configuradas ni RAPs calificados no se muestra: el servicio usa nombres provisionales. #}
@@ -9,9 +15,10 @@
 <section class="ficha-fases-tracker" aria-label="Seguimiento de fases del proyecto formativo">
     <div class="fases-tracker-header">
         <div class="fases-tracker-title">
-            <span class="fases-eyebrow">Fases del Proyecto Formativo</span>
+            <span class="fases-eyebrow">Fases del proyecto formativo</span>
             <div class="fases-badges-row">
-                {% if fases_data.desfase_fases|default(0) > 0 %}
+                {% if not tracker_completo %}
+                {% elif fases_data.desfase_fases|default(0) > 0 %}
                 <span class="fases-status-pill is-danger" title="El tiempo lectivo ha avanzado más rápido que los RAPs aprobados">
                     <span class="fases-dot"></span> Retraso de {{ fases_data.desfase_fases }} {{ 'fase' if fases_data.desfase_fases == 1 else 'fases' }}
                 </span>
@@ -26,19 +33,20 @@
                 {% endif %}
 
                 {% if fases_data.planeacion_sincronizada %}
-                <span class="fases-source-pill is-verified" title="Cruce exacto basado en la Planeación Pedagógica GFPI-F-134">
-                    ✓ GFPI-F-134
+                <span class="fases-source-pill is-verified" title="Fases tomadas de la planeación pedagógica GFPI-F-134">
+                    Según la planeación GFPI-F-134
                 </span>
                 {% elif ficha is defined and ficha.id is defined %}
-                <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="fases-source-pill is-estimated" title="Carga la Planeación GFPI-F-134 para obtener el mapeo exacto de RAPs por fase">
-                    ⚡ Estimación por juicios · Subir GFPI-F-134
+                <a href="{{ url_for('planeacion.analisis', ficha_id=ficha.id) }}" class="fases-source-pill is-estimated" title="Carga la planeación GFPI-F-134 para saber qué RAPs pertenecen a cada fase">
+                    Fases estimadas · Cargar la planeación
                 </a>
                 {% else %}
-                <span class="fases-source-pill is-estimated">⚡ Estimación estándar</span>
+                <span class="fases-source-pill is-estimated">Fases estimadas</span>
                 {% endif %}
             </div>
         </div>
 
+        {% if tracker_completo %}
         <div class="fases-comparison-summary">
             <div class="fases-comparison-item">
                 <span class="fases-comparison-label">Tiempo</span>
@@ -46,10 +54,11 @@
             </div>
             <span class="fases-comparison-divider" aria-hidden="true">vs</span>
             <div class="fases-comparison-item">
-                <span class="fases-comparison-label">Juicios RAPs</span>
+                <span class="fases-comparison-label">RAPs aprobados</span>
                 <strong class="fases-comparison-val text-accent">{% if tracker_tiene_fr %}{{ tracker_fr.icono }} {{ tracker_fr.nombre|title }}{% else %}Sin datos{% endif %}</strong>
             </div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Resumen ejecutivo de contraste: Esperado vs Real -->
@@ -66,7 +75,7 @@
     <div class="fases-corte-banner">
         <div class="fases-corte-card is-esperado">
             <div class="fases-corte-top">
-                <span class="fases-corte-badge">⏱️ Cronograma Lectivo</span>
+                <span class="fases-corte-badge">Según el calendario</span>
                 <span class="fases-corte-sub">Lo que ya debería estar evaluado</span>
             </div>
             <div class="fases-corte-num-wrap">
@@ -97,7 +106,7 @@
 
         <div class="fases-corte-card is-real">
             <div class="fases-corte-top">
-                <span class="fases-corte-badge">🎓 SOFIA Plus</span>
+                <span class="fases-corte-badge">Según SOFIA Plus</span>
                 <span class="fases-corte-sub">En qué punto vamos realmente</span>
             </div>
             <div class="fases-corte-num-wrap">
@@ -106,11 +115,11 @@
             </div>
             <p class="fases-corte-detalle">
                 {% if vencidos_pend > 0 %}
-                <span class="fases-alerta-vencidas">⚠️ Rezago en fases culminadas:</span>
-                Hay <strong>{{ vencidos_pend }} RAPs pendientes</strong> en fases que ya terminaron ({% for fv in fases_venc_list %}{{ fv.nombre|title }}: {{ fv.pendientes }}{% if not loop.last %}, {% endif %}{% endfor %}), lo cual mantiene a la ficha anclada en {{ tracker_fr.nombre|title if tracker_tiene_fr else 'fases previas' }}.
+                <span class="fases-alerta-vencidas">Rezago en fases terminadas:</span>
+                <strong>{{ vencidos_pend }} RAPs pendientes</strong> ({% for fv in fases_venc_list %}{{ fv.nombre|title }}: {{ fv.pendientes }}{% if not loop.last %}, {% endif %}{% endfor %}).
                 <br>
-                <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;">
-                    <span>🔍</span> <span>Ver auditoría de RAPs y fechas límites</span>
+                <button type="button" class="btn btn-sm btn-outline-danger mt-2 fases-btn-vencidos" onclick="if (window.abrirModal) { window.abrirModal('modal-raps-vencidos'); } else { document.getElementById('modal-raps-vencidos')?.showModal(); } event.preventDefault(); event.stopPropagation();">
+                    <i data-lucide="search" class="icon-sm" aria-hidden="true"></i> <span>Ver los RAPs y sus fechas límite</span>
                 </button>
                 {% else %}
                 Las evaluaciones asentadas se encuentran al día con respecto al calendario de fases.
@@ -140,13 +149,13 @@
                 </div>
                 <div class="fase-step-badges">
                     {% if es_esperada %}
-                    <span class="fase-marker-time" title="Fase esperada por tiempo lectivo">
-                        ⏱️ Tiempo
+                    <span class="fase-marker-time" title="Fase esperada por el tiempo transcurrido">
+                        Esperada
                     </span>
                     {% endif %}
                     {% if es_real %}
-                    <span class="fase-marker-rap" title="Fase real por avance de juicios en SOFIA Plus">
-                        📚 RAPs
+                    <span class="fase-marker-rap" title="Fase real según los RAPs aprobados en SOFIA Plus">
+                        Real
                     </span>
                     {% endif %}
                 </div>
@@ -159,9 +168,9 @@
             <div>
                 {% if fase.estado_tiempo == 'vencida' %}
                     {% if fase_pend_cnt > 0 %}
-                    <span class="fase-badge-alerta is-vencida">⚠️ Vencida · {{ fase_pend_cnt }} pendientes</span>
+                    <span class="fase-badge-alerta is-vencida">Vencida · {{ fase_pend_cnt }} pendientes</span>
                     {% else %}
-                    <span class="fase-badge-alerta is-ok">✓ Culminada</span>
+                    <span class="fase-badge-alerta is-ok">Terminada</span>
                     {% endif %}
                 {% elif fase.estado_tiempo == 'en_curso' %}
                     <span class="fase-badge-alerta is-en-curso">En curso ({{ fase.porcentaje_tiempo|default(0) }}% tiempo)</span>
@@ -170,10 +179,11 @@
                 {% endif %}
             </div>
 
+            {% if fase.resultados_total|default(0) > 0 %}
             <div class="fase-step-metric">
                 <div class="fase-metric-row">
                     <span class="fase-metric-k">Aprobados:</span>
-                    <strong>{{ fase.resultados_aprobados|default(0) }}/{{ fase.resultados_total|default(0) }}</strong>
+                    <strong>{{ fase.resultados_aprobados|default(0) }}/{{ fase.resultados_total }}</strong>
                     <small>({{ pct_fase_apr }}%)</small>
                 </div>
                 {% if fase.resultados_esperados is defined and fase.resultados_total|default(0) > 0 %}
@@ -187,6 +197,9 @@
             <div class="fase-step-bar" role="progressbar" aria-label="Aprobación de RAPs en {{ fase.nombre|title }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_fase_apr }}" aria-valuetext="{{ pct_fase_apr }}% de RAPs aprobados" title="Aprobación de RAPs en esta fase: {{ pct_fase_apr }}%">
                 <div class="fase-step-bar-fill" style="width: {{ [pct_fase_apr, 100]|min }}%;"></div>
             </div>
+            {% else %}
+            <p class="fase-step-metric fase-step-sin-raps">Sin RAPs asignados</p>
+            {% endif %}
 
             {% if fase.competencias_pendientes and fase_pend_cnt > 0 %}
             <details class="fase-step-pending-details">
@@ -203,7 +216,7 @@
     </div>
 
     <div class="fases-veredicto-caption">
-        <span class="veredicto-icon" aria-hidden="true">📌</span>
+        <i data-lucide="info" class="icon-sm veredicto-icon" aria-hidden="true"></i>
         <p>{{ fases_data.mensaje_veredicto }}</p>
     </div>
 </section>

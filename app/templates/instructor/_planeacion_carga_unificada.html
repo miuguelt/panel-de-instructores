@@ -9,15 +9,10 @@
     {# Las tres fuentes ya alimentan el análisis: resumen compacto, el formulario queda plegado #}
     <div class="pl-carga-resumen">
         <div class="pl-carga-resumen-info">
-            <strong>✅ Fuentes sincronizadas (3 de 3)</strong>
-            <div class="pl-carga-resumen-chips">
-                <span class="pl-chip pl-tone-success is-tone">📊 Planeación v{{ version_planeacion.version }}</span>
-                <span class="pl-chip pl-tone-success is-tone">📋 Juicios v{{ version_reporte.version }}</span>
-                <span class="pl-chip pl-tone-success is-tone">📑 Programa v{{ version_programa.version }}</span>
-            </div>
+            <strong><i data-lucide="check-circle-2" class="icon-sm" aria-hidden="true"></i> Fuentes sincronizadas (3 de 3)</strong>
         </div>
         <a href="{{ url_for('planeacion.descargar_todos', ficha_id=ficha.id) }}" class="btn btn-xs btn-outline" title="Descargar los 3 archivos fuente en un paquete .zip">
-            📦 Fuentes (.zip)
+            <i data-lucide="download" class="icon-sm" aria-hidden="true"></i> Fuentes (.zip)
         </a>
     </div>
     <details class="pl-details pl-carga-actualizar">

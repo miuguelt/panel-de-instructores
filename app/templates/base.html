@@ -65,9 +65,8 @@
                 {% if current_user.is_authenticated %}
                 {% set ep_general = request.endpoint %}
                 {% set enlaces_generales = [
-                    {'label': 'Inicio', 'icon': 'layout-grid', 'url': url_for('instructor.dashboard'), 'activo': ep_general == 'instructor.dashboard'},
-                    {'label': 'Fichas', 'icon': 'folder-kanban', 'url': url_for('instructor.fichas'), 'activo': ep_general in ('instructor.fichas', 'instructor.importar_reporte_ficha')},
-                    {'label': 'Comité', 'icon': 'users', 'url': url_for('comite.fichas_terminadas'), 'activo': request.blueprint == 'comite'},
+                    {'label': 'Mis fichas', 'icon': 'layout-grid', 'url': url_for('instructor.dashboard'), 'activo': ep_general in ('instructor.dashboard', 'instructor.fichas', 'instructor.importar_reporte_ficha')},
+                    {'label': 'Fichas por certificar', 'icon': 'award', 'url': url_for('comite.fichas_terminadas'), 'activo': ep_general == 'comite.fichas_terminadas'},
                 ] %}
                 {% set enlaces_generales = enlaces_generales + [{'label': 'Programación', 'icon': 'calendar-range', 'url': url_for('programacion.calendario'), 'activo': request.blueprint in ('programacion', 'equipos'), 'contador': alertas_programacion}] %}
                 {% if current_user.es_admin %}
@@ -112,12 +111,12 @@
                                 <span>{{ e.label }}</span>
                             </a>
                             {% endfor %}
+                            <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="app-popover-item">
+                                <i data-lucide="bell" class="icon-sm" aria-hidden="true"></i>
+                                <span>Notificaciones</span>
+                                {% if notificaciones_no_leidas %}<span class="app-popover-count">{{ notificaciones_no_leidas|contador_compacto }}</span>{% endif %}
+                            </a>
                         </div>
-                        <a href="{{ url_for('seguimiento.notificaciones_instructor') }}" class="app-popover-item">
-                            <i data-lucide="bell" class="icon-sm" aria-hidden="true"></i>
-                            <span>Notificaciones</span>
-                            {% if notificaciones_no_leidas %}<span class="app-popover-count">{{ notificaciones_no_leidas|contador_compacto }}</span>{% endif %}
-                        </a>
                         <button type="button" onclick="toggleTheme()" class="app-popover-item theme-toggle-btn"
                                 title="Cambiar tema de interfaz. Tema actual: SENA" aria-label="Cambiar tema de interfaz">
                             <i data-lucide="palette" class="icon-sm" aria-hidden="true"></i>

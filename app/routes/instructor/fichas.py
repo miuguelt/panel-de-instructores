@@ -49,17 +49,17 @@ def fichas():
 
         if not codigo or not nombre_programa:
             flash('El código y el nombre del programa son obligatorios.', 'error')
-            return redirect(url_for('instructor.fichas'))
+            return redirect(url_for('instructor.dashboard'))
 
         try:
             fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else None
             fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else None
         except ValueError:
             flash('Las fechas de la ficha no tienen un formato válido.', 'error')
-            return redirect(url_for('instructor.fichas'))
+            return redirect(url_for('instructor.dashboard'))
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             flash('La fecha de finalización debe ser posterior a la fecha de inicio.', 'error')
-            return redirect(url_for('instructor.fichas'))
+            return redirect(url_for('instructor.dashboard'))
         try:
             duracion_productiva = min(max(int(duracion_productiva_str), 1), 24)
         except ValueError:
@@ -74,7 +74,7 @@ def fichas():
                     f'La ficha {ficha.codigo} ya existe. Solicita al administrador o al instructor responsable que te vincule.',
                     'warning',
                 )
-                return redirect(url_for('instructor.fichas'))
+                return redirect(url_for('instructor.dashboard'))
             # Actualizar datos de la ficha existente
             ficha.nombre_programa = nombre_programa
             ficha.fecha_inicio = fecha_inicio
@@ -85,7 +85,7 @@ def fichas():
                 db.session.add(FichaInstructor(ficha_id=ficha.id, instructor_id=current_user.id))
             db.session.commit()
             flash(f'La ficha {ficha.codigo} fue actualizada correctamente.', 'success')
-            return redirect(url_for('instructor.fichas'))
+            return redirect(url_for('instructor.dashboard'))
 
         ficha = Ficha(
             codigo=codigo,
@@ -107,11 +107,12 @@ def fichas():
         db.session.commit()
 
         flash(f'Ficha {codigo} creada correctamente.', 'success')
-        return redirect(url_for('instructor.fichas'))
+        return redirect(url_for('instructor.dashboard'))
 
-    fichas = obtener_fichas()
-    cronogramas = {ficha.id: obtener_cronograma(ficha) for ficha in fichas}
-    return render_template('fichas.html', fichas=fichas, cronogramas=cronogramas)
+    # «Fichas» y «Mis fichas» eran dos listas de lo mismo. Crear e importar viven
+    # ahora en el diálogo de «Mis fichas»; la dirección antigua lleva allí (302,
+    # no 301, para poder revertirlo sin que el navegador lo recuerde).
+    return redirect(url_for('instructor.dashboard'))
 
 
 def _resumen_importacion(resultado):

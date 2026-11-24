@@ -41,19 +41,6 @@
         </small>
     </div>
 
-    {# 6. Ritmo Real vs Requerido #}
-    {% set tono_ritmo = 'pl-tone-danger' if proyeccion.estado == 'en_riesgo' else ('pl-tone-warning' if proyeccion.estado == 'ajustado' else 'pl-tone-success') %}
-    <div class="pl-kpi {{ tono_ritmo }}">
-        <span>Ritmo de evaluación</span>
-        <strong>{{ proyeccion.ritmo_mensual|round(1) }} por mes</strong>
-        <div class="pl-bar {{ tono_ritmo }}" title="Aprobaciones acumuladas: {{ proyeccion.porcentaje_pares }}%">
-            <i style="width: {{ proyeccion.porcentaje_pares }}%"></i>
-        </div>
-        <small>
-            {{ proyeccion.porcentaje_pares }} % evaluado · se requieren {{ proyeccion.ritmo_requerido|round(1) }} por mes para {{ proyeccion.pares_pendientes }} pendientes
-        </small>
-    </div>
-
     {# 8. Saberes y Criterios Oficiales Conquistados #}
     {% if desempeno_ficha and desempeno_ficha.total_saberes %}
     <div class="pl-kpi pl-tone-success">
@@ -73,7 +60,7 @@
 
 {# 1. Curva S de Avance con Pronóstico y Abanico de Incertidumbre #}
 {% if proyeccion.curva and curva_svg %}
-<section class="pl-card" id="seccion-curva-s">
+<section class="pl-card" id="seccion-curva-s" data-collapse-default="cerrado">
     <div class="pl-card-head">
         <h2>Curva S: avance planeado vs. avance real aprobado</h2>
         <p>Monitoreo cronológico del avance de la ficha: la <strong>línea gris punteada</strong> representa las horas exigidas por la planeación curricular oficial (GFPI-F-134); la <strong>línea azul sólida</strong> muestra las horas efectivamente calificadas y aprobadas en SOFIA Plus.</p>

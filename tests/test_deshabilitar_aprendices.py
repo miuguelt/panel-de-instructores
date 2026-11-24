@@ -347,8 +347,9 @@ class DeshabilitarAprendicesTestCase(unittest.TestCase):
         resp_cfg = cliente.get(f'/instructor/fichas/{self.ficha.id}/aprendices/configuracion')
         self.assertEqual(resp_cfg.status_code, 200)
         cuerpo_cfg = resp_cfg.get_data(as_text=True)
-        self.assertIn('Participación en ranking', cuerpo_cfg)
-        self.assertIn('Deshabilitado', cuerpo_cfg)
+        # Habilitar o deshabilitar vive en el directorio; la configuración solo enlaza a él.
+        self.assertNotIn('Participación en ranking', cuerpo_cfg)
+        self.assertIn('directorio de aprendices', cuerpo_cfg)
 
     def test_aprendiz_admin_autorizado_en_rutas_aseo(self):
         from flask import session

@@ -70,11 +70,17 @@ class ReglaJuicioAprobadoTest(unittest.TestCase):
 
     def test_no_queda_la_regla_por_subcadena_en_la_aplicacion(self):
         patron = re.compile(r"'APROBADO'\s+in\s|like\(\s*'%APROBADO%'")
+        rutas = [*(RAIZ / 'app').rglob('*.py'), *(RAIZ / 'app' / 'templates').rglob('*.html')]
         hallazgos = [f'{ruta.relative_to(RAIZ)}:{n}'
-                     for ruta in (RAIZ / 'app').rglob('*.py')
+                     for ruta in rutas
                      for n, linea in enumerate(ruta.read_text(encoding='utf-8').splitlines(), 1)
                      if patron.search(linea)]
-        self.assertEqual(hallazgos, [], 'Use es_aprobado() o condicion_aprobado_sql().')
+        self.assertEqual(hallazgos, [], 'Use es_aprobado(), el filtro juicio_aprobado o condicion_aprobado_sql().')
+
+    def test_filtro_de_plantilla_usa_la_misma_regla(self):
+        filtro = self.app.jinja_env.filters['juicio_aprobado']
+        self.assertEqual([filtro(texto) for texto in JUICIOS], [True, False, False, False, False])
+        self.assertFalse(filtro(None))
 
     def test_vision_general_cuenta_un_solo_aprobado(self):
         resumen = obtener_resumen_ficha_360(self.ficha)

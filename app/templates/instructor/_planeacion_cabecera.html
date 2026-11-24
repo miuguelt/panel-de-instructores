@@ -15,12 +15,14 @@
             {% endif %}
         </div>
         <div class="pl-heading-actions">
-            <a href="#centro-carga" class="btn btn-primary">{{ 'Actualizar archivos' if analisis else 'Cargar archivos' }} <span aria-hidden="true">↗</span></a>
+            {% if analisis %}
             <div class="pl-heading-secondary">
-                <a href="{{ url_for('instructor.juicios', ficha_id=ficha.id) }}" class="btn btn-outline">Juicios por aprendiz</a>
-                <a href="{{ url_for('instructor.estadisticas', ficha_id=ficha.id) }}" class="btn btn-outline">Estadísticas</a>
-                <button type="button" class="btn btn-outline" onclick="window.print()" title="Imprimir o guardar la vista como PDF">Imprimir informe</button>
+                <a href="#centro-carga" class="btn btn-outline"><i data-lucide="upload" class="icon-sm" aria-hidden="true"></i> Actualizar archivos</a>
+                <button type="button" class="btn btn-outline" onclick="window.print()" title="Imprimir o guardar la vista como PDF"><i data-lucide="printer" class="icon-sm" aria-hidden="true"></i> Imprimir informe</button>
             </div>
+            {% else %}
+            <a href="#centro-carga" class="btn btn-primary"><i data-lucide="upload" class="icon-sm" aria-hidden="true"></i> Cargar archivos</a>
+            {% endif %}
         </div>
     </div>
 </header>
@@ -43,7 +45,6 @@
             {% if radar and radar.ejes %}<a href="#seccion-radar" class="pl-subnav-link">Radar curricular</a>{% endif %}
             {% if heatmap_docente and heatmap_docente.filas %}<a href="#heatmap-docente-section" class="pl-subnav-link">Carga docente</a>{% endif %}
             {% if contraste and contraste.disponible %}<a href="#seccion-contraste" class="pl-subnav-link">Contraste con el programa</a>{% endif %}
-            {% if diagnostico %}<a href="#seccion-diagnostico" class="pl-subnav-link">Diagnóstico</a>{% endif %}
         </div>
     </details>
     <div class="pl-subnav-tools" role="group" aria-label="Mostrar u ocultar el detalle de las secciones">

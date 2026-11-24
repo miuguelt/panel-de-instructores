@@ -12401,3 +12401,17 @@ p.text-center {
 .acciones-mas-popover { width: min(16rem, calc(100vw - 24px)); padding: 8px; }
 .acciones-mas-popover:popover-open { display: flex; flex-direction: column; gap: 2px; }
 .acciones-mas-popover form { margin: 0; }
+
+/* Panel de fases: botón de RAPs vencidos y fase sin RAPs asignados. */
+.fases-btn-vencidos {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
+.fase-step-sin-raps {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}

@@ -133,8 +133,27 @@ class DashboardRenderTestCase(unittest.TestCase):
     def test_indicadores_visuales_del_grupo(self):
         card = self.tarjeta(self.render()[0])
         self.assertIn('aria-label="Asistencia: 93.5%"', card)
-        self.assertIn('Estado de los aprendices: En formación 23, Cancelados 4', card)
-        self.assertIn('Formación integral: Reconocimientos 3, Llamados de atención 1', card)
+        # El estado de los aprendices vive en Aprendices; aquí solo «N aprendices activos».
+        self.assertNotIn('Estado de los aprendices', card)
+        self.assertEqual(card.count('aprendices activos'), 1)
+        self.assertIn('Observador: Notas positivas 3, Notas negativas 1', card)
+
+    def test_la_tarjeta_no_repite_fases_ni_competencias(self):
+        extra = dict(EXTRA, top_competencias=[('Inglés técnico', {'aprobados': 2, 'total': 10})])
+        card = self.tarjeta(self.render(extra=extra)[0])
+        self.assertEqual(card.count('Retraso de 2 fases'), 1)
+        self.assertNotIn('ficha-fases-tracker', card)
+        self.assertNotIn('Competencias con menor aprobación', card)
+        self.assertNotIn('Aprendices con todos los RAPs aprobados', card)
+        self.assertIn('Ver fases y competencias en la Visión general', card)
+
+    def test_tarjeta_y_lista_compacta_ofrecen_los_mismos_accesos(self):
+        html, _ = self.render()
+        tarjeta = re.search(r'id="ficha-acciones-1"[\s\S]*?</div>', html).group(0)
+        compacta = re.search(r'id="compact-acciones-1"[\s\S]*?</div>', html).group(0)
+        etiquetas = lambda bloque: re.findall(r'<span>([^<]+)</span>', bloque)
+        self.assertEqual(etiquetas(tarjeta), etiquetas(compacta))
+        self.assertIn('Aprendices', etiquetas(compacta))
 
     def test_sin_datos_no_inventa_porcentajes_ni_fases(self):
         extra = dict(EXTRA, pct_asistencia=None, pct_entregas=None, sesiones=0, tareas_totales=0)
@@ -155,6 +174,8 @@ class DashboardRenderTestCase(unittest.TestCase):
         self.assertIn('Entregas por calificar', hoy)
         self.assertIn('>4<', hoy)
         self.assertIn('2 de 3 fichas con pendientes', hoy)
+        # Las fichas activas ya se cuentan en el título: no se repiten como indicador.
+        self.assertNotIn('Fichas activas', hoy)
 
     def test_un_solo_enlace_principal_a_la_ficha(self):
         html, urls = self.render()
@@ -166,9 +187,12 @@ class DashboardRenderTestCase(unittest.TestCase):
     def test_ficha_finalizada_va_a_archivadas(self):
         crono = cronograma_lectiva(fase='finalizada', fase_label='Finalizada', ficha_cerrada=True)
         html, _ = self.render(cronograma=crono)
-        archivadas = html[html.index('class="fichas-archivadas"'):]
+        archivadas = html[html.index('class="fichas-archivadas"'):html.index('dashboard-compact-view')]
         self.assertIn('Ficha 3235642', archivadas)
         self.assertNotIn('class="ficha-today"', archivadas)
+        # La lista compacta muestra solo las activas, igual que las tarjetas.
+        compacta = html[html.index('dashboard-compact-table'):html.index('</table>')]
+        self.assertNotIn('compact-ficha-row', compacta)
 
 
 if __name__ == '__main__':

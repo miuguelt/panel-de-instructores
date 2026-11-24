@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Comité - SENA Control{% endblock %}
+{% block title %}Fichas por certificar - SENA Control{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/instructor_comunes.css') }}">
 {% endblock %}
@@ -7,28 +7,25 @@
 {% block content %}
 <div class="page-header">
     <div class="page-title-cluster">
-        <h1><i data-lucide="users" class="icon-lg" aria-hidden="true"></i> Comité</h1>
-        <p class="text-muted">Fichas terminadas y remisiones a comité.</p>
+        <h1><i data-lucide="award" class="icon-lg" aria-hidden="true"></i> Fichas por certificar</h1>
+        <p class="text-muted">Aprendices de fichas cerradas que siguen sin certificar.</p>
     </div>
     <div class="page-header-actions">
-        <a href="{{ url_for('comite.normativa') }}" class="btn btn-outline">Normativa SENA</a>
-        <a href="{{ url_for('comite.reporte_coordinacion') }}" class="btn btn-outline">Reporte para coordinación (Excel)</a>
         {% if total %}<a href="{{ url_for('comite.fichas_terminadas', formato='csv') }}" class="btn btn-primary">Descargar CSV para el acta</a>{% endif %}
+        <a href="{{ url_for('comite.reporte_coordinacion') }}" class="btn btn-outline">Reporte para coordinación (Excel)</a>
+        <a href="{{ url_for('comite.normativa') }}" class="btn btn-ghost">Normativa SENA</a>
     </div>
 </div>
 
 <div class="card reglamento-card">
     <p class="devbrain-prose">
-        Según el Acuerdo 009 de 2024, Art. 30, numeral 2 (página 31), el plazo límite para la etapa
-        productiva es la finalización por fecha del grupo. Esta vista lista, al {{ hoy.strftime('%d/%m/%Y') }},
-        a los aprendices de fichas ya cerradas que siguen en formación, inducción, condicionados o aplazados.
-        Pasado un año sin certificación procede la cancelación por vía administrativa
-        (Art. 47, numeral 2, parágrafo 1, página 39).
+        Corte al {{ hoy.strftime('%d/%m/%Y') }}. La etapa productiva vence con la fecha de cierre del grupo
+        (Acuerdo 009 de 2024, Art. 30, num. 2); pasado un año sin certificar procede la cancelación
+        administrativa (Art. 47, num. 2, par. 1).
     </p>
     <p class="devbrain-prose text-muted">
-        El sistema recomienda; la decisión es del comité. Antes de remitir, confirme en el aplicativo de
-        gestión académica que no exista una etapa productiva, novedad o certificación sin reflejar en el
-        reporte importado.
+        El sistema recomienda y el comité decide. Antes de remitir, confirme en SOFIA Plus que no haya una
+        etapa productiva, novedad o certificación sin reflejar en el reporte.
     </p>
 </div>
 

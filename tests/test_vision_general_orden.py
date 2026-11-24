@@ -113,10 +113,35 @@ class VisionGeneralOrdenTestCase(unittest.TestCase):
         self.assertIn(f'/instructor/fichas/{ficha.id}/asistencia', nav)
         self.assertIn(f'/instructor/fichas/{ficha.id}/alertas', nav)
 
-    def test_volver_lleva_a_inicio_con_la_etiqueta_del_menu(self):
+    def test_volver_lleva_a_mis_fichas_con_la_etiqueta_del_menu(self):
         ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
         html = self.pagina(ficha)
-        self.assertRegex(html, r'<a href="/instructor/"[^>]*class="btn-back"[^>]*>&larr; Inicio</a>')
+        self.assertRegex(html, r'<a href="/instructor/"[^>]*class="btn-back"[^>]*>&larr; Mis fichas</a>')
+
+    def test_cada_dato_de_fases_y_tiempo_aparece_una_vez(self):
+        ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))
+        html = self.pagina(ficha)
+        contenido = re.sub(r'<dialog id="modal-raps-vencidos".*?</dialog>', '', html[html.index('<main'):], flags=re.S)
+        self.assertEqual(contenido.count('Fase esperada:'), 1)
+        self.assertNotIn('fases-comparison-summary', contenido)
+        self.assertNotIn('días lectivos', contenido)
+        self.assertNotIn('Estado de los aprendices', contenido)
+        self.assertLessEqual(contenido.count('GFPI-F-134'), 1)
+
+    def test_el_panel_de_fases_no_inventa_porcentajes_sin_raps(self):
+        ficha = self.crear_ficha()
+        fases_data = {
+            'disponible': True, 'planeacion_sincronizada': True, 'desfase_fases': 0,
+            'fase_esperada': {'nombre': 'ANÁLISIS', 'icono': '', 'orden': 1},
+            'fase_real': {'nombre': 'ANÁLISIS', 'icono': '', 'orden': 1, 'resultados_total': 4},
+            'fases': [{'nombre': 'ANÁLISIS', 'orden': 1, 'resultados_total': 0, 'estado_tiempo': 'futura'}],
+            'resumen_raps': {'total': 0}, 'mensaje_veredicto': 'Sin RAPs.',
+        }
+        with self.app.test_request_context():
+            html = render_template('instructor/_ficha_fases_tracker.html', fases_data=fases_data, ficha=ficha)
+        self.assertIn('Sin RAPs asignados', html)
+        self.assertNotIn('0/0', html)
+        self.assertNotIn('(0%)', html)
 
     def test_no_repite_la_rejilla_de_modulos_del_menu(self):
         ficha = self.crear_ficha(date(2026, 1, 1), date(2027, 12, 31))

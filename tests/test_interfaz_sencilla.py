@@ -119,5 +119,24 @@ class EntregasSinRepetirTest(unittest.TestCase):
         self.assertEqual(html.count('stats.a_tiempo }}'), 0)
 
 
+class PlaneacionOrdenadaTest(unittest.TestCase):
+    def test_cabecera_sin_modulos_de_la_barra_y_una_sola_accion_principal(self):
+        cabecera = leer('instructor/_planeacion_cabecera.html')
+        self.assertNotIn("url_for('instructor.juicios'", cabecera)
+        self.assertNotIn("url_for('instructor.estadisticas'", cabecera)
+        self.assertEqual(cabecera.count('btn btn-primary'), 1, 'Solo «Cargar archivos» cuando aún no hay análisis.')
+
+    def test_el_diagnostico_de_datos_va_antes_del_estado(self):
+        pagina = leer('instructor/planeacion.html')
+        self.assertLess(pagina.index('_planeacion_diagnostico.html'), pagina.index('_planeacion_estado.html'))
+        self.assertNotIn('seccion-diagnostico', leer('instructor/_planeacion_detalle.html'))
+
+    def test_el_ritmo_se_mide_una_vez_y_la_curva_s_arranca_plegada(self):
+        panorama = leer('instructor/_planeacion_panorama.html')
+        self.assertNotIn('Ritmo de evaluación', panorama)
+        self.assertIn('id="seccion-curva-s" data-collapse-default="cerrado"', panorama)
+        self.assertNotIn('Planeación v{{', leer('instructor/_planeacion_carga_unificada.html'))
+
+
 if __name__ == '__main__':
     unittest.main()

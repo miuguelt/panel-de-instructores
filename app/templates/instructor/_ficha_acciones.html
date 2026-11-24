@@ -1,0 +1,13 @@
+{#- Accesos de una ficha en «Mis fichas»: los mismos en la tarjeta y en la lista compacta. -#}
+{% from "components/_ui.html" import acciones %}
+{% macro acciones_ficha(id, ficha) -%}
+{{ acciones(id,
+    principal={'label': 'Abrir ficha', 'icon': 'layout-dashboard', 'url': url_for('instructor.vision_general', ficha_id=ficha.id)},
+    secundarias=[
+        {'label': 'Llamado a lista', 'icon': 'clipboard-check', 'url': url_for('instructor.asistencia', ficha_id=ficha.id)},
+        {'label': 'Tareas', 'icon': 'file-check', 'url': url_for('instructor.tareas', ficha_id=ficha.id)},
+        {'label': 'Juicios', 'icon': 'graduation-cap', 'url': url_for('instructor.juicios', ficha_id=ficha.id)},
+        {'label': 'Planeación', 'icon': 'compass', 'url': url_for('planeacion.analisis', ficha_id=ficha.id)},
+        {'label': 'Aprendices', 'icon': 'users', 'url': url_for('instructor.aprendices', ficha_id=ficha.id)},
+    ]) }}
+{%- endmacro %}
