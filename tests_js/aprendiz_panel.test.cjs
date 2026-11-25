@@ -452,3 +452,12 @@ test('sin modal ni formulario el portafolio no falla', () => {
     panel.initPanelAprendiz(doc, ventana());
     assert.doesNotThrow(() => { abrir.disparar('click'); cerrar.disparar('click'); });
 });
+
+test('un clic en un enlace interno del documento abre la pestaña de su destino', async () => {
+    const p = panelCompleto();
+    p.pendiente.setAttribute('id', 'evidencia-objetivo');
+    p.pendiente.closest = sel => (sel === '.learner-tab-pane' ? p.panes.evidencias : null);
+    const enlace = new Elemento('a', { href: '#evidencia-objetivo' });
+    await p.doc.disparar('click', { target: { closest: sel => (sel === 'a[href^="#"]' ? enlace : null) } });
+    assert.equal(typeof p.api.activarPestana, 'function');
+});
